@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { TimeEntry, CATEGORY_LABELS, TimeCategory } from '@/lib/types'
+import TimeEntryModal from './TimeEntryModal'
 
 interface TimeEntriesListProps {
   entries: TimeEntry[]
@@ -30,20 +30,8 @@ function formatDuration(minutes: number): string {
 }
 
 export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: TimeEntriesListProps) {
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null)
   const totalMinutes = entries.reduce((sum, entry) => sum + entry.duration_minutes, 0)
-
-  const handleDelete = async (entry: TimeEntry) => {
-    if (!confirm(`Delete "${entry.activity}"?`)) return
-
-    setDeletingId(entry.id)
-    const { error } = await supabase.from('time_entries').delete().eq('id', entry.id)
-    setDeletingId(null)
-
-    if (!error) {
-      onEntryDeleted()
-    }
-  }
 
   if (isLoading) {
     return (
@@ -73,7 +61,8 @@ export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: 
         {entries.map((entry) => (
           <li
             key={entry.id}
-            className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800"
+            onClick={() => setSelectedEntry(entry)}
+            className="cursor-pointer rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-blue-600 dark:hover:bg-blue-900/10"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -86,37 +75,38 @@ export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: 
                   </span>
                 </div>
                 {entry.description && (
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-1 truncate text-sm text-zinc-500 dark:text-zinc-400">
                     {entry.description}
                   </p>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-3">
+              <div className="flex shrink-0 items-center gap-2">
                 <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
                   {formatDuration(entry.duration_minutes)}
                 </span>
-                <button
-                  onClick={() => handleDelete(entry)}
-                  disabled={deletingId === entry.id}
-                  className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-zinc-700 dark:hover:text-red-400"
-                  title="Delete entry"
-                >
-                  {deletingId === entry.id ? (
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  )}
-                </button>
+                <svg className="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </div>
             </div>
           </li>
         ))}
       </ul>
+
+      {selectedEntry && (
+        <TimeEntryModal
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          onUpdate={() => {
+            setSelectedEntry(null)
+            onEntryDeleted()
+          }}
+          onDelete={() => {
+            setSelectedEntry(null)
+            onEntryDeleted()
+          }}
+        />
+      )}
     </div>
   )
 }

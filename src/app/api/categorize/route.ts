@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { CATEGORIES, TimeCategory } from '@/lib/types'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
 export async function POST(request: NextRequest) {
   try {
     const { activity } = await request.json()
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
 
     if (!activity || typeof activity !== 'string') {
       return NextResponse.json({ error: 'Activity is required' }, { status: 400 })

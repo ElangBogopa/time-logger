@@ -16,7 +16,10 @@ export interface TimeEntry {
   activity: string
   category: TimeCategory
   duration_minutes: number
+  start_time: string | null
+  end_time: string | null
   description: string | null
+  commentary: string | null
   created_at: string
 }
 
