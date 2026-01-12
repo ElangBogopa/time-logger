@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getLocalDateString } from '@/lib/types'
-import Toast from './Toast'
+import TimeRangePicker from './TimeRangePicker'
 
 interface TimeEntryFormProps {
   onEntryAdded: () => void
+  onShowToast: (message: string) => void
+  userId: string
 }
 
-export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
+export default function TimeEntryForm({ onEntryAdded, onShowToast, userId }: TimeEntryFormProps) {
   const [date, setDate] = useState(getLocalDateString())
   const [activity, setActivity] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -18,31 +20,6 @@ export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
   const [description, setDescription] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string } | null>(null)
-
-  // Auto-calculate duration when start and end times are both filled
-  const isDurationAutoCalculated = startTime !== '' && endTime !== ''
-
-  useEffect(() => {
-    if (startTime && endTime) {
-      const [startHours, startMinutes] = startTime.split(':').map(Number)
-      const [endHours, endMinutes] = endTime.split(':').map(Number)
-
-      const startTotalMinutes = startHours * 60 + startMinutes
-      const endTotalMinutes = endHours * 60 + endMinutes
-
-      let durationMinutes = endTotalMinutes - startTotalMinutes
-
-      // Handle case where end time is past midnight (next day)
-      if (durationMinutes < 0) {
-        durationMinutes += 24 * 60
-      }
-
-      if (durationMinutes > 0) {
-        setDuration(String(durationMinutes))
-      }
-    }
-  }, [startTime, endTime])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,7 +42,7 @@ export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
 
       // Save to Supabase and get the new entry
       const newEntry = {
-        user_id: 'default_user',
+        user_id: userId,
         date,
         activity,
         category,
@@ -90,7 +67,7 @@ export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
         .from('time_entries')
         .select('*')
         .eq('date', date)
-        .eq('user_id', 'default_user')
+        .eq('user_id', userId)
         .order('created_at', { ascending: true })
 
       // Generate commentary
@@ -128,9 +105,7 @@ export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
       setDescription('')
 
       // Show success toast with commentary
-      setToast({
-        message: generatedCommentary || 'Your time has been logged successfully.',
-      })
+      onShowToast(generatedCommentary || 'Your time has been logged successfully.')
 
       onEntryAdded()
     } catch (err) {
@@ -157,57 +132,17 @@ export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
           />
         </div>
 
-        <div>
-          <label htmlFor="startTime" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Start Time <span className="text-zinc-400">(optional)</span>
-          </label>
-          <input
-            type="time"
-            id="startTime"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="endTime" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            End Time <span className="text-zinc-400">(optional)</span>
-          </label>
-          <input
-            type="time"
-            id="endTime"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-          />
-        </div>
-
         <div className="sm:col-span-2">
-          <label htmlFor="duration" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Duration (minutes)
-            {isDurationAutoCalculated && (
-              <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">Auto-calculated</span>
-            )}
+          <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Time Range
           </label>
-          <input
-            type="number"
-            id="duration"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            min="1"
-            required
-            disabled={isDurationAutoCalculated}
-            placeholder={isDurationAutoCalculated ? '' : '30'}
-            className={`mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 ${
-              isDurationAutoCalculated ? 'bg-zinc-100 dark:bg-zinc-700 cursor-not-allowed' : ''
-            }`}
+          <TimeRangePicker
+            startTime={startTime}
+            endTime={endTime}
+            onStartTimeChange={setStartTime}
+            onEndTimeChange={setEndTime}
+            onDurationChange={(minutes) => setDuration(String(minutes))}
           />
-          {!isDurationAutoCalculated && (
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Or enter start &amp; end times above to auto-calculate
-            </p>
-          )}
         </div>
 
         <div className="sm:col-span-2">
@@ -254,15 +189,6 @@ export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
       >
         {isSubmitting ? 'Categorizing & Saving...' : 'Add Entry'}
       </button>
-
-      {toast && (
-        <Toast
-          title="Entry added"
-          message={toast.message}
-          onClose={() => setToast(null)}
-          duration={6000}
-        />
-      )}
     </form>
   )
 }

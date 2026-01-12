@@ -88,13 +88,18 @@ function getWeekStart(): string {
   return getLocalDateString(startOfWeek)
 }
 
-export default function StatsCard() {
+interface StatsCardProps {
+  userId: string
+}
+
+export default function StatsCard({ userId }: StatsCardProps) {
   const [streaks, setStreaks] = useState<Streaks>({ deepWork: 0, exercise: 0, noDistraction: 0 })
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>({ deepWorkMinutes: 0, exerciseMinutes: 0 })
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (!userId) return
       setIsLoading(true)
 
       // Fetch entries from the last 60 days for streak calculation
@@ -104,7 +109,7 @@ export default function StatsCard() {
       const { data: entries } = await supabase
         .from('time_entries')
         .select('*')
-        .eq('user_id', 'default_user')
+        .eq('user_id', userId)
         .gte('date', sixtyDaysAgo)
         .lte('date', today)
 
@@ -138,7 +143,7 @@ export default function StatsCard() {
     }
 
     fetchStats()
-  }, [])
+  }, [userId])
 
   if (isLoading) {
     return (

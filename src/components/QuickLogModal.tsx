@@ -1,15 +1,20 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getLocalDateString } from '@/lib/types'
-import Toast from './Toast'
+import { getLocalDateString, TimeEntry } from '@/lib/types'
+import TimeRangePicker from './TimeRangePicker'
+import { CalendarEvent } from './TimelineView'
 
 interface QuickLogModalProps {
   isOpen: boolean
   onClose: () => void
   onEntryAdded: () => void
   lastEntryEndTime: string | null
+  onShowToast: (message: string) => void
+  userId: string
+  calendarEvents?: CalendarEvent[]
+  entries?: TimeEntry[]
 }
 
 function getCurrentTime(): string {
@@ -33,23 +38,70 @@ function calculateDuration(start: string, end: string): number {
   return endTotal - startTotal
 }
 
-function formatDuration(minutes: number): string {
-  if (minutes <= 0) return ''
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number)
+  return hours * 60 + minutes
 }
 
-export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime }: QuickLogModalProps) {
+function formatTimeDisplay(time: string): string {
+  if (!time) return ''
+  const [hours, minutes] = time.split(':').map(Number)
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const hour12 = hours % 12 || 12
+  return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
+}
+
+export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, onShowToast, userId, calendarEvents = [], entries = [] }: QuickLogModalProps) {
   const [activity, setActivity] = useState('')
   const [notes, setNotes] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string } | null>(null)
+  const [dismissedSuggestion, setDismissedSuggestion] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Find the most recent unconfirmed calendar event that has ended
+  const suggestedEvent = useMemo(() => {
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+
+    // Filter to events that have ended and aren't already logged
+    const endedUnconfirmed = calendarEvents.filter(event => {
+      // Check if event has ended
+      const eventEndMinutes = timeToMinutes(event.endTime)
+      if (eventEndMinutes > currentMinutes) return false
+
+      // Check if this event is dismissed
+      if (dismissedSuggestion === event.id) return false
+
+      // Check if there's already a logged entry that overlaps significantly
+      const hasMatchingEntry = entries.some(entry => {
+        if (!entry.start_time || !entry.end_time) return false
+        const entryStart = timeToMinutes(entry.start_time)
+        const entryEnd = timeToMinutes(entry.end_time)
+        const eventStart = timeToMinutes(event.startTime)
+        const eventEnd = timeToMinutes(event.endTime)
+
+        // Check for significant overlap (>50%)
+        const overlapStart = Math.max(entryStart, eventStart)
+        const overlapEnd = Math.min(entryEnd, eventEnd)
+        const overlapDuration = Math.max(0, overlapEnd - overlapStart)
+        const eventDuration = eventEnd - eventStart
+        return eventDuration > 0 && overlapDuration / eventDuration > 0.5
+      })
+
+      return !hasMatchingEntry
+    })
+
+    // Return the most recent one (latest end time)
+    if (endedUnconfirmed.length === 0) return null
+    return endedUnconfirmed.reduce((latest, event) => {
+      const latestEnd = timeToMinutes(latest.endTime)
+      const eventEnd = timeToMinutes(event.endTime)
+      return eventEnd > latestEnd ? event : latest
+    })
+  }, [calendarEvents, entries, dismissedSuggestion])
 
   // Reset and auto-fill when modal opens
   useEffect(() => {
@@ -59,10 +111,20 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setEndTime(getCurrentTime())
       setStartTime(lastEntryEndTime || '')
       setError(null)
+      setDismissedSuggestion(null)
       // Focus the activity input after a brief delay
       setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [isOpen, lastEntryEndTime])
+
+  const handleSuggestionClick = () => {
+    if (suggestedEvent) {
+      setActivity(suggestedEvent.title)
+      setStartTime(suggestedEvent.startTime)
+      setEndTime(suggestedEvent.endTime)
+      setNotes('')
+    }
+  }
 
   const duration = calculateDuration(startTime, endTime)
 
@@ -100,7 +162,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
       // Save to Supabase
       const newEntry = {
-        user_id: 'default_user',
+        user_id: userId,
         date: today,
         activity,
         category,
@@ -127,7 +189,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           .from('time_entries')
           .select('*')
           .eq('date', today)
-          .eq('user_id', 'default_user')
+          .eq('user_id', userId)
           .order('created_at', { ascending: true })
 
         const commentaryResponse = await fetch('/api/commentary', {
@@ -152,16 +214,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         console.error('Failed to generate commentary')
       }
 
-      setToast({
-        message: generatedCommentary || 'Logged! Keep up the momentum.',
-      })
-
       onEntryAdded()
 
-      // Close after brief delay to show success
-      setTimeout(() => {
-        onClose()
-      }, 300)
+      // Close modal and show toast
+      onClose()
+      onShowToast(generatedCommentary || 'Logged! Keep up the momentum.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -183,15 +240,15 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   if (!isOpen) return null
 
   return (
-    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={() => !isSubmitting && onClose()}
       />
 
       {/* Modal */}
-      <div className="fixed inset-x-4 top-24 z-50 mx-auto max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-700 dark:bg-zinc-800 sm:inset-x-auto">
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-700 dark:bg-zinc-800">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             <span className="text-xl">⚡</span> Quick Log
@@ -208,6 +265,33 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Calendar suggestion chip */}
+          {suggestedEvent && !activity && (
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 dark:bg-blue-900/20">
+              <button
+                type="button"
+                onClick={handleSuggestionClick}
+                className="flex flex-1 items-center gap-2 text-left text-sm text-blue-700 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200"
+              >
+                <span className="text-base">📅</span>
+                <span className="flex-1 truncate">
+                  <span className="font-medium">{suggestedEvent.title}</span>
+                  <span className="text-blue-600 dark:text-blue-400"> ended at {formatTimeDisplay(suggestedEvent.endTime)}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDismissedSuggestion(suggestedEvent.id)}
+                className="shrink-0 rounded p-0.5 text-blue-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-800 dark:hover:text-blue-300"
+                aria-label="Dismiss suggestion"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           {/* Activity - main input */}
           <div>
             <label htmlFor="quick-activity" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -224,42 +308,22 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             />
           </div>
 
-          {/* Time row */}
-          <div className="flex items-end gap-3">
-            <div className="flex-1">
-              <label htmlFor="quick-start" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Started
-                {lastEntryEndTime && (
-                  <span className="ml-1 text-xs text-zinc-400">(from last entry)</span>
-                )}
+          {/* Time Range Picker */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Time
               </label>
-              <input
-                type="time"
-                id="quick-start"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
-              />
+              {lastEntryEndTime && (
+                <span className="text-xs text-zinc-400">(start from last entry)</span>
+              )}
             </div>
-            <div className="flex-1">
-              <label htmlFor="quick-end" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Finished
-              </label>
-              <input
-                type="time"
-                id="quick-end"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
-              />
-            </div>
-            {duration > 0 && (
-              <div className="pb-2">
-                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                  {formatDuration(duration)}
-                </span>
-              </div>
-            )}
+            <TimeRangePicker
+              startTime={startTime}
+              endTime={endTime}
+              onStartTimeChange={setStartTime}
+              onEndTimeChange={setEndTime}
+            />
           </div>
 
           {/* Optional notes */}
@@ -300,15 +364,6 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           </button>
         </form>
       </div>
-
-      {toast && (
-        <Toast
-          title="Logged!"
-          message={toast.message}
-          onClose={() => setToast(null)}
-          duration={4000}
-        />
-      )}
-    </>
+    </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { TimeEntry, TimeCategory, CATEGORY_LABELS, CATEGORIES } from '@/lib/types'
+import { TimeEntry, TimeCategory, CATEGORY_LABELS } from '@/lib/types'
 
 interface TimeEntryModalProps {
   entry: TimeEntry
@@ -55,6 +55,7 @@ function formatDate(dateStr: string): string {
 export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, promptAddTimes = false }: TimeEntryModalProps) {
   const [isEditing, setIsEditing] = useState(promptAddTimes)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTimesPrompt, setShowTimesPrompt] = useState(promptAddTimes && !entry.start_time && !entry.end_time)
@@ -62,7 +63,6 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
   // Edit form state
   const [date, setDate] = useState(entry.date)
   const [activity, setActivity] = useState(entry.activity)
-  const [category, setCategory] = useState<TimeCategory>(entry.category)
   const [startTime, setStartTime] = useState(entry.start_time || '')
   const [endTime, setEndTime] = useState(entry.end_time || '')
   const [duration, setDuration] = useState(String(entry.duration_minutes))
@@ -108,7 +108,6 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       const updatedEntry = {
         date,
         activity,
-        category,
         duration_minutes: parseInt(duration, 10),
         start_time: startTime || null,
         end_time: endTime || null,
@@ -191,7 +190,6 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
     setIsEditing(false)
     setDate(entry.date)
     setActivity(entry.activity)
-    setCategory(entry.category)
     setStartTime(entry.start_time || '')
     setEndTime(entry.end_time || '')
     setDuration(String(entry.duration_minutes))
@@ -275,24 +273,6 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                   onChange={(e) => setActivity(e.target.value)}
                   className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
                 />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Category
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as TimeCategory)}
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {/* Start & End Time */}
@@ -438,28 +418,56 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
           {isEditing ? (
             <>
               <button
-                onClick={handleCancelEdit}
+                onClick={() => setShowDeleteConfirm(true)}
                 disabled={isSaving}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
               >
-                Cancel
+                Delete
               </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={isSaving}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </>
+          ) : showDeleteConfirm ? (
+            <div className="flex w-full items-center justify-between">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">Delete this entry?</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'Yes, delete'}
+                </button>
+              </div>
+            </div>
           ) : (
             <>
               <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
               >
-                {isDeleting ? 'Deleting...' : 'Delete'}
+                Delete
               </button>
               <button
                 onClick={() => setIsEditing(true)}

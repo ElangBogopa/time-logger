@@ -1,13 +1,23 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { TimeEntry, CATEGORY_LABELS, TimeCategory } from '@/lib/types'
+import { TimeEntry, TimeCategory } from '@/lib/types'
 import TimeEntryModal from './TimeEntryModal'
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  startTime: string
+  endTime: string
+  isAllDay: boolean
+}
 
 interface TimelineViewProps {
   entries: TimeEntry[]
+  calendarEvents?: CalendarEvent[]
   isLoading: boolean
   onEntryDeleted: () => void
+  onGhostEntryClick?: (event: CalendarEvent) => void
   selectedDate?: string
   isToday?: boolean
 }
@@ -165,11 +175,41 @@ function smartPlaceEntries(
   return placed
 }
 
-export default function TimelineView({ entries, isLoading, onEntryDeleted, isToday = true }: TimelineViewProps) {
+export default function TimelineView({
+  entries,
+  calendarEvents = [],
+  isLoading,
+  onEntryDeleted,
+  onGhostEntryClick,
+  isToday = true
+}: TimelineViewProps) {
   const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null)
   const [promptAddTimes, setPromptAddTimes] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const totalMinutes = entries.reduce((sum, entry) => sum + entry.duration_minutes, 0)
+
+  // Filter out calendar events that overlap with confirmed entries (already logged)
+  const ghostEvents = useMemo(() => {
+    return calendarEvents.filter(event => {
+      // Check if any entry has similar time range (within 15 minutes)
+      const eventStart = timeToMinutes(event.startTime)
+      const eventEnd = timeToMinutes(event.endTime)
+
+      return !entries.some(entry => {
+        if (!entry.start_time || !entry.end_time) return false
+        const entryStart = timeToMinutes(entry.start_time)
+        const entryEnd = timeToMinutes(entry.end_time)
+
+        // Check for significant overlap (more than 50%)
+        const overlapStart = Math.max(eventStart, entryStart)
+        const overlapEnd = Math.min(eventEnd, entryEnd)
+        const overlap = Math.max(0, overlapEnd - overlapStart)
+        const eventDuration = eventEnd - eventStart
+
+        return overlap > eventDuration * 0.5
+      })
+    })
+  }, [calendarEvents, entries])
 
   // Separate entries with times from those without
   const { timedEntries, untimedEntries } = useMemo(() => {
@@ -185,9 +225,9 @@ export default function TimelineView({ entries, isLoading, onEntryDeleted, isTod
     return { timedEntries: timed, untimedEntries: untimed }
   }, [entries])
 
-  // Calculate the time range for the timeline
+  // Calculate the time range for the timeline (including ghost events)
   const { startHour, endHour } = useMemo(() => {
-    if (timedEntries.length === 0 && untimedEntries.length === 0) {
+    if (timedEntries.length === 0 && untimedEntries.length === 0 && ghostEvents.length === 0) {
       return { startHour: 6, endHour: 22 } // Default 6am to 10pm
     }
 
@@ -205,8 +245,16 @@ export default function TimelineView({ entries, isLoading, onEntryDeleted, isTod
       }
     })
 
+    // Include ghost events in time range
+    ghostEvents.forEach(event => {
+      const startMins = timeToMinutes(event.startTime)
+      const endMins = timeToMinutes(event.endTime)
+      minMinutes = Math.min(minMinutes, startMins)
+      maxMinutes = Math.max(maxMinutes, endMins)
+    })
+
     // If only untimed entries, show a reasonable range
-    if (timedEntries.length === 0) {
+    if (timedEntries.length === 0 && ghostEvents.length === 0) {
       return { startHour: 6, endHour: 22 }
     }
 
@@ -215,7 +263,7 @@ export default function TimelineView({ entries, isLoading, onEntryDeleted, isTod
     const end = Math.min(24, Math.ceil(maxMinutes / 60) + 1)
 
     return { startHour: start, endHour: Math.max(end, start + 4) }
-  }, [timedEntries, untimedEntries])
+  }, [timedEntries, untimedEntries, ghostEvents])
 
   // Smart place all entries
   const placedEntries = useMemo(() => {
@@ -256,7 +304,7 @@ export default function TimelineView({ entries, isLoading, onEntryDeleted, isTod
     )
   }
 
-  if (entries.length === 0) {
+  if (entries.length === 0 && ghostEvents.length === 0) {
     return (
       <div className="py-12 text-center">
         <p className="text-zinc-500 dark:text-zinc-400">
@@ -369,6 +417,61 @@ export default function TimelineView({ entries, isLoading, onEntryDeleted, isTod
                 )
               })}
 
+              {/* Ghost entries (from calendar) */}
+              {ghostEvents.map((event) => {
+                const startMinutes = timeToMinutes(event.startTime)
+                const endMinutes = timeToMinutes(event.endTime)
+                const durationMinutes = endMinutes - startMinutes
+                const top = (startMinutes - startHour * 60) * PIXELS_PER_MINUTE
+                const height = Math.max(durationMinutes * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT)
+                const isShort = height < 50
+
+                // Check if event has ended (can be confirmed)
+                const now = new Date()
+                const currentMinutes = now.getHours() * 60 + now.getMinutes()
+                const hasEnded = !isToday || currentMinutes >= endMinutes
+
+                return (
+                  <div
+                    key={`ghost-${event.id}`}
+                    onClick={() => onGhostEntryClick?.(event)}
+                    className="absolute left-1 right-1 cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-blue-400/60 bg-blue-100/40 opacity-60 transition-all hover:border-blue-500 hover:opacity-80 dark:border-blue-500/40 dark:bg-blue-900/20 dark:hover:border-blue-400"
+                    style={{ top, height }}
+                  >
+                    <div className="flex h-full flex-col justify-center px-2 py-1 text-blue-700 dark:text-blue-300">
+                      {isShort ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1 truncate text-xs font-medium">
+                            <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {event.title}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="flex items-center gap-1.5 truncate text-sm font-medium">
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {event.title}
+                          </span>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs opacity-80">
+                            <span>{event.startTime} - {event.endTime}</span>
+                            <span>({formatDuration(durationMinutes)})</span>
+                          </div>
+                          {height > 70 && (
+                            <span className="mt-1 text-xs opacity-70">
+                              {hasEnded ? 'Tap to confirm' : 'Pending...'}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+
               {/* Current time indicator */}
               {isToday && <CurrentTimeIndicator startHour={startHour} endHour={endHour} />}
             </div>
@@ -384,25 +487,6 @@ export default function TimelineView({ entries, isLoading, onEntryDeleted, isTod
             </p>
           </div>
         )}
-      </div>
-
-      {/* Category legend */}
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(CATEGORY_LABELS).map(([key, label]) => {
-          const category = key as TimeCategory
-          const hasEntry = entries.some(e => e.category === category)
-          if (!hasEntry) return null
-
-          const colors = CATEGORY_COLORS[category]
-          return (
-            <div
-              key={key}
-              className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-xs ${colors.bg} ${colors.text}`}
-            >
-              {label}
-            </div>
-          )
-        })}
       </div>
 
       {selectedEntry && (

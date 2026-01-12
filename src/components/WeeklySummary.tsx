@@ -58,7 +58,11 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`
 }
 
-export default function WeeklySummary() {
+interface WeeklySummaryProps {
+  userId: string
+}
+
+export default function WeeklySummary({ userId }: WeeklySummaryProps) {
   const [stats, setStats] = useState<CategoryStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [totalMinutes, setTotalMinutes] = useState(0)
@@ -67,6 +71,7 @@ export default function WeeklySummary() {
 
   useEffect(() => {
     const fetchWeeklyData = async () => {
+      if (!userId) return
       setIsLoading(true)
 
       const currentWeek = getWeekDateRange(0)
@@ -78,7 +83,7 @@ export default function WeeklySummary() {
       const { data: currentEntries } = await supabase
         .from('time_entries')
         .select('*')
-        .eq('user_id', 'default_user')
+        .eq('user_id', userId)
         .gte('date', currentWeek.start)
         .lte('date', currentWeek.end)
 
@@ -86,7 +91,7 @@ export default function WeeklySummary() {
       const { data: previousEntries } = await supabase
         .from('time_entries')
         .select('*')
-        .eq('user_id', 'default_user')
+        .eq('user_id', userId)
         .gte('date', previousWeek.start)
         .lte('date', previousWeek.end)
 
@@ -121,7 +126,7 @@ export default function WeeklySummary() {
     }
 
     fetchWeeklyData()
-  }, [])
+  }, [userId])
 
   if (isLoading) {
     return (

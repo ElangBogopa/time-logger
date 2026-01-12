@@ -9,7 +9,7 @@ interface ToastProps {
   duration?: number
 }
 
-export default function Toast({ title, message, onClose, duration = 5000 }: ToastProps) {
+export default function Toast({ title, message, onClose, duration = 10000 }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
 
@@ -25,62 +25,90 @@ export default function Toast({ title, message, onClose, duration = 5000 }: Toas
     return () => clearTimeout(timer)
   }, [duration])
 
+  // Close on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose()
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [])
+
   const handleClose = () => {
     setIsLeaving(true)
-    setTimeout(onClose, 300) // Wait for exit animation
+    setTimeout(onClose, 400) // Wait for exit animation
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
       <div
-        className={`transform transition-all duration-300 ease-out ${
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-400 ${
+          isVisible && !isLeaving ? 'opacity-100' : 'opacity-0'
+        }`}
+        onClick={handleClose}
+      />
+
+      {/* Modal */}
+      <div
+        className={`relative transform transition-all duration-400 ease-out ${
           isVisible && !isLeaving
             ? 'translate-y-0 opacity-100 scale-100'
-            : 'translate-y-4 opacity-0 scale-95'
+            : 'translate-y-8 opacity-0 scale-90'
         }`}
       >
-        <div className="relative w-80 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-[1px] shadow-2xl shadow-emerald-500/25">
+        {/* Celebration particles */}
+        <div className="pointer-events-none absolute -inset-8 overflow-hidden">
+          <div className="absolute left-1/4 top-0 h-2 w-2 animate-bounce rounded-full bg-amber-400 opacity-80" style={{ animationDelay: '0ms', animationDuration: '1s' }} />
+          <div className="absolute right-1/4 top-2 h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400 opacity-80" style={{ animationDelay: '150ms', animationDuration: '1.2s' }} />
+          <div className="absolute left-1/3 top-4 h-1 w-1 animate-bounce rounded-full bg-blue-400 opacity-80" style={{ animationDelay: '300ms', animationDuration: '0.9s' }} />
+          <div className="absolute right-1/3 top-1 h-2 w-2 animate-bounce rounded-full bg-pink-400 opacity-80" style={{ animationDelay: '200ms', animationDuration: '1.1s' }} />
+        </div>
+
+        <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 p-[2px] shadow-2xl shadow-emerald-500/30">
           {/* Shimmer effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-[shimmer_2s_ease-in-out_infinite]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_ease-in-out_infinite]" />
 
-          <div className="relative rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-800 p-4">
-            {/* Success icon and title */}
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg shadow-emerald-500/30">
-                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-white">{title}</h3>
-                  <button
-                    onClick={handleClose}
-                    className="ml-2 rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-200"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+          <div className="relative rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 p-6">
+            {/* Success icon */}
+            <div className="mb-4 flex justify-center">
+              <div className="relative">
+                <div className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg shadow-emerald-500/40">
+                  <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
                 </div>
-
-                {/* Commentary message */}
-                <p className="mt-2 text-sm leading-relaxed text-zinc-300">
-                  {message}
-                </p>
               </div>
             </div>
 
+            {/* Title */}
+            <h3 className="mb-3 text-center text-xl font-bold text-white">{title}</h3>
+
+            {/* Commentary message */}
+            <div className="rounded-xl bg-zinc-800/50 p-4">
+              <p className="text-center text-sm leading-relaxed text-zinc-300">
+                "{message}"
+              </p>
+            </div>
+
             {/* Progress bar */}
-            <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-zinc-700">
+            <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-700/50">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400"
+                className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400"
                 style={{
                   animation: `shrink ${duration}ms linear forwards`,
                 }}
               />
             </div>
+
+            {/* Dismiss button */}
+            <button
+              onClick={handleClose}
+              className="mt-4 w-full rounded-xl bg-zinc-800 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700 hover:text-white"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       </div>

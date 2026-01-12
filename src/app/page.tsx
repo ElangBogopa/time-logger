@@ -1,13 +1,17 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useSession, signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { TimeEntry, getLocalDateString } from '@/lib/types'
 import TimeEntryForm from '@/components/TimeEntryForm'
-import TimelineView from '@/components/TimelineView'
+import TimelineView, { CalendarEvent } from '@/components/TimelineView'
 import WeeklySummary from '@/components/WeeklySummary'
 import StatsCard from '@/components/StatsCard'
 import QuickLogModal from '@/components/QuickLogModal'
+import Toast from '@/components/Toast'
+import GhostEntryModal from '@/components/GhostEntryModal'
 
 type View = 'day' | 'weekly'
 
@@ -38,6 +42,8 @@ function getAdjacentDate(dateStr: string, direction: 'prev' | 'next'): string {
 }
 
 export default function Home() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(getLocalDateString())
@@ -45,12 +51,25 @@ export default function Home() {
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [isFormExpanded, setIsFormExpanded] = useState(false)
   const [isNavOpen, setIsNavOpen] = useState(false)
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
+  const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
+  const [toast, setToast] = useState<{ message: string } | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
+
+  // Get user ID from session
+  const userId = session?.user?.id || session?.user?.email || ''
 
   const today = getLocalDateString()
   const isToday = selectedDate === today
   const canGoNext = selectedDate < today
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
 
   // Get the last entry's end time for Quick Log auto-fill
   const lastEntryEndTime = entries.length > 0
@@ -62,25 +81,46 @@ export default function Home() {
     : null
 
   const fetchEntries = useCallback(async () => {
+    if (!userId) return
     setIsLoading(true)
     const { data, error } = await supabase
       .from('time_entries')
       .select('*')
       .eq('date', selectedDate)
-      .eq('user_id', 'default_user')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
     if (!error && data) {
       setEntries(data as TimeEntry[])
     }
     setIsLoading(false)
-  }, [selectedDate])
+  }, [selectedDate, userId])
+
+  // Fetch calendar events for the selected date
+  const fetchCalendarEvents = useCallback(async () => {
+    if (!session?.accessToken) return
+
+    try {
+      const response = await fetch(`/api/calendar/events?date=${selectedDate}`)
+      if (response.ok) {
+        const data = await response.json()
+        // Filter out all-day events and events without times
+        const timedEvents = (data.events || []).filter(
+          (e: CalendarEvent) => !e.isAllDay && e.startTime && e.endTime
+        )
+        setCalendarEvents(timedEvents)
+      }
+    } catch (err) {
+      console.error('Failed to fetch calendar events:', err)
+    }
+  }, [selectedDate, session?.accessToken])
 
   useEffect(() => {
     if (view === 'day') {
       fetchEntries()
+      fetchCalendarEvents()
     }
-  }, [fetchEntries, view])
+  }, [fetchEntries, fetchCalendarEvents, view])
 
   // Close nav dropdown when clicking outside
   useEffect(() => {
@@ -102,6 +142,24 @@ export default function Home() {
   const handleRefresh = () => {
     fetchEntries()
     setIsFormExpanded(false)
+  }
+
+  const showToast = (message: string) => {
+    setToast({ message })
+  }
+
+  // Show loading state while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-900">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      </div>
+    )
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (status === 'unauthenticated') {
+    return null
   }
 
   return (
@@ -160,6 +218,16 @@ export default function Home() {
                       onChange={(e) => handleDateChange(e.target.value)}
                       className="sr-only"
                     />
+                    <hr className="my-1 border-zinc-200 dark:border-zinc-700" />
+                    <div className="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      {session?.user?.email}
+                    </div>
+                    <button
+                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                    >
+                      <span>🚪</span> Sign out
+                    </button>
                   </div>
                 )}
               </div>
@@ -223,7 +291,7 @@ export default function Home() {
             </div>
 
             {/* Stats Card - only show for today */}
-            {isToday && <StatsCard />}
+            {isToday && <StatsCard userId={userId} />}
 
             {/* Add Entry - Collapsible */}
             {isToday && (
@@ -243,7 +311,7 @@ export default function Home() {
                         </svg>
                       </button>
                     </div>
-                    <TimeEntryForm onEntryAdded={handleRefresh} />
+                    <TimeEntryForm onEntryAdded={handleRefresh} onShowToast={showToast} userId={userId} />
                   </section>
                 ) : (
                   <button
@@ -263,8 +331,10 @@ export default function Home() {
             <section>
               <TimelineView
                 entries={entries}
+                calendarEvents={calendarEvents}
                 isLoading={isLoading}
                 onEntryDeleted={fetchEntries}
+                onGhostEntryClick={setSelectedGhostEvent}
                 selectedDate={selectedDate}
                 isToday={isToday}
               />
@@ -282,7 +352,7 @@ export default function Home() {
                 ← Back to today
               </button>
             </div>
-            <WeeklySummary />
+            <WeeklySummary userId={userId} />
           </section>
         )}
       </div>
@@ -292,7 +362,32 @@ export default function Home() {
         onClose={() => setIsQuickLogOpen(false)}
         onEntryAdded={fetchEntries}
         lastEntryEndTime={lastEntryEndTime}
+        onShowToast={showToast}
+        userId={userId}
+        calendarEvents={calendarEvents}
+        entries={entries}
       />
+
+      <GhostEntryModal
+        event={selectedGhostEvent}
+        onClose={() => setSelectedGhostEvent(null)}
+        onConfirm={() => {
+          setSelectedGhostEvent(null)
+          fetchEntries()
+          fetchCalendarEvents()
+        }}
+        onShowToast={showToast}
+        userId={userId}
+        selectedDate={selectedDate}
+      />
+
+      {toast && (
+        <Toast
+          title="Entry added"
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   )
 }
