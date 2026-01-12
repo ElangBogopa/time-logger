@@ -109,7 +109,9 @@ export default function Home() {
     if (!session?.accessToken) return
 
     try {
-      const response = await fetch(`/api/calendar/events?date=${selectedDate}`)
+      // Get user's timezone from browser
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const response = await fetch(`/api/calendar/events?date=${selectedDate}&timezone=${encodeURIComponent(timezone)}`)
       if (response.ok) {
         const data = await response.json()
         // Filter out all-day events and events without times

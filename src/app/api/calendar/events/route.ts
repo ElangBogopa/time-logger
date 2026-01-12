@@ -8,15 +8,89 @@ interface CalendarEvent {
   start: {
     dateTime?: string
     date?: string
+    timeZone?: string
   }
   end: {
     dateTime?: string
     date?: string
+    timeZone?: string
   }
 }
 
 interface GoogleCalendarResponse {
   items: CalendarEvent[]
+}
+
+// Format a date to HH:MM in the specified timezone
+function formatTimeInTimezone(isoString: string, timezone: string): string {
+  try {
+    const date = new Date(isoString)
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    const parts = formatter.formatToParts(date)
+    const hour = parts.find(p => p.type === 'hour')?.value || '00'
+    const minute = parts.find(p => p.type === 'minute')?.value || '00'
+    return `${hour}:${minute}`
+  } catch {
+    // Fallback if timezone is invalid
+    const date = new Date(isoString)
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+}
+
+// Get ISO timestamp for start/end of day in a specific timezone
+function getTimestampForTimezone(dateStr: string, time: 'start' | 'end', timezone: string): string {
+  // Parse the date string (YYYY-MM-DD)
+  const [year, month, day] = dateStr.split('-').map(Number)
+
+  // Create a date object for the given date at midnight or end of day
+  // We need to find what UTC time corresponds to midnight in the target timezone
+
+  // Use a reference date to calculate the offset
+  const hour = time === 'start' ? 0 : 23
+  const minute = time === 'start' ? 0 : 59
+  const second = time === 'start' ? 0 : 59
+
+  // Create formatter to get the offset
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'shortOffset',
+  })
+
+  // Start with a rough estimate - create a date at the target local time
+  // assuming UTC, then we'll adjust
+  const roughDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
+
+  // Get what date/time this is in the target timezone
+  const parts = formatter.formatToParts(roughDate)
+  const tzHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10)
+  const tzDay = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10)
+
+  // Calculate the offset in hours (rough approximation)
+  // The difference tells us how far off we are
+  let hourDiff = tzHour - hour
+  const dayDiff = tzDay - day
+
+  // Adjust for day boundary crossing
+  if (dayDiff !== 0) {
+    hourDiff += dayDiff * 24
+  }
+
+  // Apply the correction
+  const correctedDate = new Date(roughDate.getTime() - hourDiff * 60 * 60 * 1000)
+
+  return correctedDate.toISOString()
 }
 
 export async function GET(request: NextRequest) {
@@ -30,23 +104,25 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get date from query params (default to today)
+    // Get date and timezone from query params
     const { searchParams } = new URL(request.url)
     const dateParam = searchParams.get('date')
+    const timezone = searchParams.get('timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone
 
-    // Create date range for the requested date
-    const targetDate = dateParam ? new Date(dateParam + 'T00:00:00') : new Date()
-    const startOfDay = new Date(targetDate)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(targetDate)
-    endOfDay.setHours(23, 59, 59, 999)
+    // Use the date parameter directly
+    const targetDate = dateParam || new Date().toISOString().split('T')[0]
 
-    // Fetch events from Google Calendar
+    // Calculate the UTC timestamps for the start and end of the day in the user's timezone
+    const timeMin = getTimestampForTimezone(targetDate, 'start', timezone)
+    const timeMax = getTimestampForTimezone(targetDate, 'end', timezone)
+
+    // Fetch events from Google Calendar with timezone parameter
     const calendarResponse = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
         new URLSearchParams({
-          timeMin: startOfDay.toISOString(),
-          timeMax: endOfDay.toISOString(),
+          timeMin,
+          timeMax,
+          timeZone: timezone,
           singleEvents: 'true',
           orderBy: 'startTime',
         }),
@@ -85,11 +161,9 @@ export async function GET(request: NextRequest) {
         let endTime = ''
 
         if (event.start.dateTime) {
-          // Timed event
-          const startDate = new Date(event.start.dateTime)
-          const endDate = new Date(event.end.dateTime || event.start.dateTime)
-          startTime = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`
-          endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
+          // Timed event - convert to user's timezone
+          startTime = formatTimeInTimezone(event.start.dateTime, timezone)
+          endTime = formatTimeInTimezone(event.end.dateTime || event.start.dateTime, timezone)
         }
 
         return {
