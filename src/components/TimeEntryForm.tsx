@@ -4,6 +4,10 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getLocalDateString } from '@/lib/types'
 import TimeRangePicker from './TimeRangePicker'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Loader2 } from 'lucide-react'
 
 interface TimeEntryFormProps {
   onEntryAdded: () => void
@@ -118,24 +122,19 @@ export default function TimeEntryForm({ onEntryAdded, onShowToast, userId }: Tim
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="date" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Date
-          </label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="date">Date</Label>
+          <Input
             type="date"
             id="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
 
-        <div className="sm:col-span-2">
-          <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Time Range
-          </label>
+        <div className="sm:col-span-2 space-y-2">
+          <Label>Time Range</Label>
           <TimeRangePicker
             startTime={startTime}
             endTime={endTime}
@@ -145,50 +144,51 @@ export default function TimeEntryForm({ onEntryAdded, onShowToast, userId }: Tim
           />
         </div>
 
-        <div className="sm:col-span-2">
-          <label htmlFor="activity" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Activity
-          </label>
-          <input
-            type="text"
+        <div className="sm:col-span-2 space-y-2">
+          <Label htmlFor="activity">Activity</Label>
+          <Input
             id="activity"
             value={activity}
             onChange={(e) => setActivity(e.target.value)}
             required
             placeholder="e.g., Writing code for auth feature, Team standup, Reading documentation..."
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           />
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="text-xs text-muted-foreground">
             Category will be auto-assigned based on your activity
           </p>
         </div>
 
-        <div className="sm:col-span-2">
-          <label htmlFor="description" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Notes <span className="text-zinc-400">(optional)</span>
-          </label>
-          <input
-            type="text"
+        <div className="sm:col-span-2 space-y-2">
+          <Label htmlFor="description">
+            Notes <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <Input
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Any additional details..."
-            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       )}
 
-      <button
+      <Button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-zinc-900"
+        className="w-full"
       >
-        {isSubmitting ? 'Categorizing & Saving...' : 'Add Entry'}
-      </button>
+        {isSubmitting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Categorizing & Saving...
+          </>
+        ) : (
+          'Add Entry'
+        )}
+      </Button>
     </form>
   )
 }

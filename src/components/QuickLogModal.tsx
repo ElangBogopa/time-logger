@@ -5,6 +5,16 @@ import { supabase } from '@/lib/supabase'
 import { getLocalDateString, TimeEntry } from '@/lib/types'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Loader2, X, Zap, Calendar } from 'lucide-react'
 
 interface QuickLogModalProps {
   isOpen: boolean
@@ -226,96 +236,60 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }
   }
 
-  // Handle escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !isSubmitting) {
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, isSubmitting, onClose])
-
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={() => !isSubmitting && onClose()}
-      />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-700 dark:bg-zinc-800">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            <span className="text-xl">⚡</span> Quick Log
-          </h2>
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
+      <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-500" />
+            Quick Log
+          </DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Calendar suggestion chip */}
           {suggestedEvent && !activity && (
-            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 dark:bg-blue-900/20">
+            <div className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 border border-blue-500/20">
               <button
                 type="button"
                 onClick={handleSuggestionClick}
-                className="flex flex-1 items-center gap-2 text-left text-sm text-blue-700 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200"
+                className="flex flex-1 items-center gap-2 text-left text-sm text-blue-400 hover:text-blue-300"
               >
-                <span className="text-base">📅</span>
+                <Calendar className="h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate">
                   <span className="font-medium">{suggestedEvent.title}</span>
-                  <span className="text-blue-600 dark:text-blue-400"> ended at {formatTimeDisplay(suggestedEvent.endTime)}</span>
+                  <span className="text-blue-500"> ended at {formatTimeDisplay(suggestedEvent.endTime)}</span>
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => setDismissedSuggestion(suggestedEvent.id)}
-                className="shrink-0 rounded p-0.5 text-blue-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-800 dark:hover:text-blue-300"
+                className="shrink-0 rounded p-0.5 text-blue-500 hover:bg-blue-500/20 hover:text-blue-400"
                 aria-label="Dismiss suggestion"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-4 w-4" />
               </button>
             </div>
           )}
 
           {/* Activity - main input */}
-          <div>
-            <label htmlFor="quick-activity" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              What did you just finish?
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="quick-activity">What did you just finish?</Label>
+            <Input
               ref={inputRef}
-              type="text"
               id="quick-activity"
               value={activity}
               onChange={(e) => setActivity(e.target.value)}
               placeholder="e.g., Code review for auth PR"
-              className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
             />
           </div>
 
           {/* Time Range Picker */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Time
-              </label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Time</Label>
               {lastEntryEndTime && (
-                <span className="text-xs text-zinc-400">(start from last entry)</span>
+                <span className="text-xs text-muted-foreground">(start from last entry)</span>
               )}
             </div>
             <TimeRangePicker
@@ -323,47 +297,46 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
               endTime={endTime}
               onStartTimeChange={setStartTime}
               onEndTimeChange={setEndTime}
+              variant="quicklog"
             />
           </div>
 
           {/* Optional notes */}
-          <div>
-            <label htmlFor="quick-notes" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Notes <span className="text-zinc-400">(optional)</span>
-            </label>
-            <input
-              type="text"
+          <div className="space-y-2">
+            <Label htmlFor="quick-notes">
+              Notes <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
               id="quick-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any quick details..."
-              className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <p className="text-sm text-destructive">{error}</p>
           )}
 
-          <button
+          <Button
             type="submit"
             disabled={isSubmitting || !activity.trim() || duration <= 0}
-            className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:from-amber-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-zinc-800"
+            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
           >
             {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Logging...
-              </span>
+              </>
             ) : (
-              'Log it ⚡'
+              <>
+                Log it
+                <Zap className="h-4 w-4" />
+              </>
             )}
-          </button>
+          </Button>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

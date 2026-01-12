@@ -12,6 +12,16 @@ import StatsCard from '@/components/StatsCard'
 import QuickLogModal from '@/components/QuickLogModal'
 import Toast from '@/components/Toast'
 import GhostEntryModal from '@/components/GhostEntryModal'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Menu, Calendar, BarChart3, Search, LogOut, ChevronLeft, ChevronRight, Plus, X, Zap, Loader2 } from 'lucide-react'
 
 type View = 'day' | 'weekly'
 
@@ -50,11 +60,9 @@ export default function Home() {
   const [view, setView] = useState<View>('day')
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [isFormExpanded, setIsFormExpanded] = useState(false)
-  const [isNavOpen, setIsNavOpen] = useState(false)
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<{ message: string } | null>(null)
-  const navRef = useRef<HTMLDivElement>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   // Get user ID from session
@@ -122,21 +130,9 @@ export default function Home() {
     }
   }, [fetchEntries, fetchCalendarEvents, view])
 
-  // Close nav dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setIsNavOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate)
     setView('day')
-    setIsNavOpen(false)
   }
 
   const handleRefresh = () => {
@@ -151,8 +147,8 @@ export default function Home() {
   // Show loading state while checking authentication
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-900">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
@@ -163,85 +159,70 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
+    <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-2xl px-4 py-8">
         {/* Header */}
         <header className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Time Logger</h1>
+              <h1 className="text-xl font-bold text-foreground">Time Logger</h1>
 
               {/* Navigation dropdown */}
-              <div ref={navRef} className="relative">
-                <button
-                  onClick={() => setIsNavOpen(!isNavOpen)}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-
-                {isNavOpen && (
-                  <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
-                    <button
-                      onClick={() => {
-                        setSelectedDate(today)
-                        setView('day')
-                        setIsNavOpen(false)
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                    >
-                      <span>📅</span> Today
-                    </button>
-                    <button
-                      onClick={() => {
-                        setView('weekly')
-                        setIsNavOpen(false)
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                    >
-                      <span>📊</span> Weekly Summary
-                    </button>
-                    <hr className="my-1 border-zinc-200 dark:border-zinc-700" />
-                    <button
-                      onClick={() => dateInputRef.current?.showPicker()}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                    >
-                      <span>🔍</span> Go to date...
-                    </button>
-                    <input
-                      ref={dateInputRef}
-                      type="date"
-                      value={selectedDate}
-                      max={today}
-                      onChange={(e) => handleDateChange(e.target.value)}
-                      className="sr-only"
-                    />
-                    <hr className="my-1 border-zinc-200 dark:border-zinc-700" />
-                    <div className="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">
-                      {session?.user?.email}
-                    </div>
-                    <button
-                      onClick={() => signOut({ callbackUrl: '/login' })}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                    >
-                      <span>🚪</span> Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon-sm">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuItem onClick={() => {
+                    setSelectedDate(today)
+                    setView('day')
+                  }}>
+                    <Calendar className="h-4 w-4" />
+                    Today
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setView('weekly')}>
+                    <BarChart3 className="h-4 w-4" />
+                    Weekly Summary
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => dateInputRef.current?.showPicker()}>
+                    <Search className="h-4 w-4" />
+                    Go to date...
+                  </DropdownMenuItem>
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={selectedDate}
+                    max={today}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="sr-only"
+                  />
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+                    {session?.user?.email}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    variant="destructive"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Quick Log button */}
             {view === 'day' && isToday && (
-              <button
+              <Button
                 onClick={() => setIsQuickLogOpen(true)}
-                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
               >
-                <span>⚡</span>
+                <Zap className="h-4 w-4" />
                 <span className="hidden sm:inline">Quick Log</span>
-              </button>
+              </Button>
             )}
           </div>
         </header>
@@ -250,44 +231,38 @@ export default function Home() {
           <>
             {/* Date Navigation */}
             <div className="mb-6 flex items-center justify-between">
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => handleDateChange(getAdjacentDate(selectedDate, 'prev'))}
-                className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 aria-label="Previous day"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
 
               <button
                 onClick={() => dateInputRef.current?.showPicker()}
-                className="flex items-center gap-2 rounded-lg px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="flex items-center gap-2 rounded-lg px-4 py-2 hover:bg-accent"
               >
-                <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                <span className="text-lg font-semibold text-foreground">
                   {formatDateDisplay(selectedDate)}
                 </span>
                 {!isToday && (
-                  <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="text-sm text-muted-foreground">
                     {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                 )}
               </button>
 
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => canGoNext && handleDateChange(getAdjacentDate(selectedDate, 'next'))}
                 disabled={!canGoNext}
-                className={`rounded-lg p-2 ${
-                  canGoNext
-                    ? 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300'
-                    : 'cursor-not-allowed text-zinc-300 dark:text-zinc-600'
-                }`}
                 aria-label="Next day"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+                <ChevronRight className="h-5 w-5" />
+              </Button>
             </div>
 
             {/* Stats Card - only show for today */}
@@ -297,30 +272,27 @@ export default function Home() {
             {isToday && (
               <div className="mb-6">
                 {isFormExpanded ? (
-                  <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+                  <section className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
-                      <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                      <h2 className="text-lg font-semibold text-foreground">
                         Add Entry
                       </h2>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         onClick={() => setIsFormExpanded(false)}
-                        className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
                       >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                        <X className="h-5 w-5" />
+                      </Button>
                     </div>
                     <TimeEntryForm onEntryAdded={handleRefresh} onShowToast={showToast} userId={userId} />
                   </section>
                 ) : (
                   <button
                     onClick={() => setIsFormExpanded(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 py-3 text-sm font-medium text-zinc-500 transition-colors hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-700 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-foreground"
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
+                    <Plus className="h-4 w-4" />
                     Add detailed entry
                   </button>
                 )}
@@ -342,15 +314,17 @@ export default function Home() {
           </>
         ) : (
           /* Weekly Summary View */
-          <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+          <section className="rounded-xl border bg-card p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Weekly Summary</h2>
-              <button
+              <h2 className="text-lg font-semibold text-foreground">Weekly Summary</h2>
+              <Button
+                variant="link"
                 onClick={() => setView('day')}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                className="text-sm"
               >
-                ← Back to today
-              </button>
+                <ChevronLeft className="h-4 w-4" />
+                Back to today
+              </Button>
             </div>
             <WeeklySummary userId={userId} />
           </section>

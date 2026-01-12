@@ -1,6 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 interface TimeRangePickerProps {
   startTime: string
@@ -8,6 +17,7 @@ interface TimeRangePickerProps {
   onStartTimeChange: (time: string) => void
   onEndTimeChange: (time: string) => void
   onDurationChange?: (minutes: number) => void
+  variant?: 'default' | 'quicklog'
 }
 
 // Generate time slots in 15-minute increments (00:00 to 23:45)
@@ -114,12 +124,12 @@ function TimeColumn({ value, onChange, label }: TimeColumnProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+      <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
       <div
         ref={scrollRef}
-        className="h-[288px] overflow-y-auto overscroll-contain rounded-xl bg-zinc-100 dark:bg-zinc-700/50"
+        className="h-[288px] overflow-y-auto overscroll-contain rounded-lg border bg-muted/30"
         style={{ scrollSnapType: 'y mandatory' }}
       >
         {TIME_SLOTS.map((slot) => {
@@ -133,8 +143,8 @@ function TimeColumn({ value, onChange, label }: TimeColumnProps) {
               style={{ scrollSnapAlign: 'start' }}
               className={`flex h-12 w-full items-center justify-center text-base font-medium transition-colors ${
                 isSelected
-                  ? 'bg-blue-600 text-white'
-                  : 'text-zinc-700 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-600'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground hover:bg-accent'
               }`}
             >
               {formatTimeDisplay(slot)}
@@ -152,6 +162,7 @@ export default function TimeRangePicker({
   onStartTimeChange,
   onEndTimeChange,
   onDurationChange,
+  variant = 'default',
 }: TimeRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [tempStart, setTempStart] = useState('')
@@ -196,17 +207,6 @@ export default function TimeRangePicker({
     setIsOpen(false)
   }
 
-  // Close on escape
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false)
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-    }
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen])
-
   const displayDuration = calculateDuration(startTime, endTime)
 
   return (
@@ -216,13 +216,13 @@ export default function TimeRangePicker({
         <button
           type="button"
           onClick={handleOpen}
-          className={`flex-1 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-all ${
+          className={`flex-1 rounded-md border px-3 py-2.5 text-left text-sm font-medium transition-all ${
             startTime
-              ? 'border-zinc-300 bg-white text-zinc-900 hover:border-blue-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100'
-              : 'border-dashed border-zinc-300 bg-zinc-50 text-zinc-500 hover:border-blue-400 hover:bg-white dark:border-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400'
+              ? 'border-input bg-background text-foreground hover:border-ring'
+              : 'border-dashed border-input bg-muted/30 text-muted-foreground hover:border-ring hover:bg-background'
           }`}
         >
-          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             Start
           </span>
           <span className="mt-0.5 block">
@@ -233,24 +233,24 @@ export default function TimeRangePicker({
         {/* Duration badge */}
         {displayDuration > 0 && (
           <div className="flex flex-col items-center px-1">
-            <div className="h-px w-4 bg-zinc-300 dark:bg-zinc-600" />
-            <span className="my-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+            <div className="h-px w-4 bg-border" />
+            <span className="my-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
               {formatDuration(displayDuration)}
             </span>
-            <div className="h-px w-4 bg-zinc-300 dark:bg-zinc-600" />
+            <div className="h-px w-4 bg-border" />
           </div>
         )}
 
         <button
           type="button"
           onClick={handleOpen}
-          className={`flex-1 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-all ${
+          className={`flex-1 rounded-md border px-3 py-2.5 text-left text-sm font-medium transition-all ${
             endTime
-              ? 'border-zinc-300 bg-white text-zinc-900 hover:border-blue-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100'
-              : 'border-dashed border-zinc-300 bg-zinc-50 text-zinc-500 hover:border-blue-400 hover:bg-white dark:border-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400'
+              ? 'border-input bg-background text-foreground hover:border-ring'
+              : 'border-dashed border-input bg-muted/30 text-muted-foreground hover:border-ring hover:bg-background'
           }`}
         >
-          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             End
           </span>
           <span className="mt-0.5 block">
@@ -259,79 +259,67 @@ export default function TimeRangePicker({
         </button>
       </div>
 
-      {/* Picker modal - centered on screen */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
-          />
+      {/* Picker modal using shadcn Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <DialogTitle className="text-sm font-semibold">
+              Select Time Range
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setIsOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
 
-          {/* Modal */}
-          <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-800">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800/50">
-              <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                Select Time Range
-              </p>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+          {/* Time pickers */}
+          <div className="flex gap-3 py-2">
+            <TimeColumn
+              value={tempStart}
+              onChange={handleStartChange}
+              label="Start"
+            />
 
-            {/* Time pickers */}
-            <div className="flex gap-3 p-4">
-              <TimeColumn
-                value={tempStart}
-                onChange={handleStartChange}
-                label="Start"
-              />
-
-              <TimeColumn
-                value={tempEnd}
-                onChange={setTempEnd}
-                label="End"
-              />
-            </div>
-
-            {/* Duration display and error */}
-            <div className="px-4 pb-2">
-              {isEndBeforeStart ? (
-                <p className="text-center text-sm text-amber-600 dark:text-amber-400">
-                  End time must be after start time
-                </p>
-              ) : duration > 0 ? (
-                <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-                  Duration: <span className="font-semibold text-blue-600 dark:text-blue-400">{formatDuration(duration)}</span>
-                </p>
-              ) : null}
-            </div>
-
-            {/* Confirm button */}
-            <div className="border-t border-zinc-100 p-4 dark:border-zinc-700">
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={!isValidRange}
-                className={`w-full rounded-xl py-3 text-sm font-semibold transition-colors ${
-                  isValidRange
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'cursor-not-allowed bg-zinc-200 text-zinc-400 dark:bg-zinc-700 dark:text-zinc-500'
-                }`}
-              >
-                {isValidRange ? `Confirm ${formatDuration(duration)}` : 'Select times'}
-              </button>
-            </div>
+            <TimeColumn
+              value={tempEnd}
+              onChange={setTempEnd}
+              label="End"
+            />
           </div>
-        </div>
-      )}
+
+          {/* Duration display and error */}
+          <div className="py-2">
+            {isEndBeforeStart ? (
+              <p className="text-center text-sm text-amber-500">
+                End time must be after start time
+              </p>
+            ) : duration > 0 ? (
+              <p className="text-center text-sm text-muted-foreground">
+                Duration: <span className="font-semibold text-foreground">{formatDuration(duration)}</span>
+              </p>
+            ) : null}
+          </div>
+
+          {/* Confirm button */}
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={handleConfirm}
+              disabled={!isValidRange}
+              className={`w-full ${
+                variant === 'quicklog'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'
+                  : ''
+              }`}
+            >
+              {isValidRange ? `Confirm ${formatDuration(duration)}` : 'Select times'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
