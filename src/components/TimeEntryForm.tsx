@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getLocalDateString } from '@/lib/types'
 import Toast from './Toast'
 
 interface TimeEntryFormProps {
@@ -9,7 +10,7 @@ interface TimeEntryFormProps {
 }
 
 export default function TimeEntryForm({ onEntryAdded }: TimeEntryFormProps) {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getLocalDateString())
   const [activity, setActivity] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')

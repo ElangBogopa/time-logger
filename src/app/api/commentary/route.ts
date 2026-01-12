@@ -28,7 +28,7 @@ function formatDuration(minutes: number): string {
 
 function getCategoryTone(category: TimeCategory): 'positive' | 'neutral' | 'distraction' {
   const positive: TimeCategory[] = ['deep_work', 'learning', 'exercise', 'relationships']
-  const neutral: TimeCategory[] = ['meetings', 'admin', 'rest', 'other']
+  const neutral: TimeCategory[] = ['meetings', 'admin', 'rest', 'meals', 'self_care', 'other']
 
   if (positive.includes(category)) return 'positive'
   if (neutral.includes(category)) return 'neutral'

@@ -28,6 +28,8 @@ Category definitions:
 - learning: Reading educational content, courses, tutorials, research, studying, skill development
 - exercise: Physical workouts, gym, running, sports, yoga, cycling
 - rest: Intentional relaxation like naps, meditation, walks, watching movies/TV to unwind, reading for pleasure, relaxing
+- meals: Eating activities like breakfast, lunch, dinner, snacks, brunch, eating food, cooking meals, grabbing coffee/food
+- self_care: Personal maintenance and grooming like showering, skincare, hygiene, getting ready, brushing teeth, haircut, shaving, makeup, morning/night routine
 - relationships: Quality time with family, friends, dates, calls with loved ones, social activities
 - distraction: Unintentional time wasters like scrolling TikTok, Instagram, Twitter/X, Reddit, YouTube rabbit holes, porn, aimless browsing, doomscrolling
 - other: Anything that doesn't fit the above categories
@@ -37,6 +39,8 @@ IMPORTANT RULES:
 2. If the activity includes words like "break", "intentional", "to unwind", "relaxing", or "to decompress" with typically distracting activities, categorize as "rest" instead of "distraction".
 3. Naps, meditation, walks, movies, TV shows, and reading for fun are "rest" (intentional recovery).
 4. Hanging out with friends, family time, dates, and social calls are "relationships".
+5. Eating, breakfast, lunch, dinner, snacks, food, and cooking should be "meals".
+6. Showering, grooming, skincare, hygiene, getting ready, brushing teeth, and personal care routines should be "self_care".
 
 Respond with ONLY the category name, nothing else.`,
         },

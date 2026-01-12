@@ -11,15 +11,17 @@ interface TimeEntriesListProps {
 }
 
 const CATEGORY_COLORS: Record<TimeCategory, string> = {
-  deep_work: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  meetings: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  admin: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-300',
-  learning: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  exercise: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-  rest: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300',
-  relationships: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
-  distraction: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  other: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  deep_work: 'bg-[#64748b]/20 text-[#475569] dark:bg-[#64748b]/30 dark:text-[#94a3b8]',
+  meetings: 'bg-[#8b7aa8]/20 text-[#6b5a88] dark:bg-[#8b7aa8]/30 dark:text-[#b8a8d8]',
+  admin: 'bg-[#9ca3af]/20 text-[#6b7280] dark:bg-[#9ca3af]/30 dark:text-[#d1d5db]',
+  learning: 'bg-[#5d9a9a]/20 text-[#4a7a7a] dark:bg-[#5d9a9a]/30 dark:text-[#8dcaca]',
+  exercise: 'bg-[#6b9080]/20 text-[#4a6b5a] dark:bg-[#6b9080]/30 dark:text-[#9bc0b0]',
+  rest: 'bg-[#a8a4ce]/20 text-[#6864ae] dark:bg-[#a8a4ce]/30 dark:text-[#c8c4ee]',
+  meals: 'bg-[#b8a088]/20 text-[#8a7058] dark:bg-[#b8a088]/30 dark:text-[#d8c0a8]',
+  self_care: 'bg-[#8fa387]/20 text-[#5f7357] dark:bg-[#8fa387]/30 dark:text-[#bfc3a7]',
+  relationships: 'bg-[#b08d8d]/20 text-[#806060] dark:bg-[#b08d8d]/30 dark:text-[#d0adad]',
+  distraction: 'bg-[#c97e7e]/20 text-[#995e5e] dark:bg-[#c97e7e]/30 dark:text-[#e9aeae]',
+  other: 'bg-[#71717a]/20 text-[#52525b] dark:bg-[#71717a]/30 dark:text-[#a1a1aa]',
 }
 
 function formatDuration(minutes: number): string {
