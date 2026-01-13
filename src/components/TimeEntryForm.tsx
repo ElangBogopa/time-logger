@@ -13,10 +13,11 @@ interface TimeEntryFormProps {
   onEntryAdded: () => void
   onShowToast: (message: string) => void
   userId: string
+  selectedDate?: string
 }
 
-export default function TimeEntryForm({ onEntryAdded, onShowToast, userId }: TimeEntryFormProps) {
-  const [date, setDate] = useState(getLocalDateString())
+export default function TimeEntryForm({ onEntryAdded, onShowToast, userId, selectedDate }: TimeEntryFormProps) {
+  const [date, setDate] = useState(selectedDate || getLocalDateString())
   const [activity, setActivity] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
@@ -95,10 +96,12 @@ export default function TimeEntryForm({ onEntryAdded, onShowToast, userId }: Tim
             .from('time_entries')
             .update({ commentary })
             .eq('id', insertedEntry.id)
+        } else {
+          generatedCommentary = null
         }
       } catch {
         // Commentary generation failed, but entry was saved - continue
-        console.error('Failed to generate commentary')
+        generatedCommentary = null
       }
 
       // Reset form
@@ -108,8 +111,12 @@ export default function TimeEntryForm({ onEntryAdded, onShowToast, userId }: Tim
       setDuration('')
       setDescription('')
 
-      // Show success toast with commentary
-      onShowToast(generatedCommentary || 'Your time has been logged successfully.')
+      // Show different toast based on whether commentary generated
+      if (generatedCommentary) {
+        onShowToast(generatedCommentary)
+      } else {
+        onShowToast('Entry logged! (AI commentary unavailable)')
+      }
 
       onEntryAdded()
     } catch (err) {

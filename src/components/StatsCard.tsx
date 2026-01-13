@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TimeEntry, getLocalDateString } from '@/lib/types'
+import { formatHours } from '@/lib/time-utils'
 
 interface Streaks {
   deepWork: number
@@ -13,14 +14,6 @@ interface Streaks {
 interface WeeklyStats {
   deepWorkMinutes: number
   exerciseMinutes: number
-}
-
-function formatHours(minutes: number): string {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  if (hours === 0) return `${mins}m`
-  if (mins === 0) return `${hours}h`
-  return `${hours}h ${mins}m`
 }
 
 function getDateDaysAgo(daysAgo: number): string {

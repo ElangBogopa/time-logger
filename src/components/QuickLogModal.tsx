@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getLocalDateString, TimeEntry } from '@/lib/types'
+import { getLocalDateString, TimeEntry, isEntryInFuture, PENDING_COMMENTARY } from '@/lib/types'
+import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
 import {
@@ -14,54 +15,25 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, X, Zap, Calendar } from 'lucide-react'
+import { Loader2, X, Zap, Calendar, Clock } from 'lucide-react'
 
 interface QuickLogModalProps {
   isOpen: boolean
   onClose: () => void
   onEntryAdded: () => void
   lastEntryEndTime: string | null
+  initialStartTime?: string
+  initialEndTime?: string
   onShowToast: (message: string) => void
   userId: string
   calendarEvents?: CalendarEvent[]
   entries?: TimeEntry[]
+  selectedDate?: string
+  isFutureDay?: boolean
+  isPastDay?: boolean
 }
 
-function getCurrentTime(): string {
-  const now = new Date()
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-}
-
-function calculateDuration(start: string, end: string): number {
-  if (!start || !end) return 0
-  const [startHours, startMinutes] = start.split(':').map(Number)
-  const [endHours, endMinutes] = end.split(':').map(Number)
-
-  let startTotal = startHours * 60 + startMinutes
-  let endTotal = endHours * 60 + endMinutes
-
-  // Handle crossing midnight
-  if (endTotal < startTotal) {
-    endTotal += 24 * 60
-  }
-
-  return endTotal - startTotal
-}
-
-function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number)
-  return hours * 60 + minutes
-}
-
-function formatTimeDisplay(time: string): string {
-  if (!time) return ''
-  const [hours, minutes] = time.split(':').map(Number)
-  const period = hours >= 12 ? 'PM' : 'AM'
-  const hour12 = hours % 12 || 12
-  return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
-}
-
-export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, onShowToast, userId, calendarEvents = [], entries = [] }: QuickLogModalProps) {
+export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false }: QuickLogModalProps) {
   const [activity, setActivity] = useState('')
   const [notes, setNotes] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -72,7 +44,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Find the most recent unconfirmed calendar event that has ended
+  // Only show suggestions for TODAY, not future or past days
   const suggestedEvent = useMemo(() => {
+    // Don't show calendar suggestions on future or past days
+    if (isFutureDay || isPastDay) return null
+
     const now = new Date()
     const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
@@ -111,21 +87,68 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       const eventEnd = timeToMinutes(event.endTime)
       return eventEnd > latestEnd ? event : latest
     })
-  }, [calendarEvents, entries, dismissedSuggestion])
+  }, [calendarEvents, entries, dismissedSuggestion, isFutureDay, isPastDay])
 
-  // Reset and auto-fill when modal opens
+  // Track if we've initialized times for this modal session
+  const timesInitialized = useRef(false)
+
+  // Reset form fields when modal opens
   useEffect(() => {
     if (isOpen) {
       setActivity('')
       setNotes('')
-      setEndTime(getCurrentTime())
-      setStartTime(lastEntryEndTime || '')
       setError(null)
       setDismissedSuggestion(null)
+      timesInitialized.current = false // Reset flag when modal opens
       // Focus the activity input after a brief delay
       setTimeout(() => inputRef.current?.focus(), 100)
     }
-  }, [isOpen, lastEntryEndTime])
+  }, [isOpen])
+
+  // Set times when modal opens or when initial times arrive
+  // This handles the timing issue where drag times may arrive after modal opens
+  useEffect(() => {
+    if (!isOpen) return
+    if (timesInitialized.current) return // Don't re-initialize once set
+
+    // If we have drag-created times, use them
+    if (initialStartTime && initialEndTime) {
+      setStartTime(initialStartTime)
+      setEndTime(initialEndTime)
+      timesInitialized.current = true
+    } else if (!initialStartTime && !initialEndTime) {
+      // No drag times expected, use default behavior
+      if (isFutureDay) {
+        // Future day: default to 9:00 AM start, 10:00 AM end (1 hour block)
+        // Or use first ghost calendar event time if available
+        const firstGhostEvent = calendarEvents.length > 0
+          ? calendarEvents.reduce((earliest, event) => {
+              return timeToMinutes(event.startTime) < timeToMinutes(earliest.startTime) ? event : earliest
+            }, calendarEvents[0])
+          : null
+
+        if (firstGhostEvent) {
+          setStartTime(firstGhostEvent.startTime)
+          setEndTime(firstGhostEvent.endTime)
+        } else {
+          setStartTime('09:00')
+          setEndTime('10:00')
+        }
+      } else if (isPastDay) {
+        // Past day: default to 9:00 AM start, 10:00 AM end (1 hour block)
+        // User will adjust times to what actually happened
+        setStartTime('09:00')
+        setEndTime('10:00')
+      } else {
+        // Today: default to current time as end, last entry end as start
+        setEndTime(getCurrentTime())
+        setStartTime(lastEntryEndTime || '')
+      }
+      timesInitialized.current = true
+    }
+    // If initialStartTime/initialEndTime are undefined but might arrive later,
+    // don't mark as initialized yet - wait for them
+  }, [isOpen, initialStartTime, initialEndTime, lastEntryEndTime, isFutureDay, isPastDay, calendarEvents])
 
   const handleSuggestionClick = () => {
     if (suggestedEvent) {
@@ -138,11 +161,25 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
   const duration = calculateDuration(startTime, endTime)
 
+  // Detect if start time is in the future (for today only)
+  const isFutureStartTime = useMemo(() => {
+    if (isFutureDay || isPastDay) return false // Only relevant for today
+    if (!startTime) return false
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const startMinutes = timeToMinutes(startTime)
+    return startMinutes > currentMinutes
+  }, [startTime, isFutureDay, isPastDay])
+
+  // Planning mode: either on a future day OR start time is in the future (for today)
+  // Past days are NEVER planning mode - they're always confirmed
+  const isPlanningMode = isFutureDay || isFutureStartTime
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!activity.trim()) {
-      setError('Please describe what you just finished')
+      setError(isPlanningMode ? 'Please describe what you\'re planning' : 'Please describe what you just finished')
       return
     }
 
@@ -156,79 +193,113 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
     try {
       const today = getLocalDateString()
+      const entryDate = selectedDate || today
 
-      // Get category from AI
-      const categoryResponse = await fetch('/api/categorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activity }),
-      })
+      if (isPlanningMode) {
+        // Future/planned entry - save as pending without AI categorization/commentary
+        const newEntry = {
+          user_id: userId,
+          date: entryDate,
+          activity,
+          category: null, // No category until confirmed
+          duration_minutes: duration,
+          start_time: startTime,
+          end_time: endTime,
+          description: notes || null,
+          commentary: PENDING_COMMENTARY.planned, // Static message
+          status: 'pending',
+        }
 
-      if (!categoryResponse.ok) {
-        throw new Error('Failed to categorize activity')
-      }
-
-      const { category } = await categoryResponse.json()
-
-      // Save to Supabase
-      const newEntry = {
-        user_id: userId,
-        date: today,
-        activity,
-        category,
-        duration_minutes: duration,
-        start_time: startTime,
-        end_time: endTime,
-        description: notes || null,
-      }
-
-      const { data: insertedEntry, error: insertError } = await supabase
-        .from('time_entries')
-        .insert(newEntry)
-        .select()
-        .single()
-
-      if (insertError) {
-        throw new Error(insertError.message)
-      }
-
-      // Generate commentary
-      let generatedCommentary: string | null = null
-      try {
-        const { data: dayEntries } = await supabase
+        const { error: insertError } = await supabase
           .from('time_entries')
-          .select('*')
-          .eq('date', today)
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true })
+          .insert(newEntry)
 
-        const commentaryResponse = await fetch('/api/commentary', {
+        if (insertError) {
+          throw new Error(insertError.message)
+        }
+
+        onEntryAdded()
+        onClose()
+        onShowToast('Planned! Confirm this entry after it happens.')
+      } else {
+        // Past/current entry - normal flow with AI categorization + commentary
+        const categoryResponse = await fetch('/api/categorize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            entry: insertedEntry,
-            dayEntries: dayEntries || [],
-          }),
+          body: JSON.stringify({ activity }),
         })
 
-        if (commentaryResponse.ok) {
-          const { commentary } = await commentaryResponse.json()
-          generatedCommentary = commentary
-
-          await supabase
-            .from('time_entries')
-            .update({ commentary })
-            .eq('id', insertedEntry.id)
+        if (!categoryResponse.ok) {
+          throw new Error('Failed to categorize activity')
         }
-      } catch {
-        console.error('Failed to generate commentary')
+
+        const { category } = await categoryResponse.json()
+
+        const newEntry = {
+          user_id: userId,
+          date: entryDate,
+          activity,
+          category,
+          duration_minutes: duration,
+          start_time: startTime,
+          end_time: endTime,
+          description: notes || null,
+          status: 'confirmed',
+        }
+
+        const { data: insertedEntry, error: insertError } = await supabase
+          .from('time_entries')
+          .insert(newEntry)
+          .select()
+          .single()
+
+        if (insertError) {
+          throw new Error(insertError.message)
+        }
+
+        // Generate commentary
+        let generatedCommentary: string | null = null
+        try {
+          const { data: dayEntries } = await supabase
+            .from('time_entries')
+            .select('*')
+            .eq('date', entryDate)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: true })
+
+          const commentaryResponse = await fetch('/api/commentary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entry: insertedEntry,
+              dayEntries: dayEntries || [],
+            }),
+          })
+
+          if (commentaryResponse.ok) {
+            const { commentary } = await commentaryResponse.json()
+            generatedCommentary = commentary
+
+            await supabase
+              .from('time_entries')
+              .update({ commentary })
+              .eq('id', insertedEntry.id)
+          } else {
+            generatedCommentary = null // Mark as failed
+          }
+        } catch {
+          generatedCommentary = null // Mark as failed
+        }
+
+        onEntryAdded()
+        onClose()
+        // Show different toast based on whether commentary generated
+        if (generatedCommentary) {
+          onShowToast(generatedCommentary)
+        } else {
+          onShowToast('Entry logged! (AI commentary unavailable)')
+        }
       }
-
-      onEntryAdded()
-
-      // Close modal and show toast
-      onClose()
-      onShowToast(generatedCommentary || 'Logged! Keep up the momentum.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -241,8 +312,22 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-amber-500" />
-            Quick Log
+            {isPlanningMode ? (
+              <>
+                <Clock className="h-5 w-5 text-blue-500" />
+                Plan Ahead
+              </>
+            ) : isPastDay ? (
+              <>
+                <Clock className="h-5 w-5 text-zinc-500" />
+                Add Past Entry
+              </>
+            ) : (
+              <>
+                <Zap className="h-5 w-5 text-amber-500" />
+                Quick Log
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -274,13 +359,15 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
           {/* Activity - main input */}
           <div className="space-y-2">
-            <Label htmlFor="quick-activity">What did you just finish?</Label>
+            <Label htmlFor="quick-activity">
+              {isPlanningMode ? 'What are you planning to do?' : isPastDay ? 'What did you do?' : 'What did you just finish?'}
+            </Label>
             <Input
               ref={inputRef}
               id="quick-activity"
               value={activity}
               onChange={(e) => setActivity(e.target.value)}
-              placeholder="e.g., Code review for auth PR"
+              placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., Code review for auth PR'}
             />
           </div>
 
@@ -288,7 +375,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Time</Label>
-              {lastEntryEndTime && (
+              {!isPlanningMode && lastEntryEndTime && (
                 <span className="text-xs text-muted-foreground">(start from last entry)</span>
               )}
             </div>
@@ -321,12 +408,28 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           <Button
             type="submit"
             disabled={isSubmitting || !activity.trim() || duration <= 0}
-            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+            className={`w-full text-white ${
+              isPlanningMode
+                ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
+                : isPastDay
+                  ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
+                  : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+            }`}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Logging...
+                {isPlanningMode ? 'Planning...' : isPastDay ? 'Adding...' : 'Logging...'}
+              </>
+            ) : isPlanningMode ? (
+              <>
+                <Clock className="h-4 w-4" />
+                Plan it
+              </>
+            ) : isPastDay ? (
+              <>
+                Add Entry
+                <Clock className="h-4 w-4" />
               </>
             ) : (
               <>

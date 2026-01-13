@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { TimeEntry, TimeCategory, CATEGORY_LABELS } from '@/lib/types'
+import { TimeEntry, TimeCategory, CATEGORY_LABELS, isPendingEntryReadyToConfirm } from '@/lib/types'
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Pencil, Trash2, Clock } from 'lucide-react'
+import { Loader2, Pencil, Trash2, Clock, CheckCircle2 } from 'lucide-react'
 
 interface TimeEntryModalProps {
   entry: TimeEntry
@@ -21,6 +21,7 @@ interface TimeEntryModalProps {
   onUpdate: () => void
   onDelete: () => void
   promptAddTimes?: boolean
+  onShowToast?: (message: string) => void
 }
 
 const CATEGORY_COLORS: Record<TimeCategory, string> = {
@@ -63,13 +64,17 @@ function formatDate(dateStr: string): string {
   })
 }
 
-export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, promptAddTimes = false }: TimeEntryModalProps) {
+export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, promptAddTimes = false, onShowToast }: TimeEntryModalProps) {
   const [isEditing, setIsEditing] = useState(promptAddTimes)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTimesPrompt, setShowTimesPrompt] = useState(promptAddTimes && !entry.start_time && !entry.end_time)
+
+  const isPending = entry.status === 'pending'
+  const isReadyToConfirm = isPending && isPendingEntryReadyToConfirm(entry)
 
   // Edit form state
   const [date, setDate] = useState(entry.date)
@@ -107,9 +112,31 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
     setIsSaving(true)
 
     try {
+      const activityChanged = activity !== entry.activity
+
+      // If activity changed, get new category from AI
+      let newCategory = entry.category
+      if (activityChanged) {
+        try {
+          const categoryResponse = await fetch('/api/categorize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activity }),
+          })
+
+          if (categoryResponse.ok) {
+            const { category } = await categoryResponse.json()
+            newCategory = category
+          }
+        } catch {
+          console.error('Failed to re-categorize activity')
+        }
+      }
+
       const updatedEntry = {
         date,
         activity,
+        category: newCategory,
         duration_minutes: parseInt(duration, 10),
         start_time: startTime || null,
         end_time: endTime || null,
@@ -133,7 +160,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
         .eq('user_id', entry.user_id)
         .order('created_at', { ascending: true })
 
-      // Regenerate commentary with updated details
+      // Regenerate commentary with updated details (always regenerate if activity changed)
       try {
         const commentaryResponse = await fetch('/api/commentary', {
           method: 'POST',
@@ -199,12 +226,98 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
     setError(null)
   }
 
+  // Confirm a pending entry - runs AI categorization and commentary
+  const handleConfirmEntry = async () => {
+    setIsConfirming(true)
+    setError(null)
+
+    try {
+      // Get category from AI
+      const categoryResponse = await fetch('/api/categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activity: entry.activity }),
+      })
+
+      if (!categoryResponse.ok) {
+        throw new Error('Failed to categorize activity')
+      }
+
+      const { category } = await categoryResponse.json()
+
+      // Update entry with confirmed status and category
+      const { error: updateError } = await supabase
+        .from('time_entries')
+        .update({ status: 'confirmed', category })
+        .eq('id', entry.id)
+
+      if (updateError) {
+        throw new Error(updateError.message)
+      }
+
+      // Generate commentary
+      let generatedCommentary: string | null = null
+      try {
+        const { data: dayEntries } = await supabase
+          .from('time_entries')
+          .select('*')
+          .eq('date', entry.date)
+          .eq('user_id', entry.user_id)
+          .order('created_at', { ascending: true })
+
+        const commentaryResponse = await fetch('/api/commentary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            entry: { ...entry, category, status: 'confirmed' },
+            dayEntries: dayEntries || [],
+          }),
+        })
+
+        if (commentaryResponse.ok) {
+          const { commentary } = await commentaryResponse.json()
+          generatedCommentary = commentary
+
+          await supabase
+            .from('time_entries')
+            .update({ commentary })
+            .eq('id', entry.id)
+        } else {
+          generatedCommentary = null
+        }
+      } catch {
+        generatedCommentary = null
+      }
+
+      onUpdate()
+      onClose()
+      // Show different toast based on whether commentary generated
+      if (generatedCommentary) {
+        onShowToast?.(generatedCommentary)
+      } else {
+        onShowToast?.('Entry confirmed! (AI commentary unavailable)')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to confirm entry')
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
+  const getDialogTitle = () => {
+    if (isEditing) return 'Edit Entry'
+    if (isReadyToConfirm) return 'Confirm Entry'
+    if (isPending) return 'Planned Entry'
+    return 'Entry Details'
+  }
+
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>
-            {isEditing ? 'Edit Entry' : 'Entry Details'}
+          <DialogTitle className="flex items-center gap-2">
+            {isPending && <Clock className="h-5 w-5 text-amber-500" />}
+            {getDialogTitle()}
           </DialogTitle>
         </DialogHeader>
 
@@ -310,14 +423,52 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Pending Entry Prompt */}
+              {isPending && (
+                <div className={`rounded-lg border p-4 ${
+                  isReadyToConfirm
+                    ? 'border-amber-500/30 bg-amber-500/10'
+                    : 'border-zinc-500/30 bg-zinc-500/10'
+                }`}>
+                  {isReadyToConfirm ? (
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-medium text-amber-400">Did this happen as planned?</p>
+                        <p className="mt-1 text-sm text-amber-500/80">
+                          Confirm this entry to finalize it with AI categorization and commentary.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-5 w-5 text-zinc-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-medium text-zinc-300">This entry hasn&apos;t happened yet</p>
+                        <p className="mt-1 text-sm text-zinc-400">
+                          You can confirm it after {formatTime(entry.end_time)}.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Activity & Category */}
               <div>
                 <h3 className="text-xl font-semibold text-foreground">
                   {entry.activity}
                 </h3>
-                <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium ${CATEGORY_COLORS[entry.category]}`}>
-                  {CATEGORY_LABELS[entry.category]}
-                </span>
+                {!isPending && entry.category && (
+                  <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium ${CATEGORY_COLORS[entry.category]}`}>
+                    {CATEGORY_LABELS[entry.category]}
+                  </span>
+                )}
+                {(isPending || !entry.category) && (
+                  <span className="mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium bg-zinc-500/20 text-zinc-400">
+                    Pending
+                  </span>
+                )}
               </div>
 
               {/* Details Grid */}
@@ -368,8 +519,8 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                 </div>
               )}
 
-              {/* AI Commentary */}
-              {entry.commentary && (
+              {/* AI Commentary - only for confirmed entries */}
+              {!isPending && entry.commentary && (
                 <div className="rounded-lg border bg-card p-4">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Commentary
@@ -451,7 +602,59 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                 </Button>
               </div>
             </div>
+          ) : isReadyToConfirm ? (
+            /* Pending entry ready to confirm */
+            <div className="flex w-full items-center justify-between">
+              <Button
+                variant="ghost"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Button>
+                <Button
+                  onClick={handleConfirmEntry}
+                  disabled={isConfirming}
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                >
+                  {isConfirming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Confirming...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Confirm
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : isPending ? (
+            /* Pending entry not yet ready to confirm */
+            <div className="flex w-full items-center justify-between">
+              <Button
+                variant="ghost"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+              <Button onClick={() => setIsEditing(true)}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+            </div>
           ) : (
+            /* Confirmed entry */
             <div className="flex w-full items-center justify-between">
               <Button
                 variant="ghost"

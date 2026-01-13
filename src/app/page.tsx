@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { TimeEntry, getLocalDateString } from '@/lib/types'
 import TimeEntryForm from '@/components/TimeEntryForm'
-import TimelineView, { CalendarEvent } from '@/components/TimelineView'
+import TimelineView, { DragCreateData } from '@/components/TimelineView'
+import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import WeeklySummary from '@/components/WeeklySummary'
 import StatsCard from '@/components/StatsCard'
 import QuickLogModal from '@/components/QuickLogModal'
@@ -20,29 +21,40 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
-import { Menu, Calendar, BarChart3, Search, LogOut, ChevronLeft, ChevronRight, Plus, X, Zap, Loader2 } from 'lucide-react'
+import CalendarPicker from '@/components/CalendarPicker'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import { Menu, Calendar, BarChart3, Search, LogOut, ChevronLeft, ChevronRight, Plus, X, Zap, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 
 type View = 'day' | 'weekly'
 
-function formatDateDisplay(dateStr: string): string {
+function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
   const date = new Date(dateStr + 'T00:00:00')
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
 
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const isFuture = date > today
+
   if (dateStr === getLocalDateString(today)) {
-    return 'Today'
+    return { label: 'Today', date: formattedDate, isFuture: false }
   } else if (dateStr === getLocalDateString(yesterday)) {
-    return 'Yesterday'
+    return { label: 'Yesterday', date: formattedDate, isFuture: false }
+  } else if (dateStr === getLocalDateString(tomorrow)) {
+    return { label: 'Tomorrow', date: formattedDate, isFuture: true }
   }
 
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' })
+  return { label: weekday, date: formattedDate, isFuture }
 }
 
 function getAdjacentDate(dateStr: string, direction: 'prev' | 'next'): string {
@@ -51,8 +63,23 @@ function getAdjacentDate(dateStr: string, direction: 'prev' | 'next'): string {
   return getLocalDateString(date)
 }
 
+function formatTimeAgo(date: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays}d ago`
+}
+
 export default function Home() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update: updateSession } = useSession()
   const router = useRouter()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -60,24 +87,122 @@ export default function Home() {
   const [view, setView] = useState<View>('day')
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [isFormExpanded, setIsFormExpanded] = useState(false)
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<{ message: string } | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0) // Force re-render key
+  const [dragCreateData, setDragCreateData] = useState<DragCreateData | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
+  const lastVisibilityCheck = useRef<number>(Date.now())
+
+  // Use cached calendar events from context
+  const {
+    getEventsForDate,
+    fetchEventsForDate,
+    refreshCalendar,
+    isLoading: isCalendarLoading,
+    lastSynced,
+    isDateInCache
+  } = useCalendar()
+
+  // Get calendar events for the selected date from cache
+  const calendarEvents = getEventsForDate(selectedDate).filter(
+    (e: CalendarEvent) => !e.isAllDay && e.startTime && e.endTime
+  )
 
   // Get user ID from session
   const userId = session?.user?.id || session?.user?.email || ''
 
   const today = getLocalDateString()
   const isToday = selectedDate === today
-  const canGoNext = selectedDate < today
+  const dateDisplay = formatDateDisplay(selectedDate)
+  const isFutureDay = dateDisplay.isFuture
+  const isPastDay = !isToday && !isFutureDay
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated or if there's a token error
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
     }
   }, [status, router])
+
+  // Handle session errors (e.g., refresh token expired/revoked)
+  const hasSessionError = session?.error === 'RefreshAccessTokenError'
+
+  // Keyboard shortcut: Cmd+K (Mac) or Ctrl+K (Windows/Linux) to open Quick Log
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only on day view
+      if (view !== 'day') return
+
+      // Cmd+K or Ctrl+K
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setIsQuickLogOpen(true)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [view])
+
+  // Handle visibility change - refresh data when user returns to app
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now()
+        const timeSinceLastCheck = now - lastVisibilityCheck.current
+        lastVisibilityCheck.current = now
+
+        // Only refresh if the app has been hidden for more than 1 minute
+        if (timeSinceLastCheck > 60 * 1000) {
+          // Check if the day has changed while app was idle
+          const currentToday = getLocalDateString()
+          if (selectedDate !== currentToday && isToday) {
+            // Update to new day if we were viewing "today"
+            setSelectedDate(currentToday)
+          }
+
+          // Try to refresh the session
+          try {
+            await updateSession()
+          } catch (err) {
+            console.error('Failed to refresh session:', err)
+          }
+
+          // Force re-render of scroll containers
+          setRefreshKey(prev => prev + 1)
+
+          // Re-fetch data if we're on the day view
+          if (view === 'day' && userId) {
+            setIsLoading(true)
+            // Small delay to ensure DOM is ready after visibility change
+            setTimeout(() => {
+              // These will be called via the useEffect dependencies
+            }, 100)
+          }
+        }
+      }
+    }
+
+    // Handle page focus (for desktop browsers)
+    const handleFocus = () => {
+      const now = Date.now()
+      const timeSinceLastCheck = now - lastVisibilityCheck.current
+
+      // Only trigger on significant idle time
+      if (timeSinceLastCheck > 60 * 1000) {
+        handleVisibilityChange()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [selectedDate, isToday, view, userId, updateSession])
 
   // Get the last entry's end time for Quick Log auto-fill
   const lastEntryEndTime = entries.length > 0
@@ -104,33 +229,16 @@ export default function Home() {
     setIsLoading(false)
   }, [selectedDate, userId])
 
-  // Fetch calendar events for the selected date
-  const fetchCalendarEvents = useCallback(async () => {
-    if (!session?.accessToken) return
-
-    try {
-      // Get user's timezone from browser
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      const response = await fetch(`/api/calendar/events?date=${selectedDate}&timezone=${encodeURIComponent(timezone)}`)
-      if (response.ok) {
-        const data = await response.json()
-        // Filter out all-day events and events without times
-        const timedEvents = (data.events || []).filter(
-          (e: CalendarEvent) => !e.isAllDay && e.startTime && e.endTime
-        )
-        setCalendarEvents(timedEvents)
-      }
-    } catch (err) {
-      console.error('Failed to fetch calendar events:', err)
-    }
-  }, [selectedDate, session?.accessToken])
-
+  // Fetch entries and calendar events for the selected date
   useEffect(() => {
     if (view === 'day') {
       fetchEntries()
-      fetchCalendarEvents()
+      // Fetch calendar events if date is not in cache
+      if (!isDateInCache(selectedDate)) {
+        fetchEventsForDate(selectedDate)
+      }
     }
-  }, [fetchEntries, fetchCalendarEvents, view])
+  }, [fetchEntries, view, refreshKey, selectedDate, isDateInCache, fetchEventsForDate])
 
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate)
@@ -144,6 +252,12 @@ export default function Home() {
 
   const showToast = (message: string) => {
     setToast({ message })
+  }
+
+  // Handle drag to create new entry
+  const handleDragCreate = (data: DragCreateData) => {
+    setDragCreateData(data)
+    setIsQuickLogOpen(true)
   }
 
   // Show loading state while checking authentication
@@ -160,7 +274,32 @@ export default function Home() {
     return null
   }
 
+  // Show session error state (token refresh failed)
+  if (hasSessionError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="max-w-md text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
+            <AlertTriangle className="h-8 w-8 text-amber-500" />
+          </div>
+          <h1 className="text-xl font-semibold text-foreground">Session Expired</h1>
+          <p className="mt-2 text-muted-foreground">
+            Your Google Calendar access has expired or been revoked. Please sign in again to continue.
+          </p>
+          <Button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="mt-6"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign in again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-2xl px-4 py-8">
         {/* Header */}
@@ -172,7 +311,7 @@ export default function Home() {
               {/* Navigation dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm">
+                  <Button variant="ghost" size="icon-sm" aria-label="Open navigation menu">
                     <Menu className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -189,18 +328,34 @@ export default function Home() {
                     Weekly Summary
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => dateInputRef.current?.showPicker()}>
-                    <Search className="h-4 w-4" />
-                    Go to date...
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Search className="h-4 w-4" />
+                      Go to date
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="p-0">
+                      <CalendarPicker
+                        selectedDate={selectedDate}
+                        onDateSelect={(date) => {
+                          handleDateChange(date)
+                        }}
+                        datesWithEntries={entries.map(e => e.date)}
+                      />
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => refreshCalendar()}
+                    disabled={isCalendarLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isCalendarLoading ? 'animate-spin' : ''}`} />
+                    {isCalendarLoading ? 'Syncing...' : 'Sync Calendar'}
                   </DropdownMenuItem>
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    value={selectedDate}
-                    max={today}
-                    onChange={(e) => handleDateChange(e.target.value)}
-                    className="sr-only"
-                  />
+                  {lastSynced && (
+                    <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+                      Last synced: {formatTimeAgo(lastSynced)}
+                    </DropdownMenuLabel>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
                     {session?.user?.email}
@@ -216,14 +371,36 @@ export default function Home() {
               </DropdownMenu>
             </div>
 
-            {/* Quick Log button */}
-            {view === 'day' && isToday && (
+            {/* Quick Log / Plan / Add button - available on ALL days */}
+            {view === 'day' && (
               <Button
                 onClick={() => setIsQuickLogOpen(true)}
-                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+                title={isFutureDay ? 'Plan entry (⌘K)' : isPastDay ? 'Add entry (⌘K)' : 'Quick Log (⌘K)'}
+                aria-label={isFutureDay ? 'Plan a future entry' : isPastDay ? 'Add a past entry' : 'Quick log a time entry'}
+                className={`shadow-lg text-white ${
+                  isFutureDay
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
+                    : isPastDay
+                      ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
+                      : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                }`}
               >
-                <Zap className="h-4 w-4" />
-                <span className="hidden sm:inline">Quick Log</span>
+                {isFutureDay ? (
+                  <>
+                    <Calendar className="h-4 w-4" />
+                    <span className="hidden sm:inline">Plan</span>
+                  </>
+                ) : isPastDay ? (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Add Entry</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4" />
+                    <span className="hidden sm:inline">Quick Log</span>
+                  </>
+                )}
               </Button>
             )}
           </div>
@@ -244,23 +421,20 @@ export default function Home() {
 
               <button
                 onClick={() => dateInputRef.current?.showPicker()}
-                className="flex items-center gap-2 rounded-lg px-4 py-2 hover:bg-accent"
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 hover:bg-accent"
               >
                 <span className="text-lg font-semibold text-foreground">
-                  {formatDateDisplay(selectedDate)}
+                  {dateDisplay.label}
                 </span>
-                {!isToday && (
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                )}
+                <span className="text-sm text-muted-foreground">
+                  {dateDisplay.date}
+                </span>
               </button>
 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => canGoNext && handleDateChange(getAdjacentDate(selectedDate, 'next'))}
-                disabled={!canGoNext}
+                onClick={() => handleDateChange(getAdjacentDate(selectedDate, 'next'))}
                 aria-label="Next day"
               >
                 <ChevronRight className="h-5 w-5" />
@@ -270,47 +444,51 @@ export default function Home() {
             {/* Stats Card - only show for today */}
             {isToday && <StatsCard userId={userId} />}
 
-            {/* Add Entry - Collapsible */}
-            {isToday && (
-              <div className="mb-6">
-                {isFormExpanded ? (
-                  <section className="rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h2 className="text-lg font-semibold text-foreground">
-                        Add Entry
-                      </h2>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setIsFormExpanded(false)}
-                      >
-                        <X className="h-5 w-5" />
-                      </Button>
-                    </div>
-                    <TimeEntryForm onEntryAdded={handleRefresh} onShowToast={showToast} userId={userId} />
-                  </section>
-                ) : (
-                  <button
-                    onClick={() => setIsFormExpanded(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-foreground"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add detailed entry
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Add Entry - Collapsible - available on ALL days */}
+            <div className="mb-6">
+              {isFormExpanded ? (
+                <section className="rounded-xl border bg-card p-6 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-foreground">
+                      {isFutureDay ? 'Plan Entry' : 'Add Entry'}
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setIsFormExpanded(false)}
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <TimeEntryForm onEntryAdded={handleRefresh} onShowToast={showToast} userId={userId} selectedDate={selectedDate} />
+                </section>
+              ) : (
+                <button
+                  onClick={() => setIsFormExpanded(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-foreground"
+                  aria-label={isFutureDay ? 'Open form to plan a detailed entry' : 'Open form to add a detailed entry'}
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  {isFutureDay ? 'Plan detailed entry' : 'Add detailed entry'}
+                </button>
+              )}
+            </div>
 
             {/* Timeline */}
             <section>
               <TimelineView
+                key={refreshKey}
                 entries={entries}
                 calendarEvents={calendarEvents}
                 isLoading={isLoading}
                 onEntryDeleted={fetchEntries}
                 onGhostEntryClick={setSelectedGhostEvent}
+                onDragCreate={handleDragCreate}
+                onShowToast={showToast}
                 selectedDate={selectedDate}
                 isToday={isToday}
+                isFutureDay={isFutureDay}
+                isPastDay={isPastDay}
               />
             </section>
           </>
@@ -335,13 +513,24 @@ export default function Home() {
 
       <QuickLogModal
         isOpen={isQuickLogOpen}
-        onClose={() => setIsQuickLogOpen(false)}
-        onEntryAdded={fetchEntries}
+        onClose={() => {
+          setIsQuickLogOpen(false)
+          setDragCreateData(null)
+        }}
+        onEntryAdded={() => {
+          fetchEntries()
+          setDragCreateData(null)
+        }}
         lastEntryEndTime={lastEntryEndTime}
+        initialStartTime={dragCreateData?.startTime}
+        initialEndTime={dragCreateData?.endTime}
         onShowToast={showToast}
         userId={userId}
         calendarEvents={calendarEvents}
         entries={entries}
+        selectedDate={selectedDate}
+        isFutureDay={isFutureDay}
+        isPastDay={isPastDay}
       />
 
       <GhostEntryModal
@@ -350,7 +539,7 @@ export default function Home() {
         onConfirm={() => {
           setSelectedGhostEvent(null)
           fetchEntries()
-          fetchCalendarEvents()
+          // No need to refresh calendar - ghost events are filtered by entries
         }}
         onShowToast={showToast}
         userId={userId}
@@ -365,5 +554,6 @@ export default function Home() {
         />
       )}
     </div>
+    </ErrorBoundary>
   )
 }

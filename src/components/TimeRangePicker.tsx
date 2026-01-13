@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
+import { roundToNearest15, addMinutesToTime, calculateDuration, formatDuration, formatTimeDisplay } from '@/lib/time-utils'
 
 interface TimeRangePickerProps {
   startTime: string
@@ -32,60 +33,6 @@ function generateTimeSlots(): string[] {
 }
 
 const TIME_SLOTS = generateTimeSlots()
-
-// Round time to nearest 15-minute interval
-function roundToNearest15(date: Date = new Date()): string {
-  const minutes = date.getMinutes()
-  const roundedMinutes = Math.round(minutes / 15) * 15
-
-  let hours = date.getHours()
-  let mins = roundedMinutes
-
-  if (mins >= 60) {
-    mins = 0
-    hours = (hours + 1) % 24
-  }
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
-}
-
-// Add minutes to a time string
-function addMinutes(time: string, minutesToAdd: number): string {
-  const [hours, minutes] = time.split(':').map(Number)
-  const totalMinutes = hours * 60 + minutes + minutesToAdd
-  const newHours = Math.floor(totalMinutes / 60) % 24
-  const newMinutes = totalMinutes % 60
-  return `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`
-}
-
-// Calculate duration between two times in minutes
-function calculateDuration(start: string, end: string): number {
-  if (!start || !end) return 0
-  const [startH, startM] = start.split(':').map(Number)
-  const [endH, endM] = end.split(':').map(Number)
-  const startTotal = startH * 60 + startM
-  let endTotal = endH * 60 + endM
-  if (endTotal <= startTotal) endTotal += 24 * 60 // Handle crossing midnight
-  return endTotal - startTotal
-}
-
-// Format duration for display
-function formatDuration(minutes: number): string {
-  if (minutes <= 0) return ''
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
-}
-
-// Format time for display (12-hour format)
-function formatTimeDisplay(time: string): string {
-  if (!time) return '--:--'
-  const [hours, minutes] = time.split(':').map(Number)
-  const period = hours >= 12 ? 'PM' : 'AM'
-  const hour12 = hours % 12 || 12
-  return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
-}
 
 interface TimeColumnProps {
   value: string
@@ -176,7 +123,7 @@ export default function TimeRangePicker({
   // Handle start time change - auto-snap end time to start + 30 minutes
   const handleStartChange = useCallback((time: string) => {
     setTempStart(time)
-    setTempEnd(addMinutes(time, 30))
+    setTempEnd(addMinutesToTime(time, 30))
   }, [])
 
   // Initialize with smart defaults when opening
@@ -188,12 +135,12 @@ export default function TimeRangePicker({
     } else if (startTime) {
       // Have start, default end to start + 30min
       setTempStart(startTime)
-      setTempEnd(addMinutes(startTime, 30))
+      setTempEnd(addMinutesToTime(startTime, 30))
     } else {
       // Smart defaults: current time rounded to 15min, end 30min later
       const defaultStart = roundToNearest15()
       setTempStart(defaultStart)
-      setTempEnd(addMinutes(defaultStart, 30))
+      setTempEnd(addMinutesToTime(defaultStart, 30))
     }
     setIsOpen(true)
   }

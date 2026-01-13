@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
 interface CalendarEvent {
   id: string
@@ -39,6 +40,24 @@ function formatTimeInTimezone(isoString: string, timezone: string): string {
     // Fallback if timezone is invalid
     const date = new Date(isoString)
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+}
+
+// Format a date to YYYY-MM-DD in the specified timezone
+function formatDateInTimezone(isoString: string, timezone: string): string {
+  try {
+    const date = new Date(isoString)
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    return formatter.format(date) // en-CA locale gives YYYY-MM-DD format
+  } catch {
+    // Fallback if timezone is invalid
+    const date = new Date(isoString)
+    return date.toISOString().split('T')[0]
   }
 }
 
@@ -104,17 +123,32 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get date and timezone from query params
+    // Rate limit by user ID
+    const userId = session.user?.id || session.user?.email || 'unknown'
+    const rateLimitKey = `calendar:${userId}`
+    const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMITS.calendar)
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        { status: 429, headers: getRateLimitHeaders(rateLimitResult) }
+      )
+    }
+
+    // Get date range and timezone from query params
     const { searchParams } = new URL(request.url)
-    const dateParam = searchParams.get('date')
+    const startDate = searchParams.get('start')
+    const endDate = searchParams.get('end')
     const timezone = searchParams.get('timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone
 
-    // Use the date parameter directly
-    const targetDate = dateParam || new Date().toISOString().split('T')[0]
+    // Use provided date range or default to today
+    const today = new Date().toISOString().split('T')[0]
+    const rangeStart = startDate || today
+    const rangeEnd = endDate || today
 
-    // Calculate the UTC timestamps for the start and end of the day in the user's timezone
-    const timeMin = getTimestampForTimezone(targetDate, 'start', timezone)
-    const timeMax = getTimestampForTimezone(targetDate, 'end', timezone)
+    // Calculate the UTC timestamps for the start of first day and end of last day
+    const timeMin = getTimestampForTimezone(rangeStart, 'start', timezone)
+    const timeMax = getTimestampForTimezone(rangeEnd, 'end', timezone)
 
     // Fetch events from Google Calendar with timezone parameter
     const calendarResponse = await fetch(
@@ -137,9 +171,13 @@ export async function GET(request: NextRequest) {
       const errorText = await calendarResponse.text()
       console.error('Google Calendar API error:', errorText)
 
-      if (calendarResponse.status === 401) {
+      if (calendarResponse.status === 401 || calendarResponse.status === 403) {
+        // Token is invalid or revoked - client should trigger re-auth
         return NextResponse.json(
-          { error: 'Calendar access token expired. Please sign out and sign in again.' },
+          {
+            error: 'Calendar access token expired or revoked. Please sign in again.',
+            code: 'TOKEN_EXPIRED'
+          },
           { status: 401 }
         )
       }
@@ -159,11 +197,17 @@ export async function GET(request: NextRequest) {
         // Handle both timed events and all-day events
         let startTime = ''
         let endTime = ''
+        let eventDate = ''
 
         if (event.start.dateTime) {
           // Timed event - convert to user's timezone
           startTime = formatTimeInTimezone(event.start.dateTime, timezone)
           endTime = formatTimeInTimezone(event.end.dateTime || event.start.dateTime, timezone)
+          // Extract date in user's timezone
+          eventDate = formatDateInTimezone(event.start.dateTime, timezone)
+        } else if (event.start.date) {
+          // All-day event - date is already in YYYY-MM-DD format
+          eventDate = event.start.date
         }
 
         return {
@@ -171,6 +215,7 @@ export async function GET(request: NextRequest) {
           title: event.summary,
           startTime,
           endTime,
+          date: eventDate,
           isAllDay: !event.start.dateTime,
         }
       })

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { TimeEntry, CATEGORY_LABELS, TimeCategory } from '@/lib/types'
+import { formatDuration } from '@/lib/time-utils'
 import TimeEntryModal from './TimeEntryModal'
 
 interface TimeEntriesListProps {
@@ -22,13 +23,6 @@ const CATEGORY_COLORS: Record<TimeCategory, string> = {
   relationships: 'bg-[#b08d8d]/20 text-[#806060] dark:bg-[#b08d8d]/30 dark:text-[#d0adad]',
   distraction: 'bg-[#c97e7e]/20 text-[#995e5e] dark:bg-[#c97e7e]/30 dark:text-[#e9aeae]',
   other: 'bg-[#71717a]/20 text-[#52525b] dark:bg-[#71717a]/30 dark:text-[#a1a1aa]',
-}
-
-function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
 }
 
 export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: TimeEntriesListProps) {
@@ -59,12 +53,16 @@ export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: 
         <span className="font-medium">Total: {formatDuration(totalMinutes)}</span>
       </div>
 
-      <ul className="space-y-2">
+      <ul className="space-y-2" role="list" aria-label="Time entries for today">
         {entries.map((entry) => (
           <li
             key={entry.id}
             onClick={() => setSelectedEntry(entry)}
-            className="cursor-pointer rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-blue-600 dark:hover:bg-blue-900/10"
+            onKeyDown={(e) => e.key === 'Enter' && setSelectedEntry(entry)}
+            tabIndex={0}
+            role="button"
+            aria-label={`${entry.activity}, ${formatDuration(entry.duration_minutes)}, ${entry.category ? CATEGORY_LABELS[entry.category] : 'Pending'}. Click to view details.`}
+            className="cursor-pointer rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-blue-600 dark:hover:bg-blue-900/10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -72,8 +70,8 @@ export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: 
                   <span className="font-medium text-zinc-900 dark:text-zinc-100">
                     {entry.activity}
                   </span>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[entry.category]}`}>
-                    {CATEGORY_LABELS[entry.category]}
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${entry.category ? CATEGORY_COLORS[entry.category] : 'bg-zinc-500/20 text-zinc-400'}`}>
+                    {entry.category ? CATEGORY_LABELS[entry.category] : 'Pending'}
                   </span>
                 </div>
                 {entry.description && (
@@ -86,7 +84,7 @@ export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: 
                 <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
                   {formatDuration(entry.duration_minutes)}
                 </span>
-                <svg className="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>

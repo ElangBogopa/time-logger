@@ -162,13 +162,20 @@ export default function GhostEntryModal({
             .from('time_entries')
             .update({ commentary })
             .eq('id', insertedEntry.id)
+        } else {
+          generatedCommentary = null
         }
       } catch {
-        console.error('Failed to generate commentary')
+        generatedCommentary = null
       }
 
       onConfirm()
-      onShowToast(generatedCommentary || 'Calendar event confirmed!')
+      // Show different toast based on whether commentary generated
+      if (generatedCommentary) {
+        onShowToast(generatedCommentary)
+      } else {
+        onShowToast('Calendar event confirmed! (AI commentary unavailable)')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save entry')
     } finally {

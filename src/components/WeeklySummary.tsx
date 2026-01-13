@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TimeEntry, TimeCategory, CATEGORY_LABELS, getLocalDateString } from '@/lib/types'
+import { formatDuration } from '@/lib/time-utils'
 
 const CATEGORY_BAR_COLORS: Record<TimeCategory, string> = {
   deep_work: 'bg-[#64748b]',
@@ -23,14 +24,6 @@ interface CategoryStats {
   minutes: number
   previousMinutes: number
   change: number
-}
-
-function formatDuration(minutes: number): string {
-  if (minutes === 0) return '0m'
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
 }
 
 function getWeekDateRange(weeksAgo: number = 0): { start: string; end: string } {
@@ -95,15 +88,17 @@ export default function WeeklySummary({ userId }: WeeklySummaryProps) {
         .gte('date', previousWeek.start)
         .lte('date', previousWeek.end)
 
-      // Calculate stats by category
+      // Calculate stats by category (skip entries without a category - pending entries)
       const currentByCategory: Record<string, number> = {}
       const previousByCategory: Record<string, number> = {}
 
       ;(currentEntries || []).forEach((entry: TimeEntry) => {
+        if (!entry.category) return // Skip pending entries
         currentByCategory[entry.category] = (currentByCategory[entry.category] || 0) + entry.duration_minutes
       })
 
       ;(previousEntries || []).forEach((entry: TimeEntry) => {
+        if (!entry.category) return // Skip pending entries
         previousByCategory[entry.category] = (previousByCategory[entry.category] || 0) + entry.duration_minutes
       })
 
