@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { TimeEntry, TimeCategory, isPendingEntryReadyToConfirm } from '@/lib/types'
 import { formatDuration, formatHour, timeToMinutes, minutesToTime, formatTimeDisplay } from '@/lib/time-utils'
 import TimeEntryModal from './TimeEntryModal'
-import { Clock } from 'lucide-react'
+import { Clock, X, Eye } from 'lucide-react'
 
 export interface CalendarEvent {
   id: string
@@ -32,6 +32,7 @@ interface TimelineViewProps {
   isToday?: boolean
   isFutureDay?: boolean
   isPastDay?: boolean
+  canLog?: boolean
 }
 
 const PIXELS_PER_MINUTE = 1.5
@@ -162,7 +163,8 @@ export default function TimelineView({
   onShowToast,
   isToday = true,
   isFutureDay = false,
-  isPastDay = false
+  isPastDay = false,
+  canLog = true
 }: TimelineViewProps) {
   const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null)
   const [promptAddTimes, setPromptAddTimes] = useState(false)
@@ -187,11 +189,53 @@ export default function TimelineView({
     hasMoved: boolean
   } | null>(null)
 
-  const DRAG_THRESHOLD = 5 // pixels - if moved less than this, treat as click
+  // Touch-specific state
+  const [isTouchDragging, setIsTouchDragging] = useState(false)
+  const touchHoldTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const touchDataRef = useRef<{
+    startTime: string
+    endTime: string
+    startY: number
+    startClientY: number
+    hasMoved: boolean
+    isHoldConfirmed: boolean
+  } | null>(null)
 
-  // Filter out calendar events that overlap with confirmed entries
+  const DRAG_THRESHOLD = 5 // pixels - if moved less than this, treat as click
+  const TOUCH_HOLD_DELAY = 150 // ms - hold this long before treating as drag-to-create
+  const GHOST_TAP_THRESHOLD = 150 // ms - release before this = tap to confirm
+
+  // Ghost event interaction tracking (tap vs hold+drag)
+  const ghostInteractionRef = useRef<{
+    eventId: string
+    event: CalendarEvent
+    startY: number
+    startClientY: number
+    isTouch: boolean
+    hasMoved: boolean
+    tapTimerFired: boolean
+  } | null>(null)
+  const ghostTapTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Dismissed ghost events (hidden from view)
+  const [dismissedEventIds, setDismissedEventIds] = useState<Set<string>>(new Set())
+  const [showDismissed, setShowDismissed] = useState(false)
+
+  const dismissGhostEvent = useCallback((eventId: string) => {
+    setDismissedEventIds(prev => new Set(prev).add(eventId))
+  }, [])
+
+  const restoreAllDismissed = useCallback(() => {
+    setDismissedEventIds(new Set())
+    setShowDismissed(false)
+  }, [])
+
+  // Filter out calendar events that overlap with confirmed entries (and dismissed ones)
   const ghostEvents = useMemo(() => {
     return calendarEvents.filter(event => {
+      // Filter out dismissed events (unless showing dismissed)
+      if (!showDismissed && dismissedEventIds.has(event.id)) return false
+
       const eventStart = timeToMinutes(event.startTime)
       const eventEnd = timeToMinutes(event.endTime)
 
@@ -208,7 +252,7 @@ export default function TimelineView({
         return overlap > eventDuration * 0.5
       })
     })
-  }, [calendarEvents, entries])
+  }, [calendarEvents, entries, dismissedEventIds, showDismissed])
 
   // Separate entries with times from those without
   const { timedEntries, untimedEntries } = useMemo(() => {
@@ -390,6 +434,414 @@ export default function TimelineView({
     }
   }, [isDragging, onDragCreate])
 
+  // TOUCH START: Begin touch tracking with hold delay
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Don't start drag on existing entries or ghost blocks
+    const target = e.target as HTMLElement
+    if (target.closest('[data-entry-block]') || target.closest('[data-ghost-block]')) {
+      return
+    }
+
+    // Allow drag on ALL days (past, today, future)
+    if (!onDragCreate) {
+      return
+    }
+
+    const touch = e.touches[0]
+    const time = yToTime(touch.clientY)
+
+    // Initialize touch data
+    touchDataRef.current = {
+      startTime: time,
+      endTime: time,
+      startY: touch.clientY,
+      startClientY: touch.clientY,
+      hasMoved: false,
+      isHoldConfirmed: false
+    }
+
+    // Start hold timer - if they hold for TOUCH_HOLD_DELAY ms, we enter drag mode
+    touchHoldTimerRef.current = setTimeout(() => {
+      if (touchDataRef.current && !touchDataRef.current.hasMoved) {
+        touchDataRef.current.isHoldConfirmed = true
+        setIsTouchDragging(true)
+        setDragPreviewStart(touchDataRef.current.startTime)
+        setDragPreviewEnd(minutesToTime(timeToMinutes(touchDataRef.current.startTime) + 30))
+
+        // Haptic feedback if supported
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+      }
+    }, TOUCH_HOLD_DELAY)
+  }
+
+  // TOUCH MOVE and TOUCH END handlers
+  useEffect(() => {
+    if (!isTouchDragging && !touchDataRef.current) return
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!touchDataRef.current) return
+
+      const touch = e.touches[0]
+      const deltaY = Math.abs(touch.clientY - touchDataRef.current.startClientY)
+
+      // If user moved before hold was confirmed, cancel the hold timer and let scroll happen
+      if (!touchDataRef.current.isHoldConfirmed) {
+        if (deltaY > DRAG_THRESHOLD) {
+          // User is scrolling - cancel hold timer
+          if (touchHoldTimerRef.current) {
+            clearTimeout(touchHoldTimerRef.current)
+            touchHoldTimerRef.current = null
+          }
+          touchDataRef.current.hasMoved = true
+        }
+        return // Let default scroll happen
+      }
+
+      // Hold was confirmed - this is a drag-to-create operation
+      e.preventDefault() // Prevent scrolling
+
+      touchDataRef.current.hasMoved = true
+
+      // Calculate the current time at touch position
+      const currentTime = yToTime(touch.clientY)
+      touchDataRef.current.endTime = currentTime
+
+      // Update preview - handle dragging up or down
+      const startMins = timeToMinutes(touchDataRef.current.startTime)
+      const endMins = timeToMinutes(currentTime)
+
+      if (endMins >= startMins) {
+        setDragPreviewStart(touchDataRef.current.startTime)
+        setDragPreviewEnd(currentTime)
+      } else {
+        setDragPreviewStart(currentTime)
+        setDragPreviewEnd(touchDataRef.current.startTime)
+      }
+    }
+
+    const handleTouchEnd = () => {
+      // Clear hold timer
+      if (touchHoldTimerRef.current) {
+        clearTimeout(touchHoldTimerRef.current)
+        touchHoldTimerRef.current = null
+      }
+
+      if (!touchDataRef.current) return
+
+      const { startTime, endTime, isHoldConfirmed, hasMoved } = touchDataRef.current
+
+      // Only create entry if hold was confirmed (user held long enough to enter drag mode)
+      if (isHoldConfirmed) {
+        let finalStart: string
+        let finalEnd: string
+
+        if (hasMoved) {
+          // User actually dragged - use the dragged range
+          const startMins = timeToMinutes(startTime)
+          const endMins = timeToMinutes(endTime)
+
+          if (endMins >= startMins) {
+            finalStart = startTime
+            finalEnd = endTime
+          } else {
+            // Dragged upward - swap
+            finalStart = endTime
+            finalEnd = startTime
+          }
+
+          // Ensure minimum 15-minute duration for drags
+          const duration = timeToMinutes(finalEnd) - timeToMinutes(finalStart)
+          if (duration < 15) {
+            finalEnd = minutesToTime(timeToMinutes(finalStart) + 15)
+          }
+        } else {
+          // User just held (didn't drag) - default to 30-minute duration
+          finalStart = startTime
+          finalEnd = minutesToTime(timeToMinutes(startTime) + 30)
+        }
+
+        // Call the callback to open Quick Log modal
+        if (onDragCreate) {
+          onDragCreate({ startTime: finalStart, endTime: finalEnd })
+        }
+      }
+
+      // Reset touch state
+      touchDataRef.current = null
+      setIsTouchDragging(false)
+      setDragPreviewStart(null)
+      setDragPreviewEnd(null)
+    }
+
+    const handleTouchCancel = () => {
+      // Clear hold timer
+      if (touchHoldTimerRef.current) {
+        clearTimeout(touchHoldTimerRef.current)
+        touchHoldTimerRef.current = null
+      }
+
+      // Reset touch state
+      touchDataRef.current = null
+      setIsTouchDragging(false)
+      setDragPreviewStart(null)
+      setDragPreviewEnd(null)
+    }
+
+    // Use passive: false for touchmove to allow preventDefault
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('touchend', handleTouchEnd)
+    window.addEventListener('touchcancel', handleTouchCancel)
+
+    return () => {
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+      window.removeEventListener('touchcancel', handleTouchCancel)
+    }
+  }, [isTouchDragging, onDragCreate])
+
+  // Cleanup hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (touchHoldTimerRef.current) {
+        clearTimeout(touchHoldTimerRef.current)
+      }
+      if (ghostTapTimerRef.current) {
+        clearTimeout(ghostTapTimerRef.current)
+      }
+    }
+  }, [])
+
+  // Cancel drag function - resets all drag state without creating entry
+  const cancelDrag = useCallback(() => {
+    // Clear mouse drag state
+    dragDataRef.current = null
+    setIsDragging(false)
+
+    // Clear touch drag state
+    if (touchHoldTimerRef.current) {
+      clearTimeout(touchHoldTimerRef.current)
+      touchHoldTimerRef.current = null
+    }
+    touchDataRef.current = null
+    setIsTouchDragging(false)
+
+    // Clear ghost interaction state
+    if (ghostTapTimerRef.current) {
+      clearTimeout(ghostTapTimerRef.current)
+      ghostTapTimerRef.current = null
+    }
+    ghostInteractionRef.current = null
+
+    // Clear preview
+    setDragPreviewStart(null)
+    setDragPreviewEnd(null)
+  }, [])
+
+  // Escape key to cancel drag
+  useEffect(() => {
+    const isAnyDragActive = isDragging || isTouchDragging
+
+    if (!isAnyDragActive) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        cancelDrag()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isDragging, isTouchDragging, cancelDrag])
+
+  // GHOST EVENT: Mouse down handler - detect tap vs hold+drag
+  const handleGhostMouseDown = (e: React.MouseEvent, event: CalendarEvent) => {
+    if (e.button !== 0) return // Only left click
+    e.stopPropagation() // Don't trigger grid mousedown yet
+
+    const time = yToTime(e.clientY)
+
+    ghostInteractionRef.current = {
+      eventId: event.id,
+      event,
+      startY: e.clientY,
+      startClientY: e.clientY,
+      isTouch: false,
+      hasMoved: false,
+      tapTimerFired: false
+    }
+
+    // Start timer - if it fires, user is holding (potential drag)
+    ghostTapTimerRef.current = setTimeout(() => {
+      if (ghostInteractionRef.current && !ghostInteractionRef.current.hasMoved) {
+        ghostInteractionRef.current.tapTimerFired = true
+        // Start drag-to-create mode
+        dragDataRef.current = {
+          startTime: time,
+          endTime: time,
+          startY: e.clientY,
+          hasMoved: false
+        }
+        setIsDragging(true)
+        setDragPreviewStart(time)
+        setDragPreviewEnd(minutesToTime(timeToMinutes(time) + 30))
+      }
+    }, GHOST_TAP_THRESHOLD)
+  }
+
+  // GHOST EVENT: Touch start handler
+  const handleGhostTouchStart = (e: React.TouchEvent, event: CalendarEvent) => {
+    e.stopPropagation() // Don't trigger grid touchstart yet
+
+    const touch = e.touches[0]
+    const time = yToTime(touch.clientY)
+
+    ghostInteractionRef.current = {
+      eventId: event.id,
+      event,
+      startY: touch.clientY,
+      startClientY: touch.clientY,
+      isTouch: true,
+      hasMoved: false,
+      tapTimerFired: false
+    }
+
+    // Start timer - if it fires, user is holding (potential drag)
+    ghostTapTimerRef.current = setTimeout(() => {
+      if (ghostInteractionRef.current && !ghostInteractionRef.current.hasMoved) {
+        ghostInteractionRef.current.tapTimerFired = true
+        // Start touch drag-to-create mode
+        touchDataRef.current = {
+          startTime: time,
+          endTime: time,
+          startY: touch.clientY,
+          startClientY: touch.clientY,
+          hasMoved: false,
+          isHoldConfirmed: true
+        }
+        setIsTouchDragging(true)
+        setDragPreviewStart(time)
+        setDragPreviewEnd(minutesToTime(timeToMinutes(time) + 30))
+
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+      }
+    }, GHOST_TAP_THRESHOLD)
+  }
+
+  // GHOST EVENT: Mouse/touch move and up handlers
+  // These listeners are always active and check if there's an active ghost interaction
+  useEffect(() => {
+    const handleGhostMouseMove = (e: MouseEvent) => {
+      if (!ghostInteractionRef.current || ghostInteractionRef.current.isTouch) return
+
+      const deltaY = Math.abs(e.clientY - ghostInteractionRef.current.startClientY)
+      if (deltaY > DRAG_THRESHOLD) {
+        ghostInteractionRef.current.hasMoved = true
+
+        // If timer hasn't fired yet but user moved, cancel timer and start drag immediately
+        if (!ghostInteractionRef.current.tapTimerFired) {
+          if (ghostTapTimerRef.current) {
+            clearTimeout(ghostTapTimerRef.current)
+            ghostTapTimerRef.current = null
+          }
+
+          const time = yToTime(ghostInteractionRef.current.startClientY)
+          dragDataRef.current = {
+            startTime: time,
+            endTime: yToTime(e.clientY),
+            startY: ghostInteractionRef.current.startClientY,
+            hasMoved: true
+          }
+          setIsDragging(true)
+          setDragPreviewStart(time)
+          setDragPreviewEnd(yToTime(e.clientY))
+          ghostInteractionRef.current.tapTimerFired = true // Prevent double-start
+        }
+      }
+    }
+
+    const handleGhostMouseUp = () => {
+      if (!ghostInteractionRef.current || ghostInteractionRef.current.isTouch) return
+
+      // Clear timer
+      if (ghostTapTimerRef.current) {
+        clearTimeout(ghostTapTimerRef.current)
+        ghostTapTimerRef.current = null
+      }
+
+      const { event, hasMoved, tapTimerFired } = ghostInteractionRef.current
+
+      // If timer didn't fire and user didn't move much = tap = open confirm modal
+      if (!tapTimerFired && !hasMoved) {
+        onGhostEntryClick?.(event)
+      }
+      // If drag started, the regular drag mouseup handler will handle it
+
+      ghostInteractionRef.current = null
+    }
+
+    const handleGhostTouchMove = (e: TouchEvent) => {
+      if (!ghostInteractionRef.current || !ghostInteractionRef.current.isTouch) return
+
+      const touch = e.touches[0]
+      const deltaY = Math.abs(touch.clientY - ghostInteractionRef.current.startClientY)
+
+      if (deltaY > DRAG_THRESHOLD) {
+        ghostInteractionRef.current.hasMoved = true
+
+        // If timer hasn't fired yet but user moved, they're scrolling - cancel
+        if (!ghostInteractionRef.current.tapTimerFired) {
+          if (ghostTapTimerRef.current) {
+            clearTimeout(ghostTapTimerRef.current)
+            ghostTapTimerRef.current = null
+          }
+          // Let scroll happen naturally
+          ghostInteractionRef.current = null
+        }
+      }
+    }
+
+    const handleGhostTouchEnd = () => {
+      if (!ghostInteractionRef.current || !ghostInteractionRef.current.isTouch) return
+
+      // Clear timer
+      if (ghostTapTimerRef.current) {
+        clearTimeout(ghostTapTimerRef.current)
+        ghostTapTimerRef.current = null
+      }
+
+      const { event, hasMoved, tapTimerFired } = ghostInteractionRef.current
+
+      // If timer didn't fire and user didn't move much = tap = open confirm modal
+      if (!tapTimerFired && !hasMoved) {
+        onGhostEntryClick?.(event)
+      }
+      // If drag started, the regular touch drag handler will handle it
+
+      ghostInteractionRef.current = null
+    }
+
+    window.addEventListener('mousemove', handleGhostMouseMove)
+    window.addEventListener('mouseup', handleGhostMouseUp)
+    window.addEventListener('touchmove', handleGhostTouchMove, { passive: true })
+    window.addEventListener('touchend', handleGhostTouchEnd)
+
+    return () => {
+      window.removeEventListener('mousemove', handleGhostMouseMove)
+      window.removeEventListener('mouseup', handleGhostMouseUp)
+      window.removeEventListener('touchmove', handleGhostTouchMove)
+      window.removeEventListener('touchend', handleGhostTouchEnd)
+    }
+  }, [onGhostEntryClick])
+
   // Scroll to appropriate position on load
   // For today: center on current time
   // For other days: scroll to first event or default to 9am
@@ -465,9 +917,10 @@ export default function TimelineView({
     }
   }
 
-  // Calculate drag preview position
+  // Calculate drag preview position (works for both mouse and touch)
   const getDragPreview = () => {
-    if (!isDragging || !dragPreviewStart) return null
+    // Show preview for either mouse or touch dragging
+    if ((!isDragging && !isTouchDragging) || !dragPreviewStart) return null
 
     let previewStart = dragPreviewStart
     let previewEnd = dragPreviewEnd || dragPreviewStart
@@ -521,11 +974,13 @@ export default function TimelineView({
       <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
         {isEmpty ? (
           <span className="text-zinc-400 dark:text-zinc-500">
-            {isToday
-              ? "No entries yet — click or drag to add"
-              : isFutureDay
-                ? "No plans yet — click or drag to schedule"
-                : "No entries for this day"}
+            {!canLog
+              ? "No entries for this day"
+              : isToday
+                ? "No entries yet — tap or hold & drag to add"
+                : isFutureDay
+                  ? "No plans yet — tap or hold & drag to schedule"
+                  : "No entries for this day — tap to add"}
           </span>
         ) : (
           <>
@@ -560,8 +1015,10 @@ export default function TimelineView({
             {/* Timeline grid and entries */}
             <div
               ref={timelineGridRef}
-              className={`relative flex-1 ${onDragCreate ? 'cursor-crosshair' : ''} ${isDragging ? 'select-none' : ''}`}
+              className={`relative flex-1 ${onDragCreate ? 'cursor-crosshair' : ''} ${isDragging || isTouchDragging ? 'select-none' : ''}`}
+              style={{ touchAction: isTouchDragging ? 'none' : 'auto' }}
               onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
             >
               {/* Hour grid lines */}
               {hours.map((hour) => (
@@ -693,47 +1150,93 @@ export default function TimelineView({
                 const top = (startMinutes - startHour * 60) * PIXELS_PER_MINUTE
                 const height = Math.max(durationMinutes * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT)
                 const isShort = height < 50
+                const isDismissed = dismissedEventIds.has(event.id)
 
                 const now = new Date()
                 const currentMinutes = now.getHours() * 60 + now.getMinutes()
                 const hasEnded = !isToday || currentMinutes >= endMinutes
 
+                // During drag, ghost events should not block interaction
+                const isCurrentlyDragging = isDragging || isTouchDragging
+
                 return (
                   <div
                     key={`ghost-${event.id}`}
                     data-ghost-block
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onGhostEntryClick?.(event)
+                    onMouseDown={(e) => {
+                      if (isCurrentlyDragging || isDismissed) return
+                      handleGhostMouseDown(e, event)
                     }}
-                    className="absolute left-1 right-1 cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-blue-400/60 bg-blue-100/40 opacity-60 transition-all hover:border-blue-500 hover:opacity-80 dark:border-blue-500/40 dark:bg-blue-900/20 dark:hover:border-blue-400"
+                    onTouchStart={(e) => {
+                      if (isCurrentlyDragging || isDismissed) return
+                      handleGhostTouchStart(e, event)
+                    }}
+                    className={`absolute left-1 right-1 overflow-hidden rounded-lg border-2 border-dashed transition-all ${
+                      isDismissed
+                        ? 'border-zinc-300/40 bg-zinc-100/20 opacity-40 dark:border-zinc-600/30 dark:bg-zinc-800/20'
+                        : 'border-blue-400/60 bg-blue-100/40 opacity-60 hover:border-blue-500 hover:opacity-80 dark:border-blue-500/40 dark:bg-blue-900/20 dark:hover:border-blue-400'
+                    } ${isCurrentlyDragging ? 'pointer-events-none' : 'cursor-pointer'}`}
                     style={{ top, height }}
                   >
-                    <div className="flex h-full flex-col justify-center px-2 py-1 text-blue-700 dark:text-blue-300">
+                    <div className={`flex h-full flex-col justify-center px-2 py-1 ${isDismissed ? 'text-zinc-500 dark:text-zinc-500' : 'text-blue-700 dark:text-blue-300'}`}>
                       {isShort ? (
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-between gap-1">
                           <span className="flex items-center gap-1 truncate text-xs font-medium">
                             <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             {event.title}
                           </span>
+                          {!isDismissed && (
+                            <button
+                              onMouseDown={(e) => {
+                                e.stopPropagation()
+                                dismissGhostEvent(event.id)
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation()
+                                dismissGhostEvent(event.id)
+                              }}
+                              className="shrink-0 rounded p-0.5 opacity-60 hover:bg-blue-500/20 hover:opacity-100"
+                              aria-label="Dismiss"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <>
-                          <span className="flex items-center gap-1.5 truncate text-sm font-medium">
-                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            {event.title}
-                          </span>
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="flex items-center gap-1.5 truncate text-sm font-medium">
+                              <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              {event.title}
+                            </span>
+                            {!isDismissed && (
+                              <button
+                                onMouseDown={(e) => {
+                                  e.stopPropagation()
+                                  dismissGhostEvent(event.id)
+                                }}
+                                onTouchStart={(e) => {
+                                  e.stopPropagation()
+                                  dismissGhostEvent(event.id)
+                                }}
+                                className="shrink-0 rounded p-0.5 opacity-60 hover:bg-blue-500/20 hover:opacity-100"
+                                aria-label="Dismiss"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                           <div className="mt-0.5 flex items-center gap-2 text-xs opacity-80">
                             <span>{event.startTime} - {event.endTime}</span>
                             <span>({formatDuration(durationMinutes)})</span>
                           </div>
                           {height > 70 && (
                             <span className="mt-1 text-xs opacity-70">
-                              {hasEnded ? 'Tap to confirm' : 'Pending...'}
+                              {isDismissed ? 'Dismissed' : hasEnded ? 'Tap to confirm' : 'Pending...'}
                             </span>
                           )}
                         </>
@@ -773,6 +1276,24 @@ export default function TimelineView({
               <span className="mr-1 rounded bg-zinc-200 px-1 dark:bg-zinc-600">est</span>
               = estimated placement (no times set). Click to add actual times.
             </p>
+          </div>
+        )}
+
+        {/* Show/restore dismissed ghost events */}
+        {dismissedEventIds.size > 0 && (
+          <div className="border-t border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {dismissedEventIds.size} calendar {dismissedEventIds.size === 1 ? 'event' : 'events'} hidden
+              </p>
+              <button
+                onClick={restoreAllDismissed}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+              >
+                <Eye className="h-3 w-3" />
+                Restore all
+              </button>
+            </div>
           </div>
         )}
       </div>

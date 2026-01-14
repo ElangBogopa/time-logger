@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import OpenAI from 'openai'
-import { TimeEntry, TimeCategory, CATEGORY_LABELS } from '@/lib/types'
+import {
+  TimeEntry,
+  TimeCategory,
+  CATEGORY_LABELS,
+  UserIntention,
+  INTENTION_LABELS,
+  INTENTION_CATEGORY_MAP,
+} from '@/lib/types'
 import { getTimeOfDay, formatDurationLong } from '@/lib/time-utils'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
@@ -31,7 +41,102 @@ function detectMixedActivity(activity: string): boolean {
   return mixedIndicators.some(indicator => lowerActivity.includes(indicator))
 }
 
-function buildContext(entry: TimeEntry, dayEntries: TimeEntry[]): string {
+// Get the start of the current week (Monday)
+function getWeekStart(): string {
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Adjust for Monday start
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + diff)
+  monday.setHours(0, 0, 0, 0)
+  return monday.toISOString().split('T')[0]
+}
+
+// Calculate weekly progress for intention-related categories
+async function getWeeklyIntentionProgress(
+  userId: string,
+  intentions: UserIntention[]
+): Promise<Map<string, { minutes: number; target: number | null; intentionLabel: string }>> {
+  const progress = new Map<string, { minutes: number; target: number | null; intentionLabel: string }>()
+
+  if (intentions.length === 0) return progress
+
+  const weekStart = getWeekStart()
+
+  // Fetch all entries for this week
+  const { data: weekEntries } = await supabase
+    .from('time_entries')
+    .select('category, duration_minutes')
+    .eq('user_id', userId)
+    .eq('status', 'confirmed')
+    .gte('date', weekStart)
+
+  if (!weekEntries) return progress
+
+  // Calculate totals per category
+  const categoryTotals = new Map<TimeCategory, number>()
+  weekEntries.forEach((entry) => {
+    if (entry.category) {
+      const current = categoryTotals.get(entry.category as TimeCategory) || 0
+      categoryTotals.set(entry.category as TimeCategory, current + entry.duration_minutes)
+    }
+  })
+
+  // Map intentions to their progress
+  intentions.forEach((intention) => {
+    const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
+    let totalMinutes = 0
+
+    relatedCategories.forEach((cat) => {
+      totalMinutes += categoryTotals.get(cat) || 0
+    })
+
+    // For "less_distraction", we track distraction time
+    if (intention.intention_type === 'less_distraction') {
+      totalMinutes = categoryTotals.get('distraction') || 0
+    }
+
+    progress.set(intention.intention_type, {
+      minutes: totalMinutes,
+      target: intention.weekly_target_minutes,
+      intentionLabel: intention.intention_type === 'custom'
+        ? intention.custom_text || 'Custom goal'
+        : INTENTION_LABELS[intention.intention_type],
+    })
+  })
+
+  return progress
+}
+
+// Check if entry category relates to any intention
+function getRelatedIntention(
+  category: TimeCategory | null,
+  intentions: UserIntention[]
+): UserIntention | null {
+  if (!category) return null
+
+  for (const intention of intentions) {
+    const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
+
+    // Special case: "less_distraction" relates to distraction category
+    if (intention.intention_type === 'less_distraction' && category === 'distraction') {
+      return intention
+    }
+
+    if (relatedCategories.includes(category)) {
+      return intention
+    }
+  }
+
+  return null
+}
+
+function buildContext(
+  entry: TimeEntry,
+  dayEntries: TimeEntry[],
+  intentions: UserIntention[],
+  weeklyProgress: Map<string, { minutes: number; target: number | null; intentionLabel: string }>
+): string {
   const timeOfDay = getTimeOfDay(entry.start_time)
   const duration = formatDurationLong(entry.duration_minutes)
   const durationCategory = getDurationCategory(entry.duration_minutes)
@@ -86,7 +191,133 @@ ${entry.category ? `- This is ${categoryLabel} session #${positionInCategory} of
   context += `- Today's breakdown: ${categoryBreakdown}
 `
 
+  // Add intentions context
+  if (intentions.length > 0) {
+    context += `
+USER'S INTENTIONS (what they want to change):
+`
+    intentions.forEach((intention, idx) => {
+      const progress = weeklyProgress.get(intention.intention_type)
+      const label = intention.intention_type === 'custom'
+        ? intention.custom_text
+        : INTENTION_LABELS[intention.intention_type]
+
+      let progressStr = ''
+      if (progress) {
+        const hours = Math.round(progress.minutes / 60 * 10) / 10
+        if (progress.target) {
+          const targetHours = progress.target / 60
+          const percentage = Math.round((progress.minutes / progress.target) * 100)
+          progressStr = ` — ${hours}h logged this week (${percentage}% of ${targetHours}h target)`
+        } else {
+          progressStr = ` — ${hours}h logged this week`
+        }
+      }
+
+      context += `${idx + 1}. ${label}${progressStr}
+`
+    })
+
+    // Check if this entry relates to an intention
+    const relatedIntention = getRelatedIntention(entry.category, intentions)
+    if (relatedIntention) {
+      const progress = weeklyProgress.get(relatedIntention.intention_type)
+      if (progress) {
+        const isDistraction = relatedIntention.intention_type === 'less_distraction'
+        if (isDistraction) {
+          context += `
+THIS ENTRY RELATES TO USER'S INTENTION: "${progress.intentionLabel}"
+- They want LESS of this (distraction)
+- This week so far: ${Math.round(progress.minutes / 60 * 10) / 10}h of distraction
+`
+        } else {
+          context += `
+THIS ENTRY RELATES TO USER'S INTENTION: "${progress.intentionLabel}"
+- They want MORE of this
+- This week so far: ${Math.round(progress.minutes / 60 * 10) / 10}h
+${progress.target ? `- Weekly target: ${progress.target / 60}h (${Math.round((progress.minutes / progress.target) * 100)}% complete)` : ''}
+`
+        }
+      }
+    }
+  }
+
   return context
+}
+
+function buildIntentionInstructions(
+  entry: TimeEntry,
+  intentions: UserIntention[],
+  weeklyProgress: Map<string, { minutes: number; target: number | null; intentionLabel: string }>
+): string {
+  if (intentions.length === 0) return ''
+
+  const relatedIntention = getRelatedIntention(entry.category, intentions)
+  if (!relatedIntention) return ''
+
+  const progress = weeklyProgress.get(relatedIntention.intention_type)
+  if (!progress) return ''
+
+  const isDistraction = relatedIntention.intention_type === 'less_distraction'
+  const hoursLogged = Math.round(progress.minutes / 60 * 10) / 10
+  const targetHours = progress.target ? progress.target / 60 : null
+  const percentage = progress.target ? Math.round((progress.minutes / progress.target) * 100) : null
+
+  let instructions = `
+INTENTION-AWARE COMMENTARY:
+This entry relates to the user's intention: "${progress.intentionLabel}"
+`
+
+  if (isDistraction) {
+    instructions += `
+- The user wants LESS distraction time
+- Be supportive, not judgmental
+- Acknowledge their self-awareness in logging it
+- If they've had multiple distraction entries: gently note the pattern
+- Ask a reflective question about what they might be avoiding
+- Don't pile on guilt; they're already tracking it which shows intent to change
+- You might reference their goal: "You wanted less scrolling time..."
+`
+  } else {
+    // Positive intention (more of something)
+    if (targetHours && percentage !== null) {
+      if (percentage >= 100) {
+        instructions += `
+- They've HIT their weekly target (${hoursLogged}h of ${targetHours}h goal)!
+- Celebrate this achievement
+- Example: "That's ${hoursLogged} hours of deep work this week—you hit your target!"
+`
+      } else if (percentage >= 75) {
+        instructions += `
+- They're CLOSE to their weekly target (${percentage}% there)
+- Encourage them: "X more hours to hit your ${targetHours}h target"
+- Build momentum
+`
+      } else if (percentage >= 50) {
+        instructions += `
+- They're HALFWAY to their weekly target
+- Acknowledge progress: "${hoursLogged}h down, ${Math.round((targetHours - hoursLogged) * 10) / 10}h to go"
+`
+      } else {
+        instructions += `
+- They're building toward their target (${percentage}% so far)
+- Encourage without pressure
+- Every session counts toward the goal
+`
+      }
+    } else {
+      instructions += `
+- Acknowledge this supports their intention
+- Note the progress without specific targets: "Another ${entry.duration_minutes} minutes toward your ${progress.intentionLabel.toLowerCase()} goal"
+`
+    }
+  }
+
+  instructions += `
+IMPORTANT: Only reference their intention if it feels natural and meaningful. Don't force it into every comment.
+`
+
+  return instructions
 }
 
 export async function POST(request: NextRequest) {
@@ -105,18 +336,39 @@ export async function POST(request: NextRequest) {
 
     const { entry, dayEntries }: CommentaryRequest = await request.json()
 
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    })
-
     if (!entry) {
       return NextResponse.json({ error: 'Entry is required' }, { status: 400 })
     }
 
+    // Get session to fetch user's intentions
+    const session = await getServerSession(authOptions)
+    let intentions: UserIntention[] = []
+    let weeklyProgress = new Map<string, { minutes: number; target: number | null; intentionLabel: string }>()
+
+    if (session?.user?.id) {
+      // Fetch user's active intentions
+      const { data: userIntentions } = await supabase
+        .from('user_intentions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('active', true)
+        .order('priority', { ascending: true })
+
+      if (userIntentions) {
+        intentions = userIntentions as UserIntention[]
+        weeklyProgress = await getWeeklyIntentionProgress(session.user.id, intentions)
+      }
+    }
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+
     const tone = getCategoryTone(entry.category)
-    const context = buildContext(entry, dayEntries || [])
+    const context = buildContext(entry, dayEntries || [], intentions, weeklyProgress)
     const durationCategory = getDurationCategory(entry.duration_minutes)
     const isMixedActivity = detectMixedActivity(entry.activity)
+    const intentionInstructions = buildIntentionInstructions(entry, intentions, weeklyProgress)
 
     let toneInstructions = ''
     const categoryForTone = entry.category || 'other'
@@ -180,21 +432,27 @@ The activity text suggests they were doing productive work while also getting di
       messages: [
         {
           role: 'system',
-          content: `You are a supportive but real friend helping someone reflect on how they spend their time. You're not a motivational poster and not a disappointed parent—just honest and caring.
+          content: `Generate a VERY SHORT comment about this time entry. MAX 1 sentence, under 15 words.
 
-Generate a 1-2 sentence commentary about this time entry. Be specific to what they logged, not generic.
+Examples of good commentary:
+- "Solid focus session."
+- "That's 3 workouts this week."
+- "Long meeting day."
+- "Nice deep work block."
+- "Third distraction entry today."
+- "2 hours of learning—building momentum."
 
 ${toneInstructions}
-${durationInstructions}
-${mixedActivityInstructions}
+${intentionInstructions}
 
-Important:
-- Keep it to 1-2 sentences max
-- Reference specific details from their activity or notes when available
-- Sound like a real person, not an app notification
-- Don't start with "Great job!" or similar clichés
-- Don't use emojis
-- Factor in the duration when commenting - long sessions deserve different commentary than quick ones`,
+STRICT RULES:
+- ONE short sentence only (under 15 words)
+- NO questions
+- NO lengthy reflections or advice
+- NO emojis
+- Be specific but brief
+- Sound natural, not robotic
+- Reference patterns (streaks, totals) when relevant`,
         },
         {
           role: 'user',
@@ -202,7 +460,7 @@ Important:
         },
       ],
       temperature: 0.7,
-      max_tokens: 100,
+      max_tokens: 40,
     })
 
     const commentary = completion.choices[0]?.message?.content?.trim() || ''

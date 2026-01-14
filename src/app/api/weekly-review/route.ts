@@ -1,0 +1,541 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
+import OpenAI from 'openai'
+import {
+  TimeEntry,
+  TimeCategory,
+  CATEGORY_LABELS,
+  UserIntention,
+  INTENTION_LABELS,
+  INTENTION_CATEGORY_MAP,
+} from '@/lib/types'
+import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
+
+const MIN_ENTRIES_FOR_REVIEW = 7
+
+interface WeeklyReviewRequest {
+  weekStart: string // YYYY-MM-DD of the Monday
+}
+
+interface IntentionProgress {
+  intention: UserIntention
+  label: string
+  currentMinutes: number
+  targetMinutes: number | null
+  percentage: number | null
+  trend: 'up' | 'down' | 'same' | null
+  previousMinutes: number | null
+  isReductionGoal: boolean // For goals like "less_distraction"
+  changeMinutes: number | null // Difference from last week
+  improvementPercentage: number | null // For reduction goals
+}
+
+interface CategoryBreakdown {
+  category: TimeCategory
+  label: string
+  minutes: number
+  percentage: number
+  entryCount: number
+}
+
+type DayRating = 'good' | 'neutral' | 'rough' | 'no_data'
+
+interface IntentionDayScore {
+  date: string
+  day: string // 'Mon', 'Tue', etc.
+  rating: DayRating
+  intentionMinutes: number
+  hadDistraction: boolean // For less_distraction goals
+}
+
+interface IntentionScorecard {
+  intentionId: string
+  intentionLabel: string
+  isReductionGoal: boolean
+  days: IntentionDayScore[]
+  goodDays: number
+  roughDays: number
+}
+
+interface WeeklyReviewData {
+  weekStart: string
+  weekEnd: string
+  totalMinutes: number
+  entryCount: number
+  previousWeekMinutes: number | null
+  previousWeekEntryCount: number
+  hasEnoughData: boolean // Current week has >= 7 entries
+  hasPreviousWeekData: boolean // Previous week has >= 7 entries
+  intentionProgress: IntentionProgress[]
+  intentionScorecards: IntentionScorecard[]
+  categoryBreakdown: CategoryBreakdown[]
+  bestDays: string[]
+  bestHours: string[]
+  insights: string[]
+  coachSummary: string | null
+}
+
+// Get Sunday (start) of a given week
+function getWeekStart(date: Date): string {
+  const d = new Date(date)
+  const day = d.getDay() // 0 = Sunday, 1 = Monday, etc.
+  d.setDate(d.getDate() - day) // Go back to Sunday
+  return d.toISOString().split('T')[0]
+}
+
+// Get Saturday (end) of a given week
+function getWeekEnd(weekStart: string): string {
+  const d = new Date(weekStart + 'T00:00:00')
+  d.setDate(d.getDate() + 6) // Sunday + 6 = Saturday
+  return d.toISOString().split('T')[0]
+}
+
+// Get the previous week's Sunday
+function getPreviousWeekStart(weekStart: string): string {
+  const d = new Date(weekStart + 'T00:00:00')
+  d.setDate(d.getDate() - 7)
+  return d.toISOString().split('T')[0]
+}
+
+// Format hour to readable string
+function formatHour(hour: number): string {
+  if (hour === 0) return '12 AM'
+  if (hour === 12) return '12 PM'
+  if (hour < 12) return `${hour} AM`
+  return `${hour - 12} PM`
+}
+
+// Get day name from date
+function getDayName(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00')
+  return date.toLocaleDateString('en-US', { weekday: 'long' })
+}
+
+// Get short day name
+function getShortDayName(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00')
+  return date.toLocaleDateString('en-US', { weekday: 'short' })
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const rateLimitKey = `weekly-review:${ip}`
+    const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMITS.ai)
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        { status: 429, headers: getRateLimitHeaders(rateLimitResult) }
+      )
+    }
+
+    const { weekStart: requestedWeekStart }: WeeklyReviewRequest = await request.json()
+
+    const weekStart = requestedWeekStart || getWeekStart(new Date())
+    const weekEnd = getWeekEnd(weekStart)
+    const previousWeekStart = getPreviousWeekStart(weekStart)
+    const previousWeekEnd = getWeekEnd(previousWeekStart)
+
+    // Fetch current week entries
+    const { data: currentWeekEntries } = await supabase
+      .from('time_entries')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('status', 'confirmed')
+      .gte('date', weekStart)
+      .lte('date', weekEnd)
+      .order('date', { ascending: true })
+
+    // Fetch previous week entries
+    const { data: previousWeekEntries } = await supabase
+      .from('time_entries')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('status', 'confirmed')
+      .gte('date', previousWeekStart)
+      .lte('date', previousWeekEnd)
+
+    // Fetch user intentions
+    const { data: intentions } = await supabase
+      .from('user_intentions')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('active', true)
+      .order('priority', { ascending: true })
+
+    const entries = (currentWeekEntries || []) as TimeEntry[]
+    const prevEntries = (previousWeekEntries || []) as TimeEntry[]
+    const userIntentions = (intentions || []) as UserIntention[]
+
+    const entryCount = entries.length
+    const previousWeekEntryCount = prevEntries.length
+    const hasEnoughData = entryCount >= MIN_ENTRIES_FOR_REVIEW
+    const hasPreviousWeekData = previousWeekEntryCount >= MIN_ENTRIES_FOR_REVIEW
+
+    // Calculate totals
+    const totalMinutes = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
+    const previousWeekMinutes = hasPreviousWeekData
+      ? prevEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
+      : null
+
+    // Calculate category breakdown
+    const categoryMap = new Map<TimeCategory, { minutes: number; count: number }>()
+    entries.forEach((entry) => {
+      if (entry.category) {
+        const current = categoryMap.get(entry.category) || { minutes: 0, count: 0 }
+        categoryMap.set(entry.category, {
+          minutes: current.minutes + entry.duration_minutes,
+          count: current.count + 1,
+        })
+      }
+    })
+
+    const categoryBreakdown: CategoryBreakdown[] = Array.from(categoryMap.entries())
+      .map(([category, data]) => ({
+        category,
+        label: CATEGORY_LABELS[category],
+        minutes: data.minutes,
+        percentage: totalMinutes > 0 ? Math.round((data.minutes / totalMinutes) * 100) : 0,
+        entryCount: data.count,
+      }))
+      .sort((a, b) => b.minutes - a.minutes)
+
+    // Calculate previous week category totals
+    const prevCategoryMap = new Map<TimeCategory, number>()
+    prevEntries.forEach((entry) => {
+      if (entry.category) {
+        const current = prevCategoryMap.get(entry.category) || 0
+        prevCategoryMap.set(entry.category, current + entry.duration_minutes)
+      }
+    })
+
+    // Calculate entries by day for scorecard
+    const entriesByDay = new Map<string, TimeEntry[]>()
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart + 'T00:00:00')
+      d.setDate(d.getDate() + i)
+      const dateStr = d.toISOString().split('T')[0]
+      entriesByDay.set(dateStr, [])
+    }
+    entries.forEach((entry) => {
+      const dayEntries = entriesByDay.get(entry.date)
+      if (dayEntries) {
+        dayEntries.push(entry)
+      }
+    })
+
+    // Calculate intention progress with improved reduction goal handling
+    const intentionProgress: IntentionProgress[] = userIntentions.map((intention) => {
+      const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
+      const isReductionGoal = intention.intention_type === 'less_distraction'
+      let currentMinutes = 0
+      let previousMinutes = 0
+
+      if (isReductionGoal) {
+        currentMinutes = categoryMap.get('distraction')?.minutes || 0
+        previousMinutes = prevCategoryMap.get('distraction') || 0
+      } else {
+        relatedCategories.forEach((cat) => {
+          currentMinutes += categoryMap.get(cat)?.minutes || 0
+          previousMinutes += prevCategoryMap.get(cat) || 0
+        })
+      }
+
+      const targetMinutes = intention.weekly_target_minutes
+
+      // For reduction goals, percentage shows improvement from previous week
+      // For growth goals, percentage shows progress toward target
+      let percentage: number | null = null
+      let improvementPercentage: number | null = null
+
+      if (isReductionGoal && hasPreviousWeekData && previousMinutes > 0) {
+        // Improvement = how much we reduced (positive = good)
+        improvementPercentage = Math.round(((previousMinutes - currentMinutes) / previousMinutes) * 100)
+        percentage = improvementPercentage
+      } else if (!isReductionGoal && targetMinutes) {
+        percentage = Math.round((currentMinutes / targetMinutes) * 100)
+      }
+
+      // Trend calculation
+      let trend: 'up' | 'down' | 'same' | null = null
+      let changeMinutes: number | null = null
+
+      if (hasPreviousWeekData && previousMinutes > 0) {
+        changeMinutes = currentMinutes - previousMinutes
+        const threshold = previousMinutes * 0.1
+
+        if (Math.abs(changeMinutes) < threshold) {
+          trend = 'same'
+        } else if (changeMinutes > 0) {
+          trend = 'up'
+        } else {
+          trend = 'down'
+        }
+      }
+
+      return {
+        intention,
+        label:
+          intention.intention_type === 'custom'
+            ? intention.custom_text || 'Custom goal'
+            : INTENTION_LABELS[intention.intention_type],
+        currentMinutes,
+        targetMinutes,
+        percentage,
+        trend,
+        previousMinutes: hasPreviousWeekData ? previousMinutes : null,
+        isReductionGoal,
+        changeMinutes: hasPreviousWeekData ? changeMinutes : null,
+        improvementPercentage,
+      }
+    })
+
+    // Build intention scorecards
+    const intentionScorecards: IntentionScorecard[] = userIntentions.map((intention) => {
+      const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
+      const isReductionGoal = intention.intention_type === 'less_distraction'
+      const dailyTarget = intention.weekly_target_minutes
+        ? intention.weekly_target_minutes / 7
+        : null
+
+      const days: IntentionDayScore[] = []
+      let goodDays = 0
+      let roughDays = 0
+
+      Array.from(entriesByDay.entries()).forEach(([date, dayEntries]) => {
+        let intentionMinutes = 0
+        let hadDistraction = false
+
+        dayEntries.forEach((entry) => {
+          if (isReductionGoal) {
+            if (entry.category === 'distraction') {
+              intentionMinutes += entry.duration_minutes
+              hadDistraction = true
+            }
+          } else {
+            if (entry.category && relatedCategories.includes(entry.category)) {
+              intentionMinutes += entry.duration_minutes
+            }
+          }
+        })
+
+        let rating: DayRating = 'no_data'
+
+        if (dayEntries.length === 0) {
+          rating = 'no_data'
+        } else if (isReductionGoal) {
+          // For reduction goals: no distraction = good, <30min = neutral, >30min = rough
+          if (!hadDistraction || intentionMinutes === 0) {
+            rating = 'good'
+            goodDays++
+          } else if (intentionMinutes <= 30) {
+            rating = 'neutral'
+          } else {
+            rating = 'rough'
+            roughDays++
+          }
+        } else {
+          // For growth goals: compare against daily target or use defaults
+          const threshold = dailyTarget || 60 // Default 1 hour if no target
+          if (intentionMinutes >= threshold) {
+            rating = 'good'
+            goodDays++
+          } else if (intentionMinutes > 0) {
+            rating = 'neutral'
+          } else {
+            rating = 'rough'
+            roughDays++
+          }
+        }
+
+        days.push({
+          date,
+          day: getShortDayName(date),
+          rating,
+          intentionMinutes,
+          hadDistraction,
+        })
+      })
+
+      return {
+        intentionId: intention.id,
+        intentionLabel:
+          intention.intention_type === 'custom'
+            ? intention.custom_text || 'Custom goal'
+            : INTENTION_LABELS[intention.intention_type],
+        isReductionGoal,
+        days,
+        goodDays,
+        roughDays,
+      }
+    })
+
+    // Find best days (most productive)
+    const dayMinutes = new Map<string, number>()
+    Array.from(entriesByDay.entries()).forEach(([date, dayEntries]) => {
+      const productiveMinutes = dayEntries
+        .filter((e) => e.category && e.category !== 'distraction')
+        .reduce((sum, e) => sum + e.duration_minutes, 0)
+      dayMinutes.set(date, productiveMinutes)
+    })
+
+    const bestDays = Array.from(dayMinutes.entries())
+      .filter(([, minutes]) => minutes > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([date]) => getDayName(date))
+
+    // Calculate time-of-day patterns for best hours
+    const hourMap = new Map<number, { minutes: number; categories: Map<TimeCategory, number> }>()
+    entries.forEach((entry) => {
+      if (entry.start_time) {
+        const hour = parseInt(entry.start_time.split(':')[0], 10)
+        const hourData = hourMap.get(hour) || { minutes: 0, categories: new Map() }
+        hourData.minutes += entry.duration_minutes
+        if (entry.category) {
+          const catMinutes = hourData.categories.get(entry.category) || 0
+          hourData.categories.set(entry.category, catMinutes + entry.duration_minutes)
+        }
+        hourMap.set(hour, hourData)
+      }
+    })
+
+    const bestHours = Array.from(hourMap.entries())
+      .filter(([, data]) => {
+        const deepWork = data.categories.get('deep_work') || 0
+        const learning = data.categories.get('learning') || 0
+        return deepWork + learning > data.minutes * 0.3 // At least 30% productive
+      })
+      .sort((a, b) => b[1].minutes - a[1].minutes)
+      .slice(0, 2)
+      .map(([hour]) => formatHour(hour))
+
+    // Generate insights
+    const insights: string[] = []
+
+    if (bestDays.length > 0 && bestHours.length > 0) {
+      insights.push(`Best focus: ${bestDays.join(' & ')}, ${bestHours.join('-')}`)
+    }
+
+    const topCategory = categoryBreakdown[0]
+    if (topCategory) {
+      const hours = Math.round((topCategory.minutes / 60) * 10) / 10
+      insights.push(`Most time: ${topCategory.label} (${hours}h, ${topCategory.percentage}%)`)
+    }
+
+    if (hasPreviousWeekData && previousWeekMinutes !== null) {
+      const change = Math.round(((totalMinutes - previousWeekMinutes) / previousWeekMinutes) * 100)
+      if (change > 10) {
+        insights.push(`Logged ${change}% more time than last week`)
+      } else if (change < -10) {
+        insights.push(`Logged ${Math.abs(change)}% less time than last week`)
+      }
+    }
+
+    // Generate AI coach summary only if enough data
+    let coachSummary: string | null = null
+
+    if (hasEnoughData && entries.length > 0) {
+      try {
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+        const context = `
+Weekly Review Data:
+- Total logged: ${Math.round((totalMinutes / 60) * 10) / 10} hours (${entryCount} entries)
+- Previous week: ${hasPreviousWeekData && previousWeekMinutes ? Math.round((previousWeekMinutes / 60) * 10) / 10 + ' hours' : 'Not enough data'}
+- Best days: ${bestDays.join(', ') || 'Not enough data'}
+- Best hours: ${bestHours.join(', ') || 'Not enough data'}
+
+Category breakdown:
+${categoryBreakdown.map((c) => `- ${c.label}: ${Math.round((c.minutes / 60) * 10) / 10}h (${c.percentage}%)`).join('\n')}
+
+User intentions:
+${intentionProgress
+  .map((ip) => {
+    const hours = Math.round((ip.currentMinutes / 60) * 10) / 10
+    const targetHours = ip.targetMinutes ? Math.round((ip.targetMinutes / 60) * 10) / 10 : null
+
+    if (ip.isReductionGoal) {
+      const prevHours = ip.previousMinutes ? Math.round((ip.previousMinutes / 60) * 10) / 10 : null
+      const changeStr = ip.changeMinutes !== null
+        ? (ip.changeMinutes < 0 ? `↓${Math.abs(Math.round(ip.changeMinutes / 60 * 10) / 10)}h` : `↑${Math.round(ip.changeMinutes / 60 * 10) / 10}h`)
+        : 'no comparison'
+      return `- ${ip.label}: ${hours}h this week (${changeStr} vs last week) - WANT LESS`
+    }
+
+    const progressStr = targetHours ? ` (${ip.percentage}% of ${targetHours}h target)` : ''
+    const trendStr = ip.trend ? ` [${ip.trend} vs last week]` : ''
+    return `- ${ip.label}: ${hours}h${progressStr}${trendStr}`
+  })
+  .join('\n')}
+
+Intention scorecards (good/rough days):
+${intentionScorecards.map((sc) => `- ${sc.intentionLabel}: ${sc.goodDays} good days, ${sc.roughDays} rough days`).join('\n')}
+`
+
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a supportive personal time coach. Write a brief weekly reflection (3-4 sentences max).
+
+Structure your response in 3 parts:
+1. What went well (acknowledge wins, even small ones)
+2. What to watch (a pattern or area needing attention, if any)
+3. One specific, actionable suggestion for next week
+
+Be warm but direct. Use "you" language. Reference specific data from their week.
+Don't use bullet points - write in flowing prose.
+Keep it concise - no more than 4 sentences total.
+For reduction goals like "less distraction", celebrate decreases and gently note increases.`,
+            },
+            {
+              role: 'user',
+              content: context,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 200,
+        })
+
+        coachSummary = completion.choices[0]?.message?.content?.trim() || null
+      } catch (error) {
+        console.error('Failed to generate coach summary:', error)
+      }
+    }
+
+    const reviewData: WeeklyReviewData = {
+      weekStart,
+      weekEnd,
+      totalMinutes,
+      entryCount,
+      previousWeekMinutes,
+      previousWeekEntryCount,
+      hasEnoughData,
+      hasPreviousWeekData,
+      intentionProgress,
+      intentionScorecards,
+      categoryBreakdown,
+      bestDays,
+      bestHours,
+      insights,
+      coachSummary,
+    }
+
+    return NextResponse.json(reviewData)
+  } catch (error) {
+    console.error('Weekly review error:', error)
+    return NextResponse.json({ error: 'Failed to generate weekly review' }, { status: 500 })
+  }
+}

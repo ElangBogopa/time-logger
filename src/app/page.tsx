@@ -1,18 +1,18 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { TimeEntry, getLocalDateString } from '@/lib/types'
+import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimeEntryForm from '@/components/TimeEntryForm'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
-import WeeklySummary from '@/components/WeeklySummary'
 import StatsCard from '@/components/StatsCard'
 import QuickLogModal from '@/components/QuickLogModal'
 import Toast from '@/components/Toast'
 import GhostEntryModal from '@/components/GhostEntryModal'
+import OnboardingModal from '@/components/OnboardingModal'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -27,9 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import CalendarPicker from '@/components/CalendarPicker'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Menu, Calendar, BarChart3, Search, LogOut, ChevronLeft, ChevronRight, Plus, X, Zap, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
-
-type View = 'day' | 'weekly'
+import { Menu, Calendar, Search, LogOut, ChevronLeft, ChevronRight, Plus, X, Zap, Loader2, AlertTriangle, RefreshCw, Target, Sparkles, Settings2 } from 'lucide-react'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
   const date = new Date(dateStr + 'T00:00:00')
@@ -78,19 +76,49 @@ function formatTimeAgo(date: Date): string {
   return `${diffDays}d ago`
 }
 
-export default function Home() {
+function getTimeOfDayGreeting(name?: string): { greeting: string; prompt: string } {
+  const hour = new Date().getHours()
+  const nameGreeting = name ? `, ${name}` : ''
+
+  if (hour < 12) {
+    return {
+      greeting: `Good morning${nameGreeting}`,
+      prompt: 'Log your morning when you\'re ready.',
+    }
+  } else if (hour < 18) {
+    return {
+      greeting: `Good afternoon${nameGreeting}`,
+      prompt: 'How\'s the day going? Catch up on this afternoon.',
+    }
+  } else {
+    return {
+      greeting: `Good evening${nameGreeting}`,
+      prompt: 'Wind down time. How was today?',
+    }
+  }
+}
+
+// Check if it's a good day to review the week (Sunday or Monday)
+function isReviewDay(): boolean {
+  const day = new Date().getDay()
+  return day === 0 || day === 1 // Sunday or Monday
+}
+
+function HomeContent() {
   const { data: session, status, update: updateSession } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(getLocalDateString())
-  const [view, setView] = useState<View>('day')
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [isFormExpanded, setIsFormExpanded] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<{ message: string } | null>(null)
   const [refreshKey, setRefreshKey] = useState(0) // Force re-render key
   const [dragCreateData, setDragCreateData] = useState<DragCreateData | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [hasCheckedIntentions, setHasCheckedIntentions] = useState(false)
   const dateInputRef = useRef<HTMLInputElement>(null)
   const lastVisibilityCheck = useRef<number>(Date.now())
 
@@ -101,7 +129,9 @@ export default function Home() {
     refreshCalendar,
     isLoading: isCalendarLoading,
     lastSynced,
-    isDateInCache
+    isDateInCache,
+    calendarStatus,
+    checkCalendarStatus
   } = useCalendar()
 
   // Get calendar events for the selected date from cache
@@ -118,6 +148,30 @@ export default function Home() {
   const isFutureDay = dateDisplay.isFuture
   const isPastDay = !isToday && !isFutureDay
 
+  // Check if logging is allowed for the selected date (today, yesterday, or 2 days ago)
+  const canLog = isDateLoggable(selectedDate)
+
+  // Handle calendar connection URL params - redirect to connections page
+  useEffect(() => {
+    const hasCalendarParams = searchParams.has('calendar_connected') ||
+      searchParams.has('conflict_email') ||
+      searchParams.has('pending_id') ||
+      (searchParams.get('error')?.startsWith('calendar_'))
+
+    if (hasCalendarParams) {
+      // Redirect to connections page with the params
+      const params = new URLSearchParams()
+      searchParams.forEach((value, key) => {
+        if (key === 'calendar_connected') {
+          params.set('success', 'true')
+        } else {
+          params.set(key, value)
+        }
+      })
+      router.replace(`/settings/connections?${params.toString()}`)
+    }
+  }, [searchParams, router])
+
   // Redirect to login if not authenticated or if there's a token error
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -125,25 +179,49 @@ export default function Home() {
     }
   }, [status, router])
 
+  // Check if user needs onboarding (first-time user without intentions)
+  useEffect(() => {
+    async function checkIntentions() {
+      if (status !== 'authenticated' || !session?.user?.id || hasCheckedIntentions) {
+        return
+      }
+
+      try {
+        const response = await fetch('/api/intentions')
+        if (response.ok) {
+          const data = await response.json()
+          if (!data.intentions || data.intentions.length === 0) {
+            setShowOnboarding(true)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check intentions:', error)
+      } finally {
+        setHasCheckedIntentions(true)
+      }
+    }
+
+    checkIntentions()
+  }, [status, session?.user?.id, hasCheckedIntentions])
+
   // Handle session errors (e.g., refresh token expired/revoked)
   const hasSessionError = session?.error === 'RefreshAccessTokenError'
 
   // Keyboard shortcut: Cmd+K (Mac) or Ctrl+K (Windows/Linux) to open Quick Log
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only on day view
-      if (view !== 'day') return
-
-      // Cmd+K or Ctrl+K
+      // Cmd+K or Ctrl+K - only if logging is allowed for this date
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setIsQuickLogOpen(true)
+        if (canLog) {
+          setIsQuickLogOpen(true)
+        }
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [view])
+  }, [canLog])
 
   // Handle visibility change - refresh data when user returns to app
   useEffect(() => {
@@ -172,8 +250,8 @@ export default function Home() {
           // Force re-render of scroll containers
           setRefreshKey(prev => prev + 1)
 
-          // Re-fetch data if we're on the day view
-          if (view === 'day' && userId) {
+          // Re-fetch data
+          if (userId) {
             setIsLoading(true)
             // Small delay to ensure DOM is ready after visibility change
             setTimeout(() => {
@@ -202,7 +280,7 @@ export default function Home() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [selectedDate, isToday, view, userId, updateSession])
+  }, [selectedDate, isToday, userId, updateSession])
 
   // Get the last entry's end time for Quick Log auto-fill
   const lastEntryEndTime = entries.length > 0
@@ -231,18 +309,15 @@ export default function Home() {
 
   // Fetch entries and calendar events for the selected date
   useEffect(() => {
-    if (view === 'day') {
-      fetchEntries()
-      // Fetch calendar events if date is not in cache
-      if (!isDateInCache(selectedDate)) {
-        fetchEventsForDate(selectedDate)
-      }
+    fetchEntries()
+    // Fetch calendar events if date is not in cache
+    if (!isDateInCache(selectedDate)) {
+      fetchEventsForDate(selectedDate)
     }
-  }, [fetchEntries, view, refreshKey, selectedDate, isDateInCache, fetchEventsForDate])
+  }, [fetchEntries, refreshKey, selectedDate, isDateInCache, fetchEventsForDate])
 
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate)
-    setView('day')
   }
 
   const handleRefresh = () => {
@@ -316,16 +391,20 @@ export default function Home() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuItem onClick={() => {
-                    setSelectedDate(today)
-                    setView('day')
-                  }}>
+                  <DropdownMenuItem onClick={() => setSelectedDate(today)}>
                     <Calendar className="h-4 w-4" />
                     Today
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setView('weekly')}>
-                    <BarChart3 className="h-4 w-4" />
-                    Weekly Summary
+                  <DropdownMenuItem onClick={() => router.push('/weekly-review')}>
+                    <Sparkles className="h-4 w-4" />
+                    <span className="flex-1">Weekly Review</span>
+                    {isReviewDay() && (
+                      <span className="ml-2 h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/intentions')}>
+                    <Target className="h-4 w-4" />
+                    My Intentions
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuSub>
@@ -344,18 +423,22 @@ export default function Home() {
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => refreshCalendar()}
-                    disabled={isCalendarLoading}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isCalendarLoading ? 'animate-spin' : ''}`} />
-                    {isCalendarLoading ? 'Syncing...' : 'Sync Calendar'}
-                  </DropdownMenuItem>
-                  {lastSynced && (
-                    <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
-                      Last synced: {formatTimeAgo(lastSynced)}
-                    </DropdownMenuLabel>
+                  {calendarStatus?.connected && (
+                    <DropdownMenuItem
+                      onClick={() => refreshCalendar()}
+                      disabled={isCalendarLoading}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isCalendarLoading ? 'animate-spin' : ''}`} />
+                      {isCalendarLoading ? 'Syncing...' : 'Sync Calendar'}
+                    </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem onClick={() => router.push('/settings/connections')}>
+                    <Settings2 className="h-4 w-4" />
+                    <span className="flex-1">Manage Connections</span>
+                    {calendarStatus?.connected && (
+                      <span className="ml-2 h-2 w-2 rounded-full bg-green-500" />
+                    )}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
                     {session?.user?.email}
@@ -371,18 +454,20 @@ export default function Home() {
               </DropdownMenu>
             </div>
 
-            {/* Quick Log / Plan / Add button - available on ALL days */}
-            {view === 'day' && (
-              <Button
+            {/* Quick Log / Plan / Add button - disabled for dates 3+ days in the past */}
+            <Button
                 onClick={() => setIsQuickLogOpen(true)}
-                title={isFutureDay ? 'Plan entry (⌘K)' : isPastDay ? 'Add entry (⌘K)' : 'Quick Log (⌘K)'}
-                aria-label={isFutureDay ? 'Plan a future entry' : isPastDay ? 'Add a past entry' : 'Quick log a time entry'}
+                disabled={!canLog}
+                title={!canLog ? 'Logging disabled for old dates' : isFutureDay ? 'Plan entry (⌘K)' : isPastDay ? 'Add entry (⌘K)' : 'Quick Log (⌘K)'}
+                aria-label={!canLog ? 'Logging is disabled for dates more than 2 days ago' : isFutureDay ? 'Plan a future entry' : isPastDay ? 'Add a past entry' : 'Quick log a time entry'}
                 className={`shadow-lg text-white ${
-                  isFutureDay
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
-                    : isPastDay
-                      ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
-                      : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                  !canLog
+                    ? 'opacity-50 cursor-not-allowed bg-zinc-400'
+                    : isFutureDay
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
+                      : isPastDay
+                        ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
                 }`}
               >
                 {isFutureDay ? (
@@ -401,13 +486,12 @@ export default function Home() {
                     <span className="hidden sm:inline">Quick Log</span>
                   </>
                 )}
-              </Button>
-            )}
+            </Button>
           </div>
         </header>
 
-        {view === 'day' ? (
-          <>
+        {/* Day View Content */}
+        <>
             {/* Date Navigation */}
             <div className="mb-6 flex items-center justify-between">
               <Button
@@ -441,38 +525,58 @@ export default function Home() {
               </Button>
             </div>
 
+            {/* Time-of-day greeting - only show for today */}
+            {isToday && (
+              <div className="mb-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {getTimeOfDayGreeting(session?.user?.preferredName).greeting}! {getTimeOfDayGreeting(session?.user?.preferredName).prompt}
+                </p>
+              </div>
+            )}
+
+            {/* Viewing-only message for old dates */}
+            {!canLog && isPastDay && (
+              <div className="mb-4 rounded-lg bg-zinc-100 px-4 py-3 text-center dark:bg-zinc-800">
+                <p className="text-sm text-muted-foreground">
+                  {VIEWING_PAST_MESSAGE}
+                </p>
+              </div>
+            )}
+
             {/* Stats Card - only show for today */}
             {isToday && <StatsCard userId={userId} />}
 
-            {/* Add Entry - Collapsible - available on ALL days */}
-            <div className="mb-6">
-              {isFormExpanded ? (
-                <section className="rounded-xl border bg-card p-6 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-foreground">
-                      {isFutureDay ? 'Plan Entry' : 'Add Entry'}
-                    </h2>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setIsFormExpanded(false)}
-                    >
-                      <X className="h-5 w-5" />
-                    </Button>
-                  </div>
-                  <TimeEntryForm onEntryAdded={handleRefresh} onShowToast={showToast} userId={userId} selectedDate={selectedDate} />
-                </section>
-              ) : (
-                <button
-                  onClick={() => setIsFormExpanded(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-foreground"
-                  aria-label={isFutureDay ? 'Open form to plan a detailed entry' : 'Open form to add a detailed entry'}
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  {isFutureDay ? 'Plan detailed entry' : 'Add detailed entry'}
-                </button>
-              )}
-            </div>
+            {/* Add Entry - Collapsible - disabled for dates 3+ days in the past */}
+            {canLog && (
+              <div className="mb-6">
+                {isFormExpanded ? (
+                  <section className="rounded-xl border bg-card p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-foreground">
+                        {isFutureDay ? 'Plan Entry' : 'Add Entry'}
+                      </h2>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setIsFormExpanded(false)}
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+                    <TimeEntryForm onEntryAdded={handleRefresh} onShowToast={showToast} userId={userId} selectedDate={selectedDate} />
+                  </section>
+                ) : (
+                  <button
+                    onClick={() => setIsFormExpanded(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-foreground"
+                    aria-label={isFutureDay ? 'Open form to plan a detailed entry' : 'Open form to add a detailed entry'}
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    {isFutureDay ? 'Plan detailed entry' : 'Add detailed entry'}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Timeline */}
             <section>
@@ -483,32 +587,16 @@ export default function Home() {
                 isLoading={isLoading}
                 onEntryDeleted={fetchEntries}
                 onGhostEntryClick={setSelectedGhostEvent}
-                onDragCreate={handleDragCreate}
+                onDragCreate={canLog ? handleDragCreate : undefined}
                 onShowToast={showToast}
                 selectedDate={selectedDate}
                 isToday={isToday}
                 isFutureDay={isFutureDay}
                 isPastDay={isPastDay}
+                canLog={canLog}
               />
             </section>
-          </>
-        ) : (
-          /* Weekly Summary View */
-          <section className="rounded-xl border bg-card p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">Weekly Summary</h2>
-              <Button
-                variant="link"
-                onClick={() => setView('day')}
-                className="text-sm"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back to today
-              </Button>
-            </div>
-            <WeeklySummary userId={userId} />
-          </section>
-        )}
+        </>
       </div>
 
       <QuickLogModal
@@ -553,7 +641,25 @@ export default function Home() {
           onClose={() => setToast(null)}
         />
       )}
+
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onComplete={() => setShowOnboarding(false)}
+      />
     </div>
     </ErrorBoundary>
+  )
+}
+
+// Wrap in Suspense for useSearchParams
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-900">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   )
 }

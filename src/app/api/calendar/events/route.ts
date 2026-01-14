@@ -1,7 +1,109 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
+
+// Helper to verify token has required scopes
+async function verifyTokenScopes(accessToken: string): Promise<{ valid: boolean; scopes: string[] }> {
+  try {
+    const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${accessToken}`)
+    if (!response.ok) {
+      console.error('[Calendar Events] Token verification failed:', response.status)
+      return { valid: false, scopes: [] }
+    }
+    const data = await response.json()
+    const scopes = (data.scope || '').split(' ')
+    const hasCalendarScope = scopes.some((s: string) =>
+      s.includes('calendar.readonly') || s.includes('calendar')
+    )
+    console.log('[Calendar Events] Token scopes:', scopes, 'Has calendar:', hasCalendarScope)
+    return { valid: hasCalendarScope, scopes }
+  } catch (error) {
+    console.error('[Calendar Events] Token verification error:', error)
+    return { valid: false, scopes: [] }
+  }
+}
+
+// Helper to get access token - either from session (Google OAuth) or calendar_connections (email users)
+async function getCalendarAccessToken(session: {
+  accessToken?: string
+  user?: { id?: string }
+  authProvider?: string
+}): Promise<{ accessToken: string | null; source: 'session' | 'connection' | null }> {
+  // Google OAuth users have token in session
+  if (session.authProvider === 'google' && session.accessToken) {
+    console.log('[Calendar Events] Using session token for Google OAuth user')
+    return { accessToken: session.accessToken, source: 'session' }
+  }
+
+  // Email users - check calendar_connections
+  if (session.user?.id) {
+    console.log('[Calendar Events] Checking calendar_connections for user:', session.user.id)
+    const { data: connection, error: connError } = await supabase
+      .from('calendar_connections')
+      .select('google_access_token, google_refresh_token, token_expires_at, google_email')
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (connError) {
+      console.log('[Calendar Events] No calendar connection found:', connError.message)
+    }
+
+    if (connection) {
+      console.log('[Calendar Events] Found connection for:', connection.google_email, 'Expires:', connection.token_expires_at)
+
+      // Check if token is expired
+      const isExpired = connection.token_expires_at &&
+        new Date(connection.token_expires_at) < new Date()
+
+      if (isExpired && connection.google_refresh_token) {
+        console.log('[Calendar Events] Token expired, refreshing...')
+        // Refresh the token
+        try {
+          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: process.env.GOOGLE_CLIENT_ID!,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+              grant_type: 'refresh_token',
+              refresh_token: connection.google_refresh_token,
+            }),
+          })
+
+          const refreshedTokens = await refreshResponse.json()
+          console.log('[Calendar Events] Refresh response:', refreshResponse.ok, 'Has token:', !!refreshedTokens.access_token)
+
+          if (refreshResponse.ok && refreshedTokens.access_token) {
+            // Update the stored token
+            const expiresAt = refreshedTokens.expires_in
+              ? new Date(Date.now() + refreshedTokens.expires_in * 1000).toISOString()
+              : null
+
+            await supabase
+              .from('calendar_connections')
+              .update({
+                google_access_token: refreshedTokens.access_token,
+                token_expires_at: expiresAt,
+              })
+              .eq('user_id', session.user.id)
+
+            return { accessToken: refreshedTokens.access_token, source: 'connection' }
+          } else {
+            console.error('[Calendar Events] Token refresh failed:', refreshedTokens)
+          }
+        } catch (error) {
+          console.error('[Calendar Events] Failed to refresh calendar token:', error)
+        }
+      }
+
+      return { accessToken: connection.google_access_token, source: 'connection' }
+    }
+  }
+
+  return { accessToken: null, source: null }
+}
 
 interface CalendarEvent {
   id: string
@@ -116,10 +218,37 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.accessToken) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Not authenticated or missing calendar access' },
+        { error: 'Not authenticated' },
         { status: 401 }
+      )
+    }
+
+    // Get access token from session or calendar_connections
+    console.log('[Calendar Events] User ID:', session.user.id, 'Auth provider:', session.authProvider)
+    const { accessToken, source } = await getCalendarAccessToken(session)
+    console.log('[Calendar Events] Access token source:', source, 'Has token:', !!accessToken)
+
+    if (!accessToken) {
+      console.log('[Calendar Events] No access token found')
+      return NextResponse.json(
+        { error: 'No calendar connected', code: 'NO_CALENDAR' },
+        { status: 401 }
+      )
+    }
+
+    // Verify token has calendar scope (helps diagnose issues)
+    const scopeCheck = await verifyTokenScopes(accessToken)
+    if (!scopeCheck.valid) {
+      console.error('[Calendar Events] Token missing calendar scope! Scopes:', scopeCheck.scopes)
+      return NextResponse.json(
+        {
+          error: 'Calendar permission not granted. Please disconnect and reconnect your calendar.',
+          code: 'SCOPE_INSUFFICIENT',
+          scopes: scopeCheck.scopes
+        },
+        { status: 403 }
       )
     }
 
@@ -162,14 +291,37 @@ export async function GET(request: NextRequest) {
         }),
       {
         headers: {
-          Authorization: `Bearer ${session.accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       }
     )
 
     if (!calendarResponse.ok) {
       const errorText = await calendarResponse.text()
-      console.error('Google Calendar API error:', errorText)
+      console.error('[Calendar Events] Google Calendar API error:', calendarResponse.status, errorText)
+
+      // Parse error to check for specific issues
+      let errorData: { error?: { message?: string; status?: string } } = {}
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        // Not JSON, ignore
+      }
+
+      const isInsufficientScope = errorData.error?.message?.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT') ||
+        errorData.error?.status === 'PERMISSION_DENIED'
+
+      if (isInsufficientScope) {
+        // Token doesn't have calendar.readonly scope - user needs to re-authenticate
+        console.error('[Calendar Events] Token missing calendar scope. Source:', source)
+        return NextResponse.json(
+          {
+            error: 'Calendar permission not granted. Please disconnect and reconnect your calendar, or sign out and sign back in with Google.',
+            code: 'SCOPE_INSUFFICIENT'
+          },
+          { status: 403 }
+        )
+      }
 
       if (calendarResponse.status === 401 || calendarResponse.status === 403) {
         // Token is invalid or revoked - client should trigger re-auth
