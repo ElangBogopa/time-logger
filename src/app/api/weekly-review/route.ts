@@ -188,9 +188,15 @@ export async function POST(request: NextRequest) {
 
     const { weekStart: requestedWeekStart, timezone }: WeeklyReviewRequest = await request.json()
 
-    // Use user's timezone or fall back to UTC
-    const userTimezone = timezone || 'UTC'
-    const today = getTodayInTimezone(userTimezone)
+    // Require timezone from client - no defaults
+    if (!timezone) {
+      return NextResponse.json(
+        { error: 'Timezone parameter is required' },
+        { status: 400 }
+      )
+    }
+
+    const today = getTodayInTimezone(timezone)
     const weekStart = requestedWeekStart || getWeekStart(today)
     const weekEnd = getWeekEnd(weekStart)
     const previousWeekStart = getPreviousWeekStart(weekStart)
