@@ -1686,9 +1686,7 @@ export default function TimelineView({
                     className={`absolute overflow-hidden rounded-lg border-2 border-dashed transition-all ${
                       isDismissed
                         ? 'border-zinc-400/50 bg-zinc-200/30 opacity-50 dark:border-zinc-500/40 dark:bg-zinc-700/30'
-                        : ghostHasOverlap
-                          ? 'border-amber-500/70 bg-amber-100/60 hover:border-amber-600 hover:bg-amber-100/80 dark:border-amber-400/60 dark:bg-amber-900/40 dark:hover:border-amber-300'
-                          : 'border-blue-500/70 bg-blue-100/60 hover:border-blue-600 hover:bg-blue-100/80 dark:border-blue-400/60 dark:bg-blue-900/40 dark:hover:border-blue-300'
+                        : 'border-blue-500/70 bg-blue-100/60 hover:border-blue-600 hover:bg-blue-100/80 dark:border-blue-400/60 dark:bg-blue-900/40 dark:hover:border-blue-300'
                     } ${isCurrentlyDragging ? 'pointer-events-none' : 'cursor-pointer'}`}
                     style={{
                       top,
@@ -1700,9 +1698,7 @@ export default function TimelineView({
                     <div className={`flex h-full flex-col justify-center px-2 py-1 ${
                       isDismissed
                         ? 'text-zinc-600 dark:text-zinc-400'
-                        : ghostHasOverlap
-                          ? 'text-amber-800 dark:text-amber-200'
-                          : 'text-blue-800 dark:text-blue-200'
+                        : 'text-blue-800 dark:text-blue-200'
                     }`}>
                       {isShort ? (
                         <div className="flex items-center justify-between gap-1">
