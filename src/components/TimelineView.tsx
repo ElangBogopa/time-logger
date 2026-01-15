@@ -216,6 +216,7 @@ export default function TimelineView({
 
   // Entry adjustment state (move or resize existing entries)
   type EntryDragType = 'move' | 'resize-top' | 'resize-bottom'
+  const [isEntryTouchActive, setIsEntryTouchActive] = useState(false) // Track when touching an entry
   const [isAdjustingEntry, setIsAdjustingEntry] = useState(false)
   const [adjustPreview, setAdjustPreview] = useState<{
     entryId: string
@@ -231,8 +232,10 @@ export default function TimelineView({
     startY: number
     startClientY: number
     hasMoved: boolean
+    isStillnessConfirmed: boolean // Must hold still before any adjustment
     isHoldConfirmed: boolean // For touch move (middle drag)
   } | null>(null)
+  const entryStillnessTimerRef = useRef<NodeJS.Timeout | null>(null)
   const entryHoldTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Ghost event interaction tracking (tap vs hold+drag)
@@ -738,11 +741,16 @@ export default function TimelineView({
     ghostInteractionRef.current = null
 
     // Clear entry adjustment state
+    if (entryStillnessTimerRef.current) {
+      clearTimeout(entryStillnessTimerRef.current)
+      entryStillnessTimerRef.current = null
+    }
     if (entryHoldTimerRef.current) {
       clearTimeout(entryHoldTimerRef.current)
       entryHoldTimerRef.current = null
     }
     entryAdjustRef.current = null
+    setIsEntryTouchActive(false)
     setIsAdjustingEntry(false)
     setAdjustPreview(null)
 
@@ -993,6 +1001,7 @@ export default function TimelineView({
       startY: e.clientY,
       startClientY: e.clientY,
       hasMoved: false,
+      isStillnessConfirmed: true, // Mouse is precise, no stillness check needed
       isHoldConfirmed: dragType !== 'move' // Resize starts immediately, move needs to confirm
     }
 
@@ -1009,6 +1018,7 @@ export default function TimelineView({
   }
 
   // ENTRY ADJUSTMENT: Touch start handler
+  // Uses same two-phase approach as grid: stillness check, then hold timer
   const handleEntryTouchStart = (e: React.TouchEvent, entry: PlacedEntry) => {
     e.stopPropagation() // Don't trigger grid touchstart
 
@@ -1031,25 +1041,23 @@ export default function TimelineView({
       startY: touch.clientY,
       startClientY: touch.clientY,
       hasMoved: false,
-      isHoldConfirmed: dragType !== 'move' // Resize starts immediately
+      isStillnessConfirmed: false,
+      isHoldConfirmed: false
     }
 
-    // For resize operations, start immediately
-    if (dragType !== 'move') {
-      setIsAdjustingEntry(true)
-      setAdjustPreview({
-        entryId: entry.id,
-        startTime: entry.placedStartTime,
-        endTime: entry.placedEndTime
-      })
-      // Haptic feedback
-      if (navigator.vibrate) {
-        navigator.vibrate(30)
-      }
-    } else {
-      // For move, set up hold timer
-      entryHoldTimerRef.current = setTimeout(() => {
-        if (entryAdjustRef.current && !entryAdjustRef.current.hasMoved) {
+    // Mark entry touch as active so the useEffect adds listeners
+    setIsEntryTouchActive(true)
+
+    // Phase 1: Stillness check - must hold still before any adjustment
+    // If user moves during this time, they're scrolling - let it happen
+    entryStillnessTimerRef.current = setTimeout(() => {
+      if (entryAdjustRef.current && !entryAdjustRef.current.hasMoved) {
+        entryAdjustRef.current.isStillnessConfirmed = true
+
+        // Phase 2: For resize (edges), confirm immediately after stillness
+        // For move (middle), require additional hold time
+        if (dragType !== 'move') {
+          // Resize: ready to adjust after stillness confirmed
           entryAdjustRef.current.isHoldConfirmed = true
           setIsAdjustingEntry(true)
           setAdjustPreview({
@@ -1057,13 +1065,28 @@ export default function TimelineView({
             startTime: entry.placedStartTime,
             endTime: entry.placedEndTime
           })
-          // Haptic feedback
           if (navigator.vibrate) {
-            navigator.vibrate(50)
+            navigator.vibrate(30)
           }
+        } else {
+          // Move: need additional hold time
+          entryHoldTimerRef.current = setTimeout(() => {
+            if (entryAdjustRef.current && !entryAdjustRef.current.hasMoved) {
+              entryAdjustRef.current.isHoldConfirmed = true
+              setIsAdjustingEntry(true)
+              setAdjustPreview({
+                entryId: entry.id,
+                startTime: entry.placedStartTime,
+                endTime: entry.placedEndTime
+              })
+              if (navigator.vibrate) {
+                navigator.vibrate(50)
+              }
+            }
+          }, ENTRY_HOLD_DELAY)
         }
-      }, ENTRY_HOLD_DELAY)
-    }
+      }
+    }, STILLNESS_CHECK_DELAY)
   }
 
   // ENTRY ADJUSTMENT: Update entry times in database
@@ -1097,7 +1120,8 @@ export default function TimelineView({
 
   // ENTRY ADJUSTMENT: Mouse/touch move and up handlers
   useEffect(() => {
-    if (!entryAdjustRef.current) return
+    // Only add listeners when entry touch is active
+    if (!isEntryTouchActive && !isAdjustingEntry) return
 
     const handleAdjustMouseMove = (e: MouseEvent) => {
       if (!entryAdjustRef.current) return
@@ -1196,20 +1220,37 @@ export default function TimelineView({
       if (!entryAdjustRef.current) return
 
       const touch = e.touches[0]
-      const { dragType, originalStartMins, originalEndMins, startClientY, isHoldConfirmed } = entryAdjustRef.current
+      const { dragType, originalStartMins, originalEndMins, startClientY, isStillnessConfirmed, isHoldConfirmed } = entryAdjustRef.current
       const deltaY = touch.clientY - startClientY
 
-      // Check if moved beyond threshold (for canceling hold timer)
-      if (Math.abs(deltaY) > DRAG_THRESHOLD) {
+      // Check if moved beyond scroll threshold - if so, user is scrolling
+      if (Math.abs(deltaY) > SCROLL_CANCEL_THRESHOLD) {
         entryAdjustRef.current.hasMoved = true
 
-        // If hold wasn't confirmed yet and user moved, cancel (they're scrolling)
+        // If stillness wasn't confirmed yet, cancel everything - user is scrolling
+        if (!isStillnessConfirmed) {
+          if (entryStillnessTimerRef.current) {
+            clearTimeout(entryStillnessTimerRef.current)
+            entryStillnessTimerRef.current = null
+          }
+          if (entryHoldTimerRef.current) {
+            clearTimeout(entryHoldTimerRef.current)
+            entryHoldTimerRef.current = null
+          }
+          entryAdjustRef.current = null
+          setIsEntryTouchActive(false)
+          return // Let scroll happen
+        }
+
+        // If stillness confirmed but hold not confirmed, also cancel
         if (!isHoldConfirmed) {
           if (entryHoldTimerRef.current) {
             clearTimeout(entryHoldTimerRef.current)
             entryHoldTimerRef.current = null
           }
           entryAdjustRef.current = null
+          setIsEntryTouchActive(false)
+          setIsAdjustingEntry(false)
           return // Let scroll happen
         }
       }
@@ -1266,13 +1307,20 @@ export default function TimelineView({
     }
 
     const handleAdjustTouchEnd = () => {
-      // Clear hold timer
+      // Clear both timers
+      if (entryStillnessTimerRef.current) {
+        clearTimeout(entryStillnessTimerRef.current)
+        entryStillnessTimerRef.current = null
+      }
       if (entryHoldTimerRef.current) {
         clearTimeout(entryHoldTimerRef.current)
         entryHoldTimerRef.current = null
       }
 
-      if (!entryAdjustRef.current) return
+      if (!entryAdjustRef.current) {
+        setIsEntryTouchActive(false)
+        return
+      }
 
       const { entry, hasMoved, isHoldConfirmed } = entryAdjustRef.current
 
@@ -1290,6 +1338,7 @@ export default function TimelineView({
 
       // Reset state
       entryAdjustRef.current = null
+      setIsEntryTouchActive(false)
       setIsAdjustingEntry(false)
       setAdjustPreview(null)
     }
@@ -1305,11 +1354,14 @@ export default function TimelineView({
       window.removeEventListener('touchmove', handleAdjustTouchMove)
       window.removeEventListener('touchend', handleAdjustTouchEnd)
     }
-  }, [adjustPreview, updateEntryTimes])
+  }, [isEntryTouchActive, isAdjustingEntry, adjustPreview, updateEntryTimes])
 
-  // Cleanup entry hold timer on unmount
+  // Cleanup entry timers on unmount
   useEffect(() => {
     return () => {
+      if (entryStillnessTimerRef.current) {
+        clearTimeout(entryStillnessTimerRef.current)
+      }
       if (entryHoldTimerRef.current) {
         clearTimeout(entryHoldTimerRef.current)
       }
