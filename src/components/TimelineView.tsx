@@ -203,8 +203,8 @@ export default function TimelineView({
     isHoldConfirmed: boolean
   } | null>(null)
 
-  const DRAG_THRESHOLD = 10 // pixels - if moved less than this, treat as click
-  const TOUCH_HOLD_DELAY = 500 // ms - hold this long before treating as drag-to-create
+  const DRAG_THRESHOLD = 20 // pixels - if moved less than this, treat as click
+  const TOUCH_HOLD_DELAY = 800 // ms - hold this long before treating as drag-to-create
   const GHOST_TAP_THRESHOLD = 150 // ms - release before this = tap to confirm
   const ENTRY_EDGE_ZONE = 0.2 // 20% of entry height for resize zones
   const ENTRY_HOLD_DELAY = 200 // ms - hold before moving entry (touch only)
