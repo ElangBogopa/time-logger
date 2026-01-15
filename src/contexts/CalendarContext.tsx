@@ -126,7 +126,8 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
   // Fetch calendar events from API
   const fetchCalendarEvents = useCallback(async (startDate: string, endDate: string): Promise<CalendarEvent[]> => {
-    const response = await fetch(`/api/calendar/events?start=${startDate}&end=${endDate}`)
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const response = await fetch(`/api/calendar/events?start=${startDate}&end=${endDate}&timezone=${encodeURIComponent(timezone)}`)
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))

@@ -197,10 +197,11 @@ export default function WeeklyReviewPage() {
     setError(null)
 
     try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const response = await fetch('/api/weekly-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ weekStart }),
+        body: JSON.stringify({ weekStart, timezone }),
       })
 
       if (!response.ok) {
