@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { getLocalDateString } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { CalendarEvent } from './TimelineView'
 import TimeRangePicker from './TimeRangePicker'
@@ -72,11 +73,28 @@ export default function GhostEntryModal({
     }
   }, [event])
 
-  // Check if event has ended
-  const now = new Date()
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  const endMinutes = endTime ? timeToMinutes(endTime) : 0
-  const hasEnded = endMinutes <= currentMinutes || endMinutes > 23 * 60 + 45 // Past or near midnight
+  // Check if event has ended - must consider the DATE, not just time
+  const hasEnded = useMemo(() => {
+    const today = getLocalDateString()
+
+    // Past day - all events have ended
+    if (selectedDate < today) {
+      return true
+    }
+
+    // Future day - no events have ended
+    if (selectedDate > today) {
+      return false
+    }
+
+    // Today - check if end time has passed
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const endMinutes = endTime ? timeToMinutes(endTime) : 0
+
+    // Event has ended if end time is before now, or if it's a late-night event (near midnight)
+    return endMinutes <= currentMinutes || endMinutes > 23 * 60 + 45
+  }, [selectedDate, endTime])
 
   const duration = calculateDuration(startTime, endTime)
 
@@ -100,6 +118,38 @@ export default function GhostEntryModal({
     setIsSubmitting(true)
 
     try {
+      // Check for duplicate/overlapping entries first
+      const { data: existingEntries } = await supabase
+        .from('time_entries')
+        .select('id, start_time, end_time, activity')
+        .eq('user_id', userId)
+        .eq('date', selectedDate)
+
+      if (existingEntries && existingEntries.length > 0) {
+        const newStart = timeToMinutes(startTime)
+        const newEnd = timeToMinutes(endTime)
+
+        const overlappingEntry = existingEntries.find(entry => {
+          if (!entry.start_time || !entry.end_time) return false
+          const entryStart = timeToMinutes(entry.start_time)
+          const entryEnd = timeToMinutes(entry.end_time)
+
+          // Check for significant overlap (>50%)
+          const overlapStart = Math.max(newStart, entryStart)
+          const overlapEnd = Math.min(newEnd, entryEnd)
+          const overlapDuration = Math.max(0, overlapEnd - overlapStart)
+          const newDuration = newEnd - newStart
+
+          return newDuration > 0 && overlapDuration / newDuration > 0.5
+        })
+
+        if (overlappingEntry) {
+          setError(`This time slot overlaps with "${overlappingEntry.activity}". Please adjust the times or delete the existing entry first.`)
+          setIsSubmitting(false)
+          return
+        }
+      }
+
       // Get category from AI
       const categoryResponse = await fetch('/api/categorize', {
         method: 'POST',

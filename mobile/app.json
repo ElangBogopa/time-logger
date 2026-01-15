@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Time Logger",
+    "slug": "time-logger",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "timelogger",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#18181b"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.timelogger.app",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "Time Logger needs access to your calendar to import events.",
+        "NSSiriUsageDescription": "Time Logger uses Siri to quickly log activities.",
+        "NSWidgetExtensionIntentsSupported": true
+      },
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#18181b"
+      },
+      "package": "com.timelogger.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

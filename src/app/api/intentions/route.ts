@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import { IntentionType, UserIntention } from '@/lib/types'
 
 // GET /api/intentions - Fetch user's intentions

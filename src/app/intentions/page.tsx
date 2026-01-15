@@ -8,6 +8,8 @@ import {
   UserIntention,
   INTENTION_LABELS,
   INTENTION_DESCRIPTIONS,
+  INTENTION_CONFIGS,
+  formatTarget,
   ReminderTime,
   DEFAULT_REMINDER_TIMES,
 } from '@/lib/types'
@@ -31,6 +33,9 @@ import {
   Check,
   Target,
   Bell,
+  Lightbulb,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react'
 
 const INTENTION_TYPES: IntentionType[] = [
@@ -43,14 +48,6 @@ const INTENTION_TYPES: IntentionType[] = [
   'learning',
   'custom',
 ]
-
-const SUGGESTED_TARGETS: Partial<Record<IntentionType, { min: number; max: number; default: number }>> = {
-  deep_work: { min: 5, max: 40, default: 15 },
-  exercise: { min: 1, max: 15, default: 5 },
-  learning: { min: 1, max: 20, default: 5 },
-  relationships: { min: 2, max: 20, default: 7 },
-  self_care: { min: 2, max: 15, default: 5 },
-}
 
 export default function IntentionsPage() {
   const { data: session, status } = useSession()
@@ -310,10 +307,25 @@ export default function IntentionsPage() {
             </div>
           ) : (
             intentions.map((intention, index) => {
-              const config = SUGGESTED_TARGETS[intention.intention_type]
-              const currentHours = intention.weekly_target_minutes
-                ? intention.weekly_target_minutes / 60
-                : null
+              const config = INTENTION_CONFIGS[intention.intention_type]
+              const currentMinutes = intention.weekly_target_minutes || config.defaultTargetMinutes
+
+              // Convert minutes to display value based on unit
+              const displayValue = config.unit === 'hours'
+                ? Math.round(currentMinutes / 60)
+                : currentMinutes
+              const maxValue = config.unit === 'hours'
+                ? Math.round(config.maxTargetMinutes / 60)
+                : config.maxTargetMinutes
+              const minValue = config.unit === 'hours'
+                ? Math.round(config.minTargetMinutes / 60)
+                : config.minTargetMinutes
+              const optimalMin = config.unit === 'hours'
+                ? Math.round(config.optimalRangeMin / 60)
+                : config.optimalRangeMin
+              const optimalMax = config.unit === 'hours'
+                ? Math.round(config.optimalRangeMax / 60)
+                : config.optimalRangeMax
 
               return (
                 <div
@@ -326,11 +338,18 @@ export default function IntentionsPage() {
                         {index + 1}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                          {intention.intention_type === 'custom'
-                            ? intention.custom_text
-                            : INTENTION_LABELS[intention.intention_type]}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                            {intention.intention_type === 'custom'
+                              ? intention.custom_text
+                              : INTENTION_LABELS[intention.intention_type]}
+                          </h3>
+                          {config.direction === 'minimize' ? (
+                            <TrendingDown className="h-4 w-4 text-amber-500" />
+                          ) : (
+                            <TrendingUp className="h-4 w-4 text-green-500" />
+                          )}
+                        </div>
                         {intention.intention_type !== 'custom' && (
                           <p className="text-sm text-zinc-500">
                             {INTENTION_DESCRIPTIONS[intention.intention_type]}
@@ -350,30 +369,43 @@ export default function IntentionsPage() {
                     </Button>
                   </div>
 
-                  {/* Weekly target slider */}
-                  {config && (
+                  {/* Weekly target slider with research-backed ranges */}
+                  {intention.intention_type !== 'custom' && (
                     <div className="mt-4 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900/50">
                       <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-zinc-500">Weekly target</span>
+                        <span className="text-zinc-500">
+                          Weekly {config.direction === 'minimize' ? 'limit' : 'target'}
+                        </span>
                         <span className="font-medium text-primary">
-                          {currentHours ? `${currentHours}h/week` : 'No target'}
+                          {formatTarget(currentMinutes, config.unit)}
+                          {config.direction === 'minimize' ? ' max' : ''}
                         </span>
                       </div>
                       <Slider
-                        value={[currentHours || 0]}
+                        value={[displayValue]}
                         onValueChange={([value]) => {
-                          handleUpdateTarget(
-                            intention.id,
-                            value ? value * 60 : null
-                          )
+                          const minutes = config.unit === 'hours' ? value * 60 : value
+                          handleUpdateTarget(intention.id, minutes)
                         }}
-                        min={0}
-                        max={config.max}
-                        step={1}
+                        min={minValue}
+                        max={maxValue}
+                        step={config.unit === 'hours' ? 1 : 15}
                       />
+                      {/* Show optimal range indicator */}
                       <div className="mt-1 flex justify-between text-xs text-zinc-400">
-                        <span>Skip</span>
-                        <span>{config.max}h</span>
+                        <span>{formatTarget(config.minTargetMinutes, config.unit)}</span>
+                        <span className="text-green-600 dark:text-green-400">
+                          Optimal: {formatTarget(config.optimalRangeMin, config.unit)}-{formatTarget(config.optimalRangeMax, config.unit)}
+                        </span>
+                        <span>{formatTarget(config.maxTargetMinutes, config.unit)}</span>
+                      </div>
+
+                      {/* Research note */}
+                      <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-50 p-2 dark:bg-amber-900/20">
+                        <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          {config.researchNote}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -471,9 +503,10 @@ export default function IntentionsPage() {
                   selected={selectedType === type}
                   onSelect={() => {
                     setSelectedType(type)
-                    const config = SUGGESTED_TARGETS[type]
-                    if (config) {
-                      setWeeklyTarget(config.default)
+                    const config = INTENTION_CONFIGS[type]
+                    // Set default target in hours for consistency with existing state
+                    if (type !== 'custom') {
+                      setWeeklyTarget(config.defaultTargetMinutes / 60)
                     } else {
                       setWeeklyTarget(null)
                     }
@@ -485,25 +518,59 @@ export default function IntentionsPage() {
             </div>
 
             {/* Target slider for selected type */}
-            {selectedType && SUGGESTED_TARGETS[selectedType] && (
+            {selectedType && selectedType !== 'custom' && (
               <div className="mt-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="font-medium">Weekly target</span>
-                  <span className="text-lg font-bold text-primary">
-                    {weeklyTarget ? `${weeklyTarget}h/week` : 'No target'}
-                  </span>
-                </div>
-                <Slider
-                  value={[weeklyTarget || 0]}
-                  onValueChange={([value]) => setWeeklyTarget(value || null)}
-                  min={0}
-                  max={SUGGESTED_TARGETS[selectedType]!.max}
-                  step={1}
-                />
-                <div className="mt-1 flex justify-between text-xs text-zinc-400">
-                  <span>Skip</span>
-                  <span>{SUGGESTED_TARGETS[selectedType]!.max}h</span>
-                </div>
+                {(() => {
+                  const config = INTENTION_CONFIGS[selectedType]
+                  const currentMinutes = weeklyTarget ? weeklyTarget * 60 : config.defaultTargetMinutes
+                  const displayValue = config.unit === 'hours'
+                    ? Math.round(currentMinutes / 60)
+                    : currentMinutes
+                  const maxValue = config.unit === 'hours'
+                    ? Math.round(config.maxTargetMinutes / 60)
+                    : config.maxTargetMinutes
+                  const minValue = config.unit === 'hours'
+                    ? Math.round(config.minTargetMinutes / 60)
+                    : config.minTargetMinutes
+
+                  return (
+                    <>
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="font-medium">
+                          Weekly {config.direction === 'minimize' ? 'limit' : 'target'}
+                        </span>
+                        <span className="text-lg font-bold text-primary">
+                          {formatTarget(currentMinutes, config.unit)}
+                          {config.direction === 'minimize' ? ' max' : ''}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[displayValue]}
+                        onValueChange={([value]) => {
+                          setWeeklyTarget(config.unit === 'hours' ? value : value / 60)
+                        }}
+                        min={minValue}
+                        max={maxValue}
+                        step={config.unit === 'hours' ? 1 : 15}
+                      />
+                      <div className="mt-1 flex justify-between text-xs text-zinc-400">
+                        <span>{formatTarget(config.minTargetMinutes, config.unit)}</span>
+                        <span className="text-green-600 dark:text-green-400">
+                          Optimal: {formatTarget(config.optimalRangeMin, config.unit)}-{formatTarget(config.optimalRangeMax, config.unit)}
+                        </span>
+                        <span>{formatTarget(config.maxTargetMinutes, config.unit)}</span>
+                      </div>
+
+                      {/* Research note */}
+                      <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-50 p-2.5 dark:bg-amber-900/20">
+                        <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          {config.researchNote}
+                        </p>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             )}
 

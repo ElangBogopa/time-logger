@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 import {
   TimeEntry,
@@ -52,7 +52,65 @@ function getWeekStart(): string {
   return monday.toISOString().split('T')[0]
 }
 
+// Simple in-memory cache for weekly category totals (avoids N+1 queries)
+// Cache invalidates after 2 minutes or when a new week starts
+interface WeeklyCacheEntry {
+  totals: Map<TimeCategory, number>
+  weekStart: string
+  timestamp: number
+}
+const weeklyTotalsCache = new Map<string, WeeklyCacheEntry>()
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes (optimized from 2 min to reduce DB queries)
+
+async function getCachedWeeklyTotals(
+  userId: string
+): Promise<Map<TimeCategory, number>> {
+  const weekStart = getWeekStart()
+  const cacheKey = `${userId}:${weekStart}`
+  const cached = weeklyTotalsCache.get(cacheKey)
+
+  // Return cached if valid
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.totals
+  }
+
+  // Fetch fresh data
+  const { data: weekEntries } = await supabase
+    .from('time_entries')
+    .select('category, duration_minutes')
+    .eq('user_id', userId)
+    .eq('status', 'confirmed')
+    .gte('date', weekStart)
+
+  const totals = new Map<TimeCategory, number>()
+  if (weekEntries) {
+    weekEntries.forEach((entry) => {
+      if (entry.category) {
+        const current = totals.get(entry.category as TimeCategory) || 0
+        totals.set(entry.category as TimeCategory, current + entry.duration_minutes)
+      }
+    })
+  }
+
+  // Store in cache
+  weeklyTotalsCache.set(cacheKey, {
+    totals,
+    weekStart,
+    timestamp: Date.now(),
+  })
+
+  // Clean old entries (different week starts)
+  for (const [key, value] of weeklyTotalsCache.entries()) {
+    if (value.weekStart !== weekStart) {
+      weeklyTotalsCache.delete(key)
+    }
+  }
+
+  return totals
+}
+
 // Calculate weekly progress for intention-related categories
+// Uses cached weekly totals to avoid N+1 queries
 async function getWeeklyIntentionProgress(
   userId: string,
   intentions: UserIntention[]
@@ -61,26 +119,8 @@ async function getWeeklyIntentionProgress(
 
   if (intentions.length === 0) return progress
 
-  const weekStart = getWeekStart()
-
-  // Fetch all entries for this week
-  const { data: weekEntries } = await supabase
-    .from('time_entries')
-    .select('category, duration_minutes')
-    .eq('user_id', userId)
-    .eq('status', 'confirmed')
-    .gte('date', weekStart)
-
-  if (!weekEntries) return progress
-
-  // Calculate totals per category
-  const categoryTotals = new Map<TimeCategory, number>()
-  weekEntries.forEach((entry) => {
-    if (entry.category) {
-      const current = categoryTotals.get(entry.category as TimeCategory) || 0
-      categoryTotals.set(entry.category as TimeCategory, current + entry.duration_minutes)
-    }
-  })
+  // Use cached weekly totals instead of fetching each time
+  const categoryTotals = await getCachedWeeklyTotals(userId)
 
   // Map intentions to their progress
   intentions.forEach((intention) => {
@@ -362,6 +402,7 @@ export async function POST(request: NextRequest) {
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: 30000, // 30 second timeout
     })
 
     const tone = getCategoryTone(entry.category)
@@ -468,6 +509,22 @@ STRICT RULES:
     return NextResponse.json({ commentary })
   } catch (error) {
     console.error('Commentary generation error:', error)
+
+    // Handle specific error types
+    if (error instanceof OpenAI.APIError) {
+      if (error.status === 429) {
+        return NextResponse.json({ error: 'AI service is busy. Please try again in a moment.' }, { status: 503 })
+      }
+      if (error.status === 401) {
+        return NextResponse.json({ error: 'AI service configuration error.' }, { status: 500 })
+      }
+    }
+
+    // Handle timeout
+    if (error instanceof Error && error.message.includes('timeout')) {
+      return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 })
+    }
+
     return NextResponse.json({ error: 'Failed to generate commentary' }, { status: 500 })
   }
 }

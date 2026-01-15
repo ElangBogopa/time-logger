@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 import {
   TimeEntry,
@@ -10,6 +10,9 @@ import {
   UserIntention,
   INTENTION_LABELS,
   INTENTION_CATEGORY_MAP,
+  INTENTION_CONFIGS,
+  calculateIntentionProgress,
+  getIntentionFeedback,
 } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
@@ -30,6 +33,12 @@ interface IntentionProgress {
   isReductionGoal: boolean // For goals like "less_distraction"
   changeMinutes: number | null // Difference from last week
   improvementPercentage: number | null // For reduction goals
+  // Research-based feedback
+  feedbackMessage: string | null
+  feedbackTone: 'success' | 'warning' | 'neutral' | 'danger' | null
+  researchNote: string | null
+  optimalRangeMin: number | null
+  optimalRangeMax: number | null
 }
 
 interface CategoryBreakdown {
@@ -59,9 +68,22 @@ interface IntentionScorecard {
   roughDays: number
 }
 
+interface WeekHighlight {
+  type: 'streak' | 'improvement' | 'target_hit' | 'personal_best' | 'consistency'
+  icon: string
+  text: string
+  subtext?: string
+}
+
 interface WeeklyReviewData {
   weekStart: string
   weekEnd: string
+  // New hero metrics
+  weekScore: number // 0-100
+  weekScoreLabel: string // "Strong week", "Good progress", etc.
+  activeDays: number // Days with entries out of 7
+  highlights: WeekHighlight[]
+  // Existing
   totalMinutes: number
   entryCount: number
   previousWeekMinutes: number | null
@@ -237,7 +259,8 @@ export async function POST(request: NextRequest) {
     // Calculate intention progress with improved reduction goal handling
     const intentionProgress: IntentionProgress[] = userIntentions.map((intention) => {
       const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
-      const isReductionGoal = intention.intention_type === 'less_distraction'
+      const config = INTENTION_CONFIGS[intention.intention_type]
+      const isReductionGoal = config.direction === 'minimize'
       let currentMinutes = 0
       let previousMinutes = 0
 
@@ -251,7 +274,8 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      const targetMinutes = intention.weekly_target_minutes
+      // Use saved target or fall back to research-based default
+      const targetMinutes = intention.weekly_target_minutes || config.defaultTargetMinutes
 
       // For reduction goals, percentage shows improvement from previous week
       // For growth goals, percentage shows progress toward target
@@ -263,8 +287,11 @@ export async function POST(request: NextRequest) {
         improvementPercentage = Math.round(((previousMinutes - currentMinutes) / previousMinutes) * 100)
         percentage = improvementPercentage
       } else if (!isReductionGoal && targetMinutes) {
-        percentage = Math.round((currentMinutes / targetMinutes) * 100)
+        percentage = calculateIntentionProgress(currentMinutes, targetMinutes, config.direction)
       }
+
+      // Get research-based feedback
+      const feedback = getIntentionFeedback(currentMinutes, targetMinutes, config)
 
       // Trend calculation
       let trend: 'up' | 'down' | 'same' | null = null
@@ -297,16 +324,22 @@ export async function POST(request: NextRequest) {
         isReductionGoal,
         changeMinutes: hasPreviousWeekData ? changeMinutes : null,
         improvementPercentage,
+        // Add research-based feedback
+        feedbackMessage: feedback.message,
+        feedbackTone: feedback.tone,
+        researchNote: intention.intention_type !== 'custom' ? config.researchNote : null,
+        optimalRangeMin: config.optimalRangeMin,
+        optimalRangeMax: config.optimalRangeMax,
       }
     })
 
     // Build intention scorecards
     const intentionScorecards: IntentionScorecard[] = userIntentions.map((intention) => {
       const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
-      const isReductionGoal = intention.intention_type === 'less_distraction'
-      const dailyTarget = intention.weekly_target_minutes
-        ? intention.weekly_target_minutes / 7
-        : null
+      const config = INTENTION_CONFIGS[intention.intention_type]
+      const isReductionGoal = config.direction === 'minimize'
+      const targetMinutes = intention.weekly_target_minutes || config.defaultTargetMinutes
+      const dailyTarget = targetMinutes / 7
 
       const days: IntentionDayScore[] = []
       let goodDays = 0
@@ -345,11 +378,12 @@ export async function POST(request: NextRequest) {
             roughDays++
           }
         } else {
-          // For growth goals: compare against daily target or use defaults
-          const threshold = dailyTarget || 60 // Default 1 hour if no target
-          if (intentionMinutes >= threshold) {
+          // For growth goals: compare against daily target from research-based config
+          if (intentionMinutes >= dailyTarget) {
             rating = 'good'
             goodDays++
+          } else if (intentionMinutes >= dailyTarget * 0.5) {
+            rating = 'neutral'
           } else if (intentionMinutes > 0) {
             rating = 'neutral'
           } else {
@@ -442,6 +476,138 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Calculate active days (days with at least one entry)
+    const activeDays = Array.from(entriesByDay.values()).filter(dayEntries => dayEntries.length > 0).length
+
+    // Calculate Week Score (0-100)
+    // Components:
+    // - Active days: 0-7 days → 0-35 points (5 points per day)
+    // - Intention progress: average % across intentions → 0-45 points
+    // - Consistency: ratio of good days to total active days → 0-20 points
+    let weekScore = 0
+
+    // Active days component (35 points max)
+    const activeDaysScore = Math.round((activeDays / 7) * 35)
+    weekScore += activeDaysScore
+
+    // Intention progress component (45 points max)
+    if (intentionProgress.length > 0) {
+      const avgIntentionProgress = intentionProgress.reduce((sum, ip) => {
+        if (ip.isReductionGoal) {
+          // For reduction goals, less is better. Score based on staying under limit
+          if (ip.targetMinutes && ip.targetMinutes > 0) {
+            const ratio = ip.currentMinutes / ip.targetMinutes
+            return sum + Math.max(0, Math.min(100, (1 - ratio + 0.5) * 100)) // Under limit = 100%+, at limit = 50%
+          }
+          return sum + (ip.improvementPercentage !== null ? Math.max(0, 50 + ip.improvementPercentage / 2) : 50)
+        }
+        return sum + (ip.percentage || 0)
+      }, 0) / intentionProgress.length
+      const intentionScore = Math.round((Math.min(avgIntentionProgress, 100) / 100) * 45)
+      weekScore += intentionScore
+    } else {
+      // No intentions set, give partial credit based on activity
+      weekScore += Math.round((activeDays / 7) * 20)
+    }
+
+    // Consistency component (20 points max)
+    if (intentionScorecards.length > 0) {
+      const totalGoodDays = intentionScorecards.reduce((sum, sc) => sum + sc.goodDays, 0)
+      const totalPossibleGoodDays = intentionScorecards.length * activeDays
+      if (totalPossibleGoodDays > 0) {
+        const consistencyRatio = totalGoodDays / totalPossibleGoodDays
+        weekScore += Math.round(consistencyRatio * 20)
+      }
+    } else {
+      // No scorecards, give partial credit
+      weekScore += Math.round((activeDays / 7) * 10)
+    }
+
+    // Cap at 100
+    weekScore = Math.min(100, weekScore)
+
+    // Generate week score label
+    let weekScoreLabel = ''
+    if (weekScore >= 85) weekScoreLabel = 'Exceptional week'
+    else if (weekScore >= 70) weekScoreLabel = 'Strong week'
+    else if (weekScore >= 55) weekScoreLabel = 'Good progress'
+    else if (weekScore >= 40) weekScoreLabel = 'Building momentum'
+    else if (weekScore >= 25) weekScoreLabel = 'Getting started'
+    else weekScoreLabel = 'Room to grow'
+
+    // Generate highlights
+    const highlights: WeekHighlight[] = []
+
+    // Highlight: Active days
+    if (activeDays >= 6) {
+      highlights.push({
+        type: 'consistency',
+        icon: '🔥',
+        text: `${activeDays}/7 days active`,
+        subtext: activeDays === 7 ? 'Perfect week!' : 'Nearly perfect',
+      })
+    }
+
+    // Highlight: Intention targets hit
+    const targetsHit = intentionProgress.filter(ip => {
+      if (ip.isReductionGoal) {
+        return ip.targetMinutes && ip.currentMinutes <= ip.targetMinutes
+      }
+      return ip.percentage !== null && ip.percentage >= 100
+    })
+    if (targetsHit.length > 0) {
+      highlights.push({
+        type: 'target_hit',
+        icon: '✓',
+        text: `Hit ${targetsHit.length} of ${intentionProgress.length} targets`,
+        subtext: targetsHit.map(t => t.label).join(', '),
+      })
+    }
+
+    // Highlight: Week-over-week improvements
+    intentionProgress.forEach(ip => {
+      if (ip.changeMinutes !== null && ip.previousMinutes !== null && ip.previousMinutes > 0) {
+        const changePercent = Math.round((ip.changeMinutes / ip.previousMinutes) * 100)
+
+        if (ip.isReductionGoal && changePercent < -20) {
+          // Significant reduction in something we want less of
+          highlights.push({
+            type: 'improvement',
+            icon: '⬇️',
+            text: `${Math.abs(changePercent)}% less ${ip.label.toLowerCase()}`,
+            subtext: 'vs last week',
+          })
+        } else if (!ip.isReductionGoal && changePercent > 20) {
+          // Significant increase in something we want more of
+          highlights.push({
+            type: 'improvement',
+            icon: '⬆️',
+            text: `${changePercent}% more ${ip.label.toLowerCase()}`,
+            subtext: 'vs last week',
+          })
+        }
+      }
+    })
+
+    // Highlight: Best day
+    if (bestDays.length > 0) {
+      const bestDayDate = Array.from(dayMinutes.entries())
+        .filter(([, minutes]) => minutes > 0)
+        .sort((a, b) => b[1] - a[1])[0]
+      if (bestDayDate) {
+        const hours = Math.round((bestDayDate[1] / 60) * 10) / 10
+        highlights.push({
+          type: 'personal_best',
+          icon: '⭐',
+          text: `Best day: ${getDayName(bestDayDate[0])}`,
+          subtext: `${hours}h of focused time`,
+        })
+      }
+    }
+
+    // Limit to top 4 highlights
+    const topHighlights = highlights.slice(0, 4)
+
     // Generate AI coach summary only if enough data
     let coachSummary: string | null = null
 
@@ -518,6 +684,12 @@ For reduction goals like "less distraction", celebrate decreases and gently note
     const reviewData: WeeklyReviewData = {
       weekStart,
       weekEnd,
+      // New hero metrics
+      weekScore,
+      weekScoreLabel,
+      activeDays,
+      highlights: topHighlights,
+      // Existing
       totalMinutes,
       entryCount,
       previousWeekMinutes,

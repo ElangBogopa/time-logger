@@ -19,7 +19,6 @@ import {
   TrendingDown,
   Minus,
   Target,
-  Clock,
   Sparkles,
   BarChart3,
   Info,
@@ -47,6 +46,12 @@ interface IntentionProgress {
   isReductionGoal: boolean
   changeMinutes: number | null
   improvementPercentage: number | null
+  // Research-based feedback
+  feedbackMessage: string | null
+  feedbackTone: 'success' | 'warning' | 'neutral' | 'danger' | null
+  researchNote: string | null
+  optimalRangeMin: number | null
+  optimalRangeMax: number | null
 }
 
 interface CategoryBreakdown {
@@ -76,9 +81,22 @@ interface IntentionScorecard {
   roughDays: number
 }
 
+interface WeekHighlight {
+  type: 'streak' | 'improvement' | 'target_hit' | 'personal_best' | 'consistency'
+  icon: string
+  text: string
+  subtext?: string
+}
+
 interface WeeklyReviewData {
   weekStart: string
   weekEnd: string
+  // Hero metrics
+  weekScore: number
+  weekScoreLabel: string
+  activeDays: number
+  highlights: WeekHighlight[]
+  // Existing
   totalMinutes: number
   entryCount: number
   previousWeekMinutes: number | null
@@ -92,20 +110,6 @@ interface WeeklyReviewData {
   bestHours: string[]
   insights: string[]
   coachSummary: string | null
-}
-
-const CATEGORY_COLORS: Record<TimeCategory, string> = {
-  deep_work: 'bg-slate-500',
-  meetings: 'bg-purple-400',
-  admin: 'bg-gray-400',
-  learning: 'bg-teal-500',
-  exercise: 'bg-green-500',
-  rest: 'bg-indigo-400',
-  meals: 'bg-amber-500',
-  self_care: 'bg-lime-500',
-  relationships: 'bg-rose-400',
-  distraction: 'bg-red-400',
-  other: 'bg-zinc-400',
 }
 
 // Get Sunday (start) of a given week
@@ -350,165 +354,194 @@ export default function WeeklyReviewPage() {
                 </div>
               ) : (
                 <>
-                  {/* Total Time Summary */}
-                  <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
-                    <div className="flex items-center justify-between">
+                  {/* Hero Week Score */}
+                  <div className="rounded-xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-6 dark:border-zinc-700 dark:from-zinc-800 dark:to-zinc-800/50">
+                    <div className="flex items-center justify-between mb-4">
                       <div>
-                        <p className="text-sm text-zinc-500 flex items-center">
-                          Total time logged
-                          <InfoTooltip content="Sum of all confirmed time entries this week" />
+                        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                          Week Score
                         </p>
-                        <p className="text-3xl font-bold text-foreground">
-                          {formatHours(reviewData.totalMinutes)}
+                        <p className="text-5xl font-bold text-foreground mt-1">
+                          {reviewData.weekScore}
+                        </p>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                          {reviewData.weekScoreLabel}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-zinc-500 flex items-center justify-end">
-                          vs last week
-                          {!reviewData.hasPreviousWeekData && (
-                            <InfoTooltip content="Need 7+ entries from last week to compare" />
-                          )}
-                        </p>
-                        {reviewData.hasPreviousWeekData && reviewData.previousWeekMinutes !== null ? (
-                          <div className="flex items-center gap-1 justify-end">
-                            {reviewData.totalMinutes > reviewData.previousWeekMinutes ? (
-                              <>
-                                <TrendingUp className="h-4 w-4 text-green-500" />
-                                <span className="font-medium text-green-500">
-                                  +{formatHoursShort(reviewData.totalMinutes - reviewData.previousWeekMinutes)}
-                                </span>
-                              </>
-                            ) : reviewData.totalMinutes < reviewData.previousWeekMinutes ? (
-                              <>
-                                <TrendingDown className="h-4 w-4 text-amber-500" />
-                                <span className="font-medium text-amber-500">
-                                  -{formatHoursShort(reviewData.previousWeekMinutes - reviewData.totalMinutes)}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <Minus className="h-4 w-4 text-zinc-400" />
-                                <span className="font-medium text-zinc-400">Same</span>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-zinc-400">N/A</span>
-                        )}
+                        <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                          <span className="font-medium text-foreground text-lg">{reviewData.activeDays}/7</span>
+                          <span>days active</span>
+                        </div>
+                        {/* Mini progress ring */}
+                        <div className="mt-2 flex justify-end">
+                          <svg className="h-16 w-16 -rotate-90" viewBox="0 0 36 36">
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="14"
+                              fill="none"
+                              className="stroke-zinc-200 dark:stroke-zinc-700"
+                              strokeWidth="3"
+                            />
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="14"
+                              fill="none"
+                              className={`${
+                                reviewData.weekScore >= 70 ? 'stroke-green-500' :
+                                reviewData.weekScore >= 40 ? 'stroke-amber-500' : 'stroke-orange-500'
+                              }`}
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeDasharray={`${(reviewData.weekScore / 100) * 88} 88`}
+                            />
+                          </svg>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Intention Progress */}
+                  {/* AI Coach Summary */}
+                  {reviewData.coachSummary && (
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                        <h2 className="font-semibold text-foreground">Coach&apos;s Reflection</h2>
+                      </div>
+                      <p className="text-sm leading-relaxed text-foreground/90">
+                        {reviewData.coachSummary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Highlights */}
+                  {reviewData.highlights.length > 0 && (
+                    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
+                      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">
+                        Highlights
+                      </h2>
+                      <div className="grid grid-cols-2 gap-3">
+                        {reviewData.highlights.map((highlight, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-700/50"
+                          >
+                            <span className="text-xl">{highlight.icon}</span>
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm text-foreground truncate">
+                                {highlight.text}
+                              </p>
+                              {highlight.subtext && (
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                                  {highlight.subtext}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Intention Progress with Rings */}
                   {reviewData.intentionProgress.length > 0 && (
                     <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
                       <div className="mb-4 flex items-center gap-2">
                         <Target className="h-5 w-5 text-primary" />
-                        <h2 className="font-semibold text-foreground">Intention Progress</h2>
-                        <InfoTooltip content="Progress toward your weekly goals" />
+                        <h2 className="font-semibold text-foreground">Intentions</h2>
                       </div>
 
-                      <div className="space-y-5">
-                        {reviewData.intentionProgress.map((ip) => (
-                          <div key={ip.intention.id}>
-                            <div className="mb-1.5 flex items-center justify-between">
-                              <span className="text-sm font-medium text-foreground">{ip.label}</span>
-                              <div className="flex items-center gap-2 text-sm">
-                                {ip.isReductionGoal ? (
-                                  // Reduction goal display: show comparison
-                                  <>
-                                    <span className="text-zinc-500">
-                                      {formatHoursShort(ip.currentMinutes)} this week
-                                    </span>
-                                    {ip.previousMinutes !== null && ip.changeMinutes !== null ? (
-                                      ip.changeMinutes < 0 ? (
-                                        <span className="flex items-center gap-1 text-green-500">
-                                          <TrendingDown className="h-4 w-4" />
-                                          {formatHoursShort(Math.abs(ip.changeMinutes))} less
-                                        </span>
-                                      ) : ip.changeMinutes > 0 ? (
-                                        <span className="flex items-center gap-1 text-red-400">
-                                          <TrendingUp className="h-4 w-4" />
-                                          {formatHoursShort(ip.changeMinutes)} more
-                                        </span>
+                      <div className="space-y-4">
+                        {reviewData.intentionProgress.map((ip) => {
+                          // Calculate progress percentage for the ring
+                          const ringProgress = ip.isReductionGoal
+                            ? ip.targetMinutes && ip.targetMinutes > 0
+                              ? Math.max(0, Math.min(100, ((ip.targetMinutes - ip.currentMinutes) / ip.targetMinutes) * 100))
+                              : 50
+                            : ip.percentage || 0
+
+                          // Determine ring color
+                          const ringColor = ip.feedbackTone === 'success' ? 'stroke-green-500'
+                            : ip.feedbackTone === 'warning' ? 'stroke-amber-500'
+                            : ip.feedbackTone === 'danger' ? 'stroke-red-400'
+                            : 'stroke-orange-500'
+
+                          // Week-over-week change
+                          const weekChange = ip.changeMinutes !== null && ip.previousMinutes !== null && ip.previousMinutes > 0
+                            ? Math.round((ip.changeMinutes / ip.previousMinutes) * 100)
+                            : null
+
+                          return (
+                            <div key={ip.intention.id} className="flex items-center gap-4">
+                              {/* Progress Ring */}
+                              <div className="relative flex-shrink-0">
+                                <svg className="h-14 w-14 -rotate-90" viewBox="0 0 36 36">
+                                  <circle
+                                    cx="18" cy="18" r="14"
+                                    fill="none"
+                                    className="stroke-zinc-100 dark:stroke-zinc-700"
+                                    strokeWidth="3"
+                                  />
+                                  <circle
+                                    cx="18" cy="18" r="14"
+                                    fill="none"
+                                    className={ringColor}
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeDasharray={`${(Math.min(ringProgress, 100) / 100) * 88} 88`}
+                                  />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-xs font-semibold text-foreground">
+                                    {Math.round(ringProgress)}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-foreground">{ip.label}</span>
+                                  {weekChange !== null && (
+                                    <span className={`flex items-center gap-1 text-xs font-medium ${
+                                      ip.isReductionGoal
+                                        ? weekChange < 0 ? 'text-green-500' : weekChange > 0 ? 'text-red-400' : 'text-zinc-400'
+                                        : weekChange > 0 ? 'text-green-500' : weekChange < 0 ? 'text-amber-500' : 'text-zinc-400'
+                                    }`}>
+                                      {ip.isReductionGoal ? (
+                                        weekChange < 0 ? <TrendingDown className="h-3 w-3" /> : weekChange > 0 ? <TrendingUp className="h-3 w-3" /> : <Minus className="h-3 w-3" />
                                       ) : (
-                                        <span className="flex items-center gap-1 text-zinc-400">
-                                          <Minus className="h-4 w-4" />
-                                          Same
-                                        </span>
-                                      )
-                                    ) : (
-                                      <span className="text-zinc-400 text-xs">(no previous data)</span>
-                                    )}
-                                  </>
-                                ) : (
-                                  // Growth goal display
-                                  <>
-                                    <span className="text-zinc-500">
-                                      {formatHoursShort(ip.currentMinutes)}
-                                      {ip.targetMinutes && (
-                                        <span className="text-zinc-400">
-                                          {' '}/ {formatHoursShort(ip.targetMinutes)}
-                                        </span>
+                                        weekChange > 0 ? <TrendingUp className="h-3 w-3" /> : weekChange < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />
                                       )}
+                                      {weekChange !== 0 ? `${Math.abs(weekChange)}%` : 'Same'}
                                     </span>
-                                    {ip.trend === 'up' && <TrendingUp className="h-4 w-4 text-green-500" />}
-                                    {ip.trend === 'down' && <TrendingDown className="h-4 w-4 text-amber-500" />}
-                                    {ip.trend === 'same' && <Minus className="h-4 w-4 text-zinc-400" />}
-                                  </>
-                                )}
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                                  <span>
+                                    {formatHoursShort(ip.currentMinutes)}
+                                    {ip.targetMinutes && !ip.isReductionGoal && (
+                                      <span className="text-zinc-400"> / {formatHoursShort(ip.targetMinutes)}</span>
+                                    )}
+                                    {ip.targetMinutes && ip.isReductionGoal && (
+                                      <span className="text-zinc-400"> of {formatHoursShort(ip.targetMinutes)} limit</span>
+                                    )}
+                                  </span>
+                                  {ip.feedbackMessage && (
+                                    <span className={`text-xs ${
+                                      ip.feedbackTone === 'success' ? 'text-green-500' :
+                                      ip.feedbackTone === 'danger' ? 'text-red-400' : ''
+                                    }`}>
+                                      {ip.feedbackMessage}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-
-                            {/* Progress bar */}
-                            {!ip.isReductionGoal && ip.targetMinutes && (
-                              <>
-                                <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
-                                  <div
-                                    className={`h-full rounded-full transition-all ${
-                                      ip.percentage !== null && ip.percentage >= 100
-                                        ? 'bg-green-500'
-                                        : ip.percentage !== null && ip.percentage >= 75
-                                          ? 'bg-primary'
-                                          : ip.percentage !== null && ip.percentage >= 50
-                                            ? 'bg-amber-500'
-                                            : 'bg-zinc-400'
-                                    }`}
-                                    style={{ width: `${Math.min(ip.percentage || 0, 100)}%` }}
-                                  />
-                                </div>
-                                <p className="mt-1 text-xs text-zinc-500">
-                                  {ip.percentage !== null && ip.percentage >= 100
-                                    ? 'Target achieved!'
-                                    : `${ip.percentage || 0}% of target`}
-                                </p>
-                              </>
-                            )}
-
-                            {/* Reduction goal: improvement bar */}
-                            {ip.isReductionGoal && ip.previousMinutes !== null && ip.improvementPercentage !== null && (
-                              <>
-                                <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
-                                  <div
-                                    className={`h-full rounded-full transition-all ${
-                                      ip.improvementPercentage > 0 ? 'bg-green-500' : 'bg-red-400'
-                                    }`}
-                                    style={{
-                                      width: `${Math.min(Math.abs(ip.improvementPercentage), 100)}%`,
-                                    }}
-                                  />
-                                </div>
-                                <p className="mt-1 text-xs text-zinc-500">
-                                  {ip.improvementPercentage > 0
-                                    ? `${ip.improvementPercentage}% reduction from last week`
-                                    : ip.improvementPercentage < 0
-                                      ? `${Math.abs(ip.improvementPercentage)}% increase from last week`
-                                      : 'Same as last week'}
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -557,64 +590,6 @@ export default function WeeklyReviewPage() {
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Category Breakdown */}
-                  {reviewData.categoryBreakdown.length > 0 && (
-                    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
-                      <div className="mb-4 flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-primary" />
-                        <h2 className="font-semibold text-foreground">Time by Category</h2>
-                        <InfoTooltip content="Breakdown of time by activity type" />
-                      </div>
-
-                      {/* Horizontal stacked bar */}
-                      <div className="mb-4 h-6 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700 flex">
-                        {reviewData.categoryBreakdown.map((cat) => (
-                          <Tooltip key={cat.category}>
-                            <TooltipTrigger asChild>
-                              <div
-                                className={`h-full ${CATEGORY_COLORS[cat.category]} first:rounded-l-full last:rounded-r-full cursor-default`}
-                                style={{ width: `${cat.percentage}%` }}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>
-                                {cat.label}: {formatHoursShort(cat.minutes)} ({cat.percentage}%)
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ))}
-                      </div>
-
-                      {/* Category list */}
-                      <div className="space-y-2">
-                        {reviewData.categoryBreakdown.slice(0, 6).map((cat) => (
-                          <div key={cat.category} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className={`h-3 w-3 rounded-full ${CATEGORY_COLORS[cat.category]}`} />
-                              <span className="text-foreground">{cat.label}</span>
-                            </div>
-                            <span className="text-zinc-500">
-                              {formatHoursShort(cat.minutes)} ({cat.percentage}%)
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI Coach Summary */}
-                  {reviewData.coachSummary && (
-                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
-                      <div className="mb-3 flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-primary" />
-                        <h2 className="font-semibold text-foreground">Coach&apos;s Reflection</h2>
-                      </div>
-                      <p className="text-sm leading-relaxed text-foreground/90">
-                        {reviewData.coachSummary}
-                      </p>
                     </div>
                   )}
 

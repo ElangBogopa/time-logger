@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getLocalDateString, TimeEntry, isEntryInFuture, PENDING_COMMENTARY } from '@/lib/types'
+import { getLocalDateString, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
@@ -15,7 +15,28 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, X, Zap, Calendar, Clock } from 'lucide-react'
+import { Loader2, X, Zap, Calendar, Clock, Sparkles, TrendingUp, History } from 'lucide-react'
+
+interface ActivitySuggestion {
+  activity: string
+  category: TimeCategory | null
+  suggestedDuration: number
+  startTime: string
+  endTime: string
+  source: 'pattern' | 'recent'
+  confidence: 'high' | 'medium'
+}
+
+// Detect if text contains natural language time/duration patterns
+function hasNaturalLanguageTime(text: string): boolean {
+  if (!text || text.length < 5) return false
+  return (
+    /\d+\s*(hr|hour|min|minute|h|m)\b/i.test(text) ||  // "2 hours", "30min", "1h"
+    /\d{1,2}[:-]\d{2}\s*(am|pm)?/i.test(text) ||       // "12:30", "2:00pm"
+    /\d{1,2}\s*(am|pm)/i.test(text) ||                  // "2pm", "10am"
+    /from\s+\d|to\s+\d|\d\s*-\s*\d/i.test(text)        // "from 9", "to 5", "9-11"
+  )
+}
 
 interface QuickLogModalProps {
   isOpen: boolean
@@ -42,6 +63,87 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const [error, setError] = useState<string | null>(null)
   const [dismissedSuggestion, setDismissedSuggestion] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Smart suggestions state
+  const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([])
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+
+  // Natural language parsing state
+  const [isParsing, setIsParsing] = useState(false)
+  const [showParseButton, setShowParseButton] = useState(false)
+
+  // Detect NL patterns in activity input
+  useEffect(() => {
+    setShowParseButton(hasNaturalLanguageTime(activity))
+  }, [activity])
+
+  // Fetch smart suggestions when modal opens
+  const fetchSuggestions = useCallback(async () => {
+    if (!userId || isFutureDay) return
+
+    setIsLoadingSuggestions(true)
+    try {
+      const currentTime = getCurrentTime()
+      const date = selectedDate || getLocalDateString()
+
+      const response = await fetch('/api/suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentTime, date }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSuggestions(data.suggestions || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch suggestions:', err)
+    } finally {
+      setIsLoadingSuggestions(false)
+    }
+  }, [userId, selectedDate, isFutureDay])
+
+  // Parse natural language input
+  const handleParseActivity = async () => {
+    if (!activity.trim()) return
+
+    setIsParsing(true)
+    setError(null)
+
+    try {
+      const currentTime = getCurrentTime()
+      const date = selectedDate || getLocalDateString()
+
+      const response = await fetch('/api/parse-activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: activity, currentTime, date }),
+      })
+
+      if (response.ok) {
+        const parsed = await response.json()
+        setActivity(parsed.activity)
+        setStartTime(parsed.start_time)
+        setEndTime(parsed.end_time)
+        setShowParseButton(false)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || 'Failed to parse activity')
+      }
+    } catch (err) {
+      setError('Failed to parse activity')
+    } finally {
+      setIsParsing(false)
+    }
+  }
+
+  // Apply a suggestion
+  const handleSuggestionSelect = (suggestion: ActivitySuggestion) => {
+    setActivity(suggestion.activity)
+    setStartTime(suggestion.startTime)
+    setEndTime(suggestion.endTime)
+    setNotes('')
+  }
 
   // Find the most recent unconfirmed calendar event that has ended
   // Only show suggestions for TODAY, not future or past days
@@ -99,11 +201,15 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setNotes('')
       setError(null)
       setDismissedSuggestion(null)
+      setSuggestions([])
+      setShowParseButton(false)
       timesInitialized.current = false // Reset flag when modal opens
       // Focus the activity input after a brief delay
       setTimeout(() => inputRef.current?.focus(), 100)
+      // Fetch smart suggestions
+      fetchSuggestions()
     }
-  }, [isOpen])
+  }, [isOpen, fetchSuggestions])
 
   // Set times when modal opens or when initial times arrive
   // This handles the timing issue where drag times may arrive after modal opens
@@ -194,6 +300,38 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     try {
       const today = getLocalDateString()
       const entryDate = selectedDate || today
+
+      // Check for duplicate/overlapping entries first
+      const { data: existingEntries } = await supabase
+        .from('time_entries')
+        .select('id, start_time, end_time, activity')
+        .eq('user_id', userId)
+        .eq('date', entryDate)
+
+      if (existingEntries && existingEntries.length > 0 && startTime && endTime) {
+        const newStart = timeToMinutes(startTime)
+        const newEnd = timeToMinutes(endTime)
+
+        const overlappingEntry = existingEntries.find(entry => {
+          if (!entry.start_time || !entry.end_time) return false
+          const entryStart = timeToMinutes(entry.start_time)
+          const entryEnd = timeToMinutes(entry.end_time)
+
+          // Check for significant overlap (>50%)
+          const overlapStart = Math.max(newStart, entryStart)
+          const overlapEnd = Math.min(newEnd, entryEnd)
+          const overlapDuration = Math.max(0, overlapEnd - overlapStart)
+          const newDuration = newEnd - newStart
+
+          return newDuration > 0 && overlapDuration / newDuration > 0.5
+        })
+
+        if (overlappingEntry) {
+          setError(`This time overlaps with "${overlappingEntry.activity}". Adjust times or delete the existing entry.`)
+          setIsSubmitting(false)
+          return
+        }
+      }
 
       if (isPlanningMode) {
         // Future/planned entry - save as pending without AI categorization/commentary
@@ -332,6 +470,38 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Smart suggestions chips */}
+          {!activity && suggestions.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Sparkles className="h-3 w-3" />
+                <span>Suggestions</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSuggestionSelect(suggestion)}
+                    className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:border-primary hover:bg-primary/5 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-primary"
+                  >
+                    {suggestion.source === 'pattern' ? (
+                      <TrendingUp className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <History className="h-3 w-3 text-blue-500" />
+                    )}
+                    <span className="font-medium">{suggestion.activity}</span>
+                    <span className="text-muted-foreground">
+                      {Math.round(suggestion.suggestedDuration / 60) > 0
+                        ? `${Math.round(suggestion.suggestedDuration / 60)}h`
+                        : `${suggestion.suggestedDuration}m`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Calendar suggestion chip */}
           {suggestedEvent && !activity && (
             <div className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 border border-blue-500/20">
@@ -357,18 +527,41 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             </div>
           )}
 
-          {/* Activity - main input */}
+          {/* Activity - main input with NL parse button */}
           <div className="space-y-2">
             <Label htmlFor="quick-activity">
               {isPlanningMode ? 'What are you planning to do?' : isPastDay ? 'What did you do?' : 'What did you just finish?'}
             </Label>
-            <Input
-              ref={inputRef}
-              id="quick-activity"
-              value={activity}
-              onChange={(e) => setActivity(e.target.value)}
-              placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., Code review for auth PR'}
-            />
+            <div className="relative">
+              <Input
+                ref={inputRef}
+                id="quick-activity"
+                value={activity}
+                onChange={(e) => setActivity(e.target.value)}
+                placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., "coded for 2 hours" or "lunch 12-1pm"'}
+                className={showParseButton ? 'pr-20' : ''}
+              />
+              {showParseButton && (
+                <button
+                  type="button"
+                  onClick={handleParseActivity}
+                  disabled={isParsing}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+                >
+                  {isParsing ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  Parse
+                </button>
+              )}
+            </div>
+            {!activity && (
+              <p className="text-xs text-muted-foreground">
+                Tip: Type naturally like &quot;coded for 2 hours&quot; and click Parse
+              </p>
+            )}
           </div>
 
           {/* Time Range Picker */}

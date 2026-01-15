@@ -113,6 +113,8 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
 
     try {
       const activityChanged = activity !== entry.activity
+      const descriptionChanged = description !== (entry.description || '')
+      const needsCommentaryUpdate = activityChanged || descriptionChanged
 
       // If activity changed, get new category from AI
       let newCategory = entry.category
@@ -152,36 +154,46 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
         throw new Error(updateError.message)
       }
 
-      // Fetch all entries for the day to provide context for commentary
-      const { data: dayEntries } = await supabase
-        .from('time_entries')
-        .select('*')
-        .eq('date', date)
-        .eq('user_id', entry.user_id)
-        .order('created_at', { ascending: true })
+      // Only regenerate commentary if activity or description changed
+      // This saves ~1790 tokens per edit that only changes time/duration
+      if (needsCommentaryUpdate) {
+        // Fetch nearby entries for context (±2 entries instead of full day)
+        const { data: dayEntries } = await supabase
+          .from('time_entries')
+          .select('*')
+          .eq('date', date)
+          .eq('user_id', entry.user_id)
+          .order('start_time', { ascending: true })
 
-      // Regenerate commentary with updated details (always regenerate if activity changed)
-      try {
-        const commentaryResponse = await fetch('/api/commentary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            entry: { ...entry, ...updatedEntry },
-            dayEntries: dayEntries || [],
-          }),
-        })
+        // Filter to nearby entries only (reduce context tokens)
+        const allEntries = dayEntries || []
+        const entryIndex = allEntries.findIndex(e => e.id === entry.id)
+        const nearbyEntries = allEntries.filter((_, i) =>
+          Math.abs(i - entryIndex) <= 2 || entryIndex === -1
+        )
 
-        if (commentaryResponse.ok) {
-          const { commentary } = await commentaryResponse.json()
+        try {
+          const commentaryResponse = await fetch('/api/commentary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entry: { ...entry, ...updatedEntry },
+              dayEntries: nearbyEntries,
+            }),
+          })
 
-          await supabase
-            .from('time_entries')
-            .update({ commentary })
-            .eq('id', entry.id)
+          if (commentaryResponse.ok) {
+            const { commentary } = await commentaryResponse.json()
+
+            await supabase
+              .from('time_entries')
+              .update({ commentary })
+              .eq('id', entry.id)
+          }
+        } catch {
+          // Commentary regeneration failed, but entry was updated
+          console.error('Failed to regenerate commentary')
         }
-      } catch {
-        // Commentary regeneration failed, but entry was updated
-        console.error('Failed to regenerate commentary')
       }
 
       setIsEditing(false)
@@ -258,19 +270,27 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       // Generate commentary
       let generatedCommentary: string | null = null
       try {
+        // Fetch nearby entries for context (±2 entries to reduce tokens)
         const { data: dayEntries } = await supabase
           .from('time_entries')
           .select('*')
           .eq('date', entry.date)
           .eq('user_id', entry.user_id)
-          .order('created_at', { ascending: true })
+          .order('start_time', { ascending: true })
+
+        // Filter to nearby entries only (reduce context tokens)
+        const allEntries = dayEntries || []
+        const entryIndex = allEntries.findIndex(e => e.id === entry.id)
+        const nearbyEntries = allEntries.filter((_, i) =>
+          Math.abs(i - entryIndex) <= 2 || entryIndex === -1
+        )
 
         const commentaryResponse = await fetch('/api/commentary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             entry: { ...entry, category, status: 'confirmed' },
-            dayEntries: dayEntries || [],
+            dayEntries: nearbyEntries,
           }),
         })
 

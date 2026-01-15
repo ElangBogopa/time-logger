@@ -5,6 +5,7 @@
 
 /**
  * Convert a time string (HH:MM) to total minutes from midnight
+ * Handles "24:00" as 1440 minutes (end-of-day midnight)
  */
 export function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number)
@@ -13,8 +14,13 @@ export function timeToMinutes(time: string): number {
 
 /**
  * Convert total minutes to a time string (HH:MM)
+ * Handles 1440 (24*60) as "24:00" for end-of-day midnight
  */
 export function minutesToTime(minutes: number): string {
+  // Special case: 1440 minutes = midnight end of day = "24:00"
+  if (minutes === 24 * 60) {
+    return '24:00'
+  }
   const h = Math.floor(minutes / 60) % 24
   const m = minutes % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`

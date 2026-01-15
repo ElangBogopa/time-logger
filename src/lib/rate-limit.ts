@@ -1,6 +1,7 @@
 /**
  * Simple in-memory rate limiter for API routes
- * In production, consider using Redis or a distributed cache
+ * Designed for serverless environments - no background intervals
+ * In production at scale, consider using Redis or a distributed cache
  */
 
 interface RateLimitEntry {
@@ -10,16 +11,29 @@ interface RateLimitEntry {
 
 const rateLimitMap = new Map<string, RateLimitEntry>()
 
-// Clean up expired entries periodically (every 5 minutes)
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    const now = Date.now()
-    for (const [key, entry] of rateLimitMap.entries()) {
-      if (now > entry.resetTime) {
-        rateLimitMap.delete(key)
-      }
+// Track last cleanup time to avoid cleaning on every request
+let lastCleanup = Date.now()
+const CLEANUP_INTERVAL = 60 * 1000 // Clean up every minute
+
+/**
+ * Clean up expired entries inline (called during rate limit checks)
+ * This avoids memory leaks from setInterval in serverless environments
+ */
+function cleanupExpiredEntries(): void {
+  const now = Date.now()
+
+  // Only clean up once per minute to avoid performance overhead
+  if (now - lastCleanup < CLEANUP_INTERVAL) {
+    return
+  }
+
+  lastCleanup = now
+
+  for (const [key, entry] of rateLimitMap.entries()) {
+    if (now > entry.resetTime) {
+      rateLimitMap.delete(key)
     }
-  }, 5 * 60 * 1000)
+  }
 }
 
 interface RateLimitConfig {
@@ -40,6 +54,9 @@ interface RateLimitResult {
  * @returns Whether the request is allowed and remaining quota
  */
 export function checkRateLimit(key: string, config: RateLimitConfig): RateLimitResult {
+  // Clean up expired entries periodically (inline, no background interval)
+  cleanupExpiredEntries()
+
   const now = Date.now()
   const entry = rateLimitMap.get(key)
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { getLocalDateString } from '@/lib/types'
 
@@ -49,6 +49,12 @@ const CACHE_DURATION_MS = 30 * 60 * 1000
 const DAYS_BEFORE = 7
 const DAYS_AFTER = 14
 
+// Maximum number of events to keep in cache (prevents memory bloat)
+const MAX_CACHE_EVENTS = 500
+
+// Maximum days to keep in cache from today
+const MAX_CACHE_DAYS = 30
+
 function getDateRange(centerDate: string, daysBefore: number, daysAfter: number): { start: string; end: string } {
   const center = new Date(centerDate + 'T00:00:00')
 
@@ -71,6 +77,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(null)
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
+
+  // Track in-flight fetches to prevent race conditions
+  const fetchInProgressRef = useRef<Set<string>>(new Set())
 
   // Check calendar connection status
   const checkCalendarStatus = useCallback(async () => {
@@ -176,41 +185,76 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
     if (!calendarStatus?.connected) return
 
+    // Prevent concurrent fetches for the same date range (race condition fix)
+    const { start, end } = getDateRange(date, DAYS_BEFORE, DAYS_AFTER)
+    const fetchKey = `${start}:${end}`
+
+    if (fetchInProgressRef.current.has(fetchKey)) {
+      return // Already fetching this range
+    }
+
+    fetchInProgressRef.current.add(fetchKey)
     setIsLoading(true)
     setError(null)
 
     try {
-      // Fetch a range around the requested date
-      const { start, end } = getDateRange(date, DAYS_BEFORE, DAYS_AFTER)
       const newEvents = await fetchCalendarEvents(start, end)
 
       setCache(prevCache => {
+        // Calculate the valid date window (today +/- MAX_CACHE_DAYS)
+        const today = getLocalDateString()
+        const todayDate = new Date(today + 'T00:00:00')
+        const minDate = new Date(todayDate)
+        minDate.setDate(minDate.getDate() - MAX_CACHE_DAYS)
+        const maxDate = new Date(todayDate)
+        maxDate.setDate(maxDate.getDate() + MAX_CACHE_DAYS)
+        const minDateStr = getLocalDateString(minDate)
+        const maxDateStr = getLocalDateString(maxDate)
+
         if (!prevCache) {
           // No previous cache, create new one
           return {
-            events: newEvents,
+            events: newEvents.slice(0, MAX_CACHE_EVENTS),
             startDate: start,
             endDate: end,
             lastFetched: Date.now()
           }
         }
 
-        // Merge with existing cache
+        // Merge with existing cache, but evict old events
         // Remove events in the new date range to avoid duplicates
-        const existingEvents = prevCache.events.filter(
-          event => event.date < start || event.date > end
-        )
+        // Also remove events outside the valid date window
+        const existingEvents = prevCache.events.filter(event => {
+          // Remove duplicates in new range
+          if (event.date >= start && event.date <= end) return false
+          // Evict events outside valid window
+          if (event.date < minDateStr || event.date > maxDateStr) return false
+          return true
+        })
+
+        // Combine and limit to MAX_CACHE_EVENTS
+        const allEvents = [...existingEvents, ...newEvents]
+        const limitedEvents = allEvents.length > MAX_CACHE_EVENTS
+          ? allEvents.slice(-MAX_CACHE_EVENTS) // Keep most recent events
+          : allEvents
+
+        // Calculate new cache bounds (use string comparison for dates)
+        const effectiveStart = start > minDateStr ? start : minDateStr
+        const effectiveEnd = end < maxDateStr ? end : maxDateStr
+        const newStartDate = effectiveStart < prevCache.startDate ? effectiveStart : prevCache.startDate
+        const newEndDate = effectiveEnd > prevCache.endDate ? effectiveEnd : prevCache.endDate
 
         return {
-          events: [...existingEvents, ...newEvents],
-          startDate: start < prevCache.startDate ? start : prevCache.startDate,
-          endDate: end > prevCache.endDate ? end : prevCache.endDate,
+          events: limitedEvents,
+          startDate: newStartDate,
+          endDate: newEndDate,
           lastFetched: Date.now()
         }
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch calendar')
     } finally {
+      fetchInProgressRef.current.delete(fetchKey)
       setIsLoading(false)
     }
   }, [calendarStatus?.connected, isDateInCache, isCacheValid, fetchCalendarEvents])

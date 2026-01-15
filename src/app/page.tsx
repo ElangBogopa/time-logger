@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -104,6 +104,18 @@ function isReviewDay(): boolean {
   return day === 0 || day === 1 // Sunday or Monday
 }
 
+// Memoized greeting component to avoid duplicate function calls
+function TimeOfDayGreeting({ name }: { name?: string }) {
+  const greeting = useMemo(() => getTimeOfDayGreeting(name), [name])
+  return (
+    <div className="mb-4 text-center">
+      <p className="text-sm text-muted-foreground">
+        {greeting.greeting}! {greeting.prompt}
+      </p>
+    </div>
+  )
+}
+
 function HomeContent() {
   const { data: session, status, update: updateSession } = useSession()
   const router = useRouter()
@@ -134,19 +146,28 @@ function HomeContent() {
     checkCalendarStatus
   } = useCalendar()
 
-  // Get calendar events for the selected date from cache
-  const calendarEvents = getEventsForDate(selectedDate).filter(
-    (e: CalendarEvent) => !e.isAllDay && e.startTime && e.endTime
-  )
+  // Get calendar events for the selected date from cache (memoized)
+  const calendarEvents = useMemo(() => {
+    return getEventsForDate(selectedDate).filter(
+      (e: CalendarEvent) => !e.isAllDay && e.startTime && e.endTime
+    )
+  }, [getEventsForDate, selectedDate])
 
   // Get user ID from session
   const userId = session?.user?.id || session?.user?.email || ''
 
   const today = getLocalDateString()
   const isToday = selectedDate === today
-  const dateDisplay = formatDateDisplay(selectedDate)
-  const isFutureDay = dateDisplay.isFuture
-  const isPastDay = !isToday && !isFutureDay
+
+  // Memoize date display calculations
+  const { dateDisplay, isFutureDay, isPastDay } = useMemo(() => {
+    const display = formatDateDisplay(selectedDate)
+    return {
+      dateDisplay: display,
+      isFutureDay: display.isFuture,
+      isPastDay: !isToday && !display.isFuture
+    }
+  }, [selectedDate, isToday])
 
   // Check if logging is allowed for the selected date (today, yesterday, or 2 days ago)
   const canLog = isDateLoggable(selectedDate)
@@ -282,14 +303,15 @@ function HomeContent() {
     }
   }, [selectedDate, isToday, userId, updateSession])
 
-  // Get the last entry's end time for Quick Log auto-fill
-  const lastEntryEndTime = entries.length > 0
-    ? entries.reduce((latest, entry) => {
-        if (!entry.end_time) return latest
-        if (!latest) return entry.end_time
-        return entry.end_time > latest ? entry.end_time : latest
-      }, null as string | null)
-    : null
+  // Get the last entry's end time for Quick Log auto-fill (memoized)
+  const lastEntryEndTime = useMemo(() => {
+    if (entries.length === 0) return null
+    return entries.reduce((latest, entry) => {
+      if (!entry.end_time) return latest
+      if (!latest) return entry.end_time
+      return entry.end_time > latest ? entry.end_time : latest
+    }, null as string | null)
+  }, [entries])
 
   const fetchEntries = useCallback(async () => {
     if (!userId) return
@@ -432,12 +454,9 @@ function HomeContent() {
                       {isCalendarLoading ? 'Syncing...' : 'Sync Calendar'}
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => router.push('/settings/connections')}>
+                  <DropdownMenuItem onClick={() => router.push('/settings')}>
                     <Settings2 className="h-4 w-4" />
-                    <span className="flex-1">Manage Connections</span>
-                    {calendarStatus?.connected && (
-                      <span className="ml-2 h-2 w-2 rounded-full bg-green-500" />
-                    )}
+                    <span className="flex-1">Settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
@@ -526,13 +545,7 @@ function HomeContent() {
             </div>
 
             {/* Time-of-day greeting - only show for today */}
-            {isToday && (
-              <div className="mb-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {getTimeOfDayGreeting(session?.user?.preferredName).greeting}! {getTimeOfDayGreeting(session?.user?.preferredName).prompt}
-                </p>
-              </div>
-            )}
+            {isToday && <TimeOfDayGreeting name={session?.user?.preferredName} />}
 
             {/* Viewing-only message for old dates */}
             {!canLog && isPastDay && (

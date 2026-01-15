@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import { DEFAULT_REMINDER_TIMES, UserPreferences } from '@/lib/types'
 
 // GET /api/preferences - Get user preferences

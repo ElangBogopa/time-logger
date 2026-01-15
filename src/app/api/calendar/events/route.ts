@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
 // Helper to verify token has required scopes
@@ -163,55 +163,80 @@ function formatDateInTimezone(isoString: string, timezone: string): string {
   }
 }
 
+// Valid IANA timezone validation
+function isValidTimezone(tz: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz })
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Get ISO timestamp for start/end of day in a specific timezone
+// This handles DST transitions correctly by using binary search for precise offset calculation
 function getTimestampForTimezone(dateStr: string, time: 'start' | 'end', timezone: string): string {
   // Parse the date string (YYYY-MM-DD)
   const [year, month, day] = dateStr.split('-').map(Number)
 
-  // Create a date object for the given date at midnight or end of day
-  // We need to find what UTC time corresponds to midnight in the target timezone
+  // Target local time
+  const targetHour = time === 'start' ? 0 : 23
+  const targetMinute = time === 'start' ? 0 : 59
+  const targetSecond = time === 'start' ? 0 : 59
 
-  // Use a reference date to calculate the offset
-  const hour = time === 'start' ? 0 : 23
-  const minute = time === 'start' ? 0 : 59
-  const second = time === 'start' ? 0 : 59
-
-  // Create formatter to get the offset
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZoneName: 'shortOffset',
-  })
-
-  // Start with a rough estimate - create a date at the target local time
-  // assuming UTC, then we'll adjust
-  const roughDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
-
-  // Get what date/time this is in the target timezone
-  const parts = formatter.formatToParts(roughDate)
-  const tzHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10)
-  const tzDay = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10)
-
-  // Calculate the offset in hours (rough approximation)
-  // The difference tells us how far off we are
-  let hourDiff = tzHour - hour
-  const dayDiff = tzDay - day
-
-  // Adjust for day boundary crossing
-  if (dayDiff !== 0) {
-    hourDiff += dayDiff * 24
+  // Helper to get local time parts in target timezone
+  const getLocalParts = (utcDate: Date) => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+    const parts = formatter.formatToParts(utcDate)
+    return {
+      year: parseInt(parts.find(p => p.type === 'year')?.value || '0', 10),
+      month: parseInt(parts.find(p => p.type === 'month')?.value || '0', 10),
+      day: parseInt(parts.find(p => p.type === 'day')?.value || '0', 10),
+      hour: parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10),
+      minute: parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10),
+      second: parseInt(parts.find(p => p.type === 'second')?.value || '0', 10),
+    }
   }
 
-  // Apply the correction
-  const correctedDate = new Date(roughDate.getTime() - hourDiff * 60 * 60 * 1000)
+  // Calculate value for comparison (allows comparing dates and times)
+  const toValue = (y: number, m: number, d: number, h: number, min: number, s: number) =>
+    y * 10000000000 + m * 100000000 + d * 1000000 + h * 10000 + min * 100 + s
 
-  return correctedDate.toISOString()
+  const targetValue = toValue(year, month, day, targetHour, targetMinute, targetSecond)
+
+  // Binary search to find the UTC time that corresponds to target local time
+  // Search within a 48-hour window centered around a rough estimate
+  let low = Date.UTC(year, month - 1, day - 1, targetHour, targetMinute, targetSecond)
+  let high = Date.UTC(year, month - 1, day + 1, targetHour, targetMinute, targetSecond)
+
+  // Binary search with 1-second precision
+  while (high - low > 1000) {
+    const mid = Math.floor((low + high) / 2)
+    const midDate = new Date(mid)
+    const localParts = getLocalParts(midDate)
+    const localValue = toValue(
+      localParts.year, localParts.month, localParts.day,
+      localParts.hour, localParts.minute, localParts.second
+    )
+
+    if (localValue < targetValue) {
+      low = mid
+    } else {
+      high = mid
+    }
+  }
+
+  // Return the result (use high as it's the closest match at or after target)
+  return new Date(high).toISOString()
 }
 
 export async function GET(request: NextRequest) {
@@ -268,7 +293,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('start')
     const endDate = searchParams.get('end')
-    const timezone = searchParams.get('timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone
+    const timezoneParam = searchParams.get('timezone')
+
+    // Validate timezone - use server default if invalid or not provided
+    const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const timezone = (timezoneParam && isValidTimezone(timezoneParam)) ? timezoneParam : serverTimezone
+
+    if (timezoneParam && !isValidTimezone(timezoneParam)) {
+      console.warn(`[Calendar Events] Invalid timezone "${timezoneParam}", falling back to ${serverTimezone}`)
+    }
 
     // Use provided date range or default to today
     const today = new Date().toISOString().split('T')[0]

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 
 interface StateData {
   userId: string
@@ -124,10 +124,11 @@ export async function GET(request: Request) {
         return NextResponse.redirect(new URL(`${redirectPath}?error=calendar_save_failed`, process.env.NEXTAUTH_URL))
       }
 
-      // Redirect with pending ID and conflict email
+      // Redirect with pending ID, conflict email, and source user ID for merge option
       const conflictParams = new URLSearchParams({
         conflict_email: googleEmail,
         pending_id: pendingConnection.id,
+        source_user_id: existingGoogleUser.id,
       })
       return NextResponse.redirect(new URL(`${redirectPath}?${conflictParams.toString()}`, process.env.NEXTAUTH_URL))
     }

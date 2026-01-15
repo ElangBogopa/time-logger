@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TimeEntry, TimeCategory, CATEGORY_LABELS, getLocalDateString } from '@/lib/types'
 import { formatDuration } from '@/lib/time-utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const CATEGORY_BAR_COLORS: Record<TimeCategory, string> = {
   deep_work: 'bg-[#64748b]',
@@ -125,8 +126,24 @@ export default function WeeklySummary({ userId }: WeeklySummaryProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600"></div>
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-5 w-24" />
+        </div>
+        {/* Bars skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton className="h-3 w-full rounded-full" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }

@@ -5,6 +5,8 @@ import { TimeEntry, TimeCategory, isPendingEntryReadyToConfirm } from '@/lib/typ
 import { formatDuration, formatHour, timeToMinutes, minutesToTime, formatTimeDisplay } from '@/lib/time-utils'
 import TimeEntryModal from './TimeEntryModal'
 import { Clock, X, Eye } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { supabase } from '@/lib/supabase'
 
 export interface CalendarEvent {
   id: string
@@ -204,6 +206,29 @@ export default function TimelineView({
   const DRAG_THRESHOLD = 5 // pixels - if moved less than this, treat as click
   const TOUCH_HOLD_DELAY = 150 // ms - hold this long before treating as drag-to-create
   const GHOST_TAP_THRESHOLD = 150 // ms - release before this = tap to confirm
+  const ENTRY_EDGE_ZONE = 0.2 // 20% of entry height for resize zones
+  const ENTRY_HOLD_DELAY = 200 // ms - hold before moving entry (touch only)
+
+  // Entry adjustment state (move or resize existing entries)
+  type EntryDragType = 'move' | 'resize-top' | 'resize-bottom'
+  const [isAdjustingEntry, setIsAdjustingEntry] = useState(false)
+  const [adjustPreview, setAdjustPreview] = useState<{
+    entryId: string
+    startTime: string
+    endTime: string
+  } | null>(null)
+
+  const entryAdjustRef = useRef<{
+    entry: PlacedEntry
+    dragType: EntryDragType
+    originalStartMins: number
+    originalEndMins: number
+    startY: number
+    startClientY: number
+    hasMoved: boolean
+    isHoldConfirmed: boolean // For touch move (middle drag)
+  } | null>(null)
+  const entryHoldTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Ghost event interaction tracking (tap vs hold+drag)
   const ghostInteractionRef = useRef<{
@@ -634,6 +659,15 @@ export default function TimelineView({
     }
     ghostInteractionRef.current = null
 
+    // Clear entry adjustment state
+    if (entryHoldTimerRef.current) {
+      clearTimeout(entryHoldTimerRef.current)
+      entryHoldTimerRef.current = null
+    }
+    entryAdjustRef.current = null
+    setIsAdjustingEntry(false)
+    setAdjustPreview(null)
+
     // Clear preview
     setDragPreviewStart(null)
     setDragPreviewEnd(null)
@@ -641,7 +675,7 @@ export default function TimelineView({
 
   // Escape key to cancel drag
   useEffect(() => {
-    const isAnyDragActive = isDragging || isTouchDragging
+    const isAnyDragActive = isDragging || isTouchDragging || isAdjustingEntry
 
     if (!isAnyDragActive) return
 
@@ -657,7 +691,7 @@ export default function TimelineView({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isDragging, isTouchDragging, cancelDrag])
+  }, [isDragging, isTouchDragging, isAdjustingEntry, cancelDrag])
 
   // GHOST EVENT: Mouse down handler - detect tap vs hold+drag
   const handleGhostMouseDown = (e: React.MouseEvent, event: CalendarEvent) => {
@@ -842,6 +876,367 @@ export default function TimelineView({
     }
   }, [onGhostEntryClick])
 
+  // Detect which zone of an entry was clicked (top edge, bottom edge, or middle)
+  const detectEntryDragType = (
+    clientY: number,
+    entryTop: number,
+    entryHeight: number
+  ): EntryDragType => {
+    const relativeY = clientY - entryTop
+    const topZone = entryHeight * ENTRY_EDGE_ZONE
+    const bottomZone = entryHeight * (1 - ENTRY_EDGE_ZONE)
+
+    if (relativeY <= topZone) return 'resize-top'
+    if (relativeY >= bottomZone) return 'resize-bottom'
+    return 'move'
+  }
+
+  // ENTRY ADJUSTMENT: Mouse down handler
+  const handleEntryMouseDown = (e: React.MouseEvent, entry: PlacedEntry) => {
+    if (e.button !== 0) return // Only left click
+    e.stopPropagation() // Don't trigger grid mousedown
+
+    // Don't allow adjusting entries without times (estimated entries)
+    if (entry.isEstimated) return
+
+    const target = e.currentTarget as HTMLElement
+    const rect = target.getBoundingClientRect()
+    const dragType = detectEntryDragType(e.clientY, rect.top, rect.height)
+
+    const originalStartMins = timeToMinutes(entry.placedStartTime)
+    const originalEndMins = timeToMinutes(entry.placedEndTime)
+
+    entryAdjustRef.current = {
+      entry,
+      dragType,
+      originalStartMins,
+      originalEndMins,
+      startY: e.clientY,
+      startClientY: e.clientY,
+      hasMoved: false,
+      isHoldConfirmed: dragType !== 'move' // Resize starts immediately, move needs to confirm
+    }
+
+    // For resize operations, start immediately
+    if (dragType !== 'move') {
+      setIsAdjustingEntry(true)
+      setAdjustPreview({
+        entryId: entry.id,
+        startTime: entry.placedStartTime,
+        endTime: entry.placedEndTime
+      })
+    }
+    // For move, we'll wait for actual movement
+  }
+
+  // ENTRY ADJUSTMENT: Touch start handler
+  const handleEntryTouchStart = (e: React.TouchEvent, entry: PlacedEntry) => {
+    e.stopPropagation() // Don't trigger grid touchstart
+
+    // Don't allow adjusting entries without times (estimated entries)
+    if (entry.isEstimated) return
+
+    const touch = e.touches[0]
+    const target = e.currentTarget as HTMLElement
+    const rect = target.getBoundingClientRect()
+    const dragType = detectEntryDragType(touch.clientY, rect.top, rect.height)
+
+    const originalStartMins = timeToMinutes(entry.placedStartTime)
+    const originalEndMins = timeToMinutes(entry.placedEndTime)
+
+    entryAdjustRef.current = {
+      entry,
+      dragType,
+      originalStartMins,
+      originalEndMins,
+      startY: touch.clientY,
+      startClientY: touch.clientY,
+      hasMoved: false,
+      isHoldConfirmed: dragType !== 'move' // Resize starts immediately
+    }
+
+    // For resize operations, start immediately
+    if (dragType !== 'move') {
+      setIsAdjustingEntry(true)
+      setAdjustPreview({
+        entryId: entry.id,
+        startTime: entry.placedStartTime,
+        endTime: entry.placedEndTime
+      })
+      // Haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate(30)
+      }
+    } else {
+      // For move, set up hold timer
+      entryHoldTimerRef.current = setTimeout(() => {
+        if (entryAdjustRef.current && !entryAdjustRef.current.hasMoved) {
+          entryAdjustRef.current.isHoldConfirmed = true
+          setIsAdjustingEntry(true)
+          setAdjustPreview({
+            entryId: entry.id,
+            startTime: entry.placedStartTime,
+            endTime: entry.placedEndTime
+          })
+          // Haptic feedback
+          if (navigator.vibrate) {
+            navigator.vibrate(50)
+          }
+        }
+      }, ENTRY_HOLD_DELAY)
+    }
+  }
+
+  // ENTRY ADJUSTMENT: Update entry times in database
+  const updateEntryTimes = useCallback(async (entryId: string, newStartTime: string, newEndTime: string) => {
+    const startMins = timeToMinutes(newStartTime)
+    const endMins = timeToMinutes(newEndTime)
+    const newDuration = endMins - startMins
+
+    if (newDuration < 5) return // Don't allow entries shorter than 5 minutes
+
+    try {
+      const { error } = await supabase
+        .from('time_entries')
+        .update({
+          start_time: newStartTime,
+          end_time: newEndTime,
+          duration_minutes: newDuration
+        })
+        .eq('id', entryId)
+
+      if (error) throw error
+
+      // Refresh entries
+      onEntryDeleted()
+      onShowToast?.('Entry time updated')
+    } catch (error) {
+      console.error('Failed to update entry times:', error)
+      onShowToast?.('Failed to update entry')
+    }
+  }, [onEntryDeleted, onShowToast])
+
+  // ENTRY ADJUSTMENT: Mouse/touch move and up handlers
+  useEffect(() => {
+    if (!entryAdjustRef.current) return
+
+    const handleAdjustMouseMove = (e: MouseEvent) => {
+      if (!entryAdjustRef.current) return
+
+      const { dragType, originalStartMins, originalEndMins, startClientY, isHoldConfirmed } = entryAdjustRef.current
+      const deltaY = e.clientY - startClientY
+
+      // Check if moved beyond threshold
+      if (Math.abs(deltaY) > DRAG_THRESHOLD) {
+        entryAdjustRef.current.hasMoved = true
+
+        // For move operations, start adjusting on first significant movement
+        if (dragType === 'move' && !isHoldConfirmed) {
+          entryAdjustRef.current.isHoldConfirmed = true
+          setIsAdjustingEntry(true)
+        }
+      }
+
+      if (!entryAdjustRef.current.isHoldConfirmed) return
+
+      let newStartMins = originalStartMins
+      let newEndMins = originalEndMins
+      const duration = originalEndMins - originalStartMins
+
+      // For resize operations, use absolute cursor position for precise placement
+      // This ensures dragging to a grid line puts the time exactly there
+      const cursorTime = yToTime(e.clientY)
+      const cursorMins = timeToMinutes(cursorTime)
+
+      if (dragType === 'move') {
+        // For move, calculate delta and apply to both start and end
+        const deltaMinutes = Math.round((deltaY / PIXELS_PER_MINUTE) / 15) * 15
+        newStartMins = Math.round((originalStartMins + deltaMinutes) / 15) * 15
+        newEndMins = newStartMins + duration
+        // Clamp to day bounds (0:00 to 24:00)
+        if (newStartMins < 0) {
+          newStartMins = 0
+          newEndMins = duration
+        }
+        if (newEndMins > 24 * 60) {
+          newEndMins = 24 * 60
+          newStartMins = newEndMins - duration
+        }
+        if (newStartMins < 0) {
+          newStartMins = 0
+          newEndMins = Math.min(duration, 24 * 60)
+        }
+      } else if (dragType === 'resize-top') {
+        // Use cursor position directly for the new start time
+        newStartMins = cursorMins
+        // Clamp: can't go past end time minus 15 min, can't go below 0
+        newStartMins = Math.max(0, Math.min(newStartMins, originalEndMins - 15))
+      } else if (dragType === 'resize-bottom') {
+        // Use cursor position directly for the new end time
+        newEndMins = cursorMins
+        // If cursor is near bottom of timeline (past 23:30), snap to midnight (24:00)
+        if (cursorMins >= 23 * 60 + 30) {
+          newEndMins = 24 * 60 // Midnight = 24:00 = 1440 minutes
+        }
+        // Clamp: can't go before start time plus 15 min, can't exceed 24:00
+        newEndMins = Math.min(24 * 60, Math.max(newEndMins, originalStartMins + 15))
+      }
+
+      setAdjustPreview({
+        entryId: entryAdjustRef.current.entry.id,
+        startTime: minutesToTime(newStartMins),
+        endTime: minutesToTime(newEndMins)
+      })
+    }
+
+    const handleAdjustMouseUp = () => {
+      if (!entryAdjustRef.current) return
+
+      const { entry, hasMoved, isHoldConfirmed } = entryAdjustRef.current
+
+      // If user moved and confirmed, save the new times
+      if (hasMoved && isHoldConfirmed && adjustPreview) {
+        const { startTime, endTime } = adjustPreview
+        // Only update if times actually changed
+        if (startTime !== entry.placedStartTime || endTime !== entry.placedEndTime) {
+          updateEntryTimes(entry.id, startTime, endTime)
+        }
+      } else if (!hasMoved) {
+        // User just clicked - open edit modal
+        setSelectedEntry(entry)
+        setPromptAddTimes(false)
+      }
+
+      // Reset state
+      entryAdjustRef.current = null
+      setIsAdjustingEntry(false)
+      setAdjustPreview(null)
+    }
+
+    const handleAdjustTouchMove = (e: TouchEvent) => {
+      if (!entryAdjustRef.current) return
+
+      const touch = e.touches[0]
+      const { dragType, originalStartMins, originalEndMins, startClientY, isHoldConfirmed } = entryAdjustRef.current
+      const deltaY = touch.clientY - startClientY
+
+      // Check if moved beyond threshold (for canceling hold timer)
+      if (Math.abs(deltaY) > DRAG_THRESHOLD) {
+        entryAdjustRef.current.hasMoved = true
+
+        // If hold wasn't confirmed yet and user moved, cancel (they're scrolling)
+        if (!isHoldConfirmed) {
+          if (entryHoldTimerRef.current) {
+            clearTimeout(entryHoldTimerRef.current)
+            entryHoldTimerRef.current = null
+          }
+          entryAdjustRef.current = null
+          return // Let scroll happen
+        }
+      }
+
+      if (!isHoldConfirmed) return
+
+      // Prevent scrolling during adjustment
+      e.preventDefault()
+
+      let newStartMins = originalStartMins
+      let newEndMins = originalEndMins
+      const duration = originalEndMins - originalStartMins
+
+      // For resize operations, use absolute cursor position for precise placement
+      const cursorTime = yToTime(touch.clientY)
+      const cursorMins = timeToMinutes(cursorTime)
+
+      if (dragType === 'move') {
+        // For move, calculate delta and apply to both start and end
+        const deltaMinutes = Math.round((deltaY / PIXELS_PER_MINUTE) / 15) * 15
+        newStartMins = Math.round((originalStartMins + deltaMinutes) / 15) * 15
+        newEndMins = newStartMins + duration
+        if (newStartMins < 0) {
+          newStartMins = 0
+          newEndMins = duration
+        }
+        if (newEndMins > 24 * 60) {
+          newEndMins = 24 * 60
+          newStartMins = newEndMins - duration
+        }
+        if (newStartMins < 0) {
+          newStartMins = 0
+          newEndMins = Math.min(duration, 24 * 60)
+        }
+      } else if (dragType === 'resize-top') {
+        // Use cursor position directly for the new start time
+        newStartMins = cursorMins
+        newStartMins = Math.max(0, Math.min(newStartMins, originalEndMins - 15))
+      } else if (dragType === 'resize-bottom') {
+        // Use cursor position directly for the new end time
+        newEndMins = cursorMins
+        // If cursor is near bottom of timeline (past 23:30), snap to midnight (24:00)
+        if (cursorMins >= 23 * 60 + 30) {
+          newEndMins = 24 * 60 // Midnight = 24:00 = 1440 minutes
+        }
+        newEndMins = Math.min(24 * 60, Math.max(newEndMins, originalStartMins + 15))
+      }
+
+      setAdjustPreview({
+        entryId: entryAdjustRef.current.entry.id,
+        startTime: minutesToTime(newStartMins),
+        endTime: minutesToTime(newEndMins)
+      })
+    }
+
+    const handleAdjustTouchEnd = () => {
+      // Clear hold timer
+      if (entryHoldTimerRef.current) {
+        clearTimeout(entryHoldTimerRef.current)
+        entryHoldTimerRef.current = null
+      }
+
+      if (!entryAdjustRef.current) return
+
+      const { entry, hasMoved, isHoldConfirmed } = entryAdjustRef.current
+
+      // If user moved and confirmed, save the new times
+      if (hasMoved && isHoldConfirmed && adjustPreview) {
+        const { startTime, endTime } = adjustPreview
+        if (startTime !== entry.placedStartTime || endTime !== entry.placedEndTime) {
+          updateEntryTimes(entry.id, startTime, endTime)
+        }
+      } else if (!hasMoved && !isHoldConfirmed) {
+        // User just tapped - open edit modal
+        setSelectedEntry(entry)
+        setPromptAddTimes(false)
+      }
+
+      // Reset state
+      entryAdjustRef.current = null
+      setIsAdjustingEntry(false)
+      setAdjustPreview(null)
+    }
+
+    window.addEventListener('mousemove', handleAdjustMouseMove)
+    window.addEventListener('mouseup', handleAdjustMouseUp)
+    window.addEventListener('touchmove', handleAdjustTouchMove, { passive: false })
+    window.addEventListener('touchend', handleAdjustTouchEnd)
+
+    return () => {
+      window.removeEventListener('mousemove', handleAdjustMouseMove)
+      window.removeEventListener('mouseup', handleAdjustMouseUp)
+      window.removeEventListener('touchmove', handleAdjustTouchMove)
+      window.removeEventListener('touchend', handleAdjustTouchEnd)
+    }
+  }, [adjustPreview, updateEntryTimes])
+
+  // Cleanup entry hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (entryHoldTimerRef.current) {
+        clearTimeout(entryHoldTimerRef.current)
+      }
+    }
+  }, [])
+
   // Scroll to appropriate position on load
   // For today: center on current time
   // For other days: scroll to first event or default to 9am
@@ -957,8 +1352,33 @@ export default function TimelineView({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600"></div>
+      <div className="space-y-4">
+        {/* Skeleton stats bar */}
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+        {/* Skeleton timeline */}
+        <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+          <div className="h-[500px] overflow-hidden">
+            <div className="relative flex" style={{ height: '600px' }}>
+              {/* Hour labels skeleton */}
+              <div className="w-14 shrink-0 border-r border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
+                {[8, 9, 10, 11, 12, 13, 14].map((hour) => (
+                  <div key={hour} className="flex h-[90px] items-start justify-end pr-2 pt-0">
+                    <Skeleton className="h-3 w-8" />
+                  </div>
+                ))}
+              </div>
+              {/* Entry blocks skeleton */}
+              <div className="relative flex-1 p-2">
+                <Skeleton className="absolute left-2 right-2 h-[70px] rounded-lg" style={{ top: '20px' }} />
+                <Skeleton className="absolute left-2 right-2 h-[120px] rounded-lg" style={{ top: '180px' }} />
+                <Skeleton className="absolute left-2 right-2 h-[45px] rounded-lg" style={{ top: '350px' }} />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -1015,8 +1435,8 @@ export default function TimelineView({
             {/* Timeline grid and entries */}
             <div
               ref={timelineGridRef}
-              className={`relative flex-1 ${onDragCreate ? 'cursor-crosshair' : ''} ${isDragging || isTouchDragging ? 'select-none' : ''}`}
-              style={{ touchAction: isTouchDragging ? 'none' : 'auto' }}
+              className={`relative flex-1 ${onDragCreate ? 'cursor-crosshair' : ''} ${isDragging || isTouchDragging || isAdjustingEntry ? 'select-none' : ''}`}
+              style={{ touchAction: isTouchDragging || isAdjustingEntry ? 'none' : 'auto' }}
               onMouseDown={handleMouseDown}
               onTouchStart={handleTouchStart}
             >
@@ -1049,23 +1469,39 @@ export default function TimelineView({
                 const isPending = entry.status === 'pending'
                 const isReadyToConfirm = isPending && isPendingEntryReadyToConfirm(entry)
 
-                // Pending entries get ghost styling
+                // Pending entries get ghost styling (with drag-to-adjust if they have times)
                 if (isPending) {
+                  const pendingIsBeingAdjusted = adjustPreview?.entryId === entry.id
+                  const pendingDisplayStartTime = pendingIsBeingAdjusted ? adjustPreview.startTime : entry.placedStartTime
+                  const pendingDisplayEndTime = pendingIsBeingAdjusted ? adjustPreview.endTime : entry.placedEndTime
+                  const pendingDisplayStartMins = timeToMinutes(pendingDisplayStartTime)
+                  const pendingDisplayEndMins = timeToMinutes(pendingDisplayEndTime)
+                  const pendingDisplayTop = (pendingDisplayStartMins - startHour * 60) * PIXELS_PER_MINUTE
+                  const pendingDisplayHeight = Math.max((pendingDisplayEndMins - pendingDisplayStartMins) * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT)
+                  const pendingDisplayDuration = pendingDisplayEndMins - pendingDisplayStartMins
+                  const hasTimes = !entry.isEstimated
+
                   return (
                     <div
                       key={entry.id}
                       data-entry-block
                       data-pending
-                      onClick={(e) => {
+                      onMouseDown={hasTimes ? (e) => handleEntryMouseDown(e, entry) : undefined}
+                      onTouchStart={hasTimes ? (e) => handleEntryTouchStart(e, entry) : undefined}
+                      onClick={!hasTimes ? (e) => {
                         e.stopPropagation()
                         handleEntryClick(entry)
-                      }}
-                      className={`absolute left-1 right-1 cursor-pointer overflow-hidden rounded-lg border-2 border-dashed transition-all hover:opacity-80 ${
+                      } : undefined}
+                      className={`absolute left-1 right-1 overflow-hidden rounded-lg border-2 border-dashed transition-all ${
+                        pendingIsBeingAdjusted
+                          ? 'z-30 shadow-xl ring-2 ring-primary/50 opacity-80'
+                          : 'hover:opacity-80 opacity-60'
+                      } ${
                         isReadyToConfirm
                           ? 'border-amber-400/80 bg-amber-100/50 dark:border-amber-500/60 dark:bg-amber-900/30'
                           : 'border-zinc-400/60 bg-zinc-100/50 dark:border-zinc-500/40 dark:bg-zinc-700/30'
-                      } opacity-60`}
-                      style={{ top, height }}
+                      } ${hasTimes ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                      style={{ top: pendingDisplayTop, height: pendingDisplayHeight }}
                     >
                       <div className={`flex h-full flex-col justify-center px-2 py-1 ${isReadyToConfirm ? 'text-amber-700 dark:text-amber-300' : 'text-zinc-600 dark:text-zinc-300'}`}>
                         {isShort ? (
@@ -1082,10 +1518,10 @@ export default function TimelineView({
                               {entry.activity}
                             </span>
                             <div className="mt-0.5 flex items-center gap-2 text-xs opacity-80">
-                              <span>{formatTimeDisplay(entry.placedStartTime)} - {formatTimeDisplay(entry.placedEndTime)}</span>
-                              <span>({formatDuration(entry.duration_minutes)})</span>
+                              <span>{formatTimeDisplay(pendingDisplayStartTime)} - {formatTimeDisplay(pendingDisplayEndTime)}</span>
+                              <span>({pendingIsBeingAdjusted ? formatDuration(pendingDisplayDuration) : formatDuration(entry.duration_minutes)})</span>
                             </div>
-                            {height > 70 && (
+                            {height > 70 && !pendingIsBeingAdjusted && (
                               <span className="mt-1 text-xs font-medium">
                                 {isReadyToConfirm ? 'Ready to confirm' : 'Planned'}
                               </span>
@@ -1097,18 +1533,37 @@ export default function TimelineView({
                   )
                 }
 
-                // Confirmed entries - normal rendering
+                // Check if this entry is being adjusted
+                const isBeingAdjusted = adjustPreview?.entryId === entry.id
+                const displayStartTime = isBeingAdjusted ? adjustPreview.startTime : entry.placedStartTime
+                const displayEndTime = isBeingAdjusted ? adjustPreview.endTime : entry.placedEndTime
+                const displayStartMins = timeToMinutes(displayStartTime)
+                const displayEndMins = timeToMinutes(displayEndTime)
+                const displayTop = (displayStartMins - startHour * 60) * PIXELS_PER_MINUTE
+                const displayHeight = Math.max((displayEndMins - displayStartMins) * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT)
+                const displayDuration = displayEndMins - displayStartMins
+
+                // Confirmed entries - normal rendering with drag-to-adjust
                 return (
                   <div
                     key={entry.id}
                     data-entry-block
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleEntryClick(entry)
-                    }}
-                    className={`absolute left-1 right-1 cursor-pointer overflow-hidden rounded-lg border-l-4 shadow-sm transition-all hover:shadow-md hover:brightness-105 ${colors.bg} ${colors.border} ${entry.isEstimated ? 'opacity-70' : ''}`}
-                    style={{ top, height }}
+                    onMouseDown={(e) => handleEntryMouseDown(e, entry)}
+                    onTouchStart={(e) => handleEntryTouchStart(e, entry)}
+                    className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 shadow-sm transition-all ${
+                      isBeingAdjusted
+                        ? 'z-30 shadow-xl ring-2 ring-primary/50'
+                        : 'hover:shadow-md hover:brightness-105'
+                    } ${colors.bg} ${colors.border} ${entry.isEstimated ? 'opacity-70 cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
+                    style={{ top: displayTop, height: displayHeight }}
                   >
+                    {/* Top resize handle (visual indicator) */}
+                    {!entry.isEstimated && height >= 50 && (
+                      <div className="absolute inset-x-0 top-0 h-3 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-ns-resize">
+                        <div className="h-0.5 w-8 rounded-full bg-white/50" />
+                      </div>
+                    )}
+
                     <div className={`flex h-full flex-col justify-center px-2 py-1 ${colors.text}`}>
                       {isShort ? (
                         <div className="flex items-center justify-between gap-2">
@@ -1116,7 +1571,9 @@ export default function TimelineView({
                             {entry.isEstimated && <span className="opacity-70">~</span>}
                             {entry.activity}
                           </span>
-                          <span className="shrink-0 text-xs opacity-80">{formatDuration(entry.duration_minutes)}</span>
+                          <span className="shrink-0 text-xs opacity-80">
+                            {isBeingAdjusted ? formatDuration(displayDuration) : formatDuration(entry.duration_minutes)}
+                          </span>
                         </div>
                       ) : (
                         <>
@@ -1128,16 +1585,23 @@ export default function TimelineView({
                           </span>
                           <div className="mt-0.5 flex items-center gap-2 text-xs opacity-80">
                             <span>
-                              {entry.isEstimated ? '~' : ''}{formatTimeDisplay(entry.placedStartTime)} - {formatTimeDisplay(entry.placedEndTime)}
+                              {entry.isEstimated ? '~' : ''}{formatTimeDisplay(displayStartTime)} - {formatTimeDisplay(displayEndTime)}
                             </span>
-                            <span>({formatDuration(entry.duration_minutes)})</span>
+                            <span>({isBeingAdjusted ? formatDuration(displayDuration) : formatDuration(entry.duration_minutes)})</span>
                           </div>
-                          {entry.description && height > 70 && (
+                          {entry.description && height > 70 && !isBeingAdjusted && (
                             <span className="mt-1 truncate text-xs opacity-70">{entry.description}</span>
                           )}
                         </>
                       )}
                     </div>
+
+                    {/* Bottom resize handle (visual indicator) */}
+                    {!entry.isEstimated && height >= 50 && (
+                      <div className="absolute inset-x-0 bottom-0 h-3 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-ns-resize">
+                        <div className="h-0.5 w-8 rounded-full bg-white/50" />
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -1173,12 +1637,12 @@ export default function TimelineView({
                     }}
                     className={`absolute left-1 right-1 overflow-hidden rounded-lg border-2 border-dashed transition-all ${
                       isDismissed
-                        ? 'border-zinc-300/40 bg-zinc-100/20 opacity-40 dark:border-zinc-600/30 dark:bg-zinc-800/20'
-                        : 'border-blue-400/60 bg-blue-100/40 opacity-60 hover:border-blue-500 hover:opacity-80 dark:border-blue-500/40 dark:bg-blue-900/20 dark:hover:border-blue-400'
+                        ? 'border-zinc-400/50 bg-zinc-200/30 opacity-50 dark:border-zinc-500/40 dark:bg-zinc-700/30'
+                        : 'border-blue-500/70 bg-blue-100/60 hover:border-blue-600 hover:bg-blue-100/80 dark:border-blue-400/60 dark:bg-blue-900/40 dark:hover:border-blue-300'
                     } ${isCurrentlyDragging ? 'pointer-events-none' : 'cursor-pointer'}`}
                     style={{ top, height }}
                   >
-                    <div className={`flex h-full flex-col justify-center px-2 py-1 ${isDismissed ? 'text-zinc-500 dark:text-zinc-500' : 'text-blue-700 dark:text-blue-300'}`}>
+                    <div className={`flex h-full flex-col justify-center px-2 py-1 ${isDismissed ? 'text-zinc-600 dark:text-zinc-400' : 'text-blue-800 dark:text-blue-200'}`}>
                       {isShort ? (
                         <div className="flex items-center justify-between gap-1">
                           <span className="flex items-center gap-1 truncate text-xs font-medium">
