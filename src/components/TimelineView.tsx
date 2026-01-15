@@ -192,7 +192,9 @@ export default function TimelineView({
   } | null>(null)
 
   // Touch-specific state
+  const [isTouchActive, setIsTouchActive] = useState(false) // Track when any touch interaction is happening
   const [isTouchDragging, setIsTouchDragging] = useState(false)
+  const touchStillnessTimerRef = useRef<NodeJS.Timeout | null>(null)
   const touchHoldTimerRef = useRef<NodeJS.Timeout | null>(null)
   const touchDataRef = useRef<{
     startTime: string
@@ -200,12 +202,14 @@ export default function TimelineView({
     startY: number
     startClientY: number
     hasMoved: boolean
+    isStillnessConfirmed: boolean
     isHoldConfirmed: boolean
   } | null>(null)
 
   const DRAG_THRESHOLD = 20 // pixels - minimum drag distance to count as intentional drag (after hold confirmed)
-  const SCROLL_CANCEL_THRESHOLD = 5 // pixels - ANY movement this much cancels hold timer (user is scrolling)
-  const TOUCH_HOLD_DELAY = 800 // ms - hold STILL this long before treating as drag-to-create
+  const SCROLL_CANCEL_THRESHOLD = 3 // pixels - ANY movement this much means user is scrolling
+  const STILLNESS_CHECK_DELAY = 100 // ms - must be still this long before hold timer even starts
+  const TOUCH_HOLD_DELAY = 600 // ms - after stillness confirmed, hold this long to create entry
   const GHOST_TAP_THRESHOLD = 150 // ms - release before this = tap to confirm
   const ENTRY_EDGE_ZONE = 0.2 // 20% of entry height for resize zones
   const ENTRY_HOLD_DELAY = 200 // ms - hold before moving entry (touch only)
@@ -497,7 +501,7 @@ export default function TimelineView({
     }
   }, [isDragging, onDragCreate])
 
-  // TOUCH START: Begin touch tracking with hold delay
+  // TOUCH START: Begin touch tracking with stillness check, then hold delay
   const handleTouchStart = (e: React.TouchEvent) => {
     // Don't start drag on existing entries or ghost blocks
     const target = e.target as HTMLElement
@@ -520,28 +524,42 @@ export default function TimelineView({
       startY: touch.clientY,
       startClientY: touch.clientY,
       hasMoved: false,
+      isStillnessConfirmed: false,
       isHoldConfirmed: false
     }
 
-    // Start hold timer - if they hold for TOUCH_HOLD_DELAY ms, we enter drag mode
-    touchHoldTimerRef.current = setTimeout(() => {
-      if (touchDataRef.current && !touchDataRef.current.hasMoved) {
-        touchDataRef.current.isHoldConfirmed = true
-        setIsTouchDragging(true)
-        setDragPreviewStart(touchDataRef.current.startTime)
-        setDragPreviewEnd(minutesToTime(timeToMinutes(touchDataRef.current.startTime) + 30))
+    // Mark touch as active so the useEffect adds listeners
+    setIsTouchActive(true)
 
-        // Haptic feedback if supported
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
+    // Phase 1: Check if user stays still for STILLNESS_CHECK_DELAY
+    // If they move during this time, they're scrolling - abort everything
+    touchStillnessTimerRef.current = setTimeout(() => {
+      if (touchDataRef.current && !touchDataRef.current.hasMoved) {
+        // User stayed still - now start the actual hold timer
+        touchDataRef.current.isStillnessConfirmed = true
+
+        // Phase 2: Hold timer - if they continue holding, enter drag mode
+        touchHoldTimerRef.current = setTimeout(() => {
+          if (touchDataRef.current && !touchDataRef.current.hasMoved) {
+            touchDataRef.current.isHoldConfirmed = true
+            setIsTouchDragging(true)
+            setDragPreviewStart(touchDataRef.current.startTime)
+            setDragPreviewEnd(minutesToTime(timeToMinutes(touchDataRef.current.startTime) + 30))
+
+            // Haptic feedback if supported
+            if (navigator.vibrate) {
+              navigator.vibrate(50)
+            }
+          }
+        }, TOUCH_HOLD_DELAY)
       }
-    }, TOUCH_HOLD_DELAY)
+    }, STILLNESS_CHECK_DELAY)
   }
 
   // TOUCH MOVE and TOUCH END handlers
   useEffect(() => {
-    if (!isTouchDragging && !touchDataRef.current) return
+    // Only add listeners when touch is active (either tracking or dragging)
+    if (!isTouchActive && !isTouchDragging) return
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!touchDataRef.current) return
@@ -549,10 +567,14 @@ export default function TimelineView({
       const touch = e.touches[0]
       const deltaY = Math.abs(touch.clientY - touchDataRef.current.startClientY)
 
-      // If user moved before hold was confirmed, cancel the hold timer and let scroll happen
+      // If user moved before hold was confirmed, cancel all timers and let scroll happen
       if (!touchDataRef.current.isHoldConfirmed) {
         if (deltaY > SCROLL_CANCEL_THRESHOLD) {
-          // User is scrolling - cancel hold timer immediately
+          // User is scrolling - cancel both timers immediately
+          if (touchStillnessTimerRef.current) {
+            clearTimeout(touchStillnessTimerRef.current)
+            touchStillnessTimerRef.current = null
+          }
           if (touchHoldTimerRef.current) {
             clearTimeout(touchHoldTimerRef.current)
             touchHoldTimerRef.current = null
@@ -585,7 +607,11 @@ export default function TimelineView({
     }
 
     const handleTouchEnd = () => {
-      // Clear hold timer
+      // Clear both timers
+      if (touchStillnessTimerRef.current) {
+        clearTimeout(touchStillnessTimerRef.current)
+        touchStillnessTimerRef.current = null
+      }
       if (touchHoldTimerRef.current) {
         clearTimeout(touchHoldTimerRef.current)
         touchHoldTimerRef.current = null
@@ -633,13 +659,18 @@ export default function TimelineView({
 
       // Reset touch state
       touchDataRef.current = null
+      setIsTouchActive(false)
       setIsTouchDragging(false)
       setDragPreviewStart(null)
       setDragPreviewEnd(null)
     }
 
     const handleTouchCancel = () => {
-      // Clear hold timer
+      // Clear both timers
+      if (touchStillnessTimerRef.current) {
+        clearTimeout(touchStillnessTimerRef.current)
+        touchStillnessTimerRef.current = null
+      }
       if (touchHoldTimerRef.current) {
         clearTimeout(touchHoldTimerRef.current)
         touchHoldTimerRef.current = null
@@ -647,6 +678,7 @@ export default function TimelineView({
 
       // Reset touch state
       touchDataRef.current = null
+      setIsTouchActive(false)
       setIsTouchDragging(false)
       setDragPreviewStart(null)
       setDragPreviewEnd(null)
@@ -662,11 +694,14 @@ export default function TimelineView({
       window.removeEventListener('touchend', handleTouchEnd)
       window.removeEventListener('touchcancel', handleTouchCancel)
     }
-  }, [isTouchDragging, onDragCreate])
+  }, [isTouchActive, isTouchDragging, onDragCreate])
 
-  // Cleanup hold timer on unmount
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
+      if (touchStillnessTimerRef.current) {
+        clearTimeout(touchStillnessTimerRef.current)
+      }
       if (touchHoldTimerRef.current) {
         clearTimeout(touchHoldTimerRef.current)
       }
@@ -683,11 +718,16 @@ export default function TimelineView({
     setIsDragging(false)
 
     // Clear touch drag state
+    if (touchStillnessTimerRef.current) {
+      clearTimeout(touchStillnessTimerRef.current)
+      touchStillnessTimerRef.current = null
+    }
     if (touchHoldTimerRef.current) {
       clearTimeout(touchHoldTimerRef.current)
       touchHoldTimerRef.current = null
     }
     touchDataRef.current = null
+    setIsTouchActive(false)
     setIsTouchDragging(false)
 
     // Clear ghost interaction state
@@ -794,6 +834,7 @@ export default function TimelineView({
           startY: touch.clientY,
           startClientY: touch.clientY,
           hasMoved: false,
+          isStillnessConfirmed: true,
           isHoldConfirmed: true
         }
         setIsTouchDragging(true)
