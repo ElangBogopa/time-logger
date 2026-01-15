@@ -256,7 +256,6 @@ describe('Toast Notification Behavior', () => {
       // This test documents the expected behavior
       const shouldShowToast = [
         'New entry created via QuickLogModal',
-        'New entry created via TimeEntryForm',
         'Calendar event (ghost) confirmed via GhostEntryModal',
         'Pending entry confirmed via TimeEntryModal',
         'Any operation that fails (error toast)',

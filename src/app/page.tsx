@@ -5,7 +5,6 @@ import { useSession, signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
-import TimeEntryForm from '@/components/TimeEntryForm'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import StatsCard from '@/components/StatsCard'
@@ -27,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import CalendarPicker from '@/components/CalendarPicker'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Menu, Calendar, Search, LogOut, ChevronLeft, ChevronRight, Plus, X, Zap, Loader2, AlertTriangle, RefreshCw, Target, Sparkles, Settings2 } from 'lucide-react'
+import { Menu, Calendar, Search, LogOut, ChevronLeft, ChevronRight, Plus, Zap, Loader2, AlertTriangle, RefreshCw, Target, Sparkles, Settings2 } from 'lucide-react'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
   const date = new Date(dateStr + 'T00:00:00')
@@ -124,7 +123,6 @@ function HomeContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(getLocalDateString())
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
-  const [isFormExpanded, setIsFormExpanded] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<{ message: string } | null>(null)
   const [refreshKey, setRefreshKey] = useState(0) // Force re-render key
@@ -344,7 +342,6 @@ function HomeContent() {
 
   const handleRefresh = () => {
     fetchEntries()
-    setIsFormExpanded(false)
   }
 
   const showToast = (message: string) => {
@@ -558,38 +555,6 @@ function HomeContent() {
 
             {/* Stats Card - only show for today */}
             {isToday && <StatsCard userId={userId} />}
-
-            {/* Add Entry - Collapsible - disabled for dates 3+ days in the past */}
-            {canLog && (
-              <div className="mb-6">
-                {isFormExpanded ? (
-                  <section className="rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h2 className="text-lg font-semibold text-foreground">
-                        {isFutureDay ? 'Plan Entry' : 'Add Entry'}
-                      </h2>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setIsFormExpanded(false)}
-                      >
-                        <X className="h-5 w-5" />
-                      </Button>
-                    </div>
-                    <TimeEntryForm onEntryAdded={handleRefresh} onShowToast={showToast} userId={userId} selectedDate={selectedDate} />
-                  </section>
-                ) : (
-                  <button
-                    onClick={() => setIsFormExpanded(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-foreground"
-                    aria-label={isFutureDay ? 'Open form to plan a detailed entry' : 'Open form to add a detailed entry'}
-                  >
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    {isFutureDay ? 'Plan detailed entry' : 'Add detailed entry'}
-                  </button>
-                )}
-              </div>
-            )}
 
             {/* Timeline */}
             <section>
