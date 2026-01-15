@@ -11,7 +11,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -256,18 +255,10 @@ export default function WeeklyReviewPage() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-2xl px-4 py-8">
+      <div className="min-h-screen bg-background pb-20">
+        <div className="mx-auto max-w-2xl px-4 py-6">
           {/* Header */}
           <header className="mb-6">
-            <button
-              onClick={() => router.push('/')}
-              className="mb-4 flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to home
-            </button>
-
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
                 <BarChart3 className="h-6 w-6 text-primary" />

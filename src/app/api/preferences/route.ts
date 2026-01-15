@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
-import { DEFAULT_REMINDER_TIMES, UserPreferences } from '@/lib/types'
+import { DEFAULT_REMINDER_TIMES, UserPreferences, PendingIntentionChange } from '@/lib/types'
 
 // GET /api/preferences - Get user preferences
 export async function GET() {
@@ -26,6 +26,28 @@ export async function GET() {
 
     // Return existing preferences or defaults
     if (preferences) {
+      // Auto-initialize committedSince for existing users with intentions
+      if (!preferences.intentions_committed_since) {
+        const { data: intentions } = await supabase
+          .from('user_intentions')
+          .select('created_at')
+          .eq('user_id', session.user.id)
+          .eq('active', true)
+          .order('created_at', { ascending: true })
+          .limit(1)
+
+        if (intentions && intentions.length > 0) {
+          // Set committedSince to their first intention's creation date
+          const firstIntentionDate = intentions[0].created_at.split('T')[0]
+          await supabase
+            .from('user_preferences')
+            .update({ intentions_committed_since: firstIntentionDate })
+            .eq('user_id', session.user.id)
+
+          preferences.intentions_committed_since = firstIntentionDate
+        }
+      }
+
       return NextResponse.json({ preferences })
     }
 
@@ -53,7 +75,12 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { reminder_enabled, reminder_times } = body
+    const {
+      reminder_enabled,
+      reminder_times,
+      intentions_committed_since,
+      pending_intention_changes
+    } = body
 
     // Validate reminder_times structure if provided
     if (reminder_times !== undefined) {
@@ -72,10 +99,19 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Validate pending_intention_changes if provided
+    if (pending_intention_changes !== undefined && pending_intention_changes !== null) {
+      if (!Array.isArray(pending_intention_changes)) {
+        return NextResponse.json({ error: 'pending_intention_changes must be an array' }, { status: 400 })
+      }
+    }
+
     // Build update object
     const updateData: Record<string, unknown> = {}
     if (reminder_enabled !== undefined) updateData.reminder_enabled = reminder_enabled
     if (reminder_times !== undefined) updateData.reminder_times = reminder_times
+    if (intentions_committed_since !== undefined) updateData.intentions_committed_since = intentions_committed_since
+    if (pending_intention_changes !== undefined) updateData.pending_intention_changes = pending_intention_changes
 
     // Upsert preferences
     const { data: preferences, error } = await supabase

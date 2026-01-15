@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Bell, BellOff, Clock, Loader2, Calendar } from 'lucide-react'
+import { Bell, BellOff, Clock, Loader2, Calendar, ChevronRight, Target } from 'lucide-react'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import Toast from '@/components/Toast'
 import { ReminderTime, DEFAULT_REMINDER_TIMES } from '@/lib/types'
@@ -101,19 +101,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="min-h-screen bg-background pb-20">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Header */}
-        <header className="mb-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/')}
-            className="mb-4 -ml-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
+        <header className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage your notifications and preferences
@@ -268,6 +259,29 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
+          {/* My Intentions Link */}
+          <Card
+            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => router.push('/intentions')}
+          >
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Target className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">My Intentions</CardTitle>
+                    <CardDescription>
+                      What you want to focus on this week
+                    </CardDescription>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+
           {/* Connected Accounts Link */}
           <Card
             className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -286,7 +300,7 @@ export default function SettingsPage() {
                     </CardDescription>
                   </div>
                 </div>
-                <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
             </CardHeader>
           </Card>

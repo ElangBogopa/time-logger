@@ -12,6 +12,13 @@ import {
   formatTarget,
   ReminderTime,
   DEFAULT_REMINDER_TIMES,
+  PendingIntentionChange,
+  calculateCommitmentDays,
+  formatCommitmentStreak,
+  getCommitmentMessage,
+  getNextMonday,
+  isDatePassed,
+  getLocalDateString,
 } from '@/lib/types'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -36,6 +43,9 @@ import {
   Lightbulb,
   TrendingUp,
   TrendingDown,
+  Clock,
+  AlertTriangle,
+  Flame,
 } from 'lucide-react'
 
 const INTENTION_TYPES: IntentionType[] = [
@@ -66,6 +76,18 @@ export default function IntentionsPage() {
   const [reminderTimes, setReminderTimes] = useState<ReminderTime[]>(DEFAULT_REMINDER_TIMES)
   const [isSavingReminders, setIsSavingReminders] = useState(false)
 
+  // Commitment tracking state
+  const [committedSince, setCommittedSince] = useState<string | null>(null)
+  const [pendingChanges, setPendingChanges] = useState<PendingIntentionChange[]>([])
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [pendingAction, setPendingAction] = useState<{
+    type: 'add' | 'remove'
+    intentionId?: string
+    intentionType?: IntentionType
+    customText?: string
+    weeklyTarget?: number | null
+  } | null>(null)
+
   // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -88,7 +110,7 @@ export default function IntentionsPage() {
     }
   }, [])
 
-  // Fetch preferences
+  // Fetch preferences and handle commitment tracking
   const fetchPreferences = useCallback(async () => {
     try {
       const response = await fetch('/api/preferences')
@@ -97,6 +119,51 @@ export default function IntentionsPage() {
         if (data.preferences) {
           setReminderEnabled(data.preferences.reminder_enabled || false)
           setReminderTimes(data.preferences.reminder_times || DEFAULT_REMINDER_TIMES)
+          setCommittedSince(data.preferences.intentions_committed_since || null)
+
+          // Check for pending changes that should be applied
+          const pending = data.preferences.pending_intention_changes || []
+          const stillPending: PendingIntentionChange[] = []
+          let needsRefresh = false
+
+          for (const change of pending) {
+            if (isDatePassed(change.effective_date)) {
+              // Apply this change
+              needsRefresh = true
+              if (change.action === 'add') {
+                // The intention should already be added when queued
+                // Just mark it as active now
+              } else if (change.action === 'remove' && change.intention_id) {
+                await fetch(`/api/intentions/${change.intention_id}`, {
+                  method: 'DELETE',
+                })
+              }
+            } else {
+              stillPending.push(change)
+            }
+          }
+
+          setPendingChanges(stillPending)
+
+          // Update preferences with remaining pending changes
+          if (pending.length !== stillPending.length) {
+            await fetch('/api/preferences', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pending_intention_changes: stillPending.length > 0 ? stillPending : null,
+                intentions_committed_since: stillPending.length === 0 ? getLocalDateString() : data.preferences.intentions_committed_since,
+              }),
+            })
+            if (needsRefresh) {
+              // Refresh intentions after applying changes
+              const intentionsRes = await fetch('/api/intentions')
+              if (intentionsRes.ok) {
+                const intentionsData = await intentionsRes.json()
+                setIntentions(intentionsData.intentions || [])
+              }
+            }
+          }
         }
       }
     } catch (error) {
@@ -167,30 +234,43 @@ export default function IntentionsPage() {
     }
   }
 
-  // Add new intention
-  const handleAddIntention = async () => {
+  // Show confirmation before adding intention
+  const handleAddIntention = () => {
     if (!selectedType) return
 
     if (selectedType === 'custom' && !customText.trim()) {
       return
     }
 
+    // If this is the first intention (no existing ones), add immediately without delay
+    if (intentions.length === 0) {
+      handleFirstIntentionAdd()
+      return
+    }
+
+    // Otherwise, show confirmation for the delay
+    setPendingAction({
+      type: 'add',
+      intentionType: selectedType,
+      customText: customText,
+      weeklyTarget: weeklyTarget,
+    })
+    setShowConfirmDialog(true)
+  }
+
+  // Handle first intention add (no delay needed)
+  const handleFirstIntentionAdd = async () => {
+    if (!selectedType) return
+
     setIsSaving(true)
 
     try {
-      // Get all current intentions plus the new one
       const newIntentions = [
-        ...intentions.map((i, idx) => ({
-          intention_type: i.intention_type,
-          custom_text: i.custom_text,
-          weekly_target_minutes: i.weekly_target_minutes,
-          priority: idx + 1,
-        })),
         {
           intention_type: selectedType,
           custom_text: selectedType === 'custom' ? customText : null,
           weekly_target_minutes: weeklyTarget ? weeklyTarget * 60 : null,
-          priority: intentions.length + 1,
+          priority: 1,
         },
       ]
 
@@ -201,6 +281,17 @@ export default function IntentionsPage() {
       })
 
       if (response.ok) {
+        // Set initial commitment date
+        const today = getLocalDateString()
+        await fetch('/api/preferences', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            intentions_committed_since: today,
+          }),
+        })
+        setCommittedSince(today)
+
         await fetchIntentions()
         setShowAddModal(false)
         setSelectedType(null)
@@ -214,22 +305,101 @@ export default function IntentionsPage() {
     }
   }
 
-  // Remove intention
-  const handleRemoveIntention = async (id: string) => {
+  // Show confirmation before removing intention
+  const handleRemoveIntention = (id: string) => {
+    setPendingAction({ type: 'remove', intentionId: id })
+    setShowConfirmDialog(true)
+  }
+
+  // Actually process the confirmed action
+  const handleConfirmAction = async () => {
+    if (!pendingAction) return
+
     setIsSaving(true)
+    setShowConfirmDialog(false)
 
     try {
-      const response = await fetch(`/api/intentions/${id}`, {
-        method: 'DELETE',
-      })
+      const nextMonday = getNextMonday()
 
-      if (response.ok) {
-        await fetchIntentions()
+      if (pendingAction.type === 'remove' && pendingAction.intentionId) {
+        // Queue the removal for next Monday
+        const newPendingChange: PendingIntentionChange = {
+          action: 'remove',
+          intention_id: pendingAction.intentionId,
+          queued_at: getLocalDateString(),
+          effective_date: nextMonday,
+        }
+
+        const updatedPending = [...pendingChanges, newPendingChange]
+        setPendingChanges(updatedPending)
+
+        // Save to preferences
+        await fetch('/api/preferences', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pending_intention_changes: updatedPending,
+          }),
+        })
+      } else if (pendingAction.type === 'add' && pendingAction.intentionType) {
+        // Add the intention immediately but queue the "active" status
+        const newIntentions = [
+          ...intentions.map((i, idx) => ({
+            intention_type: i.intention_type,
+            custom_text: i.custom_text,
+            weekly_target_minutes: i.weekly_target_minutes,
+            priority: idx + 1,
+          })),
+          {
+            intention_type: pendingAction.intentionType,
+            custom_text: pendingAction.intentionType === 'custom' ? pendingAction.customText : null,
+            weekly_target_minutes: pendingAction.weeklyTarget ? pendingAction.weeklyTarget * 60 : null,
+            priority: intentions.length + 1,
+          },
+        ]
+
+        const response = await fetch('/api/intentions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ intentions: newIntentions }),
+        })
+
+        if (response.ok) {
+          // Queue the change notification
+          const newPendingChange: PendingIntentionChange = {
+            action: 'add',
+            intention_type: pendingAction.intentionType,
+            custom_text: pendingAction.customText,
+            queued_at: getLocalDateString(),
+            effective_date: nextMonday,
+          }
+
+          const updatedPending = [...pendingChanges, newPendingChange]
+          setPendingChanges(updatedPending)
+
+          // Reset committed since (streak resets)
+          await fetch('/api/preferences', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pending_intention_changes: updatedPending,
+              intentions_committed_since: nextMonday, // Streak starts fresh on Monday
+            }),
+          })
+
+          setCommittedSince(nextMonday)
+          await fetchIntentions()
+          setShowAddModal(false)
+          setSelectedType(null)
+          setCustomText('')
+          setWeeklyTarget(null)
+        }
       }
     } catch (error) {
-      console.error('Failed to remove intention:', error)
+      console.error('Failed to process action:', error)
     } finally {
       setIsSaving(false)
+      setPendingAction(null)
     }
   }
 
@@ -268,18 +438,17 @@ export default function IntentionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="min-h-screen bg-background pb-20">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Header */}
-        <header className="mb-8">
+        <header className="mb-6">
           <button
-            onClick={() => router.push('/')}
-            className="mb-4 flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+            onClick={() => router.push('/settings')}
+            className="mb-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to home
+            Settings
           </button>
-
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <Target className="h-6 w-6 text-primary" />
@@ -291,6 +460,31 @@ export default function IntentionsPage() {
               </p>
             </div>
           </div>
+
+          {/* Commitment Streak */}
+          {intentions.length > 0 && committedSince && (
+            <div className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 dark:bg-amber-900/20">
+              <div className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-amber-500" />
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                  {formatCommitmentStreak(calculateCommitmentDays(committedSince))}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-amber-600/80 dark:text-amber-400/80">
+                {getCommitmentMessage(calculateCommitmentDays(committedSince))}
+              </p>
+            </div>
+          )}
+
+          {/* Pending changes notice */}
+          {pendingChanges.length > 0 && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-900/20">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <div className="text-sm text-blue-700 dark:text-blue-300">
+                <span className="font-medium">Changes pending:</span> {pendingChanges.length} change{pendingChanges.length > 1 ? 's' : ''} will take effect Monday
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Intentions list */}
@@ -309,6 +503,9 @@ export default function IntentionsPage() {
             intentions.map((intention, index) => {
               const config = INTENTION_CONFIGS[intention.intention_type]
               const currentMinutes = intention.weekly_target_minutes || config.defaultTargetMinutes
+              const isPendingRemoval = pendingChanges.some(
+                p => p.action === 'remove' && p.intention_id === intention.id
+              )
 
               // Convert minutes to display value based on unit
               const displayValue = config.unit === 'hours'
@@ -330,8 +527,18 @@ export default function IntentionsPage() {
               return (
                 <div
                   key={intention.id}
-                  className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800"
+                  className={`rounded-xl border p-4 ${
+                    isPendingRemoval
+                      ? 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-900/20'
+                      : 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800'
+                  }`}
                 >
+                  {isPendingRemoval && (
+                    <div className="mb-3 flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                      <Clock className="h-4 w-4" />
+                      Removing Monday
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -362,8 +569,8 @@ export default function IntentionsPage() {
                       variant="ghost"
                       size="icon-sm"
                       onClick={() => handleRemoveIntention(intention.id)}
-                      disabled={isSaving}
-                      className="text-zinc-400 hover:text-red-500"
+                      disabled={isSaving || isPendingRemoval}
+                      className={isPendingRemoval ? 'text-zinc-300 cursor-not-allowed' : 'text-zinc-400 hover:text-red-500'}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -605,6 +812,79 @@ export default function IntentionsPage() {
                   <>
                     <Check className="mr-2 h-4 w-4" />
                     Add
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirmation Dialog for Changes */}
+        <Dialog open={showConfirmDialog} onOpenChange={(open) => {
+          if (!open) {
+            setShowConfirmDialog(false)
+            setPendingAction(null)
+          }
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                {pendingAction?.type === 'remove' ? 'Remove Intention?' : 'Add Intention?'}
+              </DialogTitle>
+              <DialogDescription className="pt-2">
+                {committedSince && calculateCommitmentDays(committedSince) > 0 && (
+                  <span className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                    <Flame className="h-4 w-4" />
+                    You&apos;ve been committed for {formatCommitmentStreak(calculateCommitmentDays(committedSince))}.
+                  </span>
+                )}
+                <span className="mt-2 block">
+                  This change will take effect on <strong>Monday</strong> to protect your weekly review accuracy.
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-blue-500" />
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  Effective: {new Date(getNextMonday() + 'T00:00:00').toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowConfirmDialog(false)
+                  setPendingAction(null)
+                }}
+                className="flex-1"
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmAction}
+                disabled={isSaving}
+                className="flex-1"
+                variant={pendingAction?.type === 'remove' ? 'destructive' : 'default'}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Confirm
                   </>
                 )}
               </Button>

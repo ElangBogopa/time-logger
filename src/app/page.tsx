@@ -25,8 +25,9 @@ import {
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
 import CalendarPicker from '@/components/CalendarPicker'
+import WeekStrip from '@/components/WeekStrip'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Menu, Calendar, Search, LogOut, ChevronLeft, ChevronRight, Plus, Zap, Loader2, AlertTriangle, RefreshCw, Target, Sparkles, Settings2 } from 'lucide-react'
+import { Menu, Calendar, Search, LogOut, Plus, Zap, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
   const date = new Date(dateStr + 'T00:00:00')
@@ -52,12 +53,6 @@ function formatDateDisplay(dateStr: string): { label: string; date: string; isFu
 
   const weekday = date.toLocaleDateString('en-US', { weekday: 'short' })
   return { label: weekday, date: formattedDate, isFuture }
-}
-
-function getAdjacentDate(dateStr: string, direction: 'prev' | 'next'): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  date.setDate(date.getDate() + (direction === 'next' ? 1 : -1))
-  return getLocalDateString(date)
 }
 
 function formatTimeAgo(date: Date): string {
@@ -97,12 +92,6 @@ function getTimeOfDayGreeting(name?: string): { greeting: string; prompt: string
   }
 }
 
-// Check if it's a good day to review the week (Sunday or Monday)
-function isReviewDay(): boolean {
-  const day = new Date().getDay()
-  return day === 0 || day === 1 // Sunday or Monday
-}
-
 // Memoized greeting component to avoid duplicate function calls
 function TimeOfDayGreeting({ name }: { name?: string }) {
   const greeting = useMemo(() => getTimeOfDayGreeting(name), [name])
@@ -129,7 +118,6 @@ function HomeContent() {
   const [dragCreateData, setDragCreateData] = useState<DragCreateData | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [hasCheckedIntentions, setHasCheckedIntentions] = useState(false)
-  const dateInputRef = useRef<HTMLInputElement>(null)
   const lastVisibilityCheck = useRef<number>(Date.now())
 
   // Use cached calendar events from context
@@ -394,38 +382,22 @@ function HomeContent() {
 
   return (
     <ErrorBoundary>
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="min-h-screen bg-background pb-20">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Header */}
-        <header className="mb-6">
+        <header className="mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-bold text-foreground">Time Logger</h1>
 
-              {/* Navigation dropdown */}
+              {/* Quick actions dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" aria-label="Open navigation menu">
+                  <Button variant="ghost" size="icon-sm" aria-label="More options">
                     <Menu className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuItem onClick={() => setSelectedDate(today)}>
-                    <Calendar className="h-4 w-4" />
-                    Today
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/weekly-review')}>
-                    <Sparkles className="h-4 w-4" />
-                    <span className="flex-1">Weekly Review</span>
-                    {isReviewDay() && (
-                      <span className="ml-2 h-2 w-2 rounded-full bg-primary animate-pulse" />
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/intentions')}>
-                    <Target className="h-4 w-4" />
-                    My Intentions
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
                       <Search className="h-4 w-4" />
@@ -441,20 +413,18 @@ function HomeContent() {
                       />
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
-                  <DropdownMenuSeparator />
                   {calendarStatus?.connected && (
-                    <DropdownMenuItem
-                      onClick={() => refreshCalendar()}
-                      disabled={isCalendarLoading}
-                    >
-                      <RefreshCw className={`h-4 w-4 ${isCalendarLoading ? 'animate-spin' : ''}`} />
-                      {isCalendarLoading ? 'Syncing...' : 'Sync Calendar'}
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => refreshCalendar()}
+                        disabled={isCalendarLoading}
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isCalendarLoading ? 'animate-spin' : ''}`} />
+                        {isCalendarLoading ? 'Syncing...' : 'Sync Calendar'}
+                      </DropdownMenuItem>
+                    </>
                   )}
-                  <DropdownMenuItem onClick={() => router.push('/settings')}>
-                    <Settings2 className="h-4 w-4" />
-                    <span className="flex-1">Settings</span>
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
                     {session?.user?.email}
@@ -470,7 +440,7 @@ function HomeContent() {
               </DropdownMenu>
             </div>
 
-            {/* Quick Log / Plan / Add button - disabled for dates 3+ days in the past */}
+            {/* Quick Log / Plan / Add button */}
             <Button
                 onClick={() => setIsQuickLogOpen(true)}
                 disabled={!canLog}
@@ -506,40 +476,17 @@ function HomeContent() {
           </div>
         </header>
 
+        {/* Week Strip Calendar */}
+        <div className="mb-4">
+          <WeekStrip
+            selectedDate={selectedDate}
+            onDateSelect={handleDateChange}
+            datesWithEntries={entries.map(e => e.date)}
+          />
+        </div>
+
         {/* Day View Content */}
         <>
-            {/* Date Navigation */}
-            <div className="mb-6 flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDateChange(getAdjacentDate(selectedDate, 'prev'))}
-                aria-label="Previous day"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-
-              <button
-                onClick={() => dateInputRef.current?.showPicker()}
-                className="flex items-center gap-1.5 rounded-lg px-4 py-2 hover:bg-accent"
-              >
-                <span className="text-lg font-semibold text-foreground">
-                  {dateDisplay.label}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {dateDisplay.date}
-                </span>
-              </button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDateChange(getAdjacentDate(selectedDate, 'next'))}
-                aria-label="Next day"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </div>
 
             {/* Time-of-day greeting - only show for today */}
             {isToday && <TimeOfDayGreeting name={session?.user?.preferredName} />}

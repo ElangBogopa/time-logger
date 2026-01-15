@@ -43,12 +43,26 @@ export interface ReminderTime {
   enabled: boolean
 }
 
+// Pending intention change (for delayed updates)
+export interface PendingIntentionChange {
+  action: 'add' | 'remove' | 'update'
+  intention_type?: IntentionType
+  intention_id?: string
+  custom_text?: string | null
+  weekly_target_minutes?: number | null
+  priority?: number
+  queued_at: string // ISO date when the change was requested
+  effective_date: string // ISO date when it takes effect (next Monday)
+}
+
 // User preferences
 export interface UserPreferences {
   id: string
   user_id: string
   reminder_enabled: boolean
   reminder_times: ReminderTime[]
+  intentions_committed_since: string | null // ISO date of last commitment
+  pending_intention_changes: PendingIntentionChange[] | null
   created_at: string
   updated_at: string
 }
@@ -595,6 +609,97 @@ export function isPendingEntryReadyToConfirm(entry: TimeEntry): boolean {
   if (!entry.end_time) return false
 
   return !isEntryInFuture(entry.date, entry.end_time)
+}
+
+// ============================================================================
+// INTENTION COMMITMENT HELPERS
+// ============================================================================
+
+/**
+ * Gets the next Monday from a given date.
+ * If today is Monday, returns next Monday (not today).
+ */
+export function getNextMonday(fromDate: Date = new Date()): string {
+  const date = new Date(fromDate)
+  const dayOfWeek = date.getDay() // 0 = Sunday, 1 = Monday, ...
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) // Sunday = 1 day, Monday = 7 days, etc.
+  date.setDate(date.getDate() + daysUntilMonday)
+  return getLocalDateString(date)
+}
+
+/**
+ * Gets the start of the current week (Monday).
+ */
+export function getCurrentWeekMonday(fromDate: Date = new Date()): string {
+  const date = new Date(fromDate)
+  const dayOfWeek = date.getDay() // 0 = Sunday, 1 = Monday, ...
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Sunday goes back 6, Monday stays, etc.
+  date.setDate(date.getDate() - daysToSubtract)
+  return getLocalDateString(date)
+}
+
+/**
+ * Calculates the number of full weeks since a commitment date.
+ */
+export function calculateCommitmentWeeks(committedSince: string | null): number {
+  if (!committedSince) return 0
+
+  const commitDate = new Date(committedSince + 'T00:00:00')
+  const now = new Date()
+  const diffTime = now.getTime() - commitDate.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+  return Math.floor(diffDays / 7)
+}
+
+/**
+ * Calculates the number of days since a commitment date.
+ */
+export function calculateCommitmentDays(committedSince: string | null): number {
+  if (!committedSince) return 0
+
+  const commitDate = new Date(committedSince + 'T00:00:00')
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const diffTime = now.getTime() - commitDate.getTime()
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24))
+}
+
+/**
+ * Gets contextual encouragement message based on commitment streak days.
+ * These messages emphasize why staying committed to intentions matters.
+ */
+export function getCommitmentMessage(days: number): string {
+  if (days < 7) {
+    return "Stay the course. Frequent changes reduce success."
+  } else if (days < 14) {
+    return "One week strong. Consistency builds results."
+  } else if (days < 30) {
+    return "Staying focused. Your commitment is building momentum."
+  } else if (days < 66) {
+    return "Over a month! This consistency drives real change."
+  } else {
+    return "True commitment. You're proving goals stick with focus."
+  }
+}
+
+/**
+ * Checks if a date has passed (for applying pending changes).
+ */
+export function isDatePassed(dateStr: string): boolean {
+  const targetDate = new Date(dateStr + 'T00:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return targetDate <= today
+}
+
+/**
+ * Formats the commitment streak for display (days-based).
+ */
+export function formatCommitmentStreak(days: number): string {
+  if (days === 0) return 'Today'
+  if (days === 1) return '1 day'
+  return `${days} days`
 }
 
 // ============================================================================

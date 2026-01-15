@@ -170,8 +170,8 @@ function ConnectionsContent() {
   const isGoogleOAuthUser = session?.authProvider === 'google'
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="min-h-screen bg-background pb-20">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Header */}
         <header className="mb-8">
           <Button
