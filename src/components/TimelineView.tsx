@@ -255,29 +255,66 @@ export default function TimelineView({
     setShowDismissed(false)
   }, [])
 
-  // Filter out calendar events that overlap with confirmed entries (and dismissed ones)
+  // Filter out dismissed ghost events only (keep overlapping ones for side-by-side display)
   const ghostEvents = useMemo(() => {
     return calendarEvents.filter(event => {
       // Filter out dismissed events (unless showing dismissed)
       if (!showDismissed && dismissedEventIds.has(event.id)) return false
+      return true
+    })
+  }, [calendarEvents, dismissedEventIds, showDismissed])
 
+  // Detect which ghosts overlap with confirmed entries (for side-by-side stacking)
+  const overlappingGhostIds = useMemo(() => {
+    const overlapping = new Set<string>()
+
+    ghostEvents.forEach(event => {
       const eventStart = timeToMinutes(event.startTime)
       const eventEnd = timeToMinutes(event.endTime)
 
-      return !entries.some(entry => {
+      const hasOverlap = entries.some(entry => {
         if (!entry.start_time || !entry.end_time) return false
+        if (entry.status !== 'confirmed') return false
+
         const entryStart = timeToMinutes(entry.start_time)
         const entryEnd = timeToMinutes(entry.end_time)
 
-        const overlapStart = Math.max(eventStart, entryStart)
-        const overlapEnd = Math.min(eventEnd, entryEnd)
-        const overlap = Math.max(0, overlapEnd - overlapStart)
-        const eventDuration = eventEnd - eventStart
-
-        return overlap > eventDuration * 0.5
+        // Check for any overlap (not just 50%)
+        return eventStart < entryEnd && eventEnd > entryStart
       })
+
+      if (hasOverlap) {
+        overlapping.add(event.id)
+      }
     })
-  }, [calendarEvents, entries, dismissedEventIds, showDismissed])
+
+    return overlapping
+  }, [ghostEvents, entries])
+
+  // Track which entries overlap with ghosts (for side-by-side positioning)
+  const overlappingEntryIds = useMemo(() => {
+    const overlapping = new Set<string>()
+
+    entries.forEach(entry => {
+      if (!entry.start_time || !entry.end_time) return
+      if (entry.status !== 'confirmed') return
+
+      const entryStart = timeToMinutes(entry.start_time)
+      const entryEnd = timeToMinutes(entry.end_time)
+
+      const hasOverlap = ghostEvents.some(event => {
+        const eventStart = timeToMinutes(event.startTime)
+        const eventEnd = timeToMinutes(event.endTime)
+        return entryStart < eventEnd && entryEnd > eventStart
+      })
+
+      if (hasOverlap) {
+        overlapping.add(entry.id)
+      }
+    })
+
+    return overlapping
+  }, [entries, ghostEvents])
 
   // Separate entries with times from those without
   const { timedEntries, untimedEntries } = useMemo(() => {
@@ -1543,6 +1580,9 @@ export default function TimelineView({
                 const displayHeight = Math.max((displayEndMins - displayStartMins) * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT)
                 const displayDuration = displayEndMins - displayStartMins
 
+                // Check if this entry overlaps with a ghost (for side-by-side layout)
+                const entryHasOverlap = overlappingEntryIds.has(entry.id)
+
                 // Confirmed entries - normal rendering with drag-to-adjust
                 return (
                   <div
@@ -1550,12 +1590,17 @@ export default function TimelineView({
                     data-entry-block
                     onMouseDown={(e) => handleEntryMouseDown(e, entry)}
                     onTouchStart={(e) => handleEntryTouchStart(e, entry)}
-                    className={`absolute left-1 right-1 overflow-hidden rounded-lg border-l-4 shadow-sm transition-all ${
+                    className={`absolute overflow-hidden rounded-lg border-l-4 shadow-sm transition-all ${
                       isBeingAdjusted
                         ? 'z-30 shadow-xl ring-2 ring-primary/50'
                         : 'hover:shadow-md hover:brightness-105'
                     } ${colors.bg} ${colors.border} ${entry.isEstimated ? 'opacity-70 cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
-                    style={{ top: displayTop, height: displayHeight }}
+                    style={{
+                      top: displayTop,
+                      height: displayHeight,
+                      left: '4px',
+                      right: entryHasOverlap ? '50%' : '4px',
+                    }}
                   >
                     {/* Top resize handle (visual indicator) */}
                     {!entry.isEstimated && height >= 50 && (
@@ -1623,6 +1668,9 @@ export default function TimelineView({
                 // During drag, ghost events should not block interaction
                 const isCurrentlyDragging = isDragging || isTouchDragging
 
+                // Check if this ghost overlaps with an entry (for side-by-side layout)
+                const ghostHasOverlap = overlappingGhostIds.has(event.id)
+
                 return (
                   <div
                     key={`ghost-${event.id}`}
@@ -1635,14 +1683,27 @@ export default function TimelineView({
                       if (isCurrentlyDragging || isDismissed) return
                       handleGhostTouchStart(e, event)
                     }}
-                    className={`absolute left-1 right-1 overflow-hidden rounded-lg border-2 border-dashed transition-all ${
+                    className={`absolute overflow-hidden rounded-lg border-2 border-dashed transition-all ${
                       isDismissed
                         ? 'border-zinc-400/50 bg-zinc-200/30 opacity-50 dark:border-zinc-500/40 dark:bg-zinc-700/30'
-                        : 'border-blue-500/70 bg-blue-100/60 hover:border-blue-600 hover:bg-blue-100/80 dark:border-blue-400/60 dark:bg-blue-900/40 dark:hover:border-blue-300'
+                        : ghostHasOverlap
+                          ? 'border-amber-500/70 bg-amber-100/60 hover:border-amber-600 hover:bg-amber-100/80 dark:border-amber-400/60 dark:bg-amber-900/40 dark:hover:border-amber-300'
+                          : 'border-blue-500/70 bg-blue-100/60 hover:border-blue-600 hover:bg-blue-100/80 dark:border-blue-400/60 dark:bg-blue-900/40 dark:hover:border-blue-300'
                     } ${isCurrentlyDragging ? 'pointer-events-none' : 'cursor-pointer'}`}
-                    style={{ top, height }}
+                    style={{
+                      top,
+                      height,
+                      left: ghostHasOverlap ? '50%' : '4px',
+                      right: '4px',
+                    }}
                   >
-                    <div className={`flex h-full flex-col justify-center px-2 py-1 ${isDismissed ? 'text-zinc-600 dark:text-zinc-400' : 'text-blue-800 dark:text-blue-200'}`}>
+                    <div className={`flex h-full flex-col justify-center px-2 py-1 ${
+                      isDismissed
+                        ? 'text-zinc-600 dark:text-zinc-400'
+                        : ghostHasOverlap
+                          ? 'text-amber-800 dark:text-amber-200'
+                          : 'text-blue-800 dark:text-blue-200'
+                    }`}>
                       {isShort ? (
                         <div className="flex items-center justify-between gap-1">
                           <span className="flex items-center gap-1 truncate text-xs font-medium">
@@ -1700,7 +1761,7 @@ export default function TimelineView({
                           </div>
                           {height > 70 && (
                             <span className="mt-1 text-xs opacity-70">
-                              {isDismissed ? 'Dismissed' : hasEnded ? 'Tap to confirm' : 'Pending...'}
+                              {isDismissed ? 'Dismissed' : ghostHasOverlap ? 'Already logged → Tap to dismiss' : hasEnded ? 'Tap to confirm' : 'Pending...'}
                             </span>
                           )}
                         </>
