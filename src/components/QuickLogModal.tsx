@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getLocalDateString, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
+import { parseTimeFromText, getHighlightedSegments, ParseResult } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
 import {
@@ -25,17 +26,6 @@ interface ActivitySuggestion {
   endTime: string
   source: 'pattern' | 'recent'
   confidence: 'high' | 'medium'
-}
-
-// Detect if text contains natural language time/duration patterns
-function hasNaturalLanguageTime(text: string): boolean {
-  if (!text || text.length < 5) return false
-  return (
-    /\d+\s*(hr|hour|min|minute|h|m)\b/i.test(text) ||  // "2 hours", "30min", "1h"
-    /\d{1,2}[:-]\d{2}\s*(am|pm)?/i.test(text) ||       // "12:30", "2:00pm"
-    /\d{1,2}\s*(am|pm)/i.test(text) ||                  // "2pm", "10am"
-    /from\s+\d|to\s+\d|\d\s*-\s*\d/i.test(text)        // "from 9", "to 5", "9-11"
-  )
 }
 
 interface QuickLogModalProps {
@@ -68,13 +58,23 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([])
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
 
-  // Natural language parsing state
-  const [isParsing, setIsParsing] = useState(false)
-  const [showParseButton, setShowParseButton] = useState(false)
+  // Auto-parse state - Todoist-style real-time parsing
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null)
+  const [isAutoParseApplied, setIsAutoParseApplied] = useState(false)
+  const [showHighlightedInput, setShowHighlightedInput] = useState(false)
 
-  // Detect NL patterns in activity input
+  // Real-time parsing as user types
   useEffect(() => {
-    setShowParseButton(hasNaturalLanguageTime(activity))
+    if (!activity || activity.trim().length < 2) {
+      setParseResult(null)
+      setShowHighlightedInput(false)
+      return
+    }
+
+    const currentTime = getCurrentTime()
+    const result = parseTimeFromText(activity, currentTime)
+    setParseResult(result)
+    setShowHighlightedInput(result.hasTimePattern)
   }, [activity])
 
   // Fetch smart suggestions when modal opens
@@ -103,38 +103,29 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }
   }, [userId, selectedDate, isFutureDay])
 
-  // Parse natural language input
-  const handleParseActivity = async () => {
-    if (!activity.trim()) return
+  // Apply auto-parsed times from the detected pattern
+  const handleApplyParsedTimes = () => {
+    if (!parseResult || !parseResult.hasTimePattern) return
 
-    setIsParsing(true)
-    setError(null)
-
-    try {
-      const currentTime = getCurrentTime()
-      const date = selectedDate || getLocalDateString()
-
-      const response = await fetch('/api/parse-activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: activity, currentTime, date }),
-      })
-
-      if (response.ok) {
-        const parsed = await response.json()
-        setActivity(parsed.activity)
-        setStartTime(parsed.start_time)
-        setEndTime(parsed.end_time)
-        setShowParseButton(false)
-      } else {
-        const errorData = await response.json()
-        setError(errorData.error || 'Failed to parse activity')
-      }
-    } catch (err) {
-      setError('Failed to parse activity')
-    } finally {
-      setIsParsing(false)
+    // Apply the parsed times
+    if (parseResult.startTime) {
+      setStartTime(parseResult.startTime)
     }
+    if (parseResult.endTime) {
+      setEndTime(parseResult.endTime)
+    }
+
+    // Update activity to cleaned version (without time expressions)
+    setActivity(parseResult.cleanedActivity)
+    setIsAutoParseApplied(true)
+    setShowHighlightedInput(false)
+  }
+
+  // Dismiss/undo the auto-parsed detection
+  const handleDismissParsedTimes = () => {
+    setShowHighlightedInput(false)
+    setIsAutoParseApplied(false)
+    // Keep the original activity text
   }
 
   // Apply a suggestion
@@ -202,7 +193,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setError(null)
       setDismissedSuggestion(null)
       setSuggestions([])
-      setShowParseButton(false)
+      setParseResult(null)
+      setIsAutoParseApplied(false)
+      setShowHighlightedInput(false)
       timesInitialized.current = false // Reset flag when modal opens
       // Focus the activity input after a brief delay
       setTimeout(() => inputRef.current?.focus(), 100)
@@ -527,7 +520,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             </div>
           )}
 
-          {/* Activity - main input with NL parse button */}
+          {/* Activity - main input with auto-parse highlighting */}
           <div className="space-y-2">
             <Label htmlFor="quick-activity">
               {isPlanningMode ? 'What are you planning to do?' : isPastDay ? 'What did you do?' : 'What did you just finish?'}
@@ -537,29 +530,65 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                 ref={inputRef}
                 id="quick-activity"
                 value={activity}
-                onChange={(e) => setActivity(e.target.value)}
+                onChange={(e) => {
+                  setActivity(e.target.value)
+                  setIsAutoParseApplied(false) // Reset when user types
+                }}
                 placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., "coded for 2 hours" or "lunch 12-1pm"'}
-                className={showParseButton ? 'pr-20' : ''}
               />
-              {showParseButton && (
-                <button
-                  type="button"
-                  onClick={handleParseActivity}
-                  disabled={isParsing}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
-                >
-                  {isParsing ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  Parse
-                </button>
+              {/* Highlighted overlay showing detected time patterns */}
+              {showHighlightedInput && parseResult && !isAutoParseApplied && (
+                <div className="absolute inset-0 pointer-events-none px-3 py-2 text-sm overflow-hidden">
+                  <span className="invisible">{activity}</span>
+                </div>
               )}
             </div>
+
+            {/* Auto-parse preview chip - shows detected times */}
+            {showHighlightedInput && parseResult && parseResult.hasTimePattern && !isAutoParseApplied && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-primary font-medium">Detected time info</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {parseResult.detections.map(d => d.matchedText).join(', ')}
+                    {parseResult.startTime && parseResult.endTime && (
+                      <span className="ml-1">→ {formatTimeDisplay(parseResult.startTime)} - {formatTimeDisplay(parseResult.endTime)}</span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleApplyParsedTimes}
+                    className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDismissParsedTimes}
+                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Applied confirmation */}
+            {isAutoParseApplied && (
+              <p className="text-xs text-green-600 flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                Times applied from your input
+              </p>
+            )}
+
+            {/* Help text when empty */}
             {!activity && (
               <p className="text-xs text-muted-foreground">
-                Tip: Type naturally like &quot;coded for 2 hours&quot; and click Parse
+                Tip: Type naturally like &quot;coded for 2 hours&quot; or &quot;meeting 2pm to 3pm&quot;
               </p>
             )}
           </div>

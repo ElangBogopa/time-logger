@@ -45,8 +45,13 @@ describe('minutesToTime', () => {
     expect(minutesToTime(1439)).toBe('23:59')
   })
 
+  it('handles end-of-day midnight (24:00)', () => {
+    // 1440 minutes = exactly midnight at end of day, special case returns "24:00"
+    expect(minutesToTime(1440)).toBe('24:00')
+  })
+
   it('wraps around past midnight', () => {
-    expect(minutesToTime(1440)).toBe('00:00')
+    // Values beyond 1440 wrap around using modulo
     expect(minutesToTime(1500)).toBe('01:00')
   })
 

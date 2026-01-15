@@ -1109,9 +1109,8 @@ export default function TimelineView({
 
       if (error) throw error
 
-      // Refresh entries
+      // Refresh entries silently - no toast for time adjustments
       onEntryDeleted()
-      onShowToast?.('Entry time updated')
     } catch (error) {
       console.error('Failed to update entry times:', error)
       onShowToast?.('Failed to update entry')
