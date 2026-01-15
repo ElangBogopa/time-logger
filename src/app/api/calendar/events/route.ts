@@ -295,12 +295,16 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('end')
     const timezoneParam = searchParams.get('timezone')
 
-    // Validate timezone - use server default if invalid or not provided
-    const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-    const timezone = (timezoneParam && isValidTimezone(timezoneParam)) ? timezoneParam : serverTimezone
+    // Validate timezone - require client to pass it to avoid UTC fallback on Vercel
+    if (!timezoneParam) {
+      console.warn('[Calendar Events] No timezone provided by client, using America/New_York as fallback')
+    }
+    const timezone = (timezoneParam && isValidTimezone(timezoneParam))
+      ? timezoneParam
+      : 'America/New_York' // Fallback to EST instead of server UTC
 
     if (timezoneParam && !isValidTimezone(timezoneParam)) {
-      console.warn(`[Calendar Events] Invalid timezone "${timezoneParam}", falling back to ${serverTimezone}`)
+      console.warn(`[Calendar Events] Invalid timezone "${timezoneParam}", falling back to America/New_York`)
     }
 
     // Use provided date range or default to today (in user's timezone)
