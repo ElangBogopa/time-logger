@@ -203,8 +203,9 @@ export default function TimelineView({
     isHoldConfirmed: boolean
   } | null>(null)
 
-  const DRAG_THRESHOLD = 20 // pixels - if moved less than this, treat as click
-  const TOUCH_HOLD_DELAY = 800 // ms - hold this long before treating as drag-to-create
+  const DRAG_THRESHOLD = 20 // pixels - minimum drag distance to count as intentional drag (after hold confirmed)
+  const SCROLL_CANCEL_THRESHOLD = 5 // pixels - ANY movement this much cancels hold timer (user is scrolling)
+  const TOUCH_HOLD_DELAY = 800 // ms - hold STILL this long before treating as drag-to-create
   const GHOST_TAP_THRESHOLD = 150 // ms - release before this = tap to confirm
   const ENTRY_EDGE_ZONE = 0.2 // 20% of entry height for resize zones
   const ENTRY_HOLD_DELAY = 200 // ms - hold before moving entry (touch only)
@@ -550,8 +551,8 @@ export default function TimelineView({
 
       // If user moved before hold was confirmed, cancel the hold timer and let scroll happen
       if (!touchDataRef.current.isHoldConfirmed) {
-        if (deltaY > DRAG_THRESHOLD) {
-          // User is scrolling - cancel hold timer
+        if (deltaY > SCROLL_CANCEL_THRESHOLD) {
+          // User is scrolling - cancel hold timer immediately
           if (touchHoldTimerRef.current) {
             clearTimeout(touchHoldTimerRef.current)
             touchHoldTimerRef.current = null
@@ -865,7 +866,7 @@ export default function TimelineView({
       const touch = e.touches[0]
       const deltaY = Math.abs(touch.clientY - ghostInteractionRef.current.startClientY)
 
-      if (deltaY > DRAG_THRESHOLD) {
+      if (deltaY > SCROLL_CANCEL_THRESHOLD) {
         ghostInteractionRef.current.hasMoved = true
 
         // If timer hasn't fired yet but user moved, they're scrolling - cancel
