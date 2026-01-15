@@ -565,22 +565,45 @@ export function hasTimePattern(text: string): boolean {
 function inferDefaultDuration(text: string): number {
   const lowerText = text.toLowerCase()
 
-  // Short activities (15 min)
-  if (/\b(standup|stand-up|daily|huddle|check-in|checkin)\b/.test(lowerText)) {
+  // Quick activities (15 min)
+  // Standups, check-ins, quick ceremonies
+  if (/\b(standup|stand-up|daily|huddle|check-in|checkin|scrum|debrief|recap|catchup|catch-up)\b/.test(lowerText)) {
     return 15
   }
 
-  // Medium activities (30 min)
-  if (/\b(call|chat|sync|1:1|one-on-one|coffee|break)\b/.test(lowerText)) {
+  // Short activities (30 min)
+  // Calls, quick syncs, reviews
+  if (/\b(call|chat|sync|1:1|one-on-one|coffee|break|phone|video|demo|walkthrough|review|feedback|pairing|pair\s*programming)\b/.test(lowerText)) {
     return 30
   }
 
+  // Medium-short activities (45 min)
+  // Interviews, planning, brainstorms
+  if (/\b(interview|screening|planning|sprint|grooming|refinement|brainstorm|brainstorming|retro|retrospective)\b/.test(lowerText)) {
+    return 45
+  }
+
+  // Extended activities (1.5 hours / 90 min)
+  // Classes, lectures, training
+  if (/\b(lecture|class|seminar|training|course|lesson|tutorial)\b/.test(lowerText)) {
+    return 90
+  }
+
   // Long activities (2 hours)
-  if (/\b(workshop|training|session|deep\s*work|focus\s*time|coding|study|studying)\b/.test(lowerText)) {
+  // Deep work, focused sessions, creative work
+  if (/\b(workshop|deep\s*work|focus\s*time|focus\s*session|coding|programming|development|study|studying|learning|writing|drafting|research|analysis|design|prototyping|exam|test|assessment|project|building|creating)\b/.test(lowerText)) {
     return 120
   }
 
-  // Default: 1 hour (most common for meetings, generic activities)
+  // Very long activities (3 hours)
+  // Offsites, extended workshops
+  if (/\b(offsite|bootcamp|hackathon|marathon)\b/.test(lowerText)) {
+    return 180
+  }
+
+  // Standard activities (1 hour) - default
+  // Meetings, presentations, discussions
+  // Also catches: meeting, presentation, webinar, onboarding, orientation, discussion
   return 60
 }
 

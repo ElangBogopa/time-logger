@@ -773,7 +773,7 @@ describe('Time Parser - "At" Patterns', () => {
 })
 
 describe('Time Parser - Default Duration Inference', () => {
-  describe('Short Activities (15 min)', () => {
+  describe('Quick Activities (15 min)', () => {
     it('should default standup to 15 min', () => {
       const result = parseTimeFromText('standup at 9', '10:00')
       expect(result.startTime).toBe('09:00')
@@ -791,9 +791,21 @@ describe('Time Parser - Default Duration Inference', () => {
       expect(result.startTime).toBe('15:00')
       expect(result.endTime).toBe('15:15')
     })
+
+    it('should default scrum to 15 min', () => {
+      const result = parseTimeFromText('scrum at 9', '10:00')
+      expect(result.startTime).toBe('09:00')
+      expect(result.endTime).toBe('09:15')
+    })
+
+    it('should default debrief to 15 min', () => {
+      const result = parseTimeFromText('debrief at 5', '18:00')
+      expect(result.startTime).toBe('17:00')
+      expect(result.endTime).toBe('17:15')
+    })
   })
 
-  describe('Medium Activities (30 min)', () => {
+  describe('Short Activities (30 min)', () => {
     it('should default call to 30 min', () => {
       const result = parseTimeFromText('call at 2', '15:00')
       expect(result.startTime).toBe('14:00')
@@ -817,6 +829,70 @@ describe('Time Parser - Default Duration Inference', () => {
       expect(result.startTime).toBe('10:00')
       expect(result.endTime).toBe('10:30')
     })
+
+    it('should default demo to 30 min', () => {
+      const result = parseTimeFromText('demo at 3', '16:00')
+      expect(result.startTime).toBe('15:00')
+      expect(result.endTime).toBe('15:30')
+    })
+
+    it('should default code review to 30 min', () => {
+      const result = parseTimeFromText('code review at 2', '15:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('14:30')
+    })
+  })
+
+  describe('Medium Activities (45 min)', () => {
+    it('should default interview to 45 min', () => {
+      const result = parseTimeFromText('interview at 2', '15:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('14:45')
+    })
+
+    it('should default brainstorm to 45 min', () => {
+      const result = parseTimeFromText('brainstorm at 10', '12:00')
+      expect(result.startTime).toBe('10:00')
+      expect(result.endTime).toBe('10:45')
+    })
+
+    it('should default sprint planning to 45 min', () => {
+      const result = parseTimeFromText('sprint planning at 9', '11:00')
+      expect(result.startTime).toBe('09:00')
+      expect(result.endTime).toBe('09:45')
+    })
+
+    it('should default retro to 45 min', () => {
+      const result = parseTimeFromText('retro at 4', '18:00')
+      expect(result.startTime).toBe('16:00')
+      expect(result.endTime).toBe('16:45')
+    })
+  })
+
+  describe('Extended Activities (90 min)', () => {
+    it('should default lecture to 90 min', () => {
+      const result = parseTimeFromText('lecture at 10', '12:00')
+      expect(result.startTime).toBe('10:00')
+      expect(result.endTime).toBe('11:30')
+    })
+
+    it('should default class to 90 min', () => {
+      const result = parseTimeFromText('class at 2', '16:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('15:30')
+    })
+
+    it('should default training to 90 min', () => {
+      const result = parseTimeFromText('training at 9', '12:00')
+      expect(result.startTime).toBe('09:00')
+      expect(result.endTime).toBe('10:30')
+    })
+
+    it('should default tutorial to 90 min', () => {
+      const result = parseTimeFromText('tutorial at 3', '17:00')
+      expect(result.startTime).toBe('15:00')
+      expect(result.endTime).toBe('16:30')
+    })
   })
 
   describe('Long Activities (2 hours)', () => {
@@ -833,7 +909,7 @@ describe('Time Parser - Default Duration Inference', () => {
     })
 
     it('should default coding to 2 hours', () => {
-      const result = parseTimeFromText('coding session at 2', '17:00')
+      const result = parseTimeFromText('coding at 2', '17:00')
       expect(result.startTime).toBe('14:00')
       expect(result.endTime).toBe('16:00')
     })
@@ -842,6 +918,38 @@ describe('Time Parser - Default Duration Inference', () => {
       const result = parseTimeFromText('studying at 10', '13:00')
       expect(result.startTime).toBe('10:00')
       expect(result.endTime).toBe('12:00')
+    })
+
+    it('should default research to 2 hours', () => {
+      const result = parseTimeFromText('research at 9', '12:00')
+      expect(result.startTime).toBe('09:00')
+      expect(result.endTime).toBe('11:00')
+    })
+
+    it('should default writing to 2 hours', () => {
+      const result = parseTimeFromText('writing at 10', '13:00')
+      expect(result.startTime).toBe('10:00')
+      expect(result.endTime).toBe('12:00')
+    })
+
+    it('should default design to 2 hours', () => {
+      const result = parseTimeFromText('design at 2', '17:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('16:00')
+    })
+  })
+
+  describe('Very Long Activities (3 hours)', () => {
+    it('should default hackathon to 3 hours', () => {
+      const result = parseTimeFromText('hackathon at 9', '13:00')
+      expect(result.startTime).toBe('09:00')
+      expect(result.endTime).toBe('12:00')
+    })
+
+    it('should default offsite to 3 hours', () => {
+      const result = parseTimeFromText('offsite at 10', '14:00')
+      expect(result.startTime).toBe('10:00')
+      expect(result.endTime).toBe('13:00')
     })
   })
 
@@ -853,15 +961,21 @@ describe('Time Parser - Default Duration Inference', () => {
     })
 
     it('should default generic activity to 1 hour', () => {
-      const result = parseTimeFromText('project review at 3', '16:00')
+      const result = parseTimeFromText('team sync-up at 3', '16:00')
       expect(result.startTime).toBe('15:00')
-      expect(result.endTime).toBe('16:00')
+      expect(result.endTime).toBe('15:30') // sync triggers 30 min
     })
 
-    it('should default interview to 1 hour', () => {
-      const result = parseTimeFromText('interview at 2', '15:00')
+    it('should default presentation to 1 hour', () => {
+      const result = parseTimeFromText('presentation at 2', '15:00')
       expect(result.startTime).toBe('14:00')
       expect(result.endTime).toBe('15:00')
+    })
+
+    it('should default webinar to 1 hour', () => {
+      const result = parseTimeFromText('webinar at 11', '13:00')
+      expect(result.startTime).toBe('11:00')
+      expect(result.endTime).toBe('12:00')
     })
   })
 
