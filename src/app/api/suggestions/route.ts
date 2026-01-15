@@ -65,9 +65,10 @@ export async function POST(request: NextRequest) {
     const currentDayOfWeek = getDayOfWeek(date)
 
     // Get entries from the last 4 weeks for pattern analysis
-    const fourWeeksAgo = new Date(date + 'T00:00:00')
+    const [year, month, day] = date.split('-').map(Number)
+    const fourWeeksAgo = new Date(year, month - 1, day)
     fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28)
-    const fourWeeksAgoStr = fourWeeksAgo.toISOString().split('T')[0]
+    const fourWeeksAgoStr = `${fourWeeksAgo.getFullYear()}-${String(fourWeeksAgo.getMonth() + 1).padStart(2, '0')}-${String(fourWeeksAgo.getDate()).padStart(2, '0')}`
 
     const { data: historicalEntries, error: histError } = await supabase
       .from('time_entries')

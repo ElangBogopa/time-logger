@@ -19,7 +19,8 @@ import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-lim
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 interface WeeklyReviewRequest {
-  weekStart: string // YYYY-MM-DD of the Monday
+  weekStart: string // YYYY-MM-DD of the Sunday
+  timezone?: string // IANA timezone (e.g., 'America/New_York')
 }
 
 interface IntentionProgress {
@@ -99,26 +100,50 @@ interface WeeklyReviewData {
   coachSummary: string | null
 }
 
-// Get Sunday (start) of a given week
-function getWeekStart(date: Date): string {
-  const d = new Date(date)
-  const day = d.getDay() // 0 = Sunday, 1 = Monday, etc.
-  d.setDate(d.getDate() - day) // Go back to Sunday
-  return d.toISOString().split('T')[0]
+// Get today's date in a specific timezone (YYYY-MM-DD)
+function getTodayInTimezone(timezone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  return formatter.format(new Date())
+}
+
+// Get Sunday (start) of a given week for a date in a timezone
+function getWeekStart(dateStr: string): string {
+  // Parse date as local date
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  const dayOfWeek = date.getDay() // 0 = Sunday
+  date.setDate(date.getDate() - dayOfWeek)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 // Get Saturday (end) of a given week
 function getWeekEnd(weekStart: string): string {
-  const d = new Date(weekStart + 'T00:00:00')
-  d.setDate(d.getDate() + 6) // Sunday + 6 = Saturday
-  return d.toISOString().split('T')[0]
+  const [year, month, day] = weekStart.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + 6)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 // Get the previous week's Sunday
 function getPreviousWeekStart(weekStart: string): string {
-  const d = new Date(weekStart + 'T00:00:00')
-  d.setDate(d.getDate() - 7)
-  return d.toISOString().split('T')[0]
+  const [year, month, day] = weekStart.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() - 7)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 // Format hour to readable string
@@ -161,9 +186,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { weekStart: requestedWeekStart }: WeeklyReviewRequest = await request.json()
+    const { weekStart: requestedWeekStart, timezone }: WeeklyReviewRequest = await request.json()
 
-    const weekStart = requestedWeekStart || getWeekStart(new Date())
+    // Use user's timezone or fall back to UTC
+    const userTimezone = timezone || 'UTC'
+    const today = getTodayInTimezone(userTimezone)
+    const weekStart = requestedWeekStart || getWeekStart(today)
     const weekEnd = getWeekEnd(weekStart)
     const previousWeekStart = getPreviousWeekStart(weekStart)
     const previousWeekEnd = getWeekEnd(previousWeekStart)

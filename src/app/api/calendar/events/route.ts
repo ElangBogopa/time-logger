@@ -303,8 +303,8 @@ export async function GET(request: NextRequest) {
       console.warn(`[Calendar Events] Invalid timezone "${timezoneParam}", falling back to ${serverTimezone}`)
     }
 
-    // Use provided date range or default to today
-    const today = new Date().toISOString().split('T')[0]
+    // Use provided date range or default to today (in user's timezone)
+    const today = formatDateInTimezone(new Date().toISOString(), timezone)
     const rangeStart = startDate || today
     const rangeEnd = endDate || today
 

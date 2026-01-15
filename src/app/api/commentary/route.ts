@@ -41,15 +41,17 @@ function detectMixedActivity(activity: string): boolean {
   return mixedIndicators.some(indicator => lowerActivity.includes(indicator))
 }
 
-// Get the start of the current week (Monday)
-function getWeekStart(): string {
-  const now = new Date()
-  const dayOfWeek = now.getDay()
+// Get the start of the week (Monday) for a given date string (YYYY-MM-DD)
+function getWeekStart(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  const dayOfWeek = date.getDay()
   const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Adjust for Monday start
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + diff)
-  monday.setHours(0, 0, 0, 0)
-  return monday.toISOString().split('T')[0]
+  date.setDate(date.getDate() + diff)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 // Simple in-memory cache for weekly category totals (avoids N+1 queries)
@@ -63,9 +65,10 @@ const weeklyTotalsCache = new Map<string, WeeklyCacheEntry>()
 const CACHE_TTL = 10 * 60 * 1000 // 10 minutes (optimized from 2 min to reduce DB queries)
 
 async function getCachedWeeklyTotals(
-  userId: string
+  userId: string,
+  entryDate: string
 ): Promise<Map<TimeCategory, number>> {
-  const weekStart = getWeekStart()
+  const weekStart = getWeekStart(entryDate)
   const cacheKey = `${userId}:${weekStart}`
   const cached = weeklyTotalsCache.get(cacheKey)
 
@@ -113,14 +116,15 @@ async function getCachedWeeklyTotals(
 // Uses cached weekly totals to avoid N+1 queries
 async function getWeeklyIntentionProgress(
   userId: string,
-  intentions: UserIntention[]
+  intentions: UserIntention[],
+  entryDate: string
 ): Promise<Map<string, { minutes: number; target: number | null; intentionLabel: string }>> {
   const progress = new Map<string, { minutes: number; target: number | null; intentionLabel: string }>()
 
   if (intentions.length === 0) return progress
 
   // Use cached weekly totals instead of fetching each time
-  const categoryTotals = await getCachedWeeklyTotals(userId)
+  const categoryTotals = await getCachedWeeklyTotals(userId, entryDate)
 
   // Map intentions to their progress
   intentions.forEach((intention) => {
@@ -396,7 +400,7 @@ export async function POST(request: NextRequest) {
 
       if (userIntentions) {
         intentions = userIntentions as UserIntention[]
-        weeklyProgress = await getWeeklyIntentionProgress(session.user.id, intentions)
+        weeklyProgress = await getWeeklyIntentionProgress(session.user.id, intentions, entry.date)
       }
     }
 
