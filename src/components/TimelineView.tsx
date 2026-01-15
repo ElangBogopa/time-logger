@@ -263,14 +263,36 @@ export default function TimelineView({
     setShowDismissed(false)
   }, [])
 
-  // Filter out dismissed ghost events only (keep overlapping ones for side-by-side display)
+  // Filter out dismissed ghost events AND ghosts that have been confirmed as entries
   const ghostEvents = useMemo(() => {
     return calendarEvents.filter(event => {
       // Filter out dismissed events (unless showing dismissed)
       if (!showDismissed && dismissedEventIds.has(event.id)) return false
-      return true
+
+      // Filter out ghosts that have a confirmed entry covering >50% of their time
+      const eventStart = timeToMinutes(event.startTime)
+      const eventEnd = timeToMinutes(event.endTime)
+      const ghostDuration = eventEnd - eventStart
+
+      const hasConfirmedOverlap = entries.some(entry => {
+        if (!entry.start_time || !entry.end_time) return false
+        if (entry.status !== 'confirmed') return false
+
+        const entryStart = timeToMinutes(entry.start_time)
+        const entryEnd = timeToMinutes(entry.end_time)
+
+        // Calculate overlap
+        const overlapStart = Math.max(eventStart, entryStart)
+        const overlapEnd = Math.min(eventEnd, entryEnd)
+        const overlapDuration = Math.max(0, overlapEnd - overlapStart)
+
+        // Hide ghost if confirmed entry covers >50% of it
+        return overlapDuration >= ghostDuration * 0.5
+      })
+
+      return !hasConfirmedOverlap
     })
-  }, [calendarEvents, dismissedEventIds, showDismissed])
+  }, [calendarEvents, dismissedEventIds, showDismissed, entries])
 
   // Detect which ghosts overlap with confirmed entries (for side-by-side stacking)
   const overlappingGhostIds = useMemo(() => {
