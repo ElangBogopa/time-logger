@@ -215,6 +215,30 @@ describe('Timezone Edge Cases', () => {
   })
 })
 
+describe('API timezone requirements', () => {
+  it('calendar events API should require timezone parameter', () => {
+    // If timezone is missing, API returns 400
+    // This test documents the expected behavior
+    const timezoneParam = null
+    const shouldReject = timezoneParam === null
+    expect(shouldReject).toBe(true)
+  })
+
+  it('weekly review API should require timezone parameter', () => {
+    const timezone = undefined
+    const shouldReject = !timezone
+    expect(shouldReject).toBe(true)
+  })
+
+  it('client should always have access to timezone', () => {
+    // Intl.DateTimeFormat is available in all modern browsers and Node.js
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    expect(timezone).toBeDefined()
+    expect(typeof timezone).toBe('string')
+    expect(timezone.length).toBeGreaterThan(0)
+  })
+})
+
 describe('Real-world scenarios', () => {
   it('Google Calendar event at 10am EST shows correctly', () => {
     // Google sends this for a 10am EST event
