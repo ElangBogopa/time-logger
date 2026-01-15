@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -7,10 +7,16 @@ import {
   ActivityIndicator,
   useColorScheme,
   SafeAreaView,
+  Platform,
 } from 'react-native'
 import * as AppleAuthentication from 'expo-apple-authentication'
+import * as WebBrowser from 'expo-web-browser'
+import * as AuthSession from 'expo-auth-session'
 import { supabase } from '@/lib/supabase'
 import { Ionicons } from '@expo/vector-icons'
+
+// Required for web OAuth
+WebBrowser.maybeCompleteAuthSession()
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme()
@@ -47,6 +53,54 @@ export default function LoginScreen() {
     }
   }
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const redirectUrl = AuthSession.makeRedirectUri({
+        scheme: 'timelogger',
+        path: 'auth/callback',
+      })
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      })
+
+      if (error) throw error
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl
+        )
+
+        if (result.type === 'success') {
+          const url = result.url
+          // Extract the access token and refresh token from the URL
+          const params = new URLSearchParams(url.split('#')[1])
+          const accessToken = params.get('access_token')
+          const refreshToken = params.get('refresh_token')
+
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            })
+          }
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Google sign in failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
       <View style={styles.content}>
@@ -61,7 +115,7 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {/* Auth Buttons */}
+        {/* Auth Section */}
         <View style={styles.authSection}>
           {error && (
             <View style={styles.errorContainer}>
@@ -69,22 +123,35 @@ export default function LoginScreen() {
             </View>
           )}
 
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={
-              isDark
-                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-            }
-            cornerRadius={12}
-            style={styles.appleButton}
-            onPress={handleAppleSignIn}
-          />
+          {/* Google Sign In - works on all platforms */}
+          <TouchableOpacity
+            style={[styles.googleButton, isLoading && styles.buttonDisabled]}
+            onPress={handleGoogleSignIn}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#18181b" size="small" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#18181b" />
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
-          {isLoading && (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="small" color="#6366f1" />
-            </View>
+          {/* Apple Sign In - only on iOS native */}
+          {Platform.OS === 'ios' && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={
+                isDark
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              cornerRadius={12}
+              style={styles.appleButton}
+              onPress={handleAppleSignIn}
+            />
           )}
         </View>
 
@@ -145,6 +212,25 @@ const styles = StyleSheet.create({
   authSection: {
     gap: 16,
   },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e4e4e7',
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  googleButtonText: {
+    color: '#18181b',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
   appleButton: {
     height: 52,
     width: '100%',
@@ -157,17 +243,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#dc2626',
     textAlign: 'center',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 12,
   },
   footer: {
     marginTop: 48,

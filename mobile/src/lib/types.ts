@@ -172,6 +172,12 @@ export const CATEGORY_COLORS: Record<TimeCategory, CategoryConfig> = {
   },
 }
 
+// Pending entry commentary messages
+export const PENDING_COMMENTARY = {
+  planned: "Planned for later. Confirm this entry after it happens.",
+  inProgress: "Currently in progress...",
+}
+
 // Helper to get local date string (YYYY-MM-DD)
 export function getLocalDateString(date: Date = new Date()): string {
   const year = date.getFullYear()
