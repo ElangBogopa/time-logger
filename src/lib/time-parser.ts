@@ -559,6 +559,32 @@ export function hasTimePattern(text: string): boolean {
 }
 
 /**
+ * Infer a default duration based on activity keywords
+ * Returns duration in minutes
+ */
+function inferDefaultDuration(text: string): number {
+  const lowerText = text.toLowerCase()
+
+  // Short activities (15 min)
+  if (/\b(standup|stand-up|daily|huddle|check-in|checkin)\b/.test(lowerText)) {
+    return 15
+  }
+
+  // Medium activities (30 min)
+  if (/\b(call|chat|sync|1:1|one-on-one|coffee|break)\b/.test(lowerText)) {
+    return 30
+  }
+
+  // Long activities (2 hours)
+  if (/\b(workshop|training|session|deep\s*work|focus\s*time|coding|study|studying)\b/.test(lowerText)) {
+    return 120
+  }
+
+  // Default: 1 hour (most common for meetings, generic activities)
+  return 60
+}
+
+/**
  * Parse time expressions from text and return structured result
  */
 export function parseTimeFromText(
@@ -617,6 +643,12 @@ export function parseTimeFromText(
   } else if (totalDuration > 0 && !startTime && endTime) {
     // Have end time and duration, calculate start
     startTime = subtractMinutesFromTime(endTime, totalDuration)
+  }
+
+  // If we have start time but no end time and no duration, infer default duration
+  if (startTime && !endTime && totalDuration === 0) {
+    const defaultDuration = inferDefaultDuration(text)
+    endTime = addMinutesToTime(startTime, defaultDuration)
   }
 
   return {

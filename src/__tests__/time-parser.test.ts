@@ -772,6 +772,114 @@ describe('Time Parser - "At" Patterns', () => {
   })
 })
 
+describe('Time Parser - Default Duration Inference', () => {
+  describe('Short Activities (15 min)', () => {
+    it('should default standup to 15 min', () => {
+      const result = parseTimeFromText('standup at 9', '10:00')
+      expect(result.startTime).toBe('09:00')
+      expect(result.endTime).toBe('09:15')
+    })
+
+    it('should default daily to 15 min', () => {
+      const result = parseTimeFromText('daily at 10', '11:00')
+      expect(result.startTime).toBe('10:00')
+      expect(result.endTime).toBe('10:15')
+    })
+
+    it('should default huddle to 15 min', () => {
+      const result = parseTimeFromText('team huddle at 3', '16:00')
+      expect(result.startTime).toBe('15:00')
+      expect(result.endTime).toBe('15:15')
+    })
+  })
+
+  describe('Medium Activities (30 min)', () => {
+    it('should default call to 30 min', () => {
+      const result = parseTimeFromText('call at 2', '15:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('14:30')
+    })
+
+    it('should default sync to 30 min', () => {
+      const result = parseTimeFromText('sync with team at 3', '16:00')
+      expect(result.startTime).toBe('15:00')
+      expect(result.endTime).toBe('15:30')
+    })
+
+    it('should default 1:1 to 30 min', () => {
+      const result = parseTimeFromText('1:1 with manager at noon', '13:00')
+      expect(result.startTime).toBe('12:00')
+      expect(result.endTime).toBe('12:30')
+    })
+
+    it('should default coffee to 30 min', () => {
+      const result = parseTimeFromText('coffee chat at 10', '11:00')
+      expect(result.startTime).toBe('10:00')
+      expect(result.endTime).toBe('10:30')
+    })
+  })
+
+  describe('Long Activities (2 hours)', () => {
+    it('should default workshop to 2 hours', () => {
+      const result = parseTimeFromText('workshop at 2', '17:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('16:00')
+    })
+
+    it('should default deep work to 2 hours', () => {
+      const result = parseTimeFromText('deep work at 9', '12:00')
+      expect(result.startTime).toBe('09:00')
+      expect(result.endTime).toBe('11:00')
+    })
+
+    it('should default coding to 2 hours', () => {
+      const result = parseTimeFromText('coding session at 2', '17:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('16:00')
+    })
+
+    it('should default studying to 2 hours', () => {
+      const result = parseTimeFromText('studying at 10', '13:00')
+      expect(result.startTime).toBe('10:00')
+      expect(result.endTime).toBe('12:00')
+    })
+  })
+
+  describe('Default Activities (1 hour)', () => {
+    it('should default meeting to 1 hour', () => {
+      const result = parseTimeFromText('meeting at noon', '14:00')
+      expect(result.startTime).toBe('12:00')
+      expect(result.endTime).toBe('13:00')
+    })
+
+    it('should default generic activity to 1 hour', () => {
+      const result = parseTimeFromText('project review at 3', '16:00')
+      expect(result.startTime).toBe('15:00')
+      expect(result.endTime).toBe('16:00')
+    })
+
+    it('should default interview to 1 hour', () => {
+      const result = parseTimeFromText('interview at 2', '15:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('15:00')
+    })
+  })
+
+  describe('Should NOT override explicit durations', () => {
+    it('should use explicit duration over default', () => {
+      const result = parseTimeFromText('meeting at noon for 2 hours', '15:00')
+      expect(result.startTime).toBe('12:00')
+      expect(result.endTime).toBe('14:00')
+    })
+
+    it('should use explicit range over default', () => {
+      const result = parseTimeFromText('call 2pm to 4pm', '17:00')
+      expect(result.startTime).toBe('14:00')
+      expect(result.endTime).toBe('16:00')
+    })
+  })
+})
+
 describe('Time Parser - Combined New Patterns', () => {
   it('should parse "quick call at noon"', () => {
     const result = parseTimeFromText('quick call at noon', '14:00')
