@@ -21,12 +21,12 @@ interface CommentaryRequest {
 
 function getCategoryTone(category: TimeCategory | null): 'positive' | 'neutral' | 'distraction' {
   if (!category) return 'neutral' // Default for uncategorized entries
-  const positive: TimeCategory[] = ['deep_work', 'learning', 'exercise', 'relationships', 'meals', 'self_care']
-  const neutral: TimeCategory[] = ['meetings', 'admin', 'rest', 'other']
+  const positive: TimeCategory[] = ['deep_work', 'learning', 'exercise', 'social', 'calls', 'meals', 'self_care', 'creating', 'movement']
+  const neutral: TimeCategory[] = ['meetings', 'admin', 'rest', 'other', 'shallow_work', 'errands', 'chores', 'commute', 'sleep']
 
   if (positive.includes(category)) return 'positive'
   if (neutral.includes(category)) return 'neutral'
-  return 'distraction'
+  return 'distraction' // entertainment falls here
 }
 
 function getDurationCategory(minutes: number): 'short' | 'medium' | 'long' {
@@ -135,9 +135,9 @@ async function getWeeklyIntentionProgress(
       totalMinutes += categoryTotals.get(cat) || 0
     })
 
-    // For "less_distraction", we track distraction time
+    // For "less_distraction", we track entertainment time (formerly 'distraction')
     if (intention.intention_type === 'less_distraction') {
-      totalMinutes = categoryTotals.get('distraction') || 0
+      totalMinutes = categoryTotals.get('entertainment') || 0
     }
 
     progress.set(intention.intention_type, {
@@ -162,8 +162,8 @@ function getRelatedIntention(
   for (const intention of intentions) {
     const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
 
-    // Special case: "less_distraction" relates to distraction category
-    if (intention.intention_type === 'less_distraction' && category === 'distraction') {
+    // Special case: "less_distraction" relates to entertainment category (formerly 'distraction')
+    if (intention.intention_type === 'less_distraction' && category === 'entertainment') {
       return intention
     }
 
