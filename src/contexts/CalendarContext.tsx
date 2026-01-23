@@ -82,13 +82,13 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const fetchInProgressRef = useRef<Set<string>>(new Set())
 
   // Check calendar connection status
-  const checkCalendarStatus = useCallback(async () => {
+  const checkCalendarStatus = useCallback(async (signal?: AbortSignal) => {
     if (status !== 'authenticated') return
 
     console.log('[CalendarContext] Checking calendar status...')
     setIsCheckingStatus(true)
     try {
-      const response = await fetch('/api/calendar/status')
+      const response = await fetch('/api/calendar/status', { signal })
       if (response.ok) {
         const data = await response.json()
         console.log('[CalendarContext] Status response:', data)
@@ -99,9 +99,12 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         })
       }
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       console.error('Failed to check calendar status:', err)
     } finally {
-      setIsCheckingStatus(false)
+      if (!signal?.aborted) {
+        setIsCheckingStatus(false)
+      }
     }
   }, [status])
 
@@ -125,9 +128,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   }, [cache])
 
   // Fetch calendar events from API
-  const fetchCalendarEvents = useCallback(async (startDate: string, endDate: string): Promise<CalendarEvent[]> => {
+  const fetchCalendarEvents = useCallback(async (startDate: string, endDate: string, signal?: AbortSignal): Promise<CalendarEvent[]> => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-    const response = await fetch(`/api/calendar/events?start=${startDate}&end=${endDate}&timezone=${encodeURIComponent(timezone)}`)
+    const response = await fetch(`/api/calendar/events?start=${startDate}&end=${endDate}&timezone=${encodeURIComponent(timezone)}`, { signal })
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
@@ -153,7 +156,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Refresh the entire cache (manual refresh or initial load)
-  const refreshCalendar = useCallback(async () => {
+  const refreshCalendar = useCallback(async (signal?: AbortSignal) => {
     console.log('[CalendarContext] refreshCalendar called, connected=', calendarStatus?.connected)
     if (!calendarStatus?.connected) return
 
@@ -164,18 +167,23 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       const today = getLocalDateString()
       const { start, end } = getDateRange(today, DAYS_BEFORE, DAYS_AFTER)
 
-      const events = await fetchCalendarEvents(start, end)
+      const events = await fetchCalendarEvents(start, end, signal)
 
-      setCache({
-        events,
-        startDate: start,
-        endDate: end,
-        lastFetched: Date.now()
-      })
+      if (!signal?.aborted) {
+        setCache({
+          events,
+          startDate: start,
+          endDate: end,
+          lastFetched: Date.now()
+        })
+      }
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Failed to fetch calendar')
     } finally {
-      setIsLoading(false)
+      if (!signal?.aborted) {
+        setIsLoading(false)
+      }
     }
   }, [calendarStatus?.connected, fetchCalendarEvents])
 
@@ -263,7 +271,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   // Check calendar status on login
   useEffect(() => {
     if (status === 'authenticated' && !calendarStatus) {
-      checkCalendarStatus()
+      const controller = new AbortController()
+      checkCalendarStatus(controller.signal)
+      return () => controller.abort()
     }
   }, [status, calendarStatus, checkCalendarStatus])
 
@@ -272,7 +282,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     console.log('[CalendarContext] useEffect: connected=', calendarStatus?.connected, 'cache=', !!cache)
     if (calendarStatus?.connected && !cache) {
       console.log('[CalendarContext] Triggering initial calendar refresh')
-      refreshCalendar()
+      const controller = new AbortController()
+      refreshCalendar(controller.signal)
+      return () => controller.abort()
     }
   }, [calendarStatus?.connected, cache, refreshCalendar])
 

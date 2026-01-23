@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { getLocalDateString } from '@/lib/types'
+import { getUserToday } from '@/lib/types'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface WeekStripProps {
@@ -52,7 +52,7 @@ function getMonthYear(dateStr: string): string {
 }
 
 export default function WeekStrip({ selectedDate, onDateSelect, datesWithEntries = [] }: WeekStripProps) {
-  const today = getLocalDateString()
+  const today = getUserToday()
   const [weekStart, setWeekStart] = useState(selectedDate)
   const touchStartX = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)

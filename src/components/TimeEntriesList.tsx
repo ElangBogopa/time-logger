@@ -14,17 +14,32 @@ interface TimeEntriesListProps {
 }
 
 const CATEGORY_COLORS: Record<TimeCategory, string> = {
-  deep_work: 'bg-[#64748b]/20 text-[#475569] dark:bg-[#64748b]/30 dark:text-[#94a3b8]',
+  // Productive
+  deep_work: 'bg-[#3b82f6]/20 text-[#2563eb] dark:bg-[#3b82f6]/30 dark:text-[#60a5fa]',
+  shallow_work: 'bg-[#64748b]/20 text-[#475569] dark:bg-[#64748b]/30 dark:text-[#94a3b8]',
   meetings: 'bg-[#8b7aa8]/20 text-[#6b5a88] dark:bg-[#8b7aa8]/30 dark:text-[#b8a8d8]',
+  learning: 'bg-[#0891b2]/20 text-[#0e7490] dark:bg-[#0891b2]/30 dark:text-[#22d3ee]',
+  creating: 'bg-[#7c3aed]/20 text-[#6d28d9] dark:bg-[#7c3aed]/30 dark:text-[#a78bfa]',
+  // Maintenance
   admin: 'bg-[#9ca3af]/20 text-[#6b7280] dark:bg-[#9ca3af]/30 dark:text-[#d1d5db]',
-  learning: 'bg-[#5d9a9a]/20 text-[#4a7a7a] dark:bg-[#5d9a9a]/30 dark:text-[#8dcaca]',
-  exercise: 'bg-[#6b9080]/20 text-[#4a6b5a] dark:bg-[#6b9080]/30 dark:text-[#9bc0b0]',
+  errands: 'bg-[#78716c]/20 text-[#57534e] dark:bg-[#78716c]/30 dark:text-[#a8a29e]',
+  chores: 'bg-[#a1a1aa]/20 text-[#71717a] dark:bg-[#a1a1aa]/30 dark:text-[#d4d4d8]',
+  commute: 'bg-[#737373]/20 text-[#525252] dark:bg-[#737373]/30 dark:text-[#a3a3a3]',
+  // Body
+  exercise: 'bg-[#22c55e]/20 text-[#16a34a] dark:bg-[#22c55e]/30 dark:text-[#4ade80]',
+  movement: 'bg-[#86efac]/20 text-[#22c55e] dark:bg-[#86efac]/30 dark:text-[#bbf7d0]',
+  meals: 'bg-[#f59e0b]/20 text-[#d97706] dark:bg-[#f59e0b]/30 dark:text-[#fbbf24]',
+  sleep: 'bg-[#1e3a5f]/20 text-[#172554] dark:bg-[#1e3a5f]/30 dark:text-[#3b82f6]',
+  // Mind
   rest: 'bg-[#a8a4ce]/20 text-[#6864ae] dark:bg-[#a8a4ce]/30 dark:text-[#c8c4ee]',
-  meals: 'bg-[#b8a088]/20 text-[#8a7058] dark:bg-[#b8a088]/30 dark:text-[#d8c0a8]',
-  self_care: 'bg-[#8fa387]/20 text-[#5f7357] dark:bg-[#8fa387]/30 dark:text-[#bfc3a7]',
-  relationships: 'bg-[#b08d8d]/20 text-[#806060] dark:bg-[#b08d8d]/30 dark:text-[#d0adad]',
-  distraction: 'bg-[#c97e7e]/20 text-[#995e5e] dark:bg-[#c97e7e]/30 dark:text-[#e9aeae]',
-  other: 'bg-[#71717a]/20 text-[#52525b] dark:bg-[#71717a]/30 dark:text-[#a1a1aa]',
+  self_care: 'bg-[#c4b5fd]/20 text-[#7c3aed] dark:bg-[#c4b5fd]/30 dark:text-[#ddd6fe]',
+  // Connection
+  social: 'bg-[#ec4899]/20 text-[#db2777] dark:bg-[#ec4899]/30 dark:text-[#f472b6]',
+  calls: 'bg-[#f472b6]/20 text-[#ec4899] dark:bg-[#f472b6]/30 dark:text-[#f9a8d4]',
+  // Leisure
+  entertainment: 'bg-[#71717a]/20 text-[#52525b] dark:bg-[#71717a]/30 dark:text-[#a1a1aa]',
+  // Fallback
+  other: 'bg-[#52525b]/20 text-[#3f3f46] dark:bg-[#52525b]/30 dark:text-[#71717a]',
 }
 
 export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: TimeEntriesListProps) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getLocalDateString, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS } from '@/lib/types'
+import { getLocalDateString, getUserToday, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS, TimePeriod, PERIOD_LABELS, getLoggingPeriod } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import { parseTimeFromText, getHighlightedSegments, ParseResult } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, X, Zap, Calendar, Clock, Sparkles, TrendingUp, History } from 'lucide-react'
+import { Loader2, X, Zap, Calendar, Clock, Sparkles, TrendingUp, History, Plus, CheckCircle2 } from 'lucide-react'
 
 interface ActivitySuggestion {
   activity: string
@@ -42,9 +42,12 @@ interface QuickLogModalProps {
   selectedDate?: string
   isFutureDay?: boolean
   isPastDay?: boolean
+  onPeriodComplete?: (period: TimePeriod, periodEntries: TimeEntry[]) => void
+  /** When true, skip the post-submit popup and just close after logging (for bulk logging in calendar) */
+  disablePostSubmit?: boolean
 }
 
-export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false }: QuickLogModalProps) {
+export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false, onPeriodComplete, disablePostSubmit = false }: QuickLogModalProps) {
   const [activity, setActivity] = useState('')
   const [notes, setNotes] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -62,8 +65,14 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
   const [isAutoParseApplied, setIsAutoParseApplied] = useState(false)
   const [showHighlightedInput, setShowHighlightedInput] = useState(false)
+  // Store original times before parsing, for revert on dismiss
+  const [originalTimes, setOriginalTimes] = useState<{ startTime: string; endTime: string } | null>(null)
 
-  // Real-time parsing as user types
+  // Post-submit state - shows "Log another" vs "Done with period" options
+  const [showPostSubmit, setShowPostSubmit] = useState(false)
+  const [lastLoggedActivity, setLastLoggedActivity] = useState<string>('')
+
+  // Real-time parsing as user types - NO auto-apply, just show the suggestion chip
   useEffect(() => {
     if (!activity || activity.trim().length < 2) {
       setParseResult(null)
@@ -74,8 +83,30 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     const currentTime = getCurrentTime()
     const result = parseTimeFromText(activity, currentTime)
     setParseResult(result)
-    setShowHighlightedInput(result.hasTimePattern)
-  }, [activity])
+
+    const hasDragTimes = initialStartTime && initialEndTime
+
+    // Show the suggestion chip if any time pattern is detected
+    // User must click "Apply" to use the parsed times
+    if (result.hasTimePattern && !isAutoParseApplied) {
+      // If we have drag times and no explicit time input, don't show suggestion
+      if (hasDragTimes) {
+        const hasExplicitTimeRange = /\b(am|pm|o'clock|oclock|\d{1,2}:\d{2}|\d{1,2}\s*to\s*\d{1,2}|from\s+\d|until\s+\d|till\s+\d|at\s+\d)\b/i.test(activity)
+        const hasDuration = result.detections.some(d => d.type === 'duration')
+        if (!hasDuration && !hasExplicitTimeRange) {
+          setShowHighlightedInput(false)
+          return
+        }
+      }
+      setShowHighlightedInput(true)
+      // Save original times for revert (only once when chip first appears)
+      if (!originalTimes && startTime && endTime) {
+        setOriginalTimes({ startTime, endTime })
+      }
+    } else {
+      setShowHighlightedInput(false)
+    }
+  }, [activity, initialStartTime, initialEndTime, isAutoParseApplied, startTime, endTime, originalTimes])
 
   // Fetch smart suggestions when modal opens
   const fetchSuggestions = useCallback(async () => {
@@ -84,7 +115,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     setIsLoadingSuggestions(true)
     try {
       const currentTime = getCurrentTime()
-      const date = selectedDate || getLocalDateString()
+      const date = selectedDate || getUserToday()
 
       const response = await fetch('/api/suggestions', {
         method: 'POST',
@@ -103,29 +134,70 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }
   }, [userId, selectedDate, isFutureDay])
 
-  // Apply auto-parsed times from the detected pattern
+  // Compute what times would be applied based on parse result
+  const computedParseTimes = useMemo(() => {
+    if (!parseResult || !parseResult.hasTimePattern || !startTime) return null
+
+    const totalDuration = parseResult.detections
+      .filter(d => d.type === 'duration')
+      .reduce((sum, d) => sum + (d.durationMinutes || 0), 0)
+    const hasDuration = totalDuration > 0
+
+    if (hasDuration) {
+      // Has duration: use current startTime + duration
+      const [hours, mins] = startTime.split(':').map(Number)
+      const startMins = hours * 60 + mins
+      const endMins = startMins + totalDuration
+      const endHours = Math.floor(endMins / 60) % 24
+      const endMinsPart = endMins % 60
+      return {
+        startTime: startTime,
+        endTime: `${endHours.toString().padStart(2, '0')}:${endMinsPart.toString().padStart(2, '0')}`
+      }
+    } else if (parseResult.startTime && parseResult.endTime) {
+      // Has explicit or activity-based time range: use parsed times
+      return {
+        startTime: parseResult.startTime,
+        endTime: parseResult.endTime
+      }
+    } else if (parseResult.startTime) {
+      // Has just start time: use it with current end time
+      return {
+        startTime: parseResult.startTime,
+        endTime: endTime
+      }
+    }
+    return null
+  }, [parseResult, startTime, endTime])
+
+  // Apply parsed times from the detected pattern
   const handleApplyParsedTimes = () => {
-    if (!parseResult || !parseResult.hasTimePattern) return
+    if (!computedParseTimes) return
 
-    // Apply the parsed times
-    if (parseResult.startTime) {
-      setStartTime(parseResult.startTime)
-    }
-    if (parseResult.endTime) {
-      setEndTime(parseResult.endTime)
-    }
+    setStartTime(computedParseTimes.startTime)
+    setEndTime(computedParseTimes.endTime)
 
-    // Update activity to cleaned version (without time expressions)
-    setActivity(parseResult.cleanedActivity)
+    // Update activity to cleaned version (without time expressions) only if it has content
+    if (parseResult && parseResult.cleanedActivity.trim()) {
+      setActivity(parseResult.cleanedActivity)
+    }
+    // If cleaned activity is empty, keep the original activity text
+
     setIsAutoParseApplied(true)
     setShowHighlightedInput(false)
+    setOriginalTimes(null)
   }
 
-  // Dismiss/undo the auto-parsed detection
+  // Dismiss the parsed detection and revert to original times
   const handleDismissParsedTimes = () => {
+    // Revert to original times if we have them
+    if (originalTimes) {
+      setStartTime(originalTimes.startTime)
+      setEndTime(originalTimes.endTime)
+    }
     setShowHighlightedInput(false)
-    setIsAutoParseApplied(false)
-    // Keep the original activity text
+    setIsAutoParseApplied(true) // Mark as "handled" so chip doesn't reappear
+    setOriginalTimes(null)
   }
 
   // Apply a suggestion
@@ -196,6 +268,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setParseResult(null)
       setIsAutoParseApplied(false)
       setShowHighlightedInput(false)
+      setOriginalTimes(null)
+      setShowPostSubmit(false)
+      setLastLoggedActivity('')
       timesInitialized.current = false // Reset flag when modal opens
       // Focus the activity input after a brief delay
       setTimeout(() => inputRef.current?.focus(), 100)
@@ -291,7 +366,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     setIsSubmitting(true)
 
     try {
-      const today = getLocalDateString()
+      const today = getUserToday()
       const entryDate = selectedDate || today
 
       // Check for duplicate/overlapping entries first
@@ -350,6 +425,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         }
 
         onEntryAdded()
+        // For future/planned entries, just close (no period summary for planning)
         onClose()
         onShowToast('Planned! Confirm this entry after it happens.')
       } else {
@@ -388,48 +464,34 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           throw new Error(insertError.message)
         }
 
-        // Generate commentary
-        let generatedCommentary: string | null = null
-        try {
-          const { data: dayEntries } = await supabase
-            .from('time_entries')
-            .select('*')
-            .eq('date', entryDate)
-            .eq('user_id', userId)
-            .order('created_at', { ascending: true })
-
-          const commentaryResponse = await fetch('/api/commentary', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              entry: insertedEntry,
-              dayEntries: dayEntries || [],
-            }),
-          })
-
-          if (commentaryResponse.ok) {
-            const { commentary } = await commentaryResponse.json()
-            generatedCommentary = commentary
-
-            await supabase
-              .from('time_entries')
-              .update({ commentary })
-              .eq('id', insertedEntry.id)
-          } else {
-            generatedCommentary = null // Mark as failed
-          }
-        } catch {
-          generatedCommentary = null // Mark as failed
-        }
+        // Skip per-entry commentary - we'll show period summary instead
+        // Just save a placeholder commentary for the entry
+        await supabase
+          .from('time_entries')
+          .update({ commentary: 'Logged' })
+          .eq('id', insertedEntry.id)
 
         onEntryAdded()
-        onClose()
-        // Show different toast based on whether commentary generated
-        if (generatedCommentary) {
-          onShowToast(generatedCommentary)
-        } else {
-          onShowToast('Entry logged! (AI commentary unavailable)')
+
+        // If disablePostSubmit (calendar bulk logging), just close silently
+        if (disablePostSubmit) {
+          onClose()
+          return
         }
+
+        // Show post-submit options instead of closing
+        setLastLoggedActivity(activity)
+        setShowPostSubmit(true)
+        // Reset form for potential next entry
+        setActivity('')
+        setNotes('')
+        setError(null)
+        setParseResult(null)
+        setIsAutoParseApplied(false)
+        setShowHighlightedInput(false)
+        // Set start time to end of last entry for next entry
+        setStartTime(endTime)
+        setEndTime(getCurrentTime())
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -438,31 +500,130 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }
   }
 
+  // Get current logging period
+  const currentPeriod = getLoggingPeriod()
+  const periodLabel = PERIOD_LABELS[currentPeriod]
+
+  // Handle "Log another" - reset to form view
+  const handleLogAnother = () => {
+    setShowPostSubmit(false)
+    setLastLoggedActivity('')
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
+  // Handle "Done with period" - trigger period summary
+  const handleDoneWithPeriod = async () => {
+    // Fetch all entries for this period today
+    const today = selectedDate || getUserToday()
+    const periodRange = {
+      morning: { start: 0, end: 12 },
+      afternoon: { start: 12, end: 18 },
+      evening: { start: 18, end: 24 },
+    }[currentPeriod]
+
+    // Get entries that fall within this period
+    const { data: allEntries } = await supabase
+      .from('time_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .eq('status', 'confirmed')
+
+    const periodEntries = (allEntries || []).filter(entry => {
+      if (!entry.start_time) return false
+      const hour = parseInt(entry.start_time.split(':')[0])
+      return hour >= periodRange.start && hour < periodRange.end
+    })
+
+    console.log('[Period Summary] Current period:', currentPeriod)
+    console.log('[Period Summary] Period range:', periodRange)
+    console.log('[Period Summary] All entries:', allEntries?.length, allEntries?.map(e => ({ activity: e.activity, start: e.start_time, duration: e.duration_minutes })))
+    console.log('[Period Summary] Filtered entries:', periodEntries.length, periodEntries.map(e => ({ activity: e.activity, start: e.start_time, duration: e.duration_minutes })))
+
+    onClose()
+
+    // Trigger period summary
+    if (onPeriodComplete && periodEntries.length > 0) {
+      onPeriodComplete(currentPeriod, periodEntries)
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {isPlanningMode ? (
-              <>
-                <Clock className="h-5 w-5 text-blue-500" />
-                Plan Ahead
-              </>
-            ) : isPastDay ? (
-              <>
-                <Clock className="h-5 w-5 text-zinc-500" />
-                Add Past Entry
-              </>
-            ) : (
-              <>
-                <Zap className="h-5 w-5 text-amber-500" />
-                Quick Log
-              </>
-            )}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting && !showPostSubmit}>
+        {showPostSubmit ? (
+          // Post-submit state - show options
+          <>
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex flex-col items-center py-6">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10 mb-4">
+                <CheckCircle2 className="h-7 w-7 text-green-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">Entry logged!</h3>
+              <p className="text-sm text-muted-foreground text-center">
+                &ldquo;{lastLoggedActivity}&rdquo;
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                type="button"
+                onClick={handleLogAnother}
+                variant="outline"
+                className="w-full"
+              >
+                <Plus className="h-4 w-4" />
+                Log another activity
+              </Button>
+
+              <Button
+                type="button"
+                onClick={handleDoneWithPeriod}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Done with {periodLabel.toLowerCase()}
+              </Button>
+
+              <p className="text-xs text-center text-muted-foreground">
+                Finishing will show your {periodLabel.toLowerCase()} summary
+              </p>
+            </div>
+          </>
+        ) : (
+          // Normal form view
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {isPlanningMode ? (
+                  <>
+                    <Clock className="h-5 w-5 text-blue-500" />
+                    Plan Ahead
+                  </>
+                ) : isPastDay ? (
+                  <>
+                    <Clock className="h-5 w-5 text-zinc-500" />
+                    Add Past Entry
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-5 w-5 text-amber-500" />
+                    Quick Log
+                  </>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
           {/* Smart suggestions chips */}
           {!activity && suggestions.length > 0 && (
             <div className="space-y-2">
@@ -533,6 +694,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                 onChange={(e) => {
                   setActivity(e.target.value)
                   setIsAutoParseApplied(false) // Reset when user types
+                  setOriginalTimes(null) // Reset so new parse can save new original times
                 }}
                 placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., "coded for 2 hours" or "lunch 12-1pm"'}
               />
@@ -545,16 +707,14 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             </div>
 
             {/* Auto-parse preview chip - shows detected times */}
-            {showHighlightedInput && parseResult && parseResult.hasTimePattern && !isAutoParseApplied && (
+            {showHighlightedInput && parseResult && parseResult.hasTimePattern && !isAutoParseApplied && computedParseTimes && (
               <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
                 <Sparkles className="h-4 w-4 text-primary shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-primary font-medium">Detected time info</p>
                   <p className="text-xs text-muted-foreground truncate">
                     {parseResult.detections.map(d => d.matchedText).join(', ')}
-                    {parseResult.startTime && parseResult.endTime && (
-                      <span className="ml-1">→ {formatTimeDisplay(parseResult.startTime)} - {formatTimeDisplay(parseResult.endTime)}</span>
-                    )}
+                    <span className="ml-1">→ {formatTimeDisplay(computedParseTimes.startTime)} - {formatTimeDisplay(computedParseTimes.endTime)}</span>
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -661,6 +821,8 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             )}
           </Button>
         </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -1,0 +1,344 @@
+'use client'
+
+import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useSession, signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
+import TimelineView, { DragCreateData } from '@/components/TimelineView'
+import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
+import QuickLogModal from '@/components/QuickLogModal'
+import Toast from '@/components/Toast'
+import GhostEntryModal from '@/components/GhostEntryModal'
+import { Button } from '@/components/ui/button'
+import CalendarPicker from '@/components/CalendarPicker'
+import WeekStrip from '@/components/WeekStrip'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import { Calendar, ChevronLeft, ChevronRight, Loader2, AlertTriangle, LogOut, RefreshCw } from 'lucide-react'
+
+function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
+  const date = new Date(dateStr + 'T00:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const isFuture = date > today
+
+  if (dateStr === getLocalDateString(today)) {
+    return { label: 'Today', date: formattedDate, isFuture: false }
+  } else if (dateStr === getLocalDateString(yesterday)) {
+    return { label: 'Yesterday', date: formattedDate, isFuture: false }
+  } else if (dateStr === getLocalDateString(tomorrow)) {
+    return { label: 'Tomorrow', date: formattedDate, isFuture: true }
+  }
+
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' })
+  return { label: weekday, date: formattedDate, isFuture }
+}
+
+function CalendarContent() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const [entries, setEntries] = useState<TimeEntry[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  // Initialize to empty string for hydration safety, set on client
+  const [selectedDate, setSelectedDate] = useState('')
+
+  // Set selected date on client to avoid hydration mismatch
+  useEffect(() => {
+    if (!selectedDate) {
+      setSelectedDate(getLocalDateString())
+    }
+  }, [selectedDate])
+  const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
+  const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
+  const [toast, setToast] = useState<{ message: string } | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [dragCreateData, setDragCreateData] = useState<DragCreateData | null>(null)
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false)
+
+  // Use cached calendar events from context
+  const {
+    getEventsForDate,
+    fetchEventsForDate,
+    refreshCalendar,
+    isLoading: isCalendarLoading,
+    isDateInCache,
+    calendarStatus,
+  } = useCalendar()
+
+  // Get calendar events for the selected date from cache
+  const calendarEvents = useMemo(() => {
+    return getEventsForDate(selectedDate).filter(
+      (e: CalendarEvent) => !e.isAllDay && e.startTime && e.endTime
+    )
+  }, [getEventsForDate, selectedDate])
+
+  // Get user ID from session
+  const userId = session?.user?.id || session?.user?.email || ''
+
+  // Use selectedDate as "today" reference since both are set client-side
+  const isToday = selectedDate === getLocalDateString()
+
+  // Memoize date display calculations
+  const { dateDisplay, isFutureDay, isPastDay } = useMemo(() => {
+    const display = formatDateDisplay(selectedDate)
+    return {
+      dateDisplay: display,
+      isFutureDay: display.isFuture,
+      isPastDay: !isToday && !display.isFuture
+    }
+  }, [selectedDate, isToday])
+
+  // Check if logging is allowed for the selected date
+  const canLog = isDateLoggable(selectedDate)
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
+
+  // Get the last entry's end time for Quick Log auto-fill
+  const lastEntryEndTime = useMemo(() => {
+    if (entries.length === 0) return null
+    return entries.reduce((latest, entry) => {
+      if (!entry.end_time) return latest
+      if (!latest) return entry.end_time
+      return entry.end_time > latest ? entry.end_time : latest
+    }, null as string | null)
+  }, [entries])
+
+  const fetchEntries = useCallback(async () => {
+    if (!userId) return
+    setIsLoading(true)
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('*')
+      .eq('date', selectedDate)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (!error && data) {
+      setEntries(data as TimeEntry[])
+    }
+    setIsLoading(false)
+  }, [selectedDate, userId])
+
+  // Fetch entries and calendar events for the selected date
+  useEffect(() => {
+    fetchEntries()
+    if (!isDateInCache(selectedDate)) {
+      fetchEventsForDate(selectedDate)
+    }
+  }, [fetchEntries, refreshKey, selectedDate, isDateInCache, fetchEventsForDate])
+
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate)
+  }
+
+  const handlePrevDay = () => {
+    const date = new Date(selectedDate + 'T00:00:00')
+    date.setDate(date.getDate() - 1)
+    setSelectedDate(getLocalDateString(date))
+  }
+
+  const handleNextDay = () => {
+    const date = new Date(selectedDate + 'T00:00:00')
+    date.setDate(date.getDate() + 1)
+    setSelectedDate(getLocalDateString(date))
+  }
+
+  const showToast = (message: string) => {
+    setToast({ message })
+  }
+
+  // Handle drag to create new entry
+  const handleDragCreate = (data: DragCreateData) => {
+    setDragCreateData(data)
+    setIsQuickLogOpen(true)
+  }
+
+  // Show loading state (also wait for selectedDate to be set for hydration)
+  if (status === 'loading' || !selectedDate) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return null
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background pb-20">
+        <div className="mx-auto max-w-2xl px-4 py-6">
+          {/* Header */}
+          <header className="mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Calendar
+              </h1>
+
+              {calendarStatus?.connected && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => refreshCalendar()}
+                  disabled={isCalendarLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isCalendarLoading ? 'animate-spin' : ''}`} />
+                  {isCalendarLoading ? 'Syncing' : 'Sync'}
+                </Button>
+              )}
+            </div>
+
+            {/* Date navigation */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={handlePrevDay}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                aria-label="Previous day"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+
+              <button
+                onClick={() => setShowCalendarPicker(!showCalendarPicker)}
+                className="flex flex-col items-center px-4 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <span className="text-lg font-semibold">{dateDisplay.label}</span>
+                <span className="text-sm text-muted-foreground">{dateDisplay.date}</span>
+              </button>
+
+              <button
+                onClick={handleNextDay}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                aria-label="Next day"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Calendar picker dropdown */}
+            {showCalendarPicker && (
+              <div className="mt-2 flex justify-center">
+                <CalendarPicker
+                  selectedDate={selectedDate}
+                  onDateSelect={(date) => {
+                    handleDateChange(date)
+                    setShowCalendarPicker(false)
+                  }}
+                  datesWithEntries={entries.map(e => e.date)}
+                />
+              </div>
+            )}
+          </header>
+
+          {/* Week Strip */}
+          <div className="mb-4">
+            <WeekStrip
+              selectedDate={selectedDate}
+              onDateSelect={handleDateChange}
+              datesWithEntries={entries.map(e => e.date)}
+            />
+          </div>
+
+          {/* Viewing-only message for old dates */}
+          {!canLog && isPastDay && (
+            <div className="mb-4 rounded-lg bg-zinc-100 px-4 py-3 text-center dark:bg-zinc-800">
+              <p className="text-sm text-muted-foreground">
+                {VIEWING_PAST_MESSAGE}
+              </p>
+            </div>
+          )}
+
+          {/* Timeline */}
+          <section>
+            <TimelineView
+              key={refreshKey}
+              entries={entries}
+              calendarEvents={calendarEvents}
+              isLoading={isLoading}
+              onEntryDeleted={fetchEntries}
+              onGhostEntryClick={setSelectedGhostEvent}
+              onDragCreate={canLog ? handleDragCreate : undefined}
+              onShowToast={showToast}
+              selectedDate={selectedDate}
+              isToday={isToday}
+              isFutureDay={isFutureDay}
+              isPastDay={isPastDay}
+              canLog={canLog}
+            />
+          </section>
+        </div>
+
+        <QuickLogModal
+          isOpen={isQuickLogOpen}
+          onClose={() => {
+            setIsQuickLogOpen(false)
+            setDragCreateData(null)
+          }}
+          onEntryAdded={() => {
+            fetchEntries()
+            setDragCreateData(null)
+          }}
+          lastEntryEndTime={lastEntryEndTime}
+          initialStartTime={dragCreateData?.startTime}
+          initialEndTime={dragCreateData?.endTime}
+          onShowToast={showToast}
+          userId={userId}
+          calendarEvents={calendarEvents}
+          entries={entries}
+          selectedDate={selectedDate}
+          isFutureDay={isFutureDay}
+          isPastDay={isPastDay}
+          disablePostSubmit={true}
+        />
+
+        <GhostEntryModal
+          event={selectedGhostEvent}
+          onClose={() => setSelectedGhostEvent(null)}
+          onConfirm={() => {
+            setSelectedGhostEvent(null)
+            fetchEntries()
+          }}
+          onShowToast={showToast}
+          userId={userId}
+          selectedDate={selectedDate}
+        />
+
+        {toast && (
+          <Toast
+            title="Entry added"
+            message={toast.message}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </div>
+    </ErrorBoundary>
+  )
+}
+
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-900">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    }>
+      <CalendarContent />
+    </Suspense>
+  )
+}

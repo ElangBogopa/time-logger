@@ -1053,3 +1053,137 @@ describe('Time Parser - Combined New Patterns', () => {
     expect(result.startTime).toBe('18:00')
   })
 })
+
+describe('Time Parser - Duration-Only Detection', () => {
+  // These tests verify the detection types so the UI can decide
+  // whether to use parsed times or keep existing startTime
+
+  it('should detect "for 30 min" as duration-only', () => {
+    const result = parseTimeFromText('Dinner for 30 min', '21:00')
+    expect(result.hasTimePattern).toBe(true)
+
+    // Check detection types - "dinner" creates a range, "for 30 min" creates duration
+    const durationDetections = result.detections.filter(d => d.type === 'duration')
+    const rangeDetections = result.detections.filter(d => d.type === 'range')
+
+    // Should have duration detection
+    expect(durationDetections.length).toBeGreaterThan(0)
+    expect(durationDetections[0].durationMinutes).toBe(30)
+  })
+
+  it('should detect pure duration without activity inference', () => {
+    const result = parseTimeFromText('Meeting for 45 min', '14:00')
+    expect(result.hasTimePattern).toBe(true)
+
+    const durationDetections = result.detections.filter(d => d.type === 'duration')
+    expect(durationDetections.length).toBe(1)
+    expect(durationDetections[0].durationMinutes).toBe(45)
+  })
+
+  it('should detect explicit time range', () => {
+    const result = parseTimeFromText('Meeting from 2pm to 3pm', '12:00')
+    expect(result.hasTimePattern).toBe(true)
+
+    const rangeDetections = result.detections.filter(d => d.type === 'range')
+    expect(rangeDetections.length).toBe(1)
+    expect(result.startTime).toBe('14:00')
+    expect(result.endTime).toBe('15:00')
+  })
+
+  it('should distinguish duration-only from explicit times', () => {
+    // Duration only - UI should use existing startTime
+    const durationResult = parseTimeFromText('Coding for 2 hours', '10:00')
+    const durationOnly = durationResult.detections.every(d => d.type === 'duration')
+    expect(durationOnly).toBe(true)
+
+    // Explicit time - UI should use parsed times
+    const explicitResult = parseTimeFromText('Meeting at 3pm', '10:00')
+    const hasExplicitTime = explicitResult.detections.some(d => d.type === 'time' || d.type === 'range')
+    expect(hasExplicitTime).toBe(true)
+  })
+
+  it('should handle "dinner for 30 minutes" - duration takes priority over activity-based inference', () => {
+    // This tests the case where:
+    // - "dinner" creates an activity-based range detection (18:00-19:00)
+    // - "for 30 minutes" creates a duration detection (30 mins)
+    // The UI should prioritize the duration and use the existing startTime (from gap finder)
+    const result = parseTimeFromText('dinner for 30 minutes', '20:00')
+    expect(result.hasTimePattern).toBe(true)
+
+    // Should have both types of detections
+    const durationDetections = result.detections.filter(d => d.type === 'duration')
+    const rangeDetections = result.detections.filter(d => d.type === 'range')
+
+    expect(durationDetections.length).toBe(1)
+    expect(durationDetections[0].durationMinutes).toBe(30)
+
+    // "dinner" creates a range detection but UI should ignore it when duration exists
+    expect(rangeDetections.length).toBe(1)
+    expect(rangeDetections[0].matchedText).toBe('dinner')
+
+    // The parseTimeFromText returns the dinner times because it doesn't know the "existing startTime"
+    // The UI component is responsible for prioritizing duration over activity-based times
+    expect(result.startTime).toBe('18:00') // From dinner
+    expect(result.endTime).toBe('19:00') // From dinner
+
+    // But the UI should extract the duration and calculate: existingStartTime + 30 minutes
+    // This is tested in the UI component, not here
+    const totalDuration = durationDetections.reduce((sum, d) => sum + (d.durationMinutes || 0), 0)
+    expect(totalDuration).toBe(30)
+  })
+
+  it('should differentiate explicit time patterns from activity-based inference', () => {
+    // Explicit time pattern regex used by the UI to decide whether to auto-apply times
+    const explicit = /\b(am|pm|o'clock|oclock|\d{1,2}:\d{2}|\d{1,2}\s*to\s*\d{1,2}|from\s+\d|until\s+\d|till\s+\d|at\s+\d)\b/i
+
+    // Activity + duration only - should NOT be auto-applied (no explicit time markers)
+    expect(explicit.test('dinner for 30 minutes')).toBe(false)
+    expect(explicit.test('lunch')).toBe(false)
+    expect(explicit.test('breakfast with friends')).toBe(false)
+
+    // Explicit time patterns - SHOULD be auto-applied
+    expect(explicit.test('meeting 14:30')).toBe(true) // Has HH:MM
+    expect(explicit.test('call 3 to 5')).toBe(true) // Has "X to Y"
+    expect(explicit.test('workout from 6')).toBe(true) // Has "from X"
+    expect(explicit.test('meeting until 5')).toBe(true) // Has "until X"
+    expect(explicit.test('coding at 3')).toBe(true) // Has "at X"
+    expect(explicit.test("meeting at 3 o'clock")).toBe(true) // Has "o'clock"
+  })
+})
+
+describe('Time Parser - cleanedActivity', () => {
+  it('should keep activity word and remove only time expression', () => {
+    // "dinner" is an activity-based pattern (kept), "for 30 minutes" is duration (removed)
+    const result = parseTimeFromText('dinner for 30 minutes', '12:00')
+    expect(result.cleanedActivity.trim()).toBe('dinner')
+  })
+
+  it('should keep activity-based words like dinner, lunch, breakfast', () => {
+    const result = parseTimeFromText('dinner', '12:00')
+    // "dinner" is detected as a pattern but kept in cleanedActivity
+    expect(result.hasTimePattern).toBe(true)
+    expect(result.cleanedActivity.trim()).toBe('dinner')
+  })
+
+  it('should keep activity text for duration only', () => {
+    const result = parseTimeFromText('coded for 2 hours', '12:00')
+    expect(result.cleanedActivity.trim()).toBe('coded')
+  })
+
+  it('should keep activity text for explicit time range', () => {
+    const result = parseTimeFromText('meeting 2pm to 3pm', '12:00')
+    expect(result.cleanedActivity.trim()).toBe('meeting')
+  })
+
+  it('should preserve full activity when no time pattern', () => {
+    const result = parseTimeFromText('just a regular task', '12:00')
+    expect(result.cleanedActivity).toBe('just a regular task')
+    expect(result.hasTimePattern).toBe(false)
+  })
+
+  it('should handle activity with explicit time range keeping prefix', () => {
+    const result = parseTimeFromText('meeting from 2pm to 3pm for team sync', '12:00')
+    // "from 2pm to 3pm" is removed, but "meeting" and "for team sync" remain
+    expect(result.cleanedActivity.trim()).toBe('meeting for team sync')
+  })
+})

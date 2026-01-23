@@ -67,16 +67,16 @@ function formatTime(hours: number, minutes: number = 0): string {
 }
 
 /**
- * Parse a time string like "2pm", "14:30", "2:30pm" to { hours, minutes }
- * @param inferPM - if true, infer PM for ambiguous times like "3" (assumes afternoon)
+ * Parse a time string like "2pm", "14:30", "2:30pm" to { hours, minutes, hasExplicitMeridiem }
+ * @param inferPM - if true, infer PM for ambiguous times (assumes afternoon)
  */
-function parseTimeString(timeStr: string, inferPM: boolean = false): { hours: number; minutes: number } | null {
+function parseTimeString(timeStr: string, inferPM: boolean = false): { hours: number; minutes: number; hasExplicitMeridiem: boolean } | null {
   // Match "2pm", "2 pm", "2PM"
   const simpleMatch = timeStr.match(/^(\d{1,2})\s*(am|pm)$/i)
   if (simpleMatch) {
     const hour = parseInt(simpleMatch[1], 10)
     const isPM = simpleMatch[2].toLowerCase() === 'pm'
-    return { hours: to24Hour(hour, isPM), minutes: 0 }
+    return { hours: to24Hour(hour, isPM), minutes: 0, hasExplicitMeridiem: true }
   }
 
   // Match "2:30pm", "2:30 pm", "14:30"
@@ -84,11 +84,16 @@ function parseTimeString(timeStr: string, inferPM: boolean = false): { hours: nu
   if (colonMatch) {
     let hour = parseInt(colonMatch[1], 10)
     const minutes = parseInt(colonMatch[2], 10)
+    const hasExplicit = !!colonMatch[3]
     if (colonMatch[3]) {
       const isPM = colonMatch[3].toLowerCase() === 'pm'
       hour = to24Hour(hour, isPM)
+    } else if (inferPM && hour >= 1 && hour <= 12) {
+      // No explicit meridiem, infer PM for typical afternoon hours
+      const isPM = hour <= 7 // 1-7 are almost always PM in casual speech
+      hour = to24Hour(hour, isPM)
     }
-    return { hours: hour, minutes }
+    return { hours: hour, minutes, hasExplicitMeridiem: hasExplicit }
   }
 
   // Match bare number "3", "10" - only if inferPM is enabled
@@ -100,7 +105,7 @@ function parseTimeString(timeStr: string, inferPM: boolean = false): { hours: nu
         // Infer PM for typical work hours (1-7 -> PM, 8-12 ambiguous but lean PM for ranges)
         // This handles cases like "3 to 5" -> 3pm to 5pm
         const isPM = hour <= 7 // 1-7 are almost always PM in casual speech
-        return { hours: to24Hour(hour, isPM), minutes: 0 }
+        return { hours: to24Hour(hour, isPM), minutes: 0, hasExplicitMeridiem: false }
       }
     }
   }
@@ -384,13 +389,64 @@ export function detectTimePatterns(text: string): ParsedTime[] {
     const time2 = match[2].trim()
 
     // Check if either time has explicit am/pm
-    const hasExplicitMeridiem = /am|pm/i.test(time1) || /am|pm/i.test(time2)
+    const hasExplicitMeridiem1 = /am|pm/i.test(time1)
+    const hasExplicitMeridiem2 = /am|pm/i.test(time2)
+    const hasAnyExplicitMeridiem = hasExplicitMeridiem1 || hasExplicitMeridiem2
 
-    // If no explicit am/pm, infer PM for typical work hour patterns
-    const startParsed = parseTimeString(time1, !hasExplicitMeridiem)
-    const endParsed = parseTimeString(time2, !hasExplicitMeridiem)
+    // Parse both times, inferring PM if no explicit meridiem
+    let startParsed = parseTimeString(time1, !hasAnyExplicitMeridiem)
+    let endParsed = parseTimeString(time2, !hasAnyExplicitMeridiem)
 
     if (startParsed && endParsed) {
+      // Smart range validation: if end < start and neither has explicit meridiem,
+      // the times are likely in the wrong period. Adjust to make a sensible range.
+      const startMins = startParsed.hours * 60 + startParsed.minutes
+      const endMins = endParsed.hours * 60 + endParsed.minutes
+
+      if (!hasAnyExplicitMeridiem && endMins < startMins) {
+        // End is before start - likely both should be PM or both AM
+        // Check if adding 12 hours to both makes sense
+        const startHourRaw = parseInt(time1.match(/^(\d{1,2})/)?.[1] || '0', 10)
+        const endHourRaw = parseInt(time2.match(/^(\d{1,2})/)?.[1] || '0', 10)
+
+        // If raw hours are close (within 8 hours), they're in the same period
+        // "4:30 to 5" -> both PM (close together)
+        // "9 to 5" -> could be AM to PM but more likely both PM for casual speech
+        if (Math.abs(endHourRaw - startHourRaw) <= 8 || endHourRaw < startHourRaw) {
+          // Re-parse with PM inference for both, ensuring they're in same period
+          const startInPM = startHourRaw >= 1 && startHourRaw <= 11 ? startHourRaw + 12 : startHourRaw
+          const endInPM = endHourRaw >= 1 && endHourRaw <= 11 ? endHourRaw + 12 : endHourRaw
+
+          // Use PM versions if that makes end > start
+          if (endInPM > startInPM || (endInPM === startInPM && endParsed.minutes > startParsed.minutes)) {
+            startParsed = { ...startParsed, hours: startInPM }
+            endParsed = { ...endParsed, hours: endInPM }
+          }
+        }
+      }
+
+      // Final sanity check: if range is > 12 hours and no explicit meridiem, reconsider
+      const finalStartMins = startParsed.hours * 60 + startParsed.minutes
+      const finalEndMins = endParsed.hours * 60 + endParsed.minutes
+      const rangeDuration = finalEndMins - finalStartMins
+
+      if (!hasAnyExplicitMeridiem && rangeDuration > 720) {
+        // More than 12 hours seems wrong for casual time ranges
+        // Try putting both in PM (more common for afternoon activities)
+        const startHourRaw = parseInt(time1.match(/^(\d{1,2})/)?.[1] || '0', 10)
+        const endHourRaw = parseInt(time2.match(/^(\d{1,2})/)?.[1] || '0', 10)
+
+        if (startHourRaw <= 12 && endHourRaw <= 12) {
+          const startInPM = startHourRaw + (startHourRaw < 12 ? 12 : 0)
+          const endInPM = endHourRaw + (endHourRaw < 12 ? 12 : 0)
+
+          if (endInPM > startInPM) {
+            startParsed = { ...startParsed, hours: startInPM }
+            endParsed = { ...endParsed, hours: endInPM }
+          }
+        }
+      }
+
       addDetection({
         matchedText: match[0],
         startIndex: match.index,
@@ -627,13 +683,19 @@ export function parseTimeFromText(
   }
 
   // Remove detected patterns from text to get clean activity
+  // BUT keep activity-based words (dinner, lunch, breakfast, etc.) - only remove time expressions
+  const activityBasedWords = ['dinner', 'lunch', 'breakfast']
   let cleanedActivity = text
   // Process in reverse order to maintain correct indices
   const sortedDetections = [...detections].sort((a, b) => b.startIndex - a.startIndex)
   for (const detection of sortedDetections) {
-    cleanedActivity =
-      cleanedActivity.slice(0, detection.startIndex) +
-      cleanedActivity.slice(detection.endIndex)
+    // Don't remove activity-based words - they're part of the activity description
+    const isActivityWord = activityBasedWords.includes(detection.matchedText.toLowerCase())
+    if (!isActivityWord) {
+      cleanedActivity =
+        cleanedActivity.slice(0, detection.startIndex) +
+        cleanedActivity.slice(detection.endIndex)
+    }
   }
   // Clean up extra spaces
   cleanedActivity = cleanedActivity.replace(/\s+/g, ' ').trim()

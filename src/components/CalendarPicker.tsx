@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { getLocalDateString } from '@/lib/types'
+import { getUserToday, getLocalDateString } from '@/lib/types'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface CalendarPickerProps {
@@ -19,7 +19,7 @@ function getFirstDayOfMonth(year: number, month: number): number {
 }
 
 export default function CalendarPicker({ selectedDate, onDateSelect, datesWithEntries = [] }: CalendarPickerProps) {
-  const today = getLocalDateString()
+  const today = getUserToday()
 
   // Parse selected date to get initial month/year
   const [viewDate, setViewDate] = useState(() => {
@@ -181,9 +181,11 @@ export default function CalendarPicker({ selectedDate, onDateSelect, datesWithEn
         <button
           type="button"
           onClick={() => {
-            const tomorrow = new Date()
-            tomorrow.setDate(tomorrow.getDate() + 1)
-            onDateSelect(getLocalDateString(tomorrow))
+            // Tomorrow relative to user's today (accounts for late-night rollover)
+            const userToday = getUserToday()
+            const tomorrowDate = new Date(userToday + 'T12:00:00')
+            tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+            onDateSelect(getLocalDateString(tomorrowDate))
           }}
           className="flex-1 rounded-md bg-accent px-2 py-1.5 text-xs font-medium hover:bg-accent/80"
         >

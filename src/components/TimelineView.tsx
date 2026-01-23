@@ -35,6 +35,9 @@ interface TimelineViewProps {
   isFutureDay?: boolean
   isPastDay?: boolean
   canLog?: boolean
+  // Optional hour range to show (defaults to full 24h)
+  visibleStartHour?: number
+  visibleEndHour?: number
 }
 
 const PIXELS_PER_MINUTE = 1.5
@@ -42,17 +45,32 @@ const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE // 90px per hour
 const MIN_BLOCK_HEIGHT = 24 // Minimum height for very short entries
 
 const CATEGORY_COLORS: Record<TimeCategory, { bg: string; border: string; text: string }> = {
-  deep_work: { bg: 'bg-[#64748b]', border: 'border-[#475569]', text: 'text-white' },
+  // Productive - Blues and Teals
+  deep_work: { bg: 'bg-[#3b82f6]', border: 'border-[#2563eb]', text: 'text-white' },
+  shallow_work: { bg: 'bg-[#64748b]', border: 'border-[#475569]', text: 'text-white' },
   meetings: { bg: 'bg-[#8b7aa8]', border: 'border-[#6b5a88]', text: 'text-white' },
+  learning: { bg: 'bg-[#0891b2]', border: 'border-[#0e7490]', text: 'text-white' },
+  creating: { bg: 'bg-[#7c3aed]', border: 'border-[#6d28d9]', text: 'text-white' },
+  // Maintenance - Grays
   admin: { bg: 'bg-[#9ca3af]', border: 'border-[#6b7280]', text: 'text-white' },
-  learning: { bg: 'bg-[#5d9a9a]', border: 'border-[#4a7a7a]', text: 'text-white' },
-  exercise: { bg: 'bg-[#6b9080]', border: 'border-[#4a6b5a]', text: 'text-white' },
+  errands: { bg: 'bg-[#78716c]', border: 'border-[#57534e]', text: 'text-white' },
+  chores: { bg: 'bg-[#a1a1aa]', border: 'border-[#71717a]', text: 'text-white' },
+  commute: { bg: 'bg-[#737373]', border: 'border-[#525252]', text: 'text-white' },
+  // Body - Greens
+  exercise: { bg: 'bg-[#22c55e]', border: 'border-[#16a34a]', text: 'text-white' },
+  movement: { bg: 'bg-[#86efac]', border: 'border-[#4ade80]', text: 'text-zinc-800' },
+  meals: { bg: 'bg-[#f59e0b]', border: 'border-[#d97706]', text: 'text-white' },
+  sleep: { bg: 'bg-[#1e3a5f]', border: 'border-[#172554]', text: 'text-white' },
+  // Mind - Purples/Lavenders
   rest: { bg: 'bg-[#a8a4ce]', border: 'border-[#8884ae]', text: 'text-zinc-800' },
-  meals: { bg: 'bg-[#b8a088]', border: 'border-[#98806a]', text: 'text-zinc-800' },
-  self_care: { bg: 'bg-[#8fa387]', border: 'border-[#6f8367]', text: 'text-white' },
-  relationships: { bg: 'bg-[#b08d8d]', border: 'border-[#906d6d]', text: 'text-white' },
-  distraction: { bg: 'bg-[#c97e7e]', border: 'border-[#a95e5e]', text: 'text-white' },
-  other: { bg: 'bg-[#71717a]', border: 'border-[#52525b]', text: 'text-white' },
+  self_care: { bg: 'bg-[#c4b5fd]', border: 'border-[#a78bfa]', text: 'text-zinc-800' },
+  // Connection - Pinks/Reds
+  social: { bg: 'bg-[#ec4899]', border: 'border-[#db2777]', text: 'text-white' },
+  calls: { bg: 'bg-[#f472b6]', border: 'border-[#ec4899]', text: 'text-white' },
+  // Leisure - Warm grays
+  entertainment: { bg: 'bg-[#71717a]', border: 'border-[#52525b]', text: 'text-white' },
+  // Fallback
+  other: { bg: 'bg-[#52525b]', border: 'border-[#3f3f46]', text: 'text-white' },
 }
 
 interface PlacedEntry extends TimeEntry {
@@ -166,7 +184,9 @@ export default function TimelineView({
   isToday = true,
   isFutureDay = false,
   isPastDay = false,
-  canLog = true
+  canLog = true,
+  visibleStartHour,
+  visibleEndHour,
 }: TimelineViewProps) {
   const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null)
   const [promptAddTimes, setPromptAddTimes] = useState(false)
@@ -361,11 +381,14 @@ export default function TimelineView({
   }, [entries])
 
   // Calculate the time range for the timeline
-  // ALWAYS show full 24 hours (midnight to midnight) for complete day coverage
+  // Use props if provided, otherwise show full 24 hours
   const { startHour, endHour } = useMemo(() => {
+    if (visibleStartHour !== undefined && visibleEndHour !== undefined) {
+      return { startHour: visibleStartHour, endHour: visibleEndHour }
+    }
     // Full 24-hour range: 12:00 AM (0) to 11:59 PM (24)
     return { startHour: 0, endHour: 24 }
-  }, [])
+  }, [visibleStartHour, visibleEndHour])
 
   // Smart place all entries
   const placedEntries = useMemo(() => {
@@ -1568,7 +1591,7 @@ export default function TimelineView({
           ref={scrollContainerRef}
           className="h-[500px] overflow-y-scroll"
         >
-          <div className="relative flex" style={{ height: timelineHeight }}>
+          <div className="relative flex overflow-hidden" style={{ height: timelineHeight }}>
             {/* Hour labels */}
             <div className="sticky left-0 z-10 w-14 shrink-0 border-r border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
               {hours.map((hour) => (

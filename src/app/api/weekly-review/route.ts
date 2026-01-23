@@ -299,8 +299,8 @@ export async function POST(request: NextRequest) {
       let previousMinutes = 0
 
       if (isReductionGoal) {
-        currentMinutes = categoryMap.get('distraction')?.minutes || 0
-        previousMinutes = prevCategoryMap.get('distraction') || 0
+        currentMinutes = categoryMap.get('entertainment')?.minutes || 0
+        previousMinutes = prevCategoryMap.get('entertainment') || 0
       } else {
         relatedCategories.forEach((cat) => {
           currentMinutes += categoryMap.get(cat)?.minutes || 0
@@ -385,7 +385,7 @@ export async function POST(request: NextRequest) {
 
         dayEntries.forEach((entry) => {
           if (isReductionGoal) {
-            if (entry.category === 'distraction') {
+            if (entry.category === 'entertainment') {
               intentionMinutes += entry.duration_minutes
               hadDistraction = true
             }
@@ -452,7 +452,7 @@ export async function POST(request: NextRequest) {
     const dayMinutes = new Map<string, number>()
     Array.from(entriesByDay.entries()).forEach(([date, dayEntries]) => {
       const productiveMinutes = dayEntries
-        .filter((e) => e.category && e.category !== 'distraction')
+        .filter((e) => e.category && e.category !== 'entertainment')
         .reduce((sum, e) => sum + e.duration_minutes, 0)
       dayMinutes.set(date, productiveMinutes)
     })

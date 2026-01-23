@@ -69,39 +69,56 @@ export async function POST(request: NextRequest) {
           content: `You are a time tracking assistant. Categorize the given activity into exactly one of these categories: ${CATEGORIES.join(', ')}.
 
 Category definitions:
-- deep_work: Focused, cognitively demanding work like coding, writing, analysis, design, creative projects, programming, vibe coding
-- meetings: Scheduled calls, video conferences, in-person meetings, 1:1s
-- admin: Administrative tasks like email, scheduling, paperwork, organizing, errands, chores
-- learning: Educational activities including university lectures, classes, labs, tutorials, seminars, courses, studying, research, reading educational content, skill development. University course codes (e.g., "STA414H1 LEC5101", "CSC108 TUT0101", "MAT137 LAB01") are ALWAYS learning.
-- exercise: Physical workouts, gym, running, sports, yoga, cycling
-- rest: Intentional relaxation like naps, meditation, walks, watching movies/TV to unwind, reading for pleasure, relaxing
-- meals: Eating activities like breakfast, lunch, dinner, snacks, brunch, eating food, cooking meals, grabbing coffee/food
-- self_care: Personal maintenance and grooming like showering, skincare, hygiene, getting ready, brushing teeth, haircut, shaving, makeup, morning/night routine
-- relationships: Quality time with family, friends, dates, calls with loved ones, social activities
-- distraction: ONLY use when the activity is purely unproductive with NO productive element - scrolling TikTok, Instagram, Twitter/X, Reddit, YouTube rabbit holes, porn, aimless browsing, doomscrolling
-- other: Anything that doesn't fit the above categories
+
+PRODUCTIVE (value-creating work):
+- deep_work: Focused, cognitively demanding work - coding, writing, analysis, design, creative projects, programming, vibe coding
+- shallow_work: Work tasks that are necessary but not cognitively demanding - work email, Slack, status updates, quick code reviews
+- meetings: Scheduled WORK calls, video conferences, in-person meetings, 1:1s, standups
+- learning: Educational activities - university lectures, classes, labs, tutorials, seminars, courses, studying, research, reading educational content. University course codes (e.g., "STA414H1", "CSC108") are ALWAYS learning.
+- creating: Creative hobbies and side projects - art, music, writing for fun, personal projects, crafts
+
+MAINTENANCE (life logistics):
+- admin: PERSONAL administrative tasks - personal email, bills, finances, scheduling personal appointments, planning
+- errands: Tasks outside home - grocery shopping, doctor appointments, bank visits, picking up packages, car maintenance
+- chores: Household tasks - cleaning, laundry, cooking/meal prep, dishes, home repairs, organizing
+- commute: Travel to/from obligations - commute to work, travel to appointments
+
+BODY (physical):
+- exercise: Intentional workouts - gym, running, sports, yoga, cycling, strength training, HIIT
+- movement: Light/incidental activity - walking, stretching, standing, light yoga, playing with kids
+- meals: Eating (not cooking) - breakfast, lunch, dinner, snacks, coffee breaks
+- sleep: Sleep tracking - night sleep, naps
+
+MIND (mental recovery):
+- rest: Intentional downtime - relaxing, reading for pleasure, listening to music, sitting in nature
+- self_care: Personal maintenance - showering, skincare, hygiene, meditation, journaling, therapy
+
+CONNECTION (social):
+- social: In-person time with others - hanging out with friends, family time, dates, parties
+- calls: Personal phone/video calls - FaceTime with family, catching up with friends
+
+LEISURE:
+- entertainment: Passive/active leisure - TV, movies, video games, social media, YouTube, browsing, podcasts
 
 IMPORTANT RULES:
 1. MIXED ACTIVITIES - FAVOR PRODUCTIVE: When an activity combines productive work with distractions, ALWAYS categorize by the PRODUCTIVE part:
-   - "Vibe coding + tiktok" → deep_work (coding is the primary productive activity)
-   - "Studying while checking Instagram" → learning (studying is productive)
-   - "Working on project + youtube in background" → deep_work (work is productive)
-   - "Reading docs with twitter breaks" → learning (reading docs is productive)
-   - "Coding with music/youtube" → deep_work (coding is the main activity)
-   The logic: if someone is doing productive work while occasionally getting distracted, they're still primarily doing that productive work. The distraction is secondary.
+   - "Vibe coding + tiktok" → deep_work
+   - "Studying while checking Instagram" → learning
+   - "Working on project + youtube in background" → deep_work
 
-2. ONLY categorize as "distraction" when the activity is PURELY unproductive with no productive element mentioned:
-   - "Just scrolling tiktok" → distraction
-   - "Doomscrolling twitter" → distraction
-   - "Watching random youtube videos" → distraction
+2. DISTINGUISH WORK vs PERSONAL:
+   - Work meetings/calls → meetings
+   - Personal calls with friends/family → calls
+   - Work email/Slack → shallow_work
+   - Personal email/bills → admin
 
-3. If the activity includes words like "break", "intentional", "to unwind", "relaxing", or "to decompress" with typically distracting activities, categorize as "rest" instead of "distraction".
+3. COOKING vs EATING:
+   - Cooking, meal prep → chores
+   - Eating, having lunch → meals
 
-4. Other category mappings:
-   - Naps, meditation, walks, movies, TV shows, and reading for fun are "rest" (intentional recovery)
-   - Hanging out with friends, family time, dates, and social calls are "relationships"
-   - Eating, breakfast, lunch, dinner, snacks, food, and cooking should be "meals"
-   - Showering, grooming, skincare, hygiene, getting ready, brushing teeth, and personal care routines should be "self_care"
+4. REST vs ENTERTAINMENT:
+   - Intentional relaxation, reading, unwinding → rest
+   - TV, games, scrolling, browsing → entertainment
 
 Respond with ONLY the category name, nothing else.`,
         },

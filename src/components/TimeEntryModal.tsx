@@ -25,17 +25,32 @@ interface TimeEntryModalProps {
 }
 
 const CATEGORY_COLORS: Record<TimeCategory, string> = {
-  deep_work: 'bg-[#64748b]/20 text-[#94a3b8]',
+  // Productive
+  deep_work: 'bg-[#3b82f6]/20 text-[#60a5fa]',
+  shallow_work: 'bg-[#64748b]/20 text-[#94a3b8]',
   meetings: 'bg-[#8b7aa8]/20 text-[#b8a8d8]',
+  learning: 'bg-[#0891b2]/20 text-[#22d3ee]',
+  creating: 'bg-[#7c3aed]/20 text-[#a78bfa]',
+  // Maintenance
   admin: 'bg-[#9ca3af]/20 text-[#d1d5db]',
-  learning: 'bg-[#5d9a9a]/20 text-[#8dcaca]',
-  exercise: 'bg-[#6b9080]/20 text-[#9bc0b0]',
+  errands: 'bg-[#78716c]/20 text-[#a8a29e]',
+  chores: 'bg-[#a1a1aa]/20 text-[#d4d4d8]',
+  commute: 'bg-[#737373]/20 text-[#a3a3a3]',
+  // Body
+  exercise: 'bg-[#22c55e]/20 text-[#4ade80]',
+  movement: 'bg-[#86efac]/20 text-[#bbf7d0]',
+  meals: 'bg-[#f59e0b]/20 text-[#fbbf24]',
+  sleep: 'bg-[#1e3a5f]/20 text-[#3b82f6]',
+  // Mind
   rest: 'bg-[#a8a4ce]/20 text-[#c8c4ee]',
-  meals: 'bg-[#b8a088]/20 text-[#d8c0a8]',
-  self_care: 'bg-[#8fa387]/20 text-[#bfc3a7]',
-  relationships: 'bg-[#b08d8d]/20 text-[#d0adad]',
-  distraction: 'bg-[#c97e7e]/20 text-[#e9aeae]',
-  other: 'bg-[#71717a]/20 text-[#a1a1aa]',
+  self_care: 'bg-[#c4b5fd]/20 text-[#ddd6fe]',
+  // Connection
+  social: 'bg-[#ec4899]/20 text-[#f472b6]',
+  calls: 'bg-[#f472b6]/20 text-[#f9a8d4]',
+  // Leisure
+  entertainment: 'bg-[#71717a]/20 text-[#a1a1aa]',
+  // Fallback
+  other: 'bg-[#52525b]/20 text-[#71717a]',
 }
 
 function formatDuration(minutes: number): string {

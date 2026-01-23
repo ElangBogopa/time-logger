@@ -1,21 +1,29 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { Calendar, BarChart3, Settings } from 'lucide-react'
+import { Home, Calendar, BarChart3, Settings } from 'lucide-react'
 
 interface TabItem {
   label: string
   icon: React.ElementType
   path: string
   matchPaths?: string[]
+  matchPrefix?: string[]
 }
 
 const tabs: TabItem[] = [
   {
     label: 'Today',
-    icon: Calendar,
+    icon: Home,
     path: '/',
     matchPaths: ['/'],
+    matchPrefix: ['/log'],
+  },
+  {
+    label: 'Calendar',
+    icon: Calendar,
+    path: '/calendar',
+    matchPaths: ['/calendar'],
   },
   {
     label: 'Review',
@@ -41,8 +49,13 @@ export default function BottomTabBar() {
   }
 
   const isActive = (tab: TabItem): boolean => {
-    if (tab.matchPaths) {
-      return tab.matchPaths.some(p => pathname === p)
+    // Check exact path matches
+    if (tab.matchPaths && tab.matchPaths.some(p => pathname === p)) {
+      return true
+    }
+    // Check prefix matches (e.g., /log/morning matches /log)
+    if (tab.matchPrefix && tab.matchPrefix.some(p => pathname.startsWith(p))) {
+      return true
     }
     return pathname === tab.path
   }
