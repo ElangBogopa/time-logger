@@ -1,15 +1,36 @@
 export type TimeCategory =
-  | 'deep_work'
-  | 'meetings'
-  | 'admin'
-  | 'learning'
-  | 'exercise'
-  | 'rest'
-  | 'meals'
-  | 'self_care'
-  | 'relationships'
-  | 'distraction'
-  | 'other'
+  // PRODUCTIVE
+  | 'deep_work'       // Focused cognitively demanding work
+  | 'shallow_work'    // Quick tasks, admin within work context
+  | 'meetings'        // Synchronous work communication
+  | 'learning'        // Courses, studying, reading
+  | 'creating'        // Creative hobbies, side projects
+
+  // MAINTENANCE
+  | 'admin'           // Personal admin (email, finances, planning)
+  | 'errands'         // Outside home (shopping, appointments)
+  | 'chores'          // Inside home (cleaning, cooking, repairs)
+  | 'commute'         // Travel to/from obligations
+
+  // BODY
+  | 'exercise'        // Intentional workout
+  | 'movement'        // Light activity (walks, stretching)
+  | 'meals'           // Eating, food prep
+  | 'sleep'           // Sleep tracking
+
+  // MIND
+  | 'rest'            // Intentional downtime, naps
+  | 'self_care'       // Hygiene, meditation, health
+
+  // CONNECTION
+  | 'social'          // Friends, family, community
+  | 'calls'           // Personal calls/video chats
+
+  // LEISURE
+  | 'entertainment'   // TV, games, movies, browsing
+
+  // FALLBACK
+  | 'other'           // Anything that doesn't fit
 
 export type EntryStatus = 'confirmed' | 'pending'
 
@@ -74,6 +95,207 @@ export const DEFAULT_REMINDER_TIMES: ReminderTime[] = [
   { id: 'night', label: 'Night check-in', time: '21:00', enabled: true },
 ]
 
+// Time periods for logging sessions
+export type TimePeriod = 'morning' | 'afternoon' | 'evening'
+
+export const PERIOD_LABELS: Record<TimePeriod, string> = {
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  evening: 'Evening',
+}
+
+export const PERIOD_TIME_RANGES: Record<TimePeriod, { start: number; end: number }> = {
+  morning: { start: 0, end: 12 },      // 12am - 12pm
+  afternoon: { start: 12, end: 18 },   // 12pm - 6pm
+  evening: { start: 18, end: 24 },     // 6pm - 12am
+}
+
+/**
+ * Get the current time period based on hour.
+ * Handles late-night hours (24-27) which represent midnight to 3am - still "evening".
+ */
+export function getCurrentPeriod(hour: number = new Date().getHours()): TimePeriod {
+  // Late night (midnight to 3am) is still "evening" from user's perspective
+  if (hour >= 24) return 'evening'
+  if (hour < 12) return 'morning'
+  if (hour < 18) return 'afternoon'
+  return 'evening'
+}
+
+// Session state for UI display
+export type SessionState = 'upcoming' | 'active' | 'logged' | 'skipped'
+
+// Session completion record (stored in database)
+export interface SessionCompletion {
+  id: string
+  user_id: string
+  date: string
+  period: TimePeriod
+  completed_at: string
+  entry_count: number
+  total_minutes: number
+  skipped: boolean
+}
+
+// Session info for UI rendering
+export interface SessionInfo {
+  period: TimePeriod
+  state: SessionState
+  entryCount: number
+  totalMinutes: number
+  completedAt?: string
+}
+
+// Mood/energy levels for session check-in
+export type MoodLevel = 'low' | 'okay' | 'great'
+
+// Mood check-in record (stored in database)
+export interface MoodCheckin {
+  id: string
+  user_id: string
+  date: string
+  period: TimePeriod
+  mood: MoodLevel
+  created_at: string
+}
+
+// Session-specific mood configuration
+export interface SessionMoodConfig {
+  prompt: string
+  labels: Record<MoodLevel, string>
+  // Longer motivational messages shown after check-in
+  messages: Record<MoodLevel, string[]>
+}
+
+export const SESSION_MOOD_CONFIG: Record<TimePeriod, SessionMoodConfig> = {
+  morning: {
+    prompt: "How's your morning energy?",
+    labels: {
+      low: 'Slow start',
+      okay: 'Steady',
+      great: 'Ready to go',
+    },
+    messages: {
+      low: [
+        'Be gentle with yourself this morning. Small steps still move you forward.',
+        'It\'s okay to start slow. "The secret of getting ahead is getting started." — Mark Twain',
+        'Low energy today doesn\'t define your potential. One small win at a time.',
+        'Some days you conquer the world, some days you just get through it. Both count.',
+      ],
+      okay: [
+        'Steady and ready. "The way to get started is to quit talking and begin doing." — Walt Disney',
+        'A calm start sets up a focused day. You\'ve got what it takes.',
+        'Consistency is your superpower. Keep building momentum.',
+        'You\'re in a good place to make today count. Trust your pace.',
+      ],
+      great: [
+        '"The future depends on what you do today." — Gandhi. Channel that energy!',
+        'This is your day. Use that spark for what matters most.',
+        'High morning energy is a gift. Tackle your biggest challenge first.',
+        'You woke up ready. Now go make something happen.',
+      ],
+    },
+  },
+  afternoon: {
+    prompt: "How's your afternoon going?",
+    labels: {
+      low: 'Dragging',
+      okay: 'Cruising',
+      great: 'On fire',
+    },
+    messages: {
+      low: [
+        'The afternoon slump is real — and temporary. A short break can reset everything.',
+        '"Almost everything will work again if you unplug it for a few minutes, including you." — Anne Lamott',
+        'Running low? Step outside, stretch, or grab water. Small resets, big difference.',
+        'Tired doesn\'t mean weak. It means you\'ve been working. Be kind to yourself.',
+      ],
+      okay: [
+        'You\'re halfway there and holding steady. "The best way out is always through." — Robert Frost',
+        'Cruising at a sustainable pace. That\'s how you finish strong.',
+        'Keep that rhythm going. You\'re closer to the finish line than you think.',
+        '"Doing the best at this moment puts you in the best place for the next." — Oprah',
+      ],
+      great: [
+        'On fire! "Start strong, stay strong, finish strong." — Ralph Marston',
+        'That second wind is powerful. Use it to tackle something meaningful.',
+        'Afternoon peak energy — perfect for creative or complex work. Make it count!',
+        'You\'re in the zone. Ride this momentum to a strong finish.',
+      ],
+    },
+  },
+  evening: {
+    prompt: 'How did today go?',
+    labels: {
+      low: 'Drained',
+      okay: 'Alright',
+      great: 'Great day',
+    },
+    messages: {
+      low: [
+        '"You have survived everything you have been through, and you will survive this too." Rest up.',
+        'Exhaustion is not a badge of honor. Tonight, rest is your most productive act.',
+        'Tough day? You showed up anyway. Tomorrow is a fresh start waiting for you.',
+        '"You are worth the quiet moment. You are worth the deeper breath." — Morgan Harper Nichols',
+      ],
+      okay: [
+        'A solid day done. "There is virtue in work and there is virtue in rest. Use both." — Alan Cohen',
+        'Not every day needs to be remarkable. Consistent days build remarkable lives.',
+        'You made it through. Now let your mind and body recharge for tomorrow.',
+        'Another day in the books. Rest well — you\'ve earned this evening.',
+      ],
+      great: [
+        'What a day! Carry this feeling into a restful night and an even better tomorrow.',
+        '"Brilliant things happen in calm minds." Tonight, rest and let tomorrow\'s brilliance build.',
+        'Great days deserve great rest. You\'ve earned every moment of this evening.',
+        'Remember what made today great. That\'s fuel for the days ahead.',
+      ],
+    },
+  },
+}
+
+// Get a random message for a mood+period combination
+export function getMoodMessage(period: TimePeriod, mood: MoodLevel): string {
+  const messages = SESSION_MOOD_CONFIG[period].messages[mood]
+  return messages[Math.floor(Math.random() * messages.length)]
+}
+
+// Mood emojis (same across all sessions)
+export const MOOD_EMOJIS: Record<MoodLevel, string> = {
+  low: '😴',
+  okay: '😐',
+  great: '⚡',
+}
+
+// Mood colors (same across all sessions)
+export const MOOD_COLORS: Record<MoodLevel, string> = {
+  low: 'text-amber-500',
+  okay: 'text-blue-500',
+  great: 'text-green-500',
+}
+
+// Legacy MOOD_CONFIG for backwards compatibility with tests
+export const MOOD_CONFIG: Record<MoodLevel, { emoji: string; label: string; color: string }> = {
+  low: { emoji: '😴', label: 'Low energy', color: 'text-amber-500' },
+  okay: { emoji: '😐', label: 'Okay', color: 'text-blue-500' },
+  great: { emoji: '⚡', label: 'Energized', color: 'text-green-500' },
+}
+
+/**
+ * Get the period that the user is logging for (based on reminder context)
+ * At 12pm reminder, they log morning activities
+ * At 6pm reminder, they log afternoon activities
+ * At 9pm reminder, they log evening activities
+ */
+export function getLoggingPeriod(hour: number = new Date().getHours()): TimePeriod {
+  // Before noon or at noon = logging morning
+  if (hour <= 12) return 'morning'
+  // Before 6pm or at 6pm = logging afternoon
+  if (hour <= 18) return 'afternoon'
+  // After 6pm = logging evening
+  return 'evening'
+}
+
 export const INTENTION_LABELS: Record<IntentionType, string> = {
   deep_work: 'Deep focused work',
   less_distraction: 'Less scrolling & distractions',
@@ -99,11 +321,11 @@ export const INTENTION_DESCRIPTIONS: Record<IntentionType, string> = {
 // Map intentions to relevant time categories for tracking
 export const INTENTION_CATEGORY_MAP: Record<IntentionType, TimeCategory[]> = {
   deep_work: ['deep_work'],
-  less_distraction: ['distraction'], // Track to minimize
-  work_life_balance: ['rest', 'relationships', 'self_care'],
-  exercise: ['exercise'],
+  less_distraction: ['entertainment'], // Track to minimize (was 'distraction')
+  work_life_balance: ['rest', 'social', 'self_care', 'calls'],
+  exercise: ['exercise', 'movement'],
   self_care: ['self_care', 'rest'],
-  relationships: ['relationships'],
+  relationships: ['social', 'calls'],
   learning: ['learning'],
   custom: [], // User defines what to track
 }
@@ -148,7 +370,7 @@ export const INTENTION_CONFIGS: Record<IntentionType, IntentionConfig> = {
     optimalRangeMax: 7 * 60,       // Under 7 hours is good
     unit: 'hours',
     researchNote: 'Research links >2 hrs/day non-productive screen time to anxiety and depression. Average attention span has dropped to 47 seconds.',
-    categories: ['distraction'],
+    categories: ['entertainment'],
   },
   work_life_balance: {
     label: 'Work-life balance',
@@ -161,7 +383,7 @@ export const INTENTION_CONFIGS: Record<IntentionType, IntentionConfig> = {
     optimalRangeMax: 20 * 60,
     unit: 'hours',
     researchNote: 'Work hours are a key barrier to social connection. Intentional non-work time prevents burnout and supports relationships.',
-    categories: ['rest', 'relationships', 'self_care'],
+    categories: ['rest', 'social', 'self_care', 'calls'],
   },
   exercise: {
     label: 'Exercise',
@@ -174,7 +396,7 @@ export const INTENTION_CONFIGS: Record<IntentionType, IntentionConfig> = {
     optimalRangeMax: 300,          // WHO recommended
     unit: 'minutes',
     researchNote: 'WHO: 150-300 min/week moderate OR 75-150 min vigorous. 31% of adults globally don\'t meet minimum.',
-    categories: ['exercise'],
+    categories: ['exercise', 'movement'],
   },
   self_care: {
     label: 'Rest & self-care',
@@ -187,7 +409,7 @@ export const INTENTION_CONFIGS: Record<IntentionType, IntentionConfig> = {
     optimalRangeMax: 14 * 60,
     unit: 'hours',
     researchNote: 'Self-care is a coping strategy that reduces burnout. 75% of employees report burnout. Short breaks improve mood and focus.',
-    categories: ['self_care', 'rest'],
+    categories: ['self_care', 'rest', 'sleep'],
   },
   relationships: {
     label: 'Social connection',
@@ -200,7 +422,7 @@ export const INTENTION_CONFIGS: Record<IntentionType, IntentionConfig> = {
     optimalRangeMax: 21 * 60,      // 21 hours
     unit: 'hours',
     researchNote: 'Research: 9-12 hrs/week minimum to avoid loneliness. Aim for 3-5 close friendships. Social connection increases survival odds by 50%.',
-    categories: ['relationships'],
+    categories: ['social', 'calls'],
   },
   learning: {
     label: 'Learning',
@@ -321,17 +543,142 @@ export const PENDING_COMMENTARY = {
 }
 
 export const CATEGORY_LABELS: Record<TimeCategory, string> = {
+  // Productive
   deep_work: 'Deep Work',
+  shallow_work: 'Shallow Work',
   meetings: 'Meetings',
-  admin: 'Admin',
   learning: 'Learning',
+  creating: 'Creating',
+  // Maintenance
+  admin: 'Admin',
+  errands: 'Errands',
+  chores: 'Chores',
+  commute: 'Commute',
+  // Body
   exercise: 'Exercise',
-  rest: 'Rest',
+  movement: 'Movement',
   meals: 'Meals',
+  sleep: 'Sleep',
+  // Mind
+  rest: 'Rest',
   self_care: 'Self Care',
-  relationships: 'Relationships',
-  distraction: 'Distraction',
+  // Connection
+  social: 'Social',
+  calls: 'Calls',
+  // Leisure
+  entertainment: 'Entertainment',
+  // Fallback
   other: 'Other',
+}
+
+// ============================================================================
+// AGGREGATED CATEGORY VIEWS
+// These group granular categories for different insights/views
+// ============================================================================
+
+export type AggregatedCategory =
+  | 'focus'
+  | 'ops'
+  | 'body'
+  | 'recovery'
+  | 'connection'
+  | 'escape'
+
+export interface CategoryViewGroup {
+  label: string
+  color: string
+  categories: TimeCategory[]
+}
+
+export type CategoryView = Record<AggregatedCategory, CategoryViewGroup>
+
+/**
+ * Energy/Mode View - How you spent your energy
+ * Used for Day Review and daily balance insights
+ */
+export const ENERGY_VIEW: CategoryView = {
+  focus: {
+    label: 'Focus',
+    color: 'blue',
+    categories: ['deep_work', 'learning', 'creating'],
+  },
+  ops: {
+    label: 'Ops',
+    color: 'slate',
+    categories: ['shallow_work', 'meetings', 'admin', 'errands', 'chores', 'commute'],
+  },
+  body: {
+    label: 'Body',
+    color: 'green',
+    categories: ['exercise', 'movement', 'meals', 'sleep'],
+  },
+  recovery: {
+    label: 'Recovery',
+    color: 'amber',
+    categories: ['rest', 'self_care'],
+  },
+  connection: {
+    label: 'Connection',
+    color: 'pink',
+    categories: ['social', 'calls'],
+  },
+  escape: {
+    label: 'Escape',
+    color: 'zinc',
+    categories: ['entertainment', 'other'],
+  },
+}
+
+/**
+ * Get aggregated category for a granular category
+ */
+export function getAggregatedCategory(category: TimeCategory): AggregatedCategory {
+  for (const [aggCat, group] of Object.entries(ENERGY_VIEW)) {
+    if (group.categories.includes(category)) {
+      return aggCat as AggregatedCategory
+    }
+  }
+  return 'ops' // Default fallback
+}
+
+/**
+ * Aggregate minutes by category view
+ */
+export function aggregateByView(
+  categoryMinutes: Map<TimeCategory, number>,
+  view: CategoryView = ENERGY_VIEW
+): Map<AggregatedCategory, number> {
+  const aggregated = new Map<AggregatedCategory, number>()
+
+  for (const [aggCat, group] of Object.entries(view)) {
+    let total = 0
+    for (const cat of group.categories) {
+      total += categoryMinutes.get(cat) || 0
+    }
+    if (total > 0) {
+      aggregated.set(aggCat as AggregatedCategory, total)
+    }
+  }
+
+  return aggregated
+}
+
+export const AGGREGATED_CATEGORY_LABELS: Record<AggregatedCategory, string> = {
+  focus: 'Focus',
+  ops: 'Ops',
+  body: 'Body',
+  recovery: 'Recovery',
+  connection: 'Connection',
+  escape: 'Escape',
+}
+
+export const AGGREGATED_CATEGORY_COLORS: Record<AggregatedCategory, string> = {
+  focus: 'bg-blue-500',
+  ops: 'bg-slate-500',
+  body: 'bg-green-500',
+  recovery: 'bg-amber-500',
+  connection: 'bg-pink-500',
+  escape: 'bg-zinc-500',
 }
 
 /**
@@ -345,6 +692,7 @@ export const CATEGORY_DEFINITIONS: Record<TimeCategory, {
   excludes: string[]
   source?: string
 }> = {
+  // PRODUCTIVE
   deep_work: {
     definition: 'Distraction-free concentration on cognitively demanding tasks that create new value, improve skills, and are hard to replicate.',
     includes: [
@@ -353,179 +701,283 @@ export const CATEGORY_DEFINITIONS: Record<TimeCategory, {
       'Design work',
       'Problem-solving',
       'Strategic thinking',
-      'Creative projects',
       'Research and analysis',
     ],
     excludes: [
-      'Email (→ Admin)',
+      'Email (→ Admin or Shallow Work)',
       'Meetings (→ Meetings)',
-      'Routine tasks anyone could do (→ Admin)',
-      'Work while distracted (→ Distraction)',
+      'Routine tasks (→ Shallow Work)',
     ],
     source: 'Cal Newport - Deep Work',
+  },
+  shallow_work: {
+    definition: 'Work tasks that are necessary but not cognitively demanding. Can be done while distracted.',
+    includes: [
+      'Work email and Slack',
+      'Scheduling work meetings',
+      'Filing and organizing work docs',
+      'Expense reports',
+      'Quick code reviews',
+      'Status updates',
+    ],
+    excludes: [
+      'Cognitively demanding work (→ Deep Work)',
+      'Personal admin (→ Admin)',
+    ],
+    source: 'Cal Newport - Shallow Work definition',
   },
   meetings: {
     definition: 'Scheduled time with others for work coordination, collaboration, or professional discussions.',
     includes: [
-      'Video/phone calls',
+      'Video/phone calls (work)',
       'Team standups',
       'One-on-ones',
       'Client meetings',
       'Presentations',
       'Interviews',
-      'Brainstorming sessions',
     ],
     excludes: [
-      'Social calls with friends/family (→ Relationships)',
+      'Social calls with friends/family (→ Calls)',
       'Working sessions alone (→ Deep Work)',
     ],
   },
-  admin: {
-    definition: 'Logistical tasks that are necessary but don\'t create new value. Easy to replicate and often done while distracted.',
-    includes: [
-      'Email and messages',
-      'Scheduling',
-      'Filing and organizing',
-      'Expense reports',
-      'Form filling',
-      'Errands and chores',
-      'Shopping',
-      'Commuting',
-    ],
-    excludes: [
-      'Cognitively demanding work (→ Deep Work)',
-      'Household activities for relaxation (→ Rest/Self Care)',
-    ],
-    source: 'Cal Newport - Shallow Work definition',
-  },
   learning: {
-    definition: 'Deliberate practice: structured activities with specific goals and feedback, designed to improve skills beyond your current level.',
+    definition: 'Deliberate practice: structured activities with specific goals and feedback, designed to improve skills.',
     includes: [
       'Courses and classes',
       'Tutorials with exercises',
-      'Reading technical books',
+      'Reading technical/educational books',
       'Practice with feedback',
       'Language learning',
-      'Instrument practice',
       'Studying for exams',
     ],
     excludes: [
-      'Passive content consumption (→ Rest or Distraction)',
-      'Repetitive practice without improvement goals',
-      'Reading for entertainment (→ Rest)',
+      'Passive content consumption (→ Entertainment)',
+      'Reading for pleasure (→ Rest)',
     ],
     source: 'Anders Ericsson - Deliberate Practice',
   },
-  exercise: {
-    definition: 'Physical activity at moderate intensity (can talk but not sing) or vigorous intensity. WHO recommends 150-300 min/week moderate or 75-150 min/week vigorous.',
+  creating: {
+    definition: 'Creative output outside of work obligations. Hobbies and side projects that bring joy.',
     includes: [
-      'Brisk walking (2.5+ mph)',
-      'Cycling (<10 mph recreational)',
-      'Swimming laps',
-      'Yoga (vinyasa, power)',
-      'Dancing',
-      'Sports (tennis, basketball)',
-      'Strength training',
-      'Running/jogging',
-      'Active yard work',
+      'Art and drawing',
+      'Music (playing, composing)',
+      'Writing for fun (fiction, blog)',
+      'Side projects',
+      'Crafts and DIY',
+      'Photography',
     ],
     excludes: [
-      'Slow strolling (→ Rest)',
-      'Stretching only (→ Self Care)',
-      'Watching sports (→ Rest or Distraction)',
+      'Work creative projects (→ Deep Work)',
+      'Passive consumption (→ Entertainment)',
+    ],
+  },
+
+  // MAINTENANCE
+  admin: {
+    definition: 'Personal life logistics. Tasks that keep your life running but aren\'t work.',
+    includes: [
+      'Personal email',
+      'Bills and finances',
+      'Scheduling appointments',
+      'Planning and organizing',
+      'Paperwork',
+      'Research for purchases',
+    ],
+    excludes: [
+      'Work admin (→ Shallow Work)',
+      'Shopping trips (→ Errands)',
+    ],
+  },
+  errands: {
+    definition: 'Tasks that require leaving home. Life logistics outside your house.',
+    includes: [
+      'Grocery shopping',
+      'Doctor/dentist appointments',
+      'Bank visits',
+      'Picking up packages',
+      'Car maintenance',
+      'Returns and exchanges',
+    ],
+    excludes: [
+      'Home tasks (→ Chores)',
+      'Leisure shopping (→ Entertainment)',
+    ],
+  },
+  chores: {
+    definition: 'Household tasks and maintenance. Keeping your home functional.',
+    includes: [
+      'Cleaning',
+      'Laundry',
+      'Cooking/meal prep',
+      'Dishes',
+      'Home repairs',
+      'Organizing',
+      'Pet care',
+    ],
+    excludes: [
+      'Cooking as hobby (→ Creating)',
+      'Outside errands (→ Errands)',
+    ],
+  },
+  commute: {
+    definition: 'Travel time to and from obligations. Time spent in transit.',
+    includes: [
+      'Commute to work',
+      'Travel to appointments',
+      'School drop-off/pickup',
+      'Public transit',
+      'Driving',
+    ],
+    excludes: [
+      'Leisure walks (→ Movement)',
+      'Road trips for fun (→ Entertainment)',
+    ],
+  },
+
+  // BODY
+  exercise: {
+    definition: 'Intentional physical activity at moderate+ intensity. WHO recommends 150-300 min/week.',
+    includes: [
+      'Gym workouts',
+      'Running/jogging',
+      'Sports (tennis, basketball)',
+      'Swimming laps',
+      'Cycling (workout)',
+      'Strength training',
+      'Yoga classes',
+      'HIIT',
+    ],
+    excludes: [
+      'Casual walks (→ Movement)',
+      'Stretching only (→ Movement)',
     ],
     source: 'WHO Physical Activity Guidelines',
   },
-  rest: {
-    definition: 'Intentional downtime for mental and physical recovery. Essential for preventing burnout and maintaining wellbeing.',
+  movement: {
+    definition: 'Light physical activity and incidental movement. Not structured exercise.',
     includes: [
-      'Napping',
+      'Walking',
+      'Stretching',
+      'Standing desk time',
+      'Light yoga',
+      'Playing with kids',
+      'Gardening',
+    ],
+    excludes: [
+      'Intentional workouts (→ Exercise)',
+      'Walking as commute (→ Commute)',
+    ],
+  },
+  meals: {
+    definition: 'Time spent eating. Separate from cooking (that\'s Chores) unless eating is the activity.',
+    includes: [
+      'Breakfast',
+      'Lunch',
+      'Dinner',
+      'Snacks',
+      'Coffee/tea breaks',
+    ],
+    excludes: [
+      'Cooking (→ Chores)',
+      'Social dinners (→ Social)',
+    ],
+  },
+  sleep: {
+    definition: 'Sleep and nap time. Track if you want to monitor sleep patterns.',
+    includes: [
+      'Night sleep',
+      'Naps',
+      'Rest in bed',
+    ],
+    excludes: [
+      'Relaxing awake (→ Rest)',
+    ],
+  },
+
+  // MIND
+  rest: {
+    definition: 'Intentional downtime for mental recovery. Essential for preventing burnout.',
+    includes: [
       'Relaxing without screens',
       'Reading for pleasure',
       'Listening to music',
       'Sitting in nature',
-      'Gentle stretching',
       'Daydreaming',
-      'Watching TV/movies mindfully',
+      'Meditation breaks',
     ],
     excludes: [
-      'Doom scrolling (→ Distraction)',
-      'Working while "resting" (→ appropriate work category)',
-      'Feeling guilty about resting',
+      'Sleeping (→ Sleep)',
+      'Scrolling (→ Entertainment)',
     ],
     source: 'Burnout prevention research',
   },
-  meals: {
-    definition: 'Time spent eating and preparing food. Quality meal time supports health and can be social.',
-    includes: [
-      'Eating meals',
-      'Cooking',
-      'Meal prep',
-      'Grocery shopping',
-      'Coffee/tea breaks',
-    ],
-    excludes: [
-      'Eating while working (split time appropriately)',
-      'Social dinners (primary → Relationships)',
-    ],
-  },
   self_care: {
-    definition: 'Activities that maintain physical, mental, and emotional wellbeing. A coping strategy that reduces stress and prevents burnout.',
+    definition: 'Activities that maintain physical, mental, and emotional wellbeing.',
     includes: [
       'Personal hygiene',
-      'Medical appointments',
+      'Skincare routine',
       'Meditation/mindfulness',
       'Journaling',
       'Therapy sessions',
-      'Hobbies for relaxation',
-      'Spa/massage',
-      'Skincare routines',
+      'Medical self-care',
     ],
     excludes: [
       'Exercise (→ Exercise)',
-      'Sleep (not typically logged)',
-      'Social activities (→ Relationships)',
+      'Sleep (→ Sleep)',
     ],
     source: 'Self-care and burnout prevention research',
   },
-  relationships: {
-    definition: 'Quality time with others. Research shows 7-21 hours/week of social time is needed to avoid loneliness. Aim for 3-5 close relationships.',
+
+  // CONNECTION
+  social: {
+    definition: 'Quality time with others in person. Research shows 7-21 hours/week prevents loneliness.',
     includes: [
-      'Conversations with friends/family',
-      'Phone/video calls (social)',
-      'Shared activities with others',
-      'Date nights',
+      'Hanging out with friends',
       'Family time',
-      'Visiting neighbors',
-      'Group hobbies',
+      'Date nights',
       'Parties and gatherings',
+      'Group activities',
+      'Visiting neighbors',
     ],
     excludes: [
       'Work meetings (→ Meetings)',
-      'Texting while doing other things',
-      'Passive co-presence without interaction',
+      'Video calls (→ Calls)',
     ],
     source: 'Social Connection Guidelines research',
   },
-  distraction: {
-    definition: 'Non-productive digital engagement and aimless activities. Linked to decreased focus and wellbeing when excessive (>2 hrs/day).',
+  calls: {
+    definition: 'Personal phone/video calls. Staying connected remotely with people you care about.',
     includes: [
-      'Social media scrolling',
-      'Aimless web browsing',
-      'Watching random videos',
-      'Gaming (non-social)',
-      'News rabbit holes',
-      'Online shopping without intent',
-      'Checking phone repeatedly',
+      'Video calls with friends/family',
+      'Phone calls (personal)',
+      'FaceTime/Zoom (social)',
     ],
     excludes: [
-      'Intentional entertainment (→ Rest)',
-      'Educational content (→ Learning)',
-      'Social gaming with friends (→ Relationships)',
-      'Work-related browsing (→ Admin or Deep Work)',
+      'Work calls (→ Meetings)',
+      'In-person hangouts (→ Social)',
     ],
-    source: 'Digital distraction research',
   },
+
+  // LEISURE
+  entertainment: {
+    definition: 'Passive and active leisure time. Unwinding and having fun.',
+    includes: [
+      'TV and movies',
+      'Video games',
+      'Social media',
+      'YouTube/TikTok',
+      'Browsing internet',
+      'Reading news',
+      'Podcasts (casual)',
+    ],
+    excludes: [
+      'Educational content (→ Learning)',
+      'Mindful relaxation (→ Rest)',
+    ],
+  },
+
+  // FALLBACK
   other: {
     definition: 'Activities that don\'t fit other categories. Consider if another category might apply.',
     includes: [
@@ -548,6 +1000,47 @@ export function getLocalDateString(date: Date = new Date()): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+/**
+ * The hour at which the "day" rolls over for the user.
+ * Before this hour, we consider it still "yesterday" from the user's perspective.
+ * This accounts for late-night users who haven't slept yet.
+ */
+export const DAY_ROLLOVER_HOUR = 3
+
+/**
+ * Returns "today" from the user's perspective, accounting for late nights.
+ * If it's before 3 AM, returns yesterday's date (the user is still in that day mentally).
+ * After 3 AM, returns the actual calendar date.
+ */
+export function getUserToday(now: Date = new Date()): string {
+  const hour = now.getHours()
+
+  if (hour < DAY_ROLLOVER_HOUR) {
+    // Before 3 AM - still "yesterday" from user's perspective
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    return getLocalDateString(yesterday)
+  }
+
+  return getLocalDateString(now)
+}
+
+/**
+ * Returns the current hour adjusted for day rollover.
+ * If it's 1 AM (hour 1), this returns 25 (still part of "yesterday" evening).
+ * If it's 3 AM (hour 3), this returns 3 (start of new day).
+ */
+export function getUserCurrentHour(now: Date = new Date()): number {
+  const hour = now.getHours()
+
+  if (hour < DAY_ROLLOVER_HOUR) {
+    // Before 3 AM - treat as late evening hours (24, 25, 26)
+    return 24 + hour
+  }
+
+  return hour
 }
 
 /**
@@ -767,7 +1260,7 @@ export const STREAK_CONFIGS: Record<StreakType, StreakConfig> = {
     description: 'Days with any exercise logged',
     threshold: {
       type: 'entries',
-      categories: ['exercise'],
+      categories: ['exercise', 'movement'],
     },
     milestones: [7, 14, 30, 60, 100, 365],
     graceDaysPerWeek: 2, // Rest days are important for exercise
@@ -775,10 +1268,10 @@ export const STREAK_CONFIGS: Record<StreakType, StreakConfig> = {
   focus: {
     label: 'Focus',
     emoji: '🎯',
-    description: 'Days with zero distraction logged',
+    description: 'Days with minimal entertainment time',
     threshold: {
       type: 'absence',
-      categories: ['distraction'],
+      categories: ['entertainment'],
     },
     milestones: [7, 14, 30, 60, 100, 365],
     graceDaysPerWeek: 1,
@@ -801,7 +1294,7 @@ export const STREAK_CONFIGS: Record<StreakType, StreakConfig> = {
     description: 'Days with quality social time',
     threshold: {
       type: 'entries',
-      categories: ['relationships'],
+      categories: ['social', 'calls'],
     },
     milestones: [7, 14, 30, 60, 100, 365],
     graceDaysPerWeek: 2,

@@ -221,8 +221,8 @@ describe('dayMeetsStreakRequirement', () => {
       expect(dayMeetsStreakRequirement(entries, focusConfig)).toBe(true)
     })
 
-    it('returns false when distraction exists', () => {
-      const entries = [makeEntry('deep_work', 120), makeEntry('distraction', 30)]
+    it('returns false when entertainment exists', () => {
+      const entries = [makeEntry('deep_work', 120), makeEntry('entertainment', 30)]
       expect(dayMeetsStreakRequirement(entries, focusConfig)).toBe(false)
     })
 
