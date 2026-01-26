@@ -24,12 +24,13 @@ function LoginContent() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [showGooglePrompt, setShowGooglePrompt] = useState(false)
 
-  // Check for URL params
+  // Check for URL params (legitimate: reading external URL state on mount)
   useEffect(() => {
     const merged = searchParams.get('merged')
     const errorParam = searchParams.get('error')
 
     if (merged === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reading URL params on mount
       setSuccessMessage('Accounts merged successfully. Please sign in with Google.')
       router.replace('/login', { scroll: false })
     }

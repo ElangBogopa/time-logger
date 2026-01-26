@@ -85,16 +85,14 @@ export default function LogPeriodPage() {
   const { data: session, status } = useSession()
   const period = params.period as TimePeriod
 
-  // Validate period
-  if (!['morning', 'afternoon', 'evening'].includes(period)) {
-    router.replace('/')
-    return null
-  }
+  // Validate period - use fallback for hooks (redirect happens after hooks)
+  const isValidPeriod = ['morning', 'afternoon', 'evening'].includes(period)
+  const safePeriod: TimePeriod = isValidPeriod ? period : 'morning'
 
-  const Icon = PERIOD_ICONS[period]
-  const colors = PERIOD_COLORS[period]
-  const label = PERIOD_LABELS[period]
-  const range = PERIOD_TIME_RANGES[period]
+  const Icon = PERIOD_ICONS[safePeriod]
+  const colors = PERIOD_COLORS[safePeriod]
+  const label = PERIOD_LABELS[safePeriod]
+  const range = PERIOD_TIME_RANGES[safePeriod]
 
   // Date handling - support yesterday's evening
   // Initialize empty for hydration safety, set on client
@@ -550,8 +548,15 @@ export default function LogPeriodPage() {
     setSelectedGhostEvent(event)
   }
 
+  // Redirect if invalid period (after all hooks to satisfy Rules of Hooks)
+  useEffect(() => {
+    if (!isValidPeriod) {
+      router.replace('/')
+    }
+  }, [isValidPeriod, router])
+
   // Wait for auth and selectedDate to be set (hydration safety)
-  if (status === 'loading' || !selectedDate) {
+  if (!isValidPeriod || status === 'loading' || !selectedDate) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

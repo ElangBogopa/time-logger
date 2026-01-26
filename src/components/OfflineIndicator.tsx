@@ -12,6 +12,7 @@ export function OfflineIndicator() {
   // Show banner when going offline or when coming back online with queued actions
   useEffect(() => {
     if (isOffline) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to external connectivity state changes
       setShowBanner(true)
       setWasOffline(true)
     } else if (wasOffline) {

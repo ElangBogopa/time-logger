@@ -298,20 +298,21 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
   )
 }
 
+// Trend Icon Component (extracted to avoid creating components during render)
+function TrendIcon({ trend, direction }: { trend: 'up' | 'down' | 'same'; direction: 'maximize' | 'minimize' }) {
+  const isGood = direction === 'maximize' ? trend === 'up' : trend === 'down'
+
+  if (trend === 'same') return <Minus className="h-3 w-3 text-zinc-400" />
+  if (trend === 'up') return <TrendingUp className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
+  return <TrendingDown className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
+}
+
 // Intention Progress Card
 function IntentionCard({ intention }: { intention: IntentionProgress }) {
   const getBarColor = () => {
     if (intention.progress >= 80) return 'bg-green-500'
     if (intention.progress >= 50) return 'bg-amber-500'
     return 'bg-red-500'
-  }
-
-  const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'same' }) => {
-    const isGood = intention.direction === 'maximize' ? trend === 'up' : trend === 'down'
-
-    if (trend === 'same') return <Minus className="h-3 w-3 text-zinc-400" />
-    if (trend === 'up') return <TrendingUp className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
-    return <TrendingDown className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
   }
 
   return (
@@ -329,11 +330,11 @@ function IntentionCard({ intention }: { intention: IntentionProgress }) {
         <div className="text-right">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <span>vs yesterday</span>
-            <TrendIcon trend={intention.trend} />
+            <TrendIcon trend={intention.trend} direction={intention.direction} />
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
             <span>vs last week</span>
-            <TrendIcon trend={intention.vsLastWeekTrend} />
+            <TrendIcon trend={intention.vsLastWeekTrend} direction={intention.direction} />
           </div>
         </div>
       </div>

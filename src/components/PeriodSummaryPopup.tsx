@@ -57,6 +57,7 @@ export default function PeriodSummaryPopup({
     if (isOpen) {
       requestAnimationFrame(() => setIsVisible(true))
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state driven by prop changes
       setIsVisible(false)
       setIsLeaving(false)
     }

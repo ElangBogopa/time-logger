@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { getUserToday, getLocalDateString } from '@/lib/types'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
@@ -27,11 +27,13 @@ export default function CalendarPicker({ selectedDate, onDateSelect, datesWithEn
     return { year, month: month - 1 } // month is 0-indexed
   })
 
-  // Update view when selectedDate changes externally
-  useEffect(() => {
+  // Sync view when selectedDate changes externally (render-time pattern)
+  const [prevSelectedDate, setPrevSelectedDate] = useState(selectedDate)
+  if (selectedDate !== prevSelectedDate) {
+    setPrevSelectedDate(selectedDate)
     const [year, month] = selectedDate.split('-').map(Number)
     setViewDate({ year, month: month - 1 })
-  }, [selectedDate])
+  }
 
   const { year, month } = viewDate
 

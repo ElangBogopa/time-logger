@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface ToastProps {
   title: string
@@ -13,6 +13,11 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
   const [isVisible, setIsVisible] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
 
+  const handleClose = useCallback(() => {
+    setIsLeaving(true)
+    setTimeout(onClose, 400) // Wait for exit animation
+  }, [onClose])
+
   useEffect(() => {
     // Trigger enter animation
     requestAnimationFrame(() => setIsVisible(true))
@@ -23,7 +28,7 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
     }, duration)
 
     return () => clearTimeout(timer)
-  }, [duration])
+  }, [duration, handleClose])
 
   // Close on escape key
   useEffect(() => {
@@ -32,12 +37,7 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [])
-
-  const handleClose = () => {
-    setIsLeaving(true)
-    setTimeout(onClose, 400) // Wait for exit animation
-  }
+  }, [handleClose])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -88,7 +88,7 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
             {/* Commentary message */}
             <div className="rounded-xl bg-zinc-800/50 p-4">
               <p className="text-center text-sm leading-relaxed text-zinc-300">
-                "{message}"
+                &ldquo;{message}&rdquo;
               </p>
             </div>
 

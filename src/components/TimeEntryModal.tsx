@@ -561,7 +561,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                     Commentary
                   </p>
                   <p className="mt-2 text-sm italic text-muted-foreground">
-                    "{entry.commentary}"
+                    &ldquo;{entry.commentary}&rdquo;
                   </p>
                 </div>
               )}

@@ -137,7 +137,7 @@ export function getCurrentTime(): string {
 export function isTimeInRange(time: string, rangeStart: string, rangeEnd: string): boolean {
   const t = timeToMinutes(time)
   const start = timeToMinutes(rangeStart)
-  let end = timeToMinutes(rangeEnd)
+  const end = timeToMinutes(rangeEnd)
 
   // Handle ranges crossing midnight
   if (end < start) {

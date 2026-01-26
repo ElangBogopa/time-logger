@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Calendar, ChevronLeft, ChevronRight, Loader2, AlertTriangle, LogOut, RefreshCw } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
   const date = new Date(dateStr + 'T00:00:00')
@@ -53,6 +53,7 @@ function CalendarContent() {
   // Set selected date on client to avoid hydration mismatch
   useEffect(() => {
     if (!selectedDate) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only initialization for hydration safety
       setSelectedDate(getLocalDateString())
     }
   }, [selectedDate])
@@ -134,6 +135,7 @@ function CalendarContent() {
 
   // Fetch entries and calendar events for the selected date
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching in effect is a standard pattern
     fetchEntries()
     if (!isDateInCache(selectedDate)) {
       fetchEventsForDate(selectedDate)
