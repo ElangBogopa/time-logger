@@ -9,7 +9,7 @@ interface ToastProps {
   duration?: number
 }
 
-export default function Toast({ title, message, onClose, duration = 10000 }: ToastProps) {
+export default function Toast({ title, message, onClose, duration = 4000 }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
 
@@ -40,18 +40,10 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
   }, [handleClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+      {/* Non-blocking bottom toast */}
       <div
-        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-400 ${
-          isVisible && !isLeaving ? 'opacity-100' : 'opacity-0'
-        }`}
-        onClick={handleClose}
-      />
-
-      {/* Modal */}
-      <div
-        className={`relative transform transition-all duration-400 ease-out ${
+        className={`relative transform transition-all duration-400 ease-out pointer-events-auto ${
           isVisible && !isLeaving
             ? 'translate-y-0 opacity-100 scale-100'
             : 'translate-y-8 opacity-0 scale-90'
@@ -69,7 +61,7 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
           {/* Shimmer effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_ease-in-out_infinite]" />
 
-          <div className="relative rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 p-6">
+          <div className="relative rounded-2xl bg-gradient-to-br from-white via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800 p-6">
             {/* Success icon */}
             <div className="mb-4 flex justify-center">
               <div className="relative">
@@ -83,17 +75,17 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
             </div>
 
             {/* Title */}
-            <h3 className="mb-3 text-center text-xl font-bold text-white">{title}</h3>
+            <h3 className="mb-3 text-center text-xl font-bold text-zinc-900 dark:text-white">{title}</h3>
 
             {/* Commentary message */}
-            <div className="rounded-xl bg-zinc-800/50 p-4">
-              <p className="text-center text-sm leading-relaxed text-zinc-300">
+            <div className="rounded-xl bg-zinc-100 dark:bg-zinc-800/50 p-4">
+              <p className="text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
                 &ldquo;{message}&rdquo;
               </p>
             </div>
 
             {/* Progress bar */}
-            <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-700/50">
+            <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700/50">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400"
                 style={{
@@ -105,7 +97,7 @@ export default function Toast({ title, message, onClose, duration = 10000 }: Toa
             {/* Dismiss button */}
             <button
               onClick={handleClose}
-              className="mt-4 w-full rounded-xl bg-zinc-800 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700 hover:text-white"
+              className="mt-4 w-full rounded-xl bg-zinc-200 dark:bg-zinc-800 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 transition-colors hover:bg-zinc-300 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white"
             >
               Dismiss
             </button>

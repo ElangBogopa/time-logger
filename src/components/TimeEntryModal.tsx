@@ -8,12 +8,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Pencil, Trash2, Clock, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface TimeEntryModalProps {
   entry: TimeEntry
@@ -204,19 +206,43 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
     }
   }
 
-  const handleDelete = async () => {
-    setIsDeleting(true)
-    setError(null)
-
-    try {
-      await deleteEntry(entry.id)
-
-      onDelete()
-      onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete entry')
-      setIsDeleting(false)
-    }
+  const handleDelete = () => {
+    const entryName = entry.activity || 'Entry'
+    
+    // Close the modal immediately
+    onClose()
+    
+    // Show toast with undo button - soft delete pattern
+    toast(`"${entryName}" deleted`, {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          // If user clicks undo, just show a message since entry was never actually deleted
+          onShowToast?.('Delete cancelled')
+        },
+      },
+      duration: 5000,
+      onDismiss: async () => {
+        // Only actually delete when toast expires/is dismissed without undo
+        try {
+          await deleteEntry(entry.id)
+          onDelete() // Refresh the parent component
+        } catch (err) {
+          console.error('Failed to delete entry:', err)
+          onShowToast?.('Failed to delete entry')
+        }
+      },
+      onAutoClose: async () => {
+        // Only actually delete when toast expires/is dismissed without undo
+        try {
+          await deleteEntry(entry.id)
+          onDelete() // Refresh the parent component
+        } catch (err) {
+          console.error('Failed to delete entry:', err)
+          onShowToast?.('Failed to delete entry')
+        }
+      },
+    })
   }
 
   const handleCancelEdit = () => {
@@ -315,6 +341,15 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
             {isPending && <Clock className="h-5 w-5 text-amber-500" />}
             {getDialogTitle()}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {isEditing
+              ? 'Edit your time entry details, duration, and notes'
+              : isReadyToConfirm
+                ? 'Confirm that this planned activity happened as scheduled'
+                : isPending
+                  ? 'View details of this planned activity'
+                  : 'View and edit details of this logged activity'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4">

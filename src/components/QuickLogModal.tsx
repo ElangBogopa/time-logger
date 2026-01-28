@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,6 +73,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   // Post-submit state - shows "Log another" vs "Done with period" options
   const [showPostSubmit, setShowPostSubmit] = useState(false)
   const [lastLoggedActivity, setLastLoggedActivity] = useState<string>('')
+  const [isDoneLoading, setIsDoneLoading] = useState(false)
 
   // Real-time parsing as user types - NO auto-apply, just show the suggestion chip
   useEffect(() => {
@@ -488,33 +490,43 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
   // Handle "Done with period" - trigger period summary
   const handleDoneWithPeriod = async () => {
-    // Fetch all entries for this period today
-    const today = selectedDate || getUserToday()
-    const periodRange = {
-      morning: { start: 0, end: 12 },
-      afternoon: { start: 12, end: 18 },
-      evening: { start: 18, end: 24 },
-    }[currentPeriod]
+    setIsDoneLoading(true)
+    
+    try {
+      // Fetch all entries for this period today
+      const today = selectedDate || getUserToday()
+      const periodRange = {
+        morning: { start: 0, end: 12 },
+        afternoon: { start: 12, end: 18 },
+        evening: { start: 18, end: 24 },
+      }[currentPeriod]
 
-    // Get entries that fall within this period
-    const allEntries = await fetchEntries({ date: today, status: 'confirmed' })
+      // Get entries that fall within this period
+      const allEntries = await fetchEntries({ date: today, status: 'confirmed' })
 
-    const periodEntries = allEntries.filter(entry => {
-      if (!entry.start_time) return false
-      const hour = parseInt(entry.start_time.split(':')[0])
-      return hour >= periodRange.start && hour < periodRange.end
-    })
+      const periodEntries = allEntries.filter(entry => {
+        if (!entry.start_time) return false
+        const hour = parseInt(entry.start_time.split(':')[0])
+        return hour >= periodRange.start && hour < periodRange.end
+      })
 
-    console.log('[Period Summary] Current period:', currentPeriod)
-    console.log('[Period Summary] Period range:', periodRange)
-    console.log('[Period Summary] All entries:', allEntries?.length, allEntries?.map(e => ({ activity: e.activity, start: e.start_time, duration: e.duration_minutes })))
-    console.log('[Period Summary] Filtered entries:', periodEntries.length, periodEntries.map(e => ({ activity: e.activity, start: e.start_time, duration: e.duration_minutes })))
+      console.log('[Period Summary] Current period:', currentPeriod)
+      console.log('[Period Summary] Period range:', periodRange)
+      console.log('[Period Summary] All entries:', allEntries?.length, allEntries?.map(e => ({ activity: e.activity, start: e.start_time, duration: e.duration_minutes })))
+      console.log('[Period Summary] Filtered entries:', periodEntries.length, periodEntries.map(e => ({ activity: e.activity, start: e.start_time, duration: e.duration_minutes })))
 
-    onClose()
+      onClose()
 
-    // Trigger period summary
-    if (onPeriodComplete && periodEntries.length > 0) {
-      onPeriodComplete(currentPeriod, periodEntries)
+      // Trigger period summary
+      if (onPeriodComplete && periodEntries.length > 0) {
+        onPeriodComplete(currentPeriod, periodEntries)
+      }
+    } catch (error) {
+      console.error('Error fetching period entries:', error)
+      // Still close the modal even if there's an error
+      onClose()
+    } finally {
+      setIsDoneLoading(false)
     }
   }
 
@@ -558,10 +570,20 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
               <Button
                 type="button"
                 onClick={handleDoneWithPeriod}
+                disabled={isDoneLoading}
                 className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
               >
-                <CheckCircle2 className="h-4 w-4" />
-                Done with {periodLabel.toLowerCase()}
+                {isDoneLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Finishing up...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Done with {periodLabel.toLowerCase()}
+                  </>
+                )}
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
@@ -591,6 +613,13 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                   </>
                 )}
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                {isPlanningMode
+                  ? 'Schedule an activity for the future with planned start and end times'
+                  : isPastDay
+                    ? 'Add an entry for an activity that happened in the past'
+                    : 'Log an activity you just completed with duration and notes'}
+              </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4">

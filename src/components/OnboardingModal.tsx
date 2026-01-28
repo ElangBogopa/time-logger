@@ -14,6 +14,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { Button } from '@/components/ui/button'
@@ -140,6 +141,9 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
       >
         <VisuallyHidden>
           <DialogTitle>Set up your account</DialogTitle>
+          <DialogDescription>
+            Welcome to Time Logger! Complete the setup process by entering your name and choosing weekly targets to track your productivity goals.
+          </DialogDescription>
         </VisuallyHidden>
 
         {/* Progress indicator */}
@@ -340,62 +344,80 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
         )}
 
         {/* Navigation */}
-        <div className="mt-6 flex gap-3">
-          {step > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleBack}
-              disabled={isSubmitting}
-              className="flex-1"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          )}
+        <div className="mt-6 space-y-3">
+          <div className="flex gap-3">
+            {step > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBack}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+            )}
 
-          {step < 2 ? (
-            <Button
+            {step < 2 ? (
+              <Button
+                type="button"
+                onClick={handleNext}
+                disabled={
+                  isSubmitting ||
+                  (step === 0 && !preferredName.trim()) ||
+                  (step === 1 && selectedTargets.length === 0)
+                }
+                className="flex-1"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Start logging
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Skip option - only on step 0 */}
+          {step === 0 && (
+            <button
               type="button"
-              onClick={handleNext}
-              disabled={
-                isSubmitting ||
-                (step === 0 && !preferredName.trim()) ||
-                (step === 1 && selectedTargets.length === 0)
-              }
-              className="flex-1"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  Next
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={handleSubmit}
+              onClick={() => {
+                // Set a flag to remind later
+                localStorage.setItem('onboarding-skipped', 'true')
+                onComplete()
+              }}
+              className="w-full text-center text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
               disabled={isSubmitting}
-              className="flex-1 bg-green-600 hover:bg-green-700"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  Start logging
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
+              Skip for now
+            </button>
           )}
         </div>
       </DialogContent>

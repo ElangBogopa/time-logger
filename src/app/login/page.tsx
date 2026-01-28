@@ -142,7 +142,7 @@ function LoginContent() {
         {step === 'redirecting-google' && (
           <div className="space-y-6 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10">
-              <svg className="h-8 w-8 text-blue-500" viewBox="0 0 24 24">
+              <svg className="h-8 w-8 text-blue-500" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="currentColor"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -196,7 +196,7 @@ function LoginContent() {
               className="w-full"
               onClick={handleGoogleSignIn}
             >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="currentColor"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -273,7 +273,7 @@ function LoginContent() {
               className="w-full"
               onClick={handleGoogleSignIn}
             >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="currentColor"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -387,7 +387,7 @@ function LoginContent() {
               onClick={handleGoogleSignIn}
               disabled={isLoading}
             >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="currentColor"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -410,15 +410,7 @@ function LoginContent() {
 
             {/* Footer */}
             <p className="text-center text-xs text-muted-foreground">
-              By continuing, you agree to our{' '}
-              <button className="underline underline-offset-4 hover:text-foreground">
-                Terms of Service
-              </button>{' '}
-              and{' '}
-              <button className="underline underline-offset-4 hover:text-foreground">
-                Privacy Policy
-              </button>
-              .
+              By continuing, you acknowledge that you agree to our Terms of Service and Privacy Policy.
             </p>
           </>
         )}

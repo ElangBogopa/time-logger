@@ -67,7 +67,7 @@ function ProgressRing({
         fill="none"
         stroke="currentColor"
         strokeWidth={strokeWidth}
-        className="text-zinc-800"
+        className="text-zinc-300 dark:text-zinc-800"
       />
       {/* Progress ring */}
       <circle

@@ -104,14 +104,14 @@ export default function FocusSessionBar() {
   return (
     <div className="fixed top-0 left-0 right-0 z-50">
       {/* Progress bar background */}
-      <div className="h-1 w-full bg-zinc-800/50">
+      <div className="h-1 w-full bg-zinc-300 dark:bg-zinc-800/50">
         <div
           className="h-full bg-[#6B8CAE] transition-[width] duration-1000 ease-linear"
           style={{ width: `${progress}%` }}
         />
       </div>
       {/* Info bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 bg-[#6B8CAE]/10 backdrop-blur-md border-b border-[#6B8CAE]/20">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-[#6B8CAE]/10 dark:bg-[#6B8CAE]/10 backdrop-blur-md border-b border-[#6B8CAE]/20 dark:border-[#6B8CAE]/20">
         <div className="flex items-center gap-2 min-w-0">
           <Target className="h-3.5 w-3.5 text-[#6B8CAE] shrink-0" />
           <span className="text-xs font-medium text-[#6B8CAE] truncate">

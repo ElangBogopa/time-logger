@@ -28,7 +28,7 @@ interface YearPixelsData {
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function getScoreColor(score: number | null): string {
-  if (score === null) return 'bg-zinc-800'
+  if (score === null) return 'bg-zinc-300 dark:bg-zinc-800'
   if (score >= 70) return 'bg-emerald-500'
   if (score >= 40) return 'bg-amber-500'
   return 'bg-red-400'
@@ -222,21 +222,21 @@ export default function YearInPixelsPage() {
             {/* Stats Summary */}
             {stats && stats.total > 0 && (
               <div className="mb-6 grid grid-cols-4 gap-3">
-                <div className="rounded-lg bg-zinc-800 p-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{stats.avgScore}</p>
-                  <p className="text-[10px] text-zinc-400">Avg Score</p>
+                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.avgScore}</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Avg Score</p>
                 </div>
-                <div className="rounded-lg bg-zinc-800 p-3 text-center">
+                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
                   <p className="text-2xl font-bold text-emerald-500">{stats.greatDays}</p>
-                  <p className="text-[10px] text-zinc-400">Great</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Great</p>
                 </div>
-                <div className="rounded-lg bg-zinc-800 p-3 text-center">
+                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
                   <p className="text-2xl font-bold text-amber-500">{stats.okayDays}</p>
-                  <p className="text-[10px] text-zinc-400">Okay</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Okay</p>
                 </div>
-                <div className="rounded-lg bg-zinc-800 p-3 text-center">
+                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
                   <p className="text-2xl font-bold text-red-400">{stats.roughDays}</p>
-                  <p className="text-[10px] text-zinc-400">Rough</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Rough</p>
                 </div>
               </div>
             )}
@@ -285,7 +285,7 @@ export default function YearInPixelsPage() {
             {/* Legend */}
             <div className="mt-4 flex items-center justify-center gap-4">
               <div className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-zinc-800" />
+                <span className="inline-block h-3 w-3 rounded-sm bg-zinc-300 dark:bg-zinc-800" />
                 <span className="text-xs text-zinc-500">No data</span>
               </div>
               <div className="flex items-center gap-1.5">
