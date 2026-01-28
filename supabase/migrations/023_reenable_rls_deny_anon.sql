@@ -4,6 +4,27 @@
 -- which bypasses RLS entirely. The anon key (exposed to browsers) is blocked.
 
 -- ============================================================
+-- REPAIR: Create user_streaks if missing (migration 015 may have partially failed)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_streaks (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL,
+  streak_type text NOT NULL,
+  intention_id uuid REFERENCES user_intentions(id) ON DELETE SET NULL,
+  personal_best_days integer NOT NULL DEFAULT 0,
+  personal_best_achieved_at timestamptz,
+  current_streak_days integer NOT NULL DEFAULT 0,
+  current_streak_start_date date,
+  last_calculated_at timestamptz DEFAULT now(),
+  grace_days_used integer NOT NULL DEFAULT 0,
+  grace_week_start date,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, streak_type)
+);
+CREATE INDEX IF NOT EXISTS idx_user_streaks_user_id ON user_streaks(user_id);
+
+-- ============================================================
 -- time_entries
 -- ============================================================
 ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
