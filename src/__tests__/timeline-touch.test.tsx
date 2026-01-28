@@ -3,7 +3,7 @@
  *
  * Expected behavior (matching Google Calendar and other calendar apps):
  * 1. Touch + immediate scroll = SCROLL (no entry creation)
- * 2. Touch + hold still 100ms + hold 600ms more = ENTRY CREATION
+ * 2. Touch + hold still 100ms + hold 400ms more = ENTRY CREATION
  * 3. Touch + hold still 100ms + then move = SCROLL (cancel)
  * 4. Touch + hold confirmed + drag = entry with dragged time range
  */
@@ -28,10 +28,10 @@ jest.mock('@/lib/supabase', () => ({
 
 describe('TimelineView Touch Interactions', () => {
   // Constants from the component (should match TimelineView.tsx)
-  const SCROLL_CANCEL_THRESHOLD = 3 // pixels
+  const SCROLL_CANCEL_THRESHOLD = 5 // pixels (updated from 3 for better fat finger tolerance)
   const STILLNESS_CHECK_DELAY = 100 // ms
-  const TOUCH_HOLD_DELAY = 600 // ms
-  const TOTAL_HOLD_TIME = STILLNESS_CHECK_DELAY + TOUCH_HOLD_DELAY // 700ms total
+  const TOUCH_HOLD_DELAY = 400 // ms (updated from 600 for more responsive feel)
+  const TOTAL_HOLD_TIME = STILLNESS_CHECK_DELAY + TOUCH_HOLD_DELAY // 500ms total
 
   let onDragCreate: jest.Mock<void, [DragCreateData]>
   let onEntryDeleted: jest.Mock
@@ -82,12 +82,12 @@ describe('TimelineView Touch Interactions', () => {
       // Touch start at Y=500
       fireEvent.touchStart(grid, createTouchEvent(500))
 
-      // Immediately move beyond scroll threshold (3px) - simulating scroll
+      // Immediately move beyond scroll threshold (5px) - simulating scroll
       act(() => {
         jest.advanceTimersByTime(10) // Only 10ms later
       })
 
-      // Move finger by 10px (well beyond 3px threshold)
+      // Move finger by 10px (well beyond 5px threshold)
       fireEvent.touchMove(window, {
         touches: [{ clientY: 510, clientX: 100 }],
         preventDefault: jest.fn(),
@@ -183,7 +183,7 @@ describe('TimelineView Touch Interactions', () => {
       // Touch start
       fireEvent.touchStart(grid, createTouchEvent(500))
 
-      // Hold for only 300ms (less than 100ms + 600ms = 700ms required)
+      // Hold for only 300ms (less than 100ms + 400ms = 500ms required)
       act(() => {
         jest.advanceTimersByTime(300)
       })
@@ -212,7 +212,7 @@ describe('TimelineView Touch Interactions', () => {
         jest.advanceTimersByTime(STILLNESS_CHECK_DELAY + 10)
       })
 
-      // Move during the hold phase (before 600ms hold completes)
+      // Move during the hold phase (before 400ms hold completes)
       fireEvent.touchMove(window, {
         touches: [{ clientY: 520, clientX: 100 }], // 20px movement
         preventDefault: jest.fn(),
@@ -242,7 +242,7 @@ describe('TimelineView Touch Interactions', () => {
       // Touch start
       fireEvent.touchStart(grid, createTouchEvent(500))
 
-      // Wait for full hold confirmation (100ms + 600ms)
+      // Wait for full hold confirmation (100ms + 400ms)
       act(() => {
         jest.advanceTimersByTime(TOTAL_HOLD_TIME)
       })
@@ -262,7 +262,7 @@ describe('TimelineView Touch Interactions', () => {
   })
 
   describe('Tiny Movement Tolerance', () => {
-    it('should still create entry if movement is below scroll threshold (< 3px)', () => {
+    it('should still create entry if movement is below scroll threshold (< 5px)', () => {
       const { container } = renderTimeline()
       const grid = getTimelineGrid(container)
 
@@ -273,7 +273,7 @@ describe('TimelineView Touch Interactions', () => {
       // Touch start
       fireEvent.touchStart(grid, createTouchEvent(500))
 
-      // Tiny movement (2px - below 3px threshold)
+      // Tiny movement (2px - below 5px threshold)
       act(() => {
         jest.advanceTimersByTime(50)
       })
@@ -290,11 +290,11 @@ describe('TimelineView Touch Interactions', () => {
 
       fireEvent.touchEnd(window)
 
-      // Should still create entry because 2px < 3px threshold
+      // Should still create entry because 2px < 5px threshold
       expect(onDragCreate).toHaveBeenCalledTimes(1)
     })
 
-    it('should cancel if movement exceeds scroll threshold (>= 3px)', () => {
+    it('should cancel if movement exceeds scroll threshold (>= 5px)', () => {
       const { container } = renderTimeline()
       const grid = getTimelineGrid(container)
 
@@ -305,13 +305,13 @@ describe('TimelineView Touch Interactions', () => {
       // Touch start
       fireEvent.touchStart(grid, createTouchEvent(500))
 
-      // Movement at exactly threshold (4px - above 3px)
+      // Movement at exactly threshold (6px - above 5px)
       act(() => {
         jest.advanceTimersByTime(50)
       })
 
       fireEvent.touchMove(window, {
-        touches: [{ clientY: 504, clientX: 100 }], // 4px > 3px
+        touches: [{ clientY: 506, clientX: 100 }], // 6px > 5px
         preventDefault: jest.fn(),
       })
 
@@ -331,14 +331,14 @@ describe('TimelineView Touch Interactions', () => {
 describe('Touch Interaction Timing Constants', () => {
   it('documents the expected timing behavior', () => {
     // These constants should match the implementation
-    const SCROLL_CANCEL_THRESHOLD = 3 // pixels
+    const SCROLL_CANCEL_THRESHOLD = 5 // pixels
     const STILLNESS_CHECK_DELAY = 100 // ms
-    const TOUCH_HOLD_DELAY = 600 // ms
+    const TOUCH_HOLD_DELAY = 400 // ms
 
     // Total time user must hold still to trigger create mode
     const TOTAL_HOLD_TIME = STILLNESS_CHECK_DELAY + TOUCH_HOLD_DELAY
 
-    expect(TOTAL_HOLD_TIME).toBe(700) // 700ms total
+    expect(TOTAL_HOLD_TIME).toBe(500) // 700ms total
 
     // This matches Google Calendar behavior:
     // - Must hold finger still (not scrolling) for a noticeable moment
@@ -357,7 +357,7 @@ describe('Entry Touch Interactions', () => {
    * 5. After hold confirmed, drag = adjust entry time
    */
 
-  const SCROLL_CANCEL_THRESHOLD = 3 // pixels
+  const SCROLL_CANCEL_THRESHOLD = 5 // pixels
   const STILLNESS_CHECK_DELAY = 100 // ms
   const ENTRY_HOLD_DELAY = 200 // ms - additional hold for move (after stillness)
 
@@ -464,7 +464,7 @@ describe('Entry Touch Interactions', () => {
       })
 
       fireEvent.touchMove(window, {
-        touches: [{ clientY: 510, clientX: 100 }], // 10px movement > 3px threshold
+        touches: [{ clientY: 510, clientX: 100 }], // 10px movement > 5px threshold
         preventDefault: jest.fn(),
       })
 
@@ -576,7 +576,7 @@ describe('Entry Touch Interactions', () => {
   })
 
   describe('Tiny Movement Tolerance on Entry', () => {
-    it('should still allow hold if movement is below threshold (< 3px)', () => {
+    it('should still allow hold if movement is below threshold (< 5px)', () => {
       const { container } = renderTimelineWithEntry()
       const entryBlock = getEntryBlock(container)
 
@@ -610,7 +610,7 @@ describe('Entry Touch Interactions', () => {
       // Should have entered adjust mode despite tiny movement
     })
 
-    it('should cancel hold if movement exceeds threshold (>= 3px)', () => {
+    it('should cancel hold if movement exceeds threshold (>= 5px)', () => {
       const { container } = renderTimelineWithEntry()
       const entryBlock = getEntryBlock(container)
 
@@ -624,13 +624,13 @@ describe('Entry Touch Interactions', () => {
         stopPropagation: jest.fn(),
       })
 
-      // Movement at threshold (4px > 3px)
+      // Movement at threshold (6px > 5px)
       act(() => {
         jest.advanceTimersByTime(50)
       })
 
       fireEvent.touchMove(window, {
-        touches: [{ clientY: 504, clientX: 100 }], // 4px > 3px threshold
+        touches: [{ clientY: 506, clientX: 100 }], // 6px > 5px threshold
         preventDefault: jest.fn(),
       })
 
