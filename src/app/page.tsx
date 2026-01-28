@@ -9,17 +9,15 @@ import { useSessionData } from '@/hooks/useSessionData'
 import { useGreeting } from '@/hooks/useGreeting'
 import { useDashboardState } from '@/hooks/useDashboardState'
 import DashboardHero from '@/components/DashboardHero'
-import SessionCard from '@/components/SessionCard'
 import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import MoodCheckIn from '@/components/MoodCheckIn'
-import MorningCheckin from '@/components/MorningCheckin'
 import FocusSession from '@/components/FocusSession'
 import DayInReview from '@/components/DayInReview'
 import InsightsTeaser from '@/components/insights/InsightsTeaser'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
 import MotivationalQuote from '@/components/dashboard/MotivationalQuote'
-import { Moon } from 'lucide-react'
+import { Sun, Cloud, Moon, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 function HomeContent() {
@@ -32,7 +30,7 @@ function HomeContent() {
   // Custom hooks
   const { showOnboarding, setShowOnboarding, currentHour } = useDashboardState({ session, status })
   const { greeting, quotes, currentPeriod } = useGreeting(session?.user?.preferredName, currentHour)
-  const { entries, completions, isLoading, yesterdayEveningLogged } = useSessionData({ userId, today, currentHour })
+  const { entries, completions, isLoading } = useSessionData({ userId, today, currentHour })
 
   // Build session infos (use 12 as fallback for server render)
   const sessionInfos = useMemo(() => {
@@ -47,11 +45,6 @@ function HomeContent() {
   // Navigate to view session (same as log for now)
   const handleViewClick = (period: TimePeriod) => {
     router.push(`/log/${period}`)
-  }
-
-  // Handle yesterday's evening
-  const handleLogYesterdayEvening = () => {
-    router.push('/log/evening?date=yesterday')
   }
 
   // Show loading state with skeleton session cards
@@ -127,66 +120,86 @@ function HomeContent() {
           {/* === HERO SECTION: Compact metric circles === */}
           <DashboardHero />
 
-          {/* Motivational quote for current period */}
-          <MotivationalQuote quote={quotes[currentPeriod]} currentPeriod={currentPeriod} />
+          {/* ═══ MY DAY SECTION — Whoop style ═══ */}
+          <div className="mt-2">
+            {/* Section header */}
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-foreground">My Day</h2>
+            </div>
 
-          {/* Mood Check-in for current session */}
-          <MoodCheckIn period={currentPeriod} className="mb-3" />
+            {/* Day in Review banner — shows after 9pm */}
+            <DayInReview className="mb-3" />
 
-          {/* Morning Check-in (sleep, energy, priority) */}
-          <MorningCheckin className="mb-3" />
+            {/* MOOD CHECKER */}
+            <MoodCheckIn period={currentPeriod} className="mb-3" />
 
-          {/* Yesterday's evening prompt (if not logged and it's morning) */}
-          {!yesterdayEveningLogged && currentPeriod === 'morning' && (
-            <button
-              onClick={handleLogYesterdayEvening}
-              className="w-full mb-3 rounded-xl border border-dashed border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-3 text-left hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500/10">
-                  <Moon className="h-4 w-4 text-indigo-500" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm">Yesterday&apos;s evening not logged</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Tap to log what you did last night
-                  </p>
-                </div>
+            {/* SESSIONS card — Morning / Afternoon / Evening */}
+            <div className="rounded-xl bg-[#152535] border border-[rgba(255,255,255,0.05)] p-4 mb-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#6b8299]">
+                  Sessions
+                </h3>
               </div>
-            </button>
-          )}
+              <div className="space-y-2">
+                {sessionInfos.map(info => {
+                  const isActive = info.period === currentPeriod
+                  const isLogged = info.state === 'logged'
+                  const Icon = info.period === 'morning' ? Sun : info.period === 'afternoon' ? Cloud : Moon
+                  const periodLabel = info.period === 'morning' ? 'Morning' : info.period === 'afternoon' ? 'Afternoon' : 'Evening'
 
-          {/* Focus Session */}
-          <div className="mb-3">
-            <FocusSession />
+                  return (
+                    <button
+                      key={info.period}
+                      onClick={() => isLogged ? handleViewClick(info.period) : handleLogClick(info.period)}
+                      className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 transition-all ${
+                        isActive
+                          ? 'bg-[#1e3a4f] border border-[rgba(0,220,130,0.2)]'
+                          : 'bg-[#1b3044]/50 border border-transparent hover:bg-[#1e3a4f]/50'
+                      }`}
+                    >
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                        isLogged ? 'bg-[#00dc82]/15' : isActive ? 'bg-[#3b82f6]/15' : 'bg-[#1b3044]'
+                      }`}>
+                        <Icon className={`h-4 w-4 ${
+                          isLogged ? 'text-[#00dc82]' : isActive ? 'text-[#3b82f6]' : 'text-[#4a5f78]'
+                        }`} />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <p className={`text-sm font-medium ${
+                          isActive ? 'text-foreground' : 'text-[#c8d6e0]'
+                        }`}>
+                          {periodLabel}
+                        </p>
+                        <p className="text-[11px] text-[#6b8299]">
+                          {isLogged
+                            ? `${info.entryCount} entries · ${Math.round(info.totalMinutes)}m logged`
+                            : isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged'
+                          }
+                        </p>
+                      </div>
+                      {isLogged && (
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#00dc82]">
+                          <CheckCircle2 className="h-3 w-3 text-[#0d1b2a]" />
+                        </div>
+                      )}
+                      <ChevronRight className={`h-4 w-4 ${isActive ? 'text-[#6b8299]' : 'text-[#3a4f5f]'}`} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Focus Session */}
+            <div className="mb-3">
+              <FocusSession />
+            </div>
+
+            {/* Motivational quote */}
+            <MotivationalQuote quote={quotes[currentPeriod]} currentPeriod={currentPeriod} />
+
+            {/* Insights teaser */}
+            <InsightsTeaser className="mt-3" />
           </div>
-
-          {/* Session Cards */}
-          <div className="space-y-3">
-            {sessionInfos.map(info => (
-              <SessionCard
-                key={info.period}
-                period={info.period}
-                state={info.state}
-                entryCount={info.entryCount}
-                totalMinutes={info.totalMinutes}
-                quote={quotes[info.period]}
-                onLogClick={() => handleLogClick(info.period)}
-                onViewClick={() => handleViewClick(info.period)}
-              />
-            ))}
-          </div>
-
-          {/* Day in Review - shows after 9pm */}
-          <DayInReview className="mt-4" />
-
-          {/* Insights teaser — show top 1-2 insights */}
-          <InsightsTeaser className="mt-4" />
-
-          {/* Prompt text */}
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Log your activities when each session ends
-          </p>
         </div>
 
         <OnboardingModal
