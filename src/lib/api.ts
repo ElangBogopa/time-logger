@@ -7,9 +7,29 @@
 import { TimeEntry, TimeCategory, WeeklyTarget, WeeklyTargetType } from './types'
 import { CorrelationsResponse } from './correlation-types'
 
-function getCsrfToken(): string {
+export function getCsrfToken(): string {
   const match = document.cookie.match(/csrf-token=([^;]+)/)
   return match ? match[1] : ''
+}
+
+/**
+ * Drop-in fetch replacement that auto-injects CSRF token on mutating requests.
+ * Use this instead of raw fetch() for any POST/PUT/DELETE to API routes.
+ */
+export async function csrfFetch(url: string, options?: RequestInit): Promise<Response> {
+  const method = options?.method?.toUpperCase() || 'GET'
+  const needsCsrf = ['POST', 'PUT', 'DELETE'].includes(method)
+  
+  const headers = new Headers(options?.headers)
+  
+  if (needsCsrf) {
+    const csrfToken = getCsrfToken()
+    if (csrfToken) {
+      headers.set('x-csrf-token', csrfToken)
+    }
+  }
+  
+  return fetch(url, { ...options, headers })
 }
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {

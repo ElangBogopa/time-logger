@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { fetchEntries, updateEntry, deleteEntry } from '@/lib/api'
+import { fetchEntries, updateEntry, deleteEntry, csrfFetch } from '@/lib/api'
 import { TimeEntry, TimeCategory, CATEGORY_LABELS, isPendingEntryReadyToConfirm } from '@/lib/types'
 import {
   Dialog,
@@ -137,7 +137,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       let newCategory = entry.category
       if (activityChanged) {
         try {
-          const categoryResponse = await fetch('/api/categorize', {
+          const categoryResponse = await csrfFetch('/api/categorize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ activity }),
@@ -177,7 +177,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
         )
 
         try {
-          const commentaryResponse = await fetch('/api/commentary', {
+          const commentaryResponse = await csrfFetch('/api/commentary', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -263,7 +263,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
 
     try {
       // Get category from AI
-      const categoryResponse = await fetch('/api/categorize', {
+      const categoryResponse = await csrfFetch('/api/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ activity: entry.activity }),
@@ -290,7 +290,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
           Math.abs(i - entryIndex) <= 2 || entryIndex === -1
         )
 
-        const commentaryResponse = await fetch('/api/commentary', {
+        const commentaryResponse = await csrfFetch('/api/commentary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

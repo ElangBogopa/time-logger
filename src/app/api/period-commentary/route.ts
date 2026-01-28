@@ -175,21 +175,24 @@ export async function POST(request: NextRequest) {
       toneGuidance = 'Mixed period. Highlight the positives while being realistic about the balance.'
     }
 
-    const completion = await openai.chat.completions.create({
+    // Generate main commentary
+    const commentaryCompletion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
           content: `Generate a brief, insightful summary of this person's ${periodLabel.toLowerCase()}. 2-3 sentences max.
 
-STYLE:
-- Sound like a supportive friend who's genuinely interested in how their day is going
-- Be specific about what they did (reference actual activities)
-- Notice patterns worth mentioning
-- If they have targets, briefly note progress toward them when relevant
-- NO emojis
-- Don't be preachy or give unsolicited advice
-- Don't start with "Great" or generic praise
+PERSONALITY:
+- Sound like a supportive but real friend who knows them well
+- Use casual language naturally (not forced slang)
+- Can be cheeky about distractions: "Another scroll session? We both know that assignment exists."
+- Celebrate genuinely: "You crushed it. That's your best morning this week."
+- Reference specific activities by name from the entries
+- Occasionally drop a one-liner that feels personal
+- NO emojis (keep this rule)
+- Can be blunt when needed but never mean
+- Don't start with generic praise like "Great" unless it truly fits
 
 ${toneGuidance}
 
@@ -197,7 +200,8 @@ EXAMPLES OF GOOD PERIOD SUMMARIES:
 - "Solid morning—2 hours of deep work before the meetings kicked in. That STA414 study session is paying off."
 - "Meeting-heavy afternoon, but you protected an hour for coding at the end. Smart move."
 - "Mixed evening—the gym session was clutch, though that 45-minute scroll sesh crept in after."
-- "Busy morning with lots of context switching. The workout anchored it nicely."`,
+- "You logged 3 hours of TikTok but called it 'research.' Come on."
+- "Back-to-back meetings all afternoon. You survived, but your brain needs a break."`,
         },
         {
           role: 'user',
@@ -205,12 +209,79 @@ EXAMPLES OF GOOD PERIOD SUMMARIES:
         },
       ],
       temperature: 0.7,
-      max_tokens: 100,
+      max_tokens: 150,
     })
 
-    const commentary = completion.choices[0]?.message?.content?.trim() || ''
+    const commentary = commentaryCompletion.choices[0]?.message?.content?.trim() || ''
 
-    return NextResponse.json({ commentary })
+    // Generate data-driven insight
+    const insightCompletion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Generate a ONE-LINER data-driven insight based on patterns in their time tracking.
+
+EXAMPLES:
+- "You average 2.5h deep work on Tuesdays"
+- "This is your 3rd consecutive productive morning"
+- "You've logged 12h of meetings this week—that's up 40%"
+- "Evening scroll sessions account for 60% of your entertainment time"
+- "You haven't logged exercise in 4 days"
+
+RULES:
+- ONE sentence only (under 12 words)
+- Must be data-driven with specific numbers or patterns
+- NO advice, just observation
+- NO emojis
+- Can be blunt if the data warrants it`,
+        },
+        {
+          role: 'user',
+          content: context,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 50,
+    })
+
+    const insight = insightCompletion.choices[0]?.message?.content?.trim() || null
+
+    // Generate forward-looking prediction
+    const predictionCompletion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Generate a forward-looking prediction based on their progress and patterns.
+
+EXAMPLES:
+- "At this pace, you'll close your Deep Focus ring by Thursday"
+- "You'll need to pick it up to hit your Exercise goal this week"
+- "If you keep this energy, tomorrow morning could be even better"
+- "Watch the scroll creep tonight—you tend to lose evenings after afternoons like this"
+- "One more solid day like this and you'll beat last week's total"
+
+RULES:
+- ONE sentence (under 15 words)
+- Must be forward-looking and specific
+- Base it on weekly target progress when available
+- Can reference patterns and trends
+- Be specific about timing when possible
+- NO emojis`,
+        },
+        {
+          role: 'user',
+          content: context,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 50,
+    })
+
+    const prediction = predictionCompletion.choices[0]?.message?.content?.trim() || null
+
+    return NextResponse.json({ commentary, insight, prediction })
   } catch (error) {
     console.error('Period commentary generation error:', error)
 

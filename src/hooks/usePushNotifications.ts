@@ -1,5 +1,7 @@
 'use client'
 
+import { csrfFetch } from '@/lib/api'
+
 import { useState, useEffect, useCallback } from 'react'
 
 type PermissionState = 'prompt' | 'granted' | 'denied' | 'unsupported'
@@ -69,7 +71,7 @@ export function usePushNotifications() {
       })
 
       // Send subscription to server
-      const response = await fetch('/api/push/subscribe', {
+      const response = await csrfFetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscription: subscription.toJSON() }),
@@ -103,7 +105,7 @@ export function usePushNotifications() {
         await subscription.unsubscribe()
 
         // Remove from server
-        await fetch('/api/push/subscribe', {
+        await csrfFetch('/api/push/subscribe', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ endpoint: subscription.endpoint }),

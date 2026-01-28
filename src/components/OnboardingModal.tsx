@@ -9,7 +9,7 @@ import {
   MAX_WEEKLY_TARGETS,
   formatTargetValue,
 } from '@/lib/types'
-import { createWeeklyTargets } from '@/lib/api'
+import { createWeeklyTargets, csrfFetch } from '@/lib/api'
 import {
   Dialog,
   DialogContent,
@@ -78,7 +78,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
       }
       setIsSubmitting(true)
       try {
-        const response = await fetch('/api/user', {
+        const response = await csrfFetch('/api/user', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ preferredName: preferredName.trim() }),

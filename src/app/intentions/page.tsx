@@ -17,9 +17,7 @@ import {
   getUserToday,
   TimeEntry,
 } from '@/lib/types'
-import { fetchWeeklyTargets, updateWeeklyTarget, fetchEntries, createWeeklyTargets, deleteWeeklyTarget } from '@/lib/api'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
+import { fetchWeeklyTargets, updateWeeklyTarget, fetchEntries, createWeeklyTargets, deleteWeeklyTarget, csrfFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -36,7 +34,6 @@ import {
   Loader2,
   Check,
   Target,
-  Bell,
 } from 'lucide-react'
 
 function getWeekStartDate(): string {
@@ -173,7 +170,7 @@ export default function TargetsPage() {
     setReminderEnabled(enabled)
     setIsSavingReminders(true)
     try {
-      await fetch('/api/preferences', {
+      await csrfFetch('/api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reminder_enabled: enabled }),
@@ -190,7 +187,7 @@ export default function TargetsPage() {
     const newTimes = reminderTimes.map(rt => (rt.id === id ? { ...rt, time } : rt))
     setReminderTimes(newTimes)
     try {
-      await fetch('/api/preferences', {
+      await csrfFetch('/api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reminder_times: newTimes }),
@@ -204,7 +201,7 @@ export default function TargetsPage() {
     const newTimes = reminderTimes.map(rt => (rt.id === id ? { ...rt, enabled } : rt))
     setReminderTimes(newTimes)
     try {
-      await fetch('/api/preferences', {
+      await csrfFetch('/api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reminder_times: newTimes }),
@@ -392,58 +389,6 @@ export default function TargetsPage() {
             Maximum {MAX_WEEKLY_TARGETS} targets. Remove one to add another.
           </p>
         )}
-
-        {/* Reminder Settings */}
-        <div className="mt-12 border-t border-zinc-200 pt-8 dark:border-zinc-700">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
-              <Bell className="h-5 w-5 text-amber-500" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-semibold text-foreground">Logging Reminders</h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Get reminded to log your time
-              </p>
-            </div>
-            <Switch
-              checked={reminderEnabled}
-              onCheckedChange={handleReminderToggle}
-              disabled={isSavingReminders}
-            />
-          </div>
-
-          {reminderEnabled && (
-            <div className="space-y-3">
-              {reminderTimes.map(reminder => (
-                <div
-                  key={reminder.id}
-                  className="flex items-center gap-4 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800"
-                >
-                  <Switch
-                    checked={reminder.enabled}
-                    onCheckedChange={checked => handleReminderItemToggle(reminder.id, checked)}
-                    className="shrink-0"
-                  />
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${reminder.enabled ? 'text-foreground' : 'text-zinc-400'}`}>
-                      {reminder.label}
-                    </p>
-                  </div>
-                  <Input
-                    type="time"
-                    value={reminder.time}
-                    onChange={e => handleReminderTimeChange(reminder.id, e.target.value)}
-                    disabled={!reminder.enabled}
-                    className="w-28 text-center"
-                  />
-                </div>
-              ))}
-              <p className="text-xs text-zinc-500 text-center mt-4">
-                Push notifications coming soon with mobile app
-              </p>
-            </div>
-          )}
-        </div>
 
         {/* Add target modal */}
         <Dialog open={showAddModal} onOpenChange={setShowAddModal}>

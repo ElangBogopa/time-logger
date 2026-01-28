@@ -36,6 +36,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import ShareableStatsCard, { type ShareableStatsCardProps } from '@/components/ShareableStatsCard'
+import { csrfFetch } from '@/lib/api'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
@@ -207,7 +208,7 @@ export default function WeeklyReviewPage() {
 
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      const response = await fetch('/api/weekly-review', {
+      const response = await csrfFetch('/api/weekly-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ weekStart, timezone }),

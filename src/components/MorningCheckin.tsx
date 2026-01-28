@@ -1,5 +1,7 @@
 'use client'
 
+import { csrfFetch } from '@/lib/api'
+
 import { useState, useEffect } from 'react'
 import { Check, Sun, Target } from 'lucide-react'
 import { getUserToday } from '@/lib/types'
@@ -127,7 +129,7 @@ export default function MorningCheckin({ className = '' }: MorningCheckinProps) 
     }
 
     try {
-      const response = await fetch('/api/morning-checkin', {
+      const response = await csrfFetch('/api/morning-checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(checkinData),

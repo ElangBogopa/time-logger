@@ -1,5 +1,7 @@
 'use client'
 
+import { csrfFetch } from '@/lib/api'
+
 import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
@@ -66,7 +68,7 @@ function LoginContent() {
 
     try {
       // Pre-check if this email already has a Google account linked
-      const checkRes = await fetch('/api/auth/check-email', {
+      const checkRes = await csrfFetch('/api/auth/check-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

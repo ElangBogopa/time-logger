@@ -1,5 +1,7 @@
 'use client'
 
+import { csrfFetch } from '@/lib/api'
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type FocusSessionState = 'idle' | 'active' | 'completed'
@@ -236,7 +238,7 @@ export function useFocusSession() {
     const entryData = { ...completedData, ...overrides }
 
     try {
-      await fetch('/api/entries', {
+      await csrfFetch('/api/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

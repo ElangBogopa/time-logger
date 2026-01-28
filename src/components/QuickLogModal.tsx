@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { fetchEntries, createEntry, updateEntry } from '@/lib/api'
+import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
 import { getLocalDateString, getUserToday, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS, TimePeriod, PERIOD_LABELS, getLoggingPeriod } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import { parseTimeFromText, getHighlightedSegments, ParseResult } from '@/lib/time-parser'
@@ -120,7 +120,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       const currentTime = getCurrentTime()
       const date = selectedDate || getUserToday()
 
-      const response = await fetch('/api/suggestions', {
+      const response = await csrfFetch('/api/suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentTime, date }),
@@ -421,7 +421,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         onShowToast('Planned! Confirm this entry after it happens.')
       } else {
         // Past/current entry - normal flow with AI categorization + commentary
-        const categoryResponse = await fetch('/api/categorize', {
+        const categoryResponse = await csrfFetch('/api/categorize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ activity }),

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { fetchEntries as apiFetchEntries, createEntry, deleteEntry, upsertSessionCompletion } from '@/lib/api'
+import { fetchEntries as apiFetchEntries, createEntry, deleteEntry, upsertSessionCompletion, csrfFetch } from '@/lib/api'
 import {
   TimePeriod,
   TimeEntry,
@@ -32,6 +32,7 @@ import TimeRangePicker from '@/components/TimeRangePicker'
 import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import GhostEntryModal from '@/components/GhostEntryModal'
+import QuickLogModal from '@/components/QuickLogModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -118,10 +119,14 @@ export default function LogPeriodPage() {
   const [error, setError] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
+  const [summaryInsight, setSummaryInsight] = useState<string | null>(null)
+  const [summaryPrediction, setSummaryPrediction] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'form' | 'timeline'>('form')
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
+  const [quickLogDragData, setQuickLogDragData] = useState<DragCreateData | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Soft-delete: track entry IDs pending deletion (hidden from UI, deleted after toast expires)
@@ -217,7 +222,7 @@ export default function LogPeriodPage() {
       const currentTime = getCurrentTime()
       const date = selectedDate || getUserToday()
 
-      const response = await fetch('/api/suggestions', {
+      const response = await csrfFetch('/api/suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentTime, date }),
@@ -343,6 +348,16 @@ export default function LogPeriodPage() {
   const periodEntries = getEntriesForPeriod(visibleEntries, period)
   const stats = getSessionStats(visibleEntries, period)
 
+  // Get the last entry's end time for QuickLogModal auto-fill
+  const lastEntryEndTime = useMemo(() => {
+    if (visibleEntries.length === 0) return null
+    return visibleEntries.reduce((latest, entry) => {
+      if (!entry.end_time) return latest
+      if (!latest) return entry.end_time
+      return entry.end_time > latest ? entry.end_time : latest
+    }, null as string | null)
+  }, [visibleEntries])
+
   // Get period-relevant ghost events from calendar
   const calendarEvents = getEventsForDate(selectedDate).filter((e: CalendarEvent) => {
     if (e.isAllDay || !e.startTime) return false
@@ -402,7 +417,7 @@ export default function LogPeriodPage() {
       }
 
       // Categorize with AI
-      const categoryResponse = await fetch('/api/categorize', {
+      const categoryResponse = await csrfFetch('/api/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ activity }),
@@ -471,9 +486,9 @@ export default function LogPeriodPage() {
     setShowSummary(true)
     setIsSummaryLoading(true)
 
-    // Fetch AI commentary
+    // Fetch AI commentary, insight, and prediction
     try {
-      const response = await fetch('/api/period-commentary', {
+      const response = await csrfFetch('/api/period-commentary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -484,8 +499,10 @@ export default function LogPeriodPage() {
       })
 
       if (response.ok) {
-        const { commentary } = await response.json()
+        const { commentary, insight, prediction } = await response.json()
         setSummaryCommentary(commentary)
+        setSummaryInsight(insight || null)
+        setSummaryPrediction(prediction || null)
       }
     } catch (err) {
       console.error('Failed to fetch commentary:', err)
@@ -569,11 +586,16 @@ export default function LogPeriodPage() {
 
   // Handle drag-to-create from timeline view
   const handleDragCreate = (data: DragCreateData) => {
-    setStartTime(data.startTime)
-    setEndTime(data.endTime)
-    setViewMode('form')
-    // Focus the activity input after switching to form view
-    setTimeout(() => inputRef.current?.focus(), 100)
+    if (viewMode === 'timeline') {
+      // In timeline mode, open QuickLogModal (same as Calendar page)
+      setQuickLogDragData(data)
+      setIsQuickLogOpen(true)
+    } else {
+      // In form mode, pre-fill the form
+      setStartTime(data.startTime)
+      setEndTime(data.endTime)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
   }
 
   // Handle ghost entry click from timeline
@@ -929,12 +951,38 @@ export default function LogPeriodPage() {
         period={period}
         entries={periodEntries}
         commentary={summaryCommentary}
+        insight={summaryInsight}
+        prediction={summaryPrediction}
         isLoading={isSummaryLoading}
         isEvening={period === 'evening'}
         onViewDayReview={() => {
           // TODO: Navigate to day in review
           handleSummaryClose()
         }}
+      />
+
+      {/* Quick Log Modal (for timeline drag-create, same as Calendar page) */}
+      <QuickLogModal
+        isOpen={isQuickLogOpen}
+        onClose={() => {
+          setIsQuickLogOpen(false)
+          setQuickLogDragData(null)
+        }}
+        onEntryAdded={() => {
+          fetchEntries()
+          setQuickLogDragData(null)
+        }}
+        lastEntryEndTime={lastEntryEndTime}
+        initialStartTime={quickLogDragData?.startTime}
+        initialEndTime={quickLogDragData?.endTime}
+        onShowToast={setToast}
+        userId={userId}
+        calendarEvents={calendarEvents}
+        entries={visibleEntries}
+        selectedDate={selectedDate}
+        isFutureDay={false}
+        isPastDay={isYesterday}
+        disablePostSubmit={true}
       />
 
       {/* Ghost Entry Modal (for timeline view) */}

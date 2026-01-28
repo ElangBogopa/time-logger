@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { getLocalDateString } from '@/lib/types'
-import { fetchEntries, createEntry, updateEntry } from '@/lib/api'
+import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
 import { CalendarEvent } from './TimelineView'
 import TimeRangePicker from './TimeRangePicker'
 import {
@@ -147,7 +147,7 @@ export default function GhostEntryModal({
       }
 
       // Get category from AI
-      const categoryResponse = await fetch('/api/categorize', {
+      const categoryResponse = await csrfFetch('/api/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ activity }),
@@ -175,7 +175,7 @@ export default function GhostEntryModal({
       try {
         const dayEntries = await fetchEntries({ date: selectedDate, orderBy: 'created_at', orderAsc: true })
 
-        const commentaryResponse = await fetch('/api/commentary', {
+        const commentaryResponse = await csrfFetch('/api/commentary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

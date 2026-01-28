@@ -1,5 +1,7 @@
 'use client'
 
+import { csrfFetch } from '@/lib/api'
+
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -488,7 +490,7 @@ export default function DayReviewPage() {
   const fetchCommentary = useCallback(async (summaryData: DaySummary) => {
     setIsLoadingCommentary(true)
     try {
-      const response = await fetch('/api/day-commentary', {
+      const response = await csrfFetch('/api/day-commentary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,5 +1,7 @@
 'use client'
 
+import { csrfFetch } from '@/lib/api'
+
 import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -55,7 +57,7 @@ export default function SettingsPage() {
   const saveReminderTimes = async (newTimes: ReminderTime[]) => {
     setIsSaving(true)
     try {
-      const response = await fetch('/api/preferences', {
+      const response = await csrfFetch('/api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reminder_times: newTimes }),
@@ -63,7 +65,6 @@ export default function SettingsPage() {
 
       if (response.ok) {
         setReminderTimes(newTimes)
-        setToast({ message: 'Reminder times saved', variant: 'success' })
       } else {
         setToast({ message: 'Failed to save', variant: 'error' })
       }
@@ -217,16 +218,18 @@ export default function SettingsPage() {
           </Card>
 
           {/* Reminder Times Card */}
-          <Card>
+          <Card className={!push.isSubscribed ? 'opacity-50 pointer-events-none' : ''}>
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                  <Clock className="h-5 w-5 text-blue-500" />
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${push.isSubscribed ? 'bg-blue-500/10' : 'bg-muted'}`}>
+                  <Clock className={`h-5 w-5 ${push.isSubscribed ? 'text-blue-500' : 'text-muted-foreground'}`} />
                 </div>
                 <div>
                   <CardTitle className="text-base">Reminder Times</CardTitle>
                   <CardDescription>
-                    When should we remind you to log your time?
+                    {push.isSubscribed
+                      ? 'When should we remind you to log your time?'
+                      : 'Enable push notifications to set reminders'}
                   </CardDescription>
                 </div>
               </div>
@@ -240,9 +243,9 @@ export default function SettingsPage() {
                   >
                     <div className="flex items-center gap-3">
                       <Switch
-                        checked={reminder.enabled}
+                        checked={push.isSubscribed && reminder.enabled}
                         onCheckedChange={() => toggleReminder(reminder.id)}
-                        disabled={isSaving}
+                        disabled={!push.isSubscribed || isSaving}
                       />
                       <div>
                         <p className="text-sm font-medium">{reminder.label}</p>
@@ -252,18 +255,13 @@ export default function SettingsPage() {
                       type="time"
                       value={reminder.time}
                       onChange={(e) => updateReminderTime(reminder.id, e.target.value)}
-                      disabled={!reminder.enabled || isSaving}
+                      disabled={!push.isSubscribed || !reminder.enabled || isSaving}
                       className="rounded-md border border-input bg-background px-2 py-1 text-sm
                                disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 ))}
               </div>
-              {!push.isSubscribed && push.isSupported && push.permission !== 'denied' && (
-                <p className="mt-4 text-xs text-muted-foreground">
-                  Enable push notifications above to receive these reminders.
-                </p>
-              )}
             </CardContent>
           </Card>
 

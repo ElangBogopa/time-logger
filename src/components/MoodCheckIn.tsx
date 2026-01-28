@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Check } from 'lucide-react'
+import { csrfFetch } from '@/lib/api'
 import {
   MoodLevel,
   TimePeriod,
@@ -67,7 +68,7 @@ export default function MoodCheckIn({ period, onMoodSelected, className = '' }: 
     setSelectedMood(mood)
 
     try {
-      const response = await fetch('/api/mood', {
+      const response = await csrfFetch('/api/mood', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mood, period }),

@@ -15,6 +15,7 @@ import {
 import { ArrowLeft, Calendar, Loader2, X } from 'lucide-react'
 import Toast from '@/components/Toast'
 import { useCalendar } from '@/contexts/CalendarContext'
+import { csrfFetch } from '@/lib/api'
 
 interface ConflictData {
   email: string
@@ -90,7 +91,7 @@ function ConnectionsContent() {
   const handleDisconnect = async () => {
     setIsDisconnecting(true)
     try {
-      const response = await fetch('/api/calendar/status', { method: 'DELETE' })
+      const response = await csrfFetch('/api/calendar/status', { method: 'DELETE' })
       if (response.ok) {
         checkCalendarStatus() // Update shared context
         setToast({ message: 'Calendar disconnected', variant: 'success' })
@@ -110,7 +111,7 @@ function ConnectionsContent() {
   const handleCancelConflict = async () => {
     if (!conflictModal) return
     try {
-      await fetch('/api/calendar/callback/resolve', {
+      await csrfFetch('/api/calendar/callback/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,7 +130,7 @@ function ConnectionsContent() {
     if (!conflictModal || !session?.user?.id) return
     setIsMerging(true)
     try {
-      const response = await fetch('/api/auth/merge-accounts', {
+      const response = await csrfFetch('/api/auth/merge-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
