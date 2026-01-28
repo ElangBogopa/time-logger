@@ -25,8 +25,6 @@ import {
   findFirstGapInPeriod,
 } from '@/lib/session-utils'
 import { getCurrentTime, calculateDuration, timeToMinutes } from '@/lib/time-utils'
-import { parseTimeFromText, ParseResult } from '@/lib/time-parser'
-import { formatTimeDisplay } from '@/lib/time-utils'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import TimeRangePicker from '@/components/TimeRangePicker'
 import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
@@ -45,14 +43,9 @@ import {
   Calendar,
   Plus,
   CheckCircle2,
-  Clock,
   Trash2,
-  Sparkles,
   List,
   LayoutGrid,
-  TrendingUp,
-  History,
-  X,
 } from 'lucide-react'
 import { toast as sonnerToast } from 'sonner'
 
@@ -133,26 +126,6 @@ export default function LogPeriodPage() {
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
   const deleteTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
-  // Smart suggestions state
-  interface ActivitySuggestion {
-    activity: string
-    category: string | null
-    suggestedDuration: number
-    startTime: string
-    endTime: string
-    source: 'pattern' | 'recent'
-    confidence: 'high' | 'medium'
-  }
-  const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([])
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
-
-  // Auto-parse state
-  const [parseResult, setParseResult] = useState<ParseResult | null>(null)
-  const [isAutoParseApplied, setIsAutoParseApplied] = useState(false)
-  const [showHighlightedInput, setShowHighlightedInput] = useState(false)
-  // Store original times before parsing, for revert on dismiss
-  const [originalTimes, setOriginalTimes] = useState<{ startTime: string; endTime: string } | null>(null)
-
   // Calendar context for ghost events
   const { getEventsForDate } = useCalendar()
 
@@ -212,136 +185,6 @@ export default function LogPeriodPage() {
       setEndTime(`${Math.min(hour + 1, range.end).toString().padStart(2, '0')}:00`)
     }
   }, [entries, period, range])
-
-  // Fetch smart suggestions
-  const fetchSuggestions = useCallback(async () => {
-    if (!userId) return
-
-    setIsLoadingSuggestions(true)
-    try {
-      const currentTime = getCurrentTime()
-      const date = selectedDate || getUserToday()
-
-      const response = await csrfFetch('/api/suggestions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentTime, date }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSuggestions(data.suggestions || [])
-      }
-    } catch (err) {
-      console.error('Failed to fetch suggestions:', err)
-    } finally {
-      setIsLoadingSuggestions(false)
-    }
-  }, [userId, selectedDate])
-
-  // Fetch suggestions on mount
-  useEffect(() => {
-    fetchSuggestions()
-  }, [fetchSuggestions])
-
-  // Real-time parsing as user types - NO auto-apply, just show the suggestion chip
-  useEffect(() => {
-    if (!activity || activity.trim().length < 2) {
-      setParseResult(null)
-      setShowHighlightedInput(false)
-      return
-    }
-
-    const currentTime = getCurrentTime()
-    const result = parseTimeFromText(activity, currentTime)
-    setParseResult(result)
-
-    // Show the suggestion chip if any time pattern is detected
-    // User must click "Apply" to use the parsed times
-    if (result.hasTimePattern && !isAutoParseApplied) {
-      setShowHighlightedInput(true)
-      // Save original times for revert (only once when chip first appears)
-      if (!originalTimes && startTime && endTime) {
-        setOriginalTimes({ startTime, endTime })
-      }
-    } else {
-      setShowHighlightedInput(false)
-    }
-  }, [activity, isAutoParseApplied, startTime, endTime, originalTimes])
-
-  // Compute what times would be applied based on parse result
-  const computedParseTimes = useMemo(() => {
-    if (!parseResult || !parseResult.hasTimePattern || !startTime) return null
-
-    const totalDuration = parseResult.detections
-      .filter(d => d.type === 'duration')
-      .reduce((sum, d) => sum + (d.durationMinutes || 0), 0)
-    const hasDuration = totalDuration > 0
-
-    if (hasDuration) {
-      // Has duration: use current startTime + duration
-      const [hours, mins] = startTime.split(':').map(Number)
-      const startMins = hours * 60 + mins
-      const endMins = startMins + totalDuration
-      const endHours = Math.floor(endMins / 60) % 24
-      const endMinsPart = endMins % 60
-      return {
-        startTime: startTime,
-        endTime: `${endHours.toString().padStart(2, '0')}:${endMinsPart.toString().padStart(2, '0')}`
-      }
-    } else if (parseResult.startTime && parseResult.endTime) {
-      // Has explicit or activity-based time range: use parsed times
-      return {
-        startTime: parseResult.startTime,
-        endTime: parseResult.endTime
-      }
-    } else if (parseResult.startTime) {
-      // Has just start time: use it with current end time
-      return {
-        startTime: parseResult.startTime,
-        endTime: endTime
-      }
-    }
-    return null
-  }, [parseResult, startTime, endTime])
-
-  // Apply parsed times from the detected pattern
-  const handleApplyParsedTimes = () => {
-    if (!computedParseTimes) return
-
-    setStartTime(computedParseTimes.startTime)
-    setEndTime(computedParseTimes.endTime)
-
-    // Update activity to cleaned version (without time expressions) only if it has content
-    if (parseResult && parseResult.cleanedActivity.trim()) {
-      setActivity(parseResult.cleanedActivity)
-    }
-    // If cleaned activity is empty, keep the original activity text
-
-    setIsAutoParseApplied(true)
-    setShowHighlightedInput(false)
-    setOriginalTimes(null)
-  }
-
-  // Dismiss the parsed detection and revert to original times
-  const handleDismissParsedTimes = () => {
-    // Revert to original times if we have them
-    if (originalTimes) {
-      setStartTime(originalTimes.startTime)
-      setEndTime(originalTimes.endTime)
-    }
-    setShowHighlightedInput(false)
-    setIsAutoParseApplied(true) // Mark as "handled" so chip doesn't reappear
-    setOriginalTimes(null)
-  }
-
-  // Apply a suggestion
-  const handleSuggestionSelect = (suggestion: ActivitySuggestion) => {
-    setActivity(suggestion.activity)
-    setStartTime(suggestion.startTime)
-    setEndTime(suggestion.endTime)
-    setNotes('')
-  }
 
   // Get period-relevant entries (excluding soft-deleted ones)
   const visibleEntries = entries.filter(e => !pendingDeletes.has(e.id))
@@ -759,97 +602,15 @@ export default function LogPeriodPage() {
               </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border bg-card p-4">
-                {/* Smart suggestions chips */}
-                {!activity && suggestions.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Sparkles className="h-3 w-3" />
-                      <span>Suggestions</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {suggestions.map((suggestion, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => handleSuggestionSelect(suggestion)}
-                          className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:border-primary hover:bg-primary/5 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-primary"
-                        >
-                          {suggestion.source === 'pattern' ? (
-                            <TrendingUp className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <History className="h-3 w-3 text-blue-500" />
-                          )}
-                          <span className="font-medium">{suggestion.activity}</span>
-                          <span className="text-muted-foreground">
-                            {Math.round(suggestion.suggestedDuration / 60) > 0
-                              ? `${Math.round(suggestion.suggestedDuration / 60)}h`
-                              : `${suggestion.suggestedDuration}m`}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="space-y-2">
-                  <Label htmlFor="activity">What did you do?</Label>
+                  <Label htmlFor="activity">Activity</Label>
                   <Input
                     ref={inputRef}
                     id="activity"
                     value={activity}
-                    onChange={(e) => {
-                      setActivity(e.target.value)
-                      setIsAutoParseApplied(false)
-                      setOriginalTimes(null) // Reset so new parse can save new original times
-                    }}
-                    placeholder='e.g., "coded for 2 hours" or "meeting 2pm to 3pm"'
+                    onChange={(e) => setActivity(e.target.value)}
+                    placeholder="What did you do?"
                   />
-
-                  {/* Auto-parse preview chip */}
-                  {showHighlightedInput && parseResult && parseResult.hasTimePattern && !isAutoParseApplied && computedParseTimes && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
-                      <Sparkles className="h-4 w-4 text-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-primary font-medium">Detected time info</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {parseResult.detections.map(d => d.matchedText).join(', ')}
-                          <span className="ml-1">→ {formatTimeDisplay(computedParseTimes.startTime)} - {formatTimeDisplay(computedParseTimes.endTime)}</span>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={handleApplyParsedTimes}
-                          className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                        >
-                          Apply
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleDismissParsedTimes}
-                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          aria-label="Dismiss"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Applied confirmation */}
-                  {isAutoParseApplied && (
-                    <p className="text-xs text-green-600 flex items-center gap-1">
-                      <Sparkles className="h-3 w-3" />
-                      Times applied from your input
-                    </p>
-                  )}
-
-                  {/* Help text when empty */}
-                  {!activity && (
-                    <p className="text-xs text-muted-foreground">
-                      Tip: Type naturally like &quot;coded for 2 hours&quot; or &quot;meeting 2pm to 3pm&quot;
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-2">

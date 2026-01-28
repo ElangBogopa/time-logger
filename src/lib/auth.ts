@@ -234,12 +234,24 @@ If you didn't request this email, you can safely ignore it.`
       if (account?.provider === 'google') {
         const email = profile?.email?.toLowerCase()
 
-        // Get user id from our users table
-        const { data: dbUser } = await supabase
-          .from('users')
-          .select('id, preferred_name')
-          .eq('email', email)
-          .single()
+        // Get user id from our users table (try email first, then google_id)
+        let dbUser = null
+        if (email) {
+          const { data } = await supabase
+            .from('users')
+            .select('id, preferred_name')
+            .eq('email', email)
+            .single()
+          dbUser = data
+        }
+        if (!dbUser && profile?.sub) {
+          const { data } = await supabase
+            .from('users')
+            .select('id, preferred_name')
+            .eq('google_id', profile.sub)
+            .single()
+          dbUser = data
+        }
 
         // Debug: Log the scopes we received from Google
         console.log('[Auth] Google sign-in:')
