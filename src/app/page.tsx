@@ -125,7 +125,7 @@ function HomeContent() {
           <GreetingHeader greeting={greeting} currentPeriod={currentPeriod} />
 
           {/* === HERO SECTION: Compact metric circles === */}
-          <DashboardHero userId={userId} />
+          <DashboardHero />
 
           {/* Motivational quote for current period */}
           <MotivationalQuote quote={quotes[currentPeriod]} currentPeriod={currentPeriod} />
