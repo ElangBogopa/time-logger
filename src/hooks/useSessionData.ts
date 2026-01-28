@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { fetchEntries as apiFetchEntries, fetchSessionCompletions } from '@/lib/api'
-import { TimeEntry, SessionCompletion } from '@/lib/types'
+import { TimeEntry, SessionCompletion, PERIOD_TIME_RANGES } from '@/lib/types'
 import { canLogYesterdayEvening, getYesterdayDateString } from '@/lib/session-utils'
 
 interface UseSessionDataReturn {
@@ -40,11 +40,20 @@ export function useSessionData({ userId, today, currentHour }: UseSessionDataPro
       setCompletions(completionsData as SessionCompletion[])
 
       // Check if yesterday's evening was logged (for morning prompt)
-      // Use 12 as fallback (won't show prompt) if currentHour not yet set
+      // Consider it "logged" if there's a session completion OR actual entries in the evening time range
       if (currentHour !== null && canLogYesterdayEvening(currentHour)) {
         const yesterday = getYesterdayDateString()
-        const yesterdayCompletions = await fetchSessionCompletions({ date: yesterday, period: 'evening' })
-        setYesterdayEveningLogged(yesterdayCompletions.length > 0)
+        const [yesterdayCompletions, yesterdayEntries] = await Promise.all([
+          fetchSessionCompletions({ date: yesterday, period: 'evening' }),
+          apiFetchEntries({ date: yesterday, status: 'confirmed' }),
+        ])
+        // Check for entries in the evening time range (18:00+)
+        const eveningRange = PERIOD_TIME_RANGES.evening
+        const hasEveningEntries = yesterdayEntries.some(e => {
+          const startHour = parseInt(e.start_time?.split(':')[0] || '0', 10)
+          return startHour >= eveningRange.start
+        })
+        setYesterdayEveningLogged(yesterdayCompletions.length > 0 || hasEveningEntries)
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
