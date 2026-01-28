@@ -18,30 +18,30 @@ interface MetricsResponse {
   nudge: string
 }
 
-/* ── Per-metric color identity (like Whoop: each circle = unique color) ── */
+/* ── Per-metric color identity ── */
 const METRIC_IDENTITY = {
   focus: {
     active: '#3b82f6',   // blue — cognitive output
-    track: '#1e3a5f',    // dark blue track
-    trackDim: '#162d4a', // dimmer when 0%
+    track: '#3b82f620',  // blue track (transparent)
+    trackDim: '#3b82f610',
   },
   balance: {
-    active: '#f5c842',   // gold/yellow — recovery
-    track: '#3d3520',    // dark gold track
-    trackDim: '#2a2618', // dimmer when 0%
+    active: '#f59e0b',   // amber — recovery
+    track: '#f59e0b20',
+    trackDim: '#f59e0b10',
   },
   rhythm: {
-    active: '#00dc82',   // green — consistency
-    track: '#0d3a2a',    // dark green track
-    trackDim: '#0a2d22', // dimmer when 0%
+    active: '#22c55e',   // green — consistency
+    track: '#22c55e20',
+    trackDim: '#22c55e10',
   },
 }
 
 /* ── Status color for labels ── */
 const STATUS_COLORS = {
-  green: 'text-[#00dc82]',
-  yellow: 'text-[#f5c842]',
-  red: 'text-[#ef4444]',
+  green: 'text-green-500',
+  yellow: 'text-amber-500',
+  red: 'text-destructive',
 }
 
 /* ── Metric Circle — Whoop style with unique identity color ── */
@@ -69,7 +69,7 @@ function MetricCircle({
   // When 0%, show dimmer track and gray text. When > 0%, show identity color.
   const trackColor = hasProgress ? identity.track : identity.trackDim
   const activeColor = identity.active
-  const textColor = hasProgress ? activeColor : '#4a5f78'
+  const textColor = hasProgress ? activeColor : 'var(--muted-foreground)'
 
   return (
     <div className="flex flex-col items-center">
@@ -117,8 +117,7 @@ function MetricCircle({
         </div>
       </div>
       {/* Label below */}
-      <span className="text-[11px] font-semibold uppercase tracking-wider mt-2"
-        style={{ color: hasProgress ? '#c8d6e0' : '#4a5f78' }}>
+      <span className={`text-[11px] font-semibold uppercase tracking-wider mt-2 ${hasProgress ? 'text-foreground' : 'text-muted-foreground'}`}>
         {label} ›
       </span>
     </div>
@@ -194,8 +193,8 @@ export default function DashboardHero() {
 
       {/* Insight card — Whoop style */}
       {metrics.nudge && (
-        <div className="mx-2 rounded-xl bg-[#152535] border border-[rgba(255,255,255,0.05)] px-4 py-3">
-          <p className="text-[13px] text-[#c8d6e0] leading-relaxed">
+        <div className="mx-2 rounded-xl bg-card border border-border px-4 py-3">
+          <p className="text-[13px] text-secondary-foreground leading-relaxed">
             {metrics.nudge}
           </p>
         </div>

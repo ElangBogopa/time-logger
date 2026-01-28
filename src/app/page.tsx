@@ -134,9 +134,9 @@ function HomeContent() {
             <MoodCheckIn period={currentPeriod} className="mb-3" />
 
             {/* SESSIONS card — Morning / Afternoon / Evening */}
-            <div className="rounded-xl bg-[#152535] border border-[rgba(255,255,255,0.05)] p-4 mb-3">
+            <div className="rounded-xl bg-card border border-border p-4 mb-3">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#6b8299]">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Sessions
                 </h3>
               </div>
@@ -153,24 +153,24 @@ function HomeContent() {
                       onClick={() => isLogged ? handleViewClick(info.period) : handleLogClick(info.period)}
                       className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 transition-all ${
                         isActive
-                          ? 'bg-[#1e3a4f] border border-[rgba(0,220,130,0.2)]'
-                          : 'bg-[#1b3044]/50 border border-transparent hover:bg-[#1e3a4f]/50'
+                          ? 'bg-accent border border-primary/20'
+                          : 'bg-secondary/50 border border-transparent hover:bg-accent/50'
                       }`}
                     >
                       <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                        isLogged ? 'bg-[#00dc82]/15' : isActive ? 'bg-[#3b82f6]/15' : 'bg-[#1b3044]'
+                        isLogged ? 'bg-primary/15' : isActive ? 'bg-blue-500/15' : 'bg-secondary'
                       }`}>
                         <Icon className={`h-4 w-4 ${
-                          isLogged ? 'text-[#00dc82]' : isActive ? 'text-[#3b82f6]' : 'text-[#4a5f78]'
+                          isLogged ? 'text-primary' : isActive ? 'text-blue-500' : 'text-muted-foreground'
                         }`} />
                       </div>
                       <div className="flex-1 text-left">
                         <p className={`text-sm font-medium ${
-                          isActive ? 'text-foreground' : 'text-[#c8d6e0]'
+                          isActive ? 'text-foreground' : 'text-secondary-foreground'
                         }`}>
                           {periodLabel}
                         </p>
-                        <p className="text-[11px] text-[#6b8299]">
+                        <p className="text-[11px] text-muted-foreground">
                           {isLogged
                             ? `${info.entryCount} entries · ${Math.round(info.totalMinutes)}m logged`
                             : isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged'
@@ -178,11 +178,11 @@ function HomeContent() {
                         </p>
                       </div>
                       {isLogged && (
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#00dc82]">
-                          <CheckCircle2 className="h-3 w-3 text-[#0d1b2a]" />
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary">
+                          <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
                         </div>
                       )}
-                      <ChevronRight className={`h-4 w-4 ${isActive ? 'text-[#6b8299]' : 'text-[#3a4f5f]'}`} />
+                      <ChevronRight className={`h-4 w-4 ${isActive ? 'text-muted-foreground' : 'text-muted-foreground/50'}`} />
                     </button>
                   )
                 })}

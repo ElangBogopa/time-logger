@@ -47,80 +47,77 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   WHOOP-INSPIRED COLOR SYSTEM
-   Deep teal-dark palette with bright accent colors.
-   Both light and dark modes use the same dark aesthetic.
+   shadcn/ui Default Color System (Zinc)
+   Clean, neutral palette with proper light/dark modes.
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  --radius: 0.65rem;
-  /* Whoop dark teal — used for BOTH modes */
-  --background: #0d1b2a;                       /* deep navy-teal */
-  --foreground: #e8edf2;                       /* soft white */
-  --card: #152535;                             /* raised surface */
-  --card-foreground: #e8edf2;
-  --popover: #172a3a;
-  --popover-foreground: #e8edf2;
-  --primary: #00dc82;                          /* whoop green */
-  --primary-foreground: #0d1b2a;
-  --secondary: #1b3044;                        /* subtle teal surface */
-  --secondary-foreground: #c8d6e0;
-  --muted: #1b3044;                            /* muted surface */
-  --muted-foreground: #6b8299;                 /* slate blue-gray text */
-  --accent: #1e3a4f;                           /* interactive surface */
-  --accent-foreground: #e8edf2;
-  --destructive: #ef4444;
-  --border: rgba(255, 255, 255, 0.07);         /* barely visible */
-  --input: rgba(255, 255, 255, 0.1);
-  --ring: #00dc82;                             /* green ring */
-  --chart-1: #00dc82;                          /* green */
-  --chart-2: #3b82f6;                          /* blue */
-  --chart-3: #f59e0b;                          /* amber */
-  --chart-4: #8b5cf6;                          /* purple */
-  --chart-5: #ef4444;                          /* red */
-  --sidebar: #101e2e;
-  --sidebar-foreground: #e8edf2;
-  --sidebar-primary: #00dc82;
-  --sidebar-primary-foreground: #0d1b2a;
-  --sidebar-accent: #1b3044;
-  --sidebar-accent-foreground: #e8edf2;
-  --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: #00dc82;
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Dark class overrides — same palette, keeps Tailwind dark: utilities working */
 .dark {
-  --background: #0d1b2a;
-  --foreground: #e8edf2;
-  --card: #152535;
-  --card-foreground: #e8edf2;
-  --popover: #172a3a;
-  --popover-foreground: #e8edf2;
-  --primary: #00dc82;
-  --primary-foreground: #0d1b2a;
-  --secondary: #1b3044;
-  --secondary-foreground: #c8d6e0;
-  --muted: #1b3044;
-  --muted-foreground: #6b8299;
-  --accent: #1e3a4f;
-  --accent-foreground: #e8edf2;
-  --destructive: #ef4444;
-  --border: rgba(255, 255, 255, 0.07);
-  --input: rgba(255, 255, 255, 0.1);
-  --ring: #00dc82;
-  --chart-1: #00dc82;
-  --chart-2: #3b82f6;
-  --chart-3: #f59e0b;
-  --chart-4: #8b5cf6;
-  --chart-5: #ef4444;
-  --sidebar: #101e2e;
-  --sidebar-foreground: #e8edf2;
-  --sidebar-primary: #00dc82;
-  --sidebar-primary-foreground: #0d1b2a;
-  --sidebar-accent: #1b3044;
-  --sidebar-accent-foreground: #e8edf2;
-  --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: #00dc82;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
