@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lightbulb, Sun, BarChart3 } from 'lucide-react'
@@ -34,7 +34,7 @@ const tabs: { id: ReviewTab; label: string; icon: React.ElementType }[] = [
   { id: 'weekly', label: 'Weekly', icon: BarChart3 },
 ]
 
-export default function ReviewPage() {
+function ReviewContent() {
   const { status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -107,5 +107,17 @@ export default function ReviewPage() {
         {activeTab === 'weekly' && <WeeklyReviewContent />}
       </div>
     </div>
+  )
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    }>
+      <ReviewContent />
+    </Suspense>
   )
 }
