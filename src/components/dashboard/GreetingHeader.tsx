@@ -10,12 +10,12 @@ interface GreetingHeaderProps {
 
 export default function GreetingHeader({ greeting, currentPeriod }: GreetingHeaderProps) {
   return (
-    <header className="mb-5">
+    <header className="mb-3">
       <div className="flex items-center gap-2">
-        <span className="text-3xl" role="img" aria-label={currentPeriod}>
+        <span className="text-2xl" role="img" aria-label={currentPeriod}>
           {greeting.emoji}
         </span>
-        <h1 className="text-2xl font-bold text-foreground">{greeting.text}</h1>
+        <h1 className="text-xl font-bold text-foreground">{greeting.text}</h1>
       </div>
     </header>
   )
