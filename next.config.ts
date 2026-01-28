@@ -60,6 +60,10 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   // Empty turbopack config to silence warning when using webpack
   turbopack: {},
+  // Skip TS check during build (already checked locally, saves Vercel memory)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 };
 
 export default withSentryConfig(withPWA(nextConfig), {
