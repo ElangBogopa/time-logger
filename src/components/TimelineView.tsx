@@ -45,6 +45,7 @@ export default function TimelineView({
   onGhostEntryClick,
   onDragCreate,
   onShowToast,
+  selectedDate,
   isToday = true,
   isFutureDay = false,
   isPastDay = false,
@@ -142,9 +143,59 @@ export default function TimelineView({
     onEntryClick: handleEntryClick,
   })
 
-  // For now, let's implement ghost events state directly here since the hook is complex
-  const [dismissedEventIds, setDismissedEventIds] = useState<Set<string>>(new Set())
+  // Persist dismissed ghost event IDs to localStorage so they survive reloads
+  const dismissedStorageKey = `dismissed-ghosts-${selectedDate ?? 'unknown'}`
+
+  const [dismissedEventIds, setDismissedEventIds] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const stored = localStorage.getItem(dismissedStorageKey)
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
   const [showDismissed, setShowDismissed] = useState(false)
+
+  // Re-load dismissed IDs when selectedDate changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = localStorage.getItem(dismissedStorageKey)
+      setDismissedEventIds(stored ? new Set(JSON.parse(stored) as string[]) : new Set())
+    } catch {
+      setDismissedEventIds(new Set())
+    }
+  }, [dismissedStorageKey])
+
+  // Sync to localStorage whenever dismissedEventIds changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (dismissedEventIds.size === 0) {
+      localStorage.removeItem(dismissedStorageKey)
+    } else {
+      localStorage.setItem(dismissedStorageKey, JSON.stringify([...dismissedEventIds]))
+    }
+  }, [dismissedEventIds, dismissedStorageKey])
+
+  // Clean up old dismissed keys (older than 7 days) on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const prefix = 'dismissed-ghosts-'
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 7)
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i)
+        if (key?.startsWith(prefix)) {
+          const dateStr = key.slice(prefix.length)
+          if (dateStr < cutoff.toISOString().slice(0, 10)) {
+            localStorage.removeItem(key)
+          }
+        }
+      }
+    } catch { /* ignore cleanup errors */ }
+  }, [])
 
   const dismissGhostEvent = useCallback((eventId: string) => {
     setDismissedEventIds(prev => new Set(prev).add(eventId))
