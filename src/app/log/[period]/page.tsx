@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { supabase } from '@/lib/supabase'
+import { fetchEntries as apiFetchEntries, createEntry, deleteEntry, upsertSessionCompletion } from '@/lib/api'
 import {
   TimePeriod,
   TimeEntry,
@@ -53,6 +53,7 @@ import {
   History,
   X,
 } from 'lucide-react'
+import { toast as sonnerToast } from 'sonner'
 
 const PERIOD_ICONS: Record<TimePeriod, typeof Sun> = {
   morning: Sun,
@@ -123,6 +124,10 @@ export default function LogPeriodPage() {
   const [toast, setToast] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Soft-delete: track entry IDs pending deletion (hidden from UI, deleted after toast expires)
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
+  const deleteTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+
   // Smart suggestions state
   interface ActivitySuggestion {
     activity: string
@@ -153,16 +158,11 @@ export default function LogPeriodPage() {
     if (!userId) return
     setIsLoading(true)
 
-    const { data, error } = await supabase
-      .from('time_entries')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', selectedDate)
-      .eq('status', 'confirmed')
-      .order('start_time')
-
-    if (!error && data) {
-      setEntries(data as TimeEntry[])
+    try {
+      const data = await apiFetchEntries({ date: selectedDate, status: 'confirmed', orderBy: 'start_time', orderAsc: true })
+      setEntries(data)
+    } catch (err) {
+      console.error('Failed to fetch entries:', err)
     }
     setIsLoading(false)
   }, [userId, selectedDate])
@@ -170,6 +170,15 @@ export default function LogPeriodPage() {
   useEffect(() => {
     fetchEntries()
   }, [fetchEntries])
+
+  // Cleanup pending delete timers on unmount
+  useEffect(() => {
+    const timers = deleteTimersRef.current
+    return () => {
+      timers.forEach(timer => clearTimeout(timer))
+      timers.clear()
+    }
+  }, [])
 
   // Auto-hide toast
   useEffect(() => {
@@ -329,9 +338,10 @@ export default function LogPeriodPage() {
     setNotes('')
   }
 
-  // Get period-relevant entries
-  const periodEntries = getEntriesForPeriod(entries, period)
-  const stats = getSessionStats(entries, period)
+  // Get period-relevant entries (excluding soft-deleted ones)
+  const visibleEntries = entries.filter(e => !pendingDeletes.has(e.id))
+  const periodEntries = getEntriesForPeriod(visibleEntries, period)
+  const stats = getSessionStats(visibleEntries, period)
 
   // Get period-relevant ghost events from calendar
   const calendarEvents = getEventsForDate(selectedDate).filter((e: CalendarEvent) => {
@@ -405,22 +415,17 @@ export default function LogPeriodPage() {
       const { category } = await categoryResponse.json()
 
       // Insert entry
-      const { error: insertError } = await supabase
-        .from('time_entries')
-        .insert({
-          user_id: userId,
-          date: selectedDate,
-          activity,
-          category,
-          duration_minutes: duration,
-          start_time: startTime,
-          end_time: endTime,
-          description: notes || null,
-          commentary: 'Logged',
-          status: 'confirmed',
-        })
-
-      if (insertError) throw new Error(insertError.message)
+      await createEntry({
+        date: selectedDate,
+        activity,
+        category,
+        duration_minutes: duration,
+        start_time: startTime,
+        end_time: endTime,
+        description: notes || null,
+        commentary: 'Logged',
+        status: 'confirmed',
+      })
 
       // Refresh and reset form
       await fetchEntries()
@@ -450,21 +455,16 @@ export default function LogPeriodPage() {
   // Handle "Done with period"
   const handleDone = async () => {
     // Save session completion
-    const { error: completionError } = await supabase
-      .from('session_completions')
-      .upsert({
-        user_id: userId,
+    try {
+      await upsertSessionCompletion({
         date: selectedDate,
         period,
         entry_count: stats.entryCount,
         total_minutes: stats.totalMinutes,
         skipped: false,
-      }, {
-        onConflict: 'user_id,date,period',
       })
-
-    if (completionError) {
-      console.error('Failed to save session completion:', completionError)
+    } catch (err) {
+      console.error('Failed to save session completion:', err)
     }
 
     // Show summary popup
@@ -496,21 +496,16 @@ export default function LogPeriodPage() {
 
   // Handle "Nothing to log" (skip)
   const handleSkip = async () => {
-    const { error: completionError } = await supabase
-      .from('session_completions')
-      .upsert({
-        user_id: userId,
+    try {
+      await upsertSessionCompletion({
         date: selectedDate,
         period,
         entry_count: 0,
         total_minutes: 0,
         skipped: true,
-      }, {
-        onConflict: 'user_id,date,period',
       })
-
-    if (completionError) {
-      console.error('Failed to save skip:', completionError)
+    } catch (err) {
+      console.error('Failed to save skip:', err)
     }
 
     router.push('/')
@@ -522,16 +517,54 @@ export default function LogPeriodPage() {
     router.push('/')
   }
 
-  // Delete entry
-  const handleDeleteEntry = async (entryId: string) => {
-    const { error } = await supabase
-      .from('time_entries')
-      .delete()
-      .eq('id', entryId)
+  // Delete entry with undo support
+  const handleDeleteEntry = (entryId: string) => {
+    const entry = entries.find(e => e.id === entryId)
+    const entryName = entry?.activity || 'Entry'
 
-    if (!error) {
-      await fetchEntries()
-    }
+    // Soft-delete: hide from UI immediately
+    setPendingDeletes(prev => new Set(prev).add(entryId))
+
+    // Set a timer for the actual deletion
+    const timer = setTimeout(async () => {
+      try {
+        await deleteEntry(entryId)
+        await fetchEntries()
+      } catch (err) {
+        console.error('Failed to delete entry:', err)
+      } finally {
+        setPendingDeletes(prev => {
+          const next = new Set(prev)
+          next.delete(entryId)
+          return next
+        })
+        deleteTimersRef.current.delete(entryId)
+      }
+    }, 5000)
+
+    deleteTimersRef.current.set(entryId, timer)
+
+    // Show toast with undo button
+    sonnerToast(`"${entryName}" deleted`, {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          // Cancel the pending deletion
+          const pendingTimer = deleteTimersRef.current.get(entryId)
+          if (pendingTimer) {
+            clearTimeout(pendingTimer)
+            deleteTimersRef.current.delete(entryId)
+          }
+          // Restore the entry in UI
+          setPendingDeletes(prev => {
+            const next = new Set(prev)
+            next.delete(entryId)
+            return next
+          })
+        },
+      },
+      duration: 5000,
+    })
   }
 
   // Handle drag-to-create from timeline view
@@ -846,7 +879,7 @@ export default function LogPeriodPage() {
         {viewMode === 'timeline' && (
           <section className="mb-6">
             <TimelineView
-              entries={entries}
+              entries={visibleEntries}
               calendarEvents={calendarEvents}
               isLoading={isLoading}
               onEntryDeleted={fetchEntries}

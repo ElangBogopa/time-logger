@@ -1,5 +1,5 @@
 import { Adapter, AdapterUser, AdapterAccount, AdapterSession, VerificationToken } from 'next-auth/adapters'
-import { supabase } from './supabase'
+import { supabase } from './supabase-server'
 
 /**
  * Custom partial adapter for NextAuth that handles verification tokens

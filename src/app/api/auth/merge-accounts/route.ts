@@ -127,64 +127,64 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Move user_intentions from email to google (skip if same intention_type exists)
-    const { data: emailIntentions } = await supabase
-      .from('user_intentions')
-      .select('id, intention_type')
+    // 2. Move weekly_targets from email to google (skip if same target_type exists)
+    const { data: emailTargets } = await supabase
+      .from('weekly_targets')
+      .select('id, target_type')
       .eq('user_id', emailUserId)
 
-    const { data: googleIntentions } = await supabase
-      .from('user_intentions')
-      .select('intention_type')
+    const { data: googleTargets } = await supabase
+      .from('weekly_targets')
+      .select('target_type')
       .eq('user_id', googleUserId)
 
-    if (emailIntentions && emailIntentions.length > 0) {
-      // Create a set of existing Google intention types
-      const googleIntentionTypes = new Set(
-        (googleIntentions || []).map(i => i.intention_type)
+    if (emailTargets && emailTargets.length > 0) {
+      // Create a set of existing Google target types
+      const googleTargetTypes = new Set(
+        (googleTargets || []).map(t => t.target_type)
       )
 
-      // Find intentions to move and to delete
-      const intentionsToMove: string[] = []
-      const intentionsToDelete: string[] = []
+      // Find targets to move and to delete
+      const targetsToMove: string[] = []
+      const targetsToDelete: string[] = []
 
-      for (const intention of emailIntentions) {
-        if (googleIntentionTypes.has(intention.intention_type)) {
+      for (const target of emailTargets) {
+        if (googleTargetTypes.has(target.target_type)) {
           // Duplicate type - delete email's version
-          intentionsToDelete.push(intention.id)
+          targetsToDelete.push(target.id)
         } else {
           // New type - move to Google account
-          intentionsToMove.push(intention.id)
+          targetsToMove.push(target.id)
         }
       }
 
-      // Delete duplicate intentions
-      if (intentionsToDelete.length > 0) {
+      // Delete duplicate targets
+      if (targetsToDelete.length > 0) {
         const { error: deleteError } = await supabase
-          .from('user_intentions')
+          .from('weekly_targets')
           .delete()
-          .in('id', intentionsToDelete)
+          .in('id', targetsToDelete)
 
         if (deleteError) {
-          console.error('[Merge] Failed to delete duplicate intentions:', deleteError)
-          errors.push('intentions_delete')
+          console.error('[Merge] Failed to delete duplicate targets:', deleteError)
+          errors.push('targets_delete')
         } else {
-          console.log('[Merge] Deleted duplicate intentions:', intentionsToDelete.length)
+          console.log('[Merge] Deleted duplicate targets:', targetsToDelete.length)
         }
       }
 
-      // Move non-duplicate intentions
-      if (intentionsToMove.length > 0) {
+      // Move non-duplicate targets
+      if (targetsToMove.length > 0) {
         const { error: moveError } = await supabase
-          .from('user_intentions')
+          .from('weekly_targets')
           .update({ user_id: googleUserId })
-          .in('id', intentionsToMove)
+          .in('id', targetsToMove)
 
         if (moveError) {
-          console.error('[Merge] Failed to move intentions:', moveError)
-          errors.push('intentions_move')
+          console.error('[Merge] Failed to move targets:', moveError)
+          errors.push('targets_move')
         } else {
-          console.log('[Merge] Moved intentions:', intentionsToMove.length)
+          console.log('[Merge] Moved targets:', targetsToMove.length)
         }
       }
     }

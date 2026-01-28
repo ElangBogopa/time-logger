@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
 // Helper to verify token has required scopes
-async function verifyTokenScopes(accessToken: string): Promise<{ valid: boolean; scopes: string[] }> {
+async function verifyTokenScopes(accessToken: string): Promise<{ valid: boolean; scopes: string[]; tokenInvalid: boolean }> {
   try {
     const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${accessToken}`)
     if (!response.ok) {
+      // 400 = token expired/revoked/invalid (not a scope issue)
       console.error('[Calendar Events] Token verification failed:', response.status)
-      return { valid: false, scopes: [] }
+      return { valid: false, scopes: [], tokenInvalid: true }
     }
     const data = await response.json()
     const scopes = (data.scope || '').split(' ')
@@ -18,23 +20,25 @@ async function verifyTokenScopes(accessToken: string): Promise<{ valid: boolean;
       s.includes('calendar.readonly') || s.includes('calendar')
     )
     console.log('[Calendar Events] Token scopes:', scopes, 'Has calendar:', hasCalendarScope)
-    return { valid: hasCalendarScope, scopes }
+    return { valid: hasCalendarScope, scopes, tokenInvalid: false }
   } catch (error) {
     console.error('[Calendar Events] Token verification error:', error)
-    return { valid: false, scopes: [] }
+    return { valid: false, scopes: [], tokenInvalid: true }
   }
 }
 
-// Helper to get access token - either from session (Google OAuth) or calendar_connections (email users)
-async function getCalendarAccessToken(session: {
-  accessToken?: string
-  user?: { id?: string }
-  authProvider?: string
-}): Promise<{ accessToken: string | null; source: 'session' | 'connection' | null }> {
-  // Google OAuth users have token in session
-  if (session.authProvider === 'google' && session.accessToken) {
-    console.log('[Calendar Events] Using session token for Google OAuth user')
-    return { accessToken: session.accessToken, source: 'session' }
+// Helper to get access token - either from JWT token (Google OAuth) or calendar_connections (email users)
+async function getCalendarAccessToken(
+  token: { accessToken?: string } | null,
+  session: {
+    user?: { id?: string }
+    authProvider?: string
+  }
+): Promise<{ accessToken: string | null; source: 'session' | 'connection' | null }> {
+  // Google OAuth users have token in JWT
+  if (session.authProvider === 'google' && token?.accessToken) {
+    console.log('[Calendar Events] Using JWT token for Google OAuth user')
+    return { accessToken: token.accessToken, source: 'session' }
   }
 
   // Email users - check calendar_connections
@@ -250,9 +254,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get access token from session or calendar_connections
+    // Get access token from JWT or calendar_connections
     console.log('[Calendar Events] User ID:', session.user.id, 'Auth provider:', session.authProvider)
-    const { accessToken, source } = await getCalendarAccessToken(session)
+    const token = await getToken({ req: request })
+    const { accessToken, source } = await getCalendarAccessToken(token, session)
     console.log('[Calendar Events] Access token source:', source, 'Has token:', !!accessToken)
 
     if (!accessToken) {
@@ -266,6 +271,18 @@ export async function GET(request: NextRequest) {
     // Verify token has calendar scope (helps diagnose issues)
     const scopeCheck = await verifyTokenScopes(accessToken)
     if (!scopeCheck.valid) {
+      if (scopeCheck.tokenInvalid) {
+        // Token is expired/revoked — client should trigger re-auth
+        console.error('[Calendar Events] Token expired or invalid')
+        return NextResponse.json(
+          {
+            error: 'Calendar access token expired. Please sign out and sign in again.',
+            code: 'TOKEN_EXPIRED',
+          },
+          { status: 401 }
+        )
+      }
+      // Token is valid but lacks calendar scope
       console.error('[Calendar Events] Token missing calendar scope! Scopes:', scopeCheck.scopes)
       return NextResponse.json(
         {

@@ -26,25 +26,25 @@ export async function GET() {
 
     // Return existing preferences or defaults
     if (preferences) {
-      // Auto-initialize committedSince for existing users with intentions
+      // Auto-initialize committedSince for existing users with targets
       if (!preferences.intentions_committed_since) {
-        const { data: intentions } = await supabase
-          .from('user_intentions')
+        const { data: targets } = await supabase
+          .from('weekly_targets')
           .select('created_at')
           .eq('user_id', session.user.id)
           .eq('active', true)
           .order('created_at', { ascending: true })
           .limit(1)
 
-        if (intentions && intentions.length > 0) {
-          // Set committedSince to their first intention's creation date
-          const firstIntentionDate = intentions[0].created_at.split('T')[0]
+        if (targets && targets.length > 0) {
+          // Set committedSince to their first target's creation date
+          const firstTargetDate = targets[0].created_at.split('T')[0]
           await supabase
             .from('user_preferences')
-            .update({ intentions_committed_since: firstIntentionDate })
+            .update({ intentions_committed_since: firstTargetDate })
             .eq('user_id', session.user.id)
 
-          preferences.intentions_committed_since = firstIntentionDate
+          preferences.intentions_committed_since = firstTargetDate
         }
       }
 

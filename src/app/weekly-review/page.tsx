@@ -24,16 +24,25 @@ import {
   CheckCircle2,
   XCircle,
   Circle,
+  Share2,
+  Grid3X3,
 } from 'lucide-react'
-import { TimeCategory, CATEGORY_LABELS } from '@/lib/types'
+import { TimeCategory, CATEGORY_LABELS, ENERGY_VIEW, AggregatedCategory, AGGREGATED_CATEGORY_LABELS } from '@/lib/types'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import ShareableStatsCard, { type ShareableStatsCardProps } from '@/components/ShareableStatsCard'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
-interface IntentionProgress {
-  intention: {
+interface TargetProgress {
+  target: {
     id: string
-    intention_type: string
-    custom_text: string | null
+    target_type: string
     weekly_target_minutes: number | null
   }
   label: string
@@ -42,7 +51,7 @@ interface IntentionProgress {
   percentage: number | null
   trend: 'up' | 'down' | 'same' | null
   previousMinutes: number | null
-  isReductionGoal: boolean
+  isLimitTarget: boolean
   changeMinutes: number | null
   improvementPercentage: number | null
   // Research-based feedback
@@ -63,19 +72,19 @@ interface CategoryBreakdown {
 
 type DayRating = 'good' | 'neutral' | 'rough' | 'no_data'
 
-interface IntentionDayScore {
+interface TargetDayScore {
   date: string
   day: string
   rating: DayRating
-  intentionMinutes: number
+  targetMinutes: number
   hadDistraction: boolean
 }
 
-interface IntentionScorecard {
-  intentionId: string
-  intentionLabel: string
-  isReductionGoal: boolean
-  days: IntentionDayScore[]
+interface TargetScorecard {
+  targetId: string
+  targetLabel: string
+  isLimitTarget: boolean
+  days: TargetDayScore[]
   goodDays: number
   roughDays: number
 }
@@ -102,8 +111,8 @@ interface WeeklyReviewData {
   previousWeekEntryCount: number
   hasEnoughData: boolean
   hasPreviousWeekData: boolean
-  intentionProgress: IntentionProgress[]
-  intentionScorecards: IntentionScorecard[]
+  targetProgress: TargetProgress[]
+  targetScorecards: TargetScorecard[]
   categoryBreakdown: CategoryBreakdown[]
   bestDays: string[]
   bestHours: string[]
@@ -184,6 +193,7 @@ export default function WeeklyReviewPage() {
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -241,6 +251,62 @@ export default function WeeklyReviewPage() {
     setWeekStart(getWeekStart(new Date()))
   }
 
+  // Build shareable card props from review data
+  const buildShareCardProps = (): ShareableStatsCardProps | null => {
+    if (!reviewData || !reviewData.hasEnoughData) return null
+
+    const weekDateRange = formatWeekRange(reviewData.weekStart, reviewData.weekEnd)
+
+    // Build top categories from the category breakdown, aggregated
+    const aggMinutes = new Map<string, number>()
+    for (const cb of reviewData.categoryBreakdown) {
+      for (const [aggKey, group] of Object.entries(ENERGY_VIEW)) {
+        if (group.categories.includes(cb.category)) {
+          aggMinutes.set(aggKey, (aggMinutes.get(aggKey) || 0) + cb.minutes)
+          break
+        }
+      }
+    }
+
+    const topCategories = Array.from(aggMinutes.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([key, minutes]) => ({
+        name: AGGREGATED_CATEGORY_LABELS[key as AggregatedCategory] || key,
+        key,
+        hours: Math.round((minutes / 60) * 10) / 10,
+      }))
+
+    // Build ring progress from target progress
+    const ringColorMap: Record<string, string> = {
+      deep_focus: '#6B8CAE',
+      exercise: '#7D9B8A',
+      social_time: '#A0848E',
+      recovery: '#B5A07A',
+      leisure: '#7A7D82',
+      meetings: '#8B8680',
+    }
+
+    const rings = reviewData.targetProgress
+      .filter(tp => tp.percentage !== null)
+      .map(tp => ({
+        label: tp.label,
+        percentage: Math.max(0, Math.min(100, tp.percentage || 0)),
+        color: ringColorMap[tp.target.target_type] || '#71717a',
+      }))
+
+    return {
+      weekDateRange,
+      avgDayScore: reviewData.weekScore,
+      totalHours: Math.round((reviewData.totalMinutes / 60) * 10) / 10,
+      topCategories,
+      streakDays: reviewData.highlights.find(h => h.type === 'consistency')
+        ? parseInt(reviewData.highlights.find(h => h.type === 'consistency')!.text) || null
+        : null,
+      rings,
+    }
+  }
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -259,17 +325,49 @@ export default function WeeklyReviewPage() {
         <div className="mx-auto max-w-2xl px-4 py-6">
           {/* Header */}
           <header className="mb-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <BarChart3 className="h-6 w-6 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <BarChart3 className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">
+                    {session?.user?.preferredName ? `${session.user.preferredName}'s Week` : 'Your Week in Review'}
+                  </h1>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    Personal insights and progress
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  {session?.user?.preferredName ? `${session.user.preferredName}'s Week` : 'Your Week in Review'}
-                </h1>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Personal insights and progress
-                </p>
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => router.push('/pixels')}
+                      className="h-9 w-9"
+                    >
+                      <Grid3X3 className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Year in Pixels</TooltipContent>
+                </Tooltip>
+                {reviewData?.hasEnoughData && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowShareModal(true)}
+                        className="h-9 w-9"
+                      >
+                        <Share2 className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Share Weekly Stats</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
             </div>
           </header>
@@ -317,32 +415,87 @@ export default function WeeklyReviewPage() {
             <div className="space-y-6">
               {/* Minimum Data Check */}
               {!reviewData.hasEnoughData ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-900/20">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Target className="h-6 w-6 text-amber-500" />
-                    <h2 className="font-semibold text-foreground">Almost there!</h2>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                    Log at least {MIN_ENTRIES_FOR_REVIEW} activities to unlock your weekly review.
-                  </p>
-                  {/* Progress bar */}
-                  <div className="mb-2">
-                    <div className="flex justify-between text-xs text-zinc-500 mb-1">
-                      <span>{reviewData.entryCount} logged</span>
-                      <span>{MIN_ENTRIES_FOR_REVIEW} needed</span>
+                <div className="space-y-6">
+                  {/* Motivating prompt */}
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-900/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                        <Target className="h-5 w-5 text-amber-500" />
+                      </div>
+                      <div>
+                        <h2 className="font-semibold text-foreground">Almost there!</h2>
+                        <p className="text-xs text-muted-foreground">
+                          Your weekly review is waiting
+                        </p>
+                      </div>
                     </div>
-                    <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
-                      <div
-                        className="h-full rounded-full bg-amber-500 transition-all"
-                        style={{
-                          width: `${Math.min((reviewData.entryCount / MIN_ENTRIES_FOR_REVIEW) * 100, 100)}%`,
-                        }}
-                      />
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                      Log {MIN_ENTRIES_FOR_REVIEW - reviewData.entryCount} more {MIN_ENTRIES_FOR_REVIEW - reviewData.entryCount === 1 ? 'activity' : 'activities'} to unlock insights, trends, and your personalized coach summary.
+                    </p>
+                    {/* Progress bar */}
+                    <div className="mb-2">
+                      <div className="flex justify-between text-xs text-zinc-500 mb-1">
+                        <span>{reviewData.entryCount} logged</span>
+                        <span>{MIN_ENTRIES_FOR_REVIEW} needed</span>
+                      </div>
+                      <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                        <div
+                          className="h-full rounded-full bg-amber-500 transition-all"
+                          style={{
+                            width: `${Math.min((reviewData.entryCount / MIN_ENTRIES_FOR_REVIEW) * 100, 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={() => router.push('/')} className="w-full mt-4">
+                      Start logging
+                    </Button>
+                  </div>
+
+                  {/* Preview mockup of what the review looks like */}
+                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-5 opacity-50 pointer-events-none select-none">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-3">
+                      Preview — What you&apos;ll unlock
+                    </p>
+
+                    {/* Fake Week Score */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-xs text-zinc-400">Week Score</p>
+                        <p className="text-3xl font-bold text-zinc-300 dark:text-zinc-600">72</p>
+                        <p className="text-xs text-zinc-300 dark:text-zinc-600">Solid week</p>
+                      </div>
+                      <svg className="h-14 w-14 -rotate-90" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="14" fill="none" className="stroke-zinc-200 dark:stroke-zinc-700" strokeWidth="3" />
+                        <circle cx="18" cy="18" r="14" fill="none" className="stroke-zinc-300 dark:stroke-zinc-600" strokeWidth="3" strokeLinecap="round" strokeDasharray="63 88" />
+                      </svg>
+                    </div>
+
+                    {/* Fake highlights */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <div className="rounded-lg bg-zinc-50 dark:bg-zinc-700/30 p-2 flex items-center gap-2">
+                        <span className="text-lg">🔥</span>
+                        <span className="text-xs text-zinc-300 dark:text-zinc-600">3 day streak</span>
+                      </div>
+                      <div className="rounded-lg bg-zinc-50 dark:bg-zinc-700/30 p-2 flex items-center gap-2">
+                        <span className="text-lg">📈</span>
+                        <span className="text-xs text-zinc-300 dark:text-zinc-600">+20% focus</span>
+                      </div>
+                    </div>
+
+                    {/* Fake coach note */}
+                    <div className="rounded-lg bg-zinc-50 dark:bg-zinc-700/30 p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="h-4 w-4 text-zinc-300 dark:text-zinc-600" />
+                        <span className="text-xs font-medium text-zinc-300 dark:text-zinc-600">Coach&apos;s Reflection</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="h-2 w-full rounded bg-zinc-200 dark:bg-zinc-700" />
+                        <div className="h-2 w-3/4 rounded bg-zinc-200 dark:bg-zinc-700" />
+                        <div className="h-2 w-5/6 rounded bg-zinc-200 dark:bg-zinc-700" />
+                      </div>
                     </div>
                   </div>
-                  <Button onClick={() => router.push('/')} className="w-full mt-4">
-                    Start logging
-                  </Button>
                 </div>
               ) : (
                 <>
@@ -437,36 +590,36 @@ export default function WeeklyReviewPage() {
                     </div>
                   )}
 
-                  {/* Intention Progress with Rings */}
-                  {reviewData.intentionProgress.length > 0 && (
+                  {/* Target Progress with Rings */}
+                  {reviewData.targetProgress.length > 0 && (
                     <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
                       <div className="mb-4 flex items-center gap-2">
                         <Target className="h-5 w-5 text-primary" />
-                        <h2 className="font-semibold text-foreground">Intentions</h2>
+                        <h2 className="font-semibold text-foreground">Targets</h2>
                       </div>
 
                       <div className="space-y-4">
-                        {reviewData.intentionProgress.map((ip) => {
+                        {reviewData.targetProgress.map((tp) => {
                           // Calculate progress percentage for the ring
-                          const ringProgress = ip.isReductionGoal
-                            ? ip.targetMinutes && ip.targetMinutes > 0
-                              ? Math.max(0, Math.min(100, ((ip.targetMinutes - ip.currentMinutes) / ip.targetMinutes) * 100))
+                          const ringProgress = tp.isLimitTarget
+                            ? tp.targetMinutes && tp.targetMinutes > 0
+                              ? Math.max(0, Math.min(100, ((tp.targetMinutes - tp.currentMinutes) / tp.targetMinutes) * 100))
                               : 50
-                            : ip.percentage || 0
+                            : tp.percentage || 0
 
                           // Determine ring color
-                          const ringColor = ip.feedbackTone === 'success' ? 'stroke-green-500'
-                            : ip.feedbackTone === 'warning' ? 'stroke-amber-500'
-                            : ip.feedbackTone === 'danger' ? 'stroke-red-400'
+                          const ringColor = tp.feedbackTone === 'success' ? 'stroke-green-500'
+                            : tp.feedbackTone === 'warning' ? 'stroke-amber-500'
+                            : tp.feedbackTone === 'danger' ? 'stroke-red-400'
                             : 'stroke-orange-500'
 
                           // Week-over-week change
-                          const weekChange = ip.changeMinutes !== null && ip.previousMinutes !== null && ip.previousMinutes > 0
-                            ? Math.round((ip.changeMinutes / ip.previousMinutes) * 100)
+                          const weekChange = tp.changeMinutes !== null && tp.previousMinutes !== null && tp.previousMinutes > 0
+                            ? Math.round((tp.changeMinutes / tp.previousMinutes) * 100)
                             : null
 
                           return (
-                            <div key={ip.intention.id} className="flex items-center gap-4">
+                            <div key={tp.target.id} className="flex items-center gap-4">
                               {/* Progress Ring */}
                               <div className="relative flex-shrink-0">
                                 <svg className="h-14 w-14 -rotate-90" viewBox="0 0 36 36">
@@ -495,14 +648,14 @@ export default function WeeklyReviewPage() {
                               {/* Content */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
-                                  <span className="font-medium text-foreground">{ip.label}</span>
+                                  <span className="font-medium text-foreground">{tp.label}</span>
                                   {weekChange !== null && (
                                     <span className={`flex items-center gap-1 text-xs font-medium ${
-                                      ip.isReductionGoal
+                                      tp.isLimitTarget
                                         ? weekChange < 0 ? 'text-green-500' : weekChange > 0 ? 'text-red-400' : 'text-zinc-400'
                                         : weekChange > 0 ? 'text-green-500' : weekChange < 0 ? 'text-amber-500' : 'text-zinc-400'
                                     }`}>
-                                      {ip.isReductionGoal ? (
+                                      {tp.isLimitTarget ? (
                                         weekChange < 0 ? <TrendingDown className="h-3 w-3" /> : weekChange > 0 ? <TrendingUp className="h-3 w-3" /> : <Minus className="h-3 w-3" />
                                       ) : (
                                         weekChange > 0 ? <TrendingUp className="h-3 w-3" /> : weekChange < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />
@@ -513,20 +666,20 @@ export default function WeeklyReviewPage() {
                                 </div>
                                 <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
                                   <span>
-                                    {formatHoursShort(ip.currentMinutes)}
-                                    {ip.targetMinutes && !ip.isReductionGoal && (
-                                      <span className="text-zinc-400"> / {formatHoursShort(ip.targetMinutes)}</span>
+                                    {formatHoursShort(tp.currentMinutes)}
+                                    {tp.targetMinutes && !tp.isLimitTarget && (
+                                      <span className="text-zinc-400"> / {formatHoursShort(tp.targetMinutes)}</span>
                                     )}
-                                    {ip.targetMinutes && ip.isReductionGoal && (
-                                      <span className="text-zinc-400"> of {formatHoursShort(ip.targetMinutes)} limit</span>
+                                    {tp.targetMinutes && tp.isLimitTarget && (
+                                      <span className="text-zinc-400"> of {formatHoursShort(tp.targetMinutes)} limit</span>
                                     )}
                                   </span>
-                                  {ip.feedbackMessage && (
+                                  {tp.feedbackMessage && (
                                     <span className={`text-xs ${
-                                      ip.feedbackTone === 'success' ? 'text-green-500' :
-                                      ip.feedbackTone === 'danger' ? 'text-red-400' : ''
+                                      tp.feedbackTone === 'success' ? 'text-green-500' :
+                                      tp.feedbackTone === 'danger' ? 'text-red-400' : ''
                                     }`}>
-                                      {ip.feedbackMessage}
+                                      {tp.feedbackMessage}
                                     </span>
                                   )}
                                 </div>
@@ -538,20 +691,20 @@ export default function WeeklyReviewPage() {
                     </div>
                   )}
 
-                  {/* Intention Scorecards */}
-                  {reviewData.intentionScorecards.length > 0 && (
+                  {/* Target Scorecards */}
+                  {reviewData.targetScorecards.length > 0 && (
                     <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
                       <div className="mb-4 flex items-center gap-2">
                         <CheckCircle2 className="h-5 w-5 text-primary" />
-                        <h2 className="font-semibold text-foreground">Intention Scorecard</h2>
-                        <InfoTooltip content="Daily progress toward each intention. Green = good day, Yellow = some progress, Red = rough day" />
+                        <h2 className="font-semibold text-foreground">Target Scorecard</h2>
+                        <InfoTooltip content="Daily progress toward each target. Green = good day, Yellow = some progress, Red = rough day" />
                       </div>
 
                       <div className="space-y-4">
-                        {reviewData.intentionScorecards.map((sc) => (
-                          <div key={sc.intentionId}>
+                        {reviewData.targetScorecards.map((sc) => (
+                          <div key={sc.targetId}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-foreground">{sc.intentionLabel}</span>
+                              <span className="text-sm font-medium text-foreground">{sc.targetLabel}</span>
                               <span className="text-xs text-zinc-500">
                                 {sc.goodDays} good, {sc.roughDays} rough
                               </span>
@@ -567,12 +720,12 @@ export default function WeeklyReviewPage() {
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>
-                                      {sc.isReductionGoal
+                                      {sc.isLimitTarget
                                         ? day.hadDistraction
-                                          ? `${formatHoursShort(day.intentionMinutes)} distraction`
-                                          : 'No distraction'
-                                        : day.intentionMinutes > 0
-                                          ? `${formatHoursShort(day.intentionMinutes)} logged`
+                                          ? `${formatHoursShort(day.targetMinutes)} over limit`
+                                          : 'Under limit'
+                                        : day.targetMinutes > 0
+                                          ? `${formatHoursShort(day.targetMinutes)} logged`
                                           : 'No activity logged'}
                                     </p>
                                   </TooltipContent>
@@ -625,6 +778,30 @@ export default function WeeklyReviewPage() {
           ) : null}
         </div>
       </div>
+
+      {/* Share Modal */}
+      <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
+        <DialogContent className="max-w-[420px] p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Share Your Week</DialogTitle>
+            <DialogDescription>
+              Screenshot this card and share it on social media!
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-center overflow-hidden rounded-xl">
+            {(() => {
+              const props = buildShareCardProps()
+              if (!props) return <p className="text-sm text-zinc-500 py-8">Not enough data to generate a share card.</p>
+              return <ShareableStatsCard {...props} />
+            })()}
+          </div>
+
+          <p className="text-center text-xs text-zinc-500">
+            Take a screenshot to share on Instagram, Twitter, or WhatsApp
+          </p>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }

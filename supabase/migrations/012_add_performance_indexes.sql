@@ -28,6 +28,11 @@ CREATE TRIGGER update_time_entries_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Add columns that were added to production but missing from migrations
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS start_time TIME;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS end_time TIME;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS commentary TEXT;
+
 -- Add check constraint for time validity (end_time >= start_time when both are set)
 -- Note: Using a function to handle the constraint logic for nullable columns
 ALTER TABLE time_entries
@@ -41,10 +46,7 @@ CHECK (
     OR end_time >= start_time
 );
 
--- Add index on intentions table for common queries
-CREATE INDEX IF NOT EXISTS idx_intentions_user_week
-ON intentions(user_id, week_start);
-
-CREATE INDEX IF NOT EXISTS idx_intentions_user_active
-ON intentions(user_id, is_active)
-WHERE is_active = true;
+-- Add index on user_intentions table for common queries
+CREATE INDEX IF NOT EXISTS idx_user_intentions_user_active
+ON user_intentions(user_id, active)
+WHERE active = true;

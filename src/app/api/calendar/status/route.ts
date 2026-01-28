@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -15,12 +16,15 @@ export async function GET() {
     console.log('[Calendar Status] User ID:', session.user.id, 'Auth provider:', session.authProvider)
 
     // Google OAuth users have calendar access built-in
-    if (session.authProvider === 'google' && session.accessToken) {
-      return NextResponse.json({
-        connected: true,
-        source: 'google_oauth',
-        googleEmail: session.user.email,
-      })
+    if (session.authProvider === 'google') {
+      const token = await getToken({ req: request })
+      if (token?.accessToken) {
+        return NextResponse.json({
+          connected: true,
+          source: 'google_oauth',
+          googleEmail: session.user.email,
+        })
+      }
     }
 
     // Email users need to check calendar_connections table
@@ -57,7 +61,7 @@ export async function GET() {
 }
 
 // DELETE to disconnect calendar
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 

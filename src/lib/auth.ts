@@ -2,7 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import EmailProvider from 'next-auth/providers/email'
 import { Resend } from 'resend'
-import { supabase } from './supabase'
+import { supabase } from './supabase-server'
 import { SupabaseAdapter } from './auth-adapter'
 
 // Lazy initialization of Resend client
@@ -301,8 +301,7 @@ If you didn't request this email, you can safely ignore it.`
         tokenSub: token.sub,
         authProvider: token.authProvider,
       })
-      // Send access token, user ID, and error state to the client
-      session.accessToken = token.accessToken as string
+      // Send user ID and error state to the client (NO access token)
       session.user.id = token.id as string || token.sub as string
       session.user.preferredName = token.preferredName as string | undefined
       session.authProvider = token.authProvider as string | undefined
@@ -340,7 +339,6 @@ If you didn't request this email, you can safely ignore it.`
 // Extend the built-in session types
 declare module 'next-auth' {
   interface Session {
-    accessToken?: string
     error?: string
     authProvider?: string
     user: {

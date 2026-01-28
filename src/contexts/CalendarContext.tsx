@@ -31,6 +31,7 @@ interface CalendarContextType {
   isLoading: boolean
   lastSynced: Date | null
   error: string | null
+  googleTokenExpired: boolean
   calendarStatus: CalendarStatus | null
   isCheckingStatus: boolean
   getEventsForDate: (date: string) => CalendarEvent[]
@@ -77,6 +78,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(null)
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
+  const [googleTokenExpired, setGoogleTokenExpired] = useState(false)
 
   // Track in-flight fetches to prevent race conditions
   const fetchInProgressRef = useRef<Set<string>>(new Set())
@@ -140,13 +142,14 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         return []
       }
 
+      if (data.code === 'TOKEN_EXPIRED' || response.status === 401) {
+        setGoogleTokenExpired(true)
+        throw new Error('Calendar access expired. Please sign in again.')
+      }
+
       if (data.code === 'SCOPE_INSUFFICIENT') {
         // Token doesn't have calendar scope - need to reconnect
         throw new Error('Calendar permission not granted. Please go to Settings > Connections and reconnect your calendar.')
-      }
-
-      if (response.status === 401) {
-        throw new Error('Calendar access expired. Please reconnect your calendar.')
       }
       throw new Error('Failed to fetch calendar events')
     }
@@ -305,6 +308,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         isLoading,
         lastSynced,
         error,
+        googleTokenExpired,
         calendarStatus,
         isCheckingStatus,
         getEventsForDate,

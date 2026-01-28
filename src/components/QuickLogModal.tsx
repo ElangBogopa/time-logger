@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { fetchEntries, createEntry, updateEntry } from '@/lib/api'
 import { getLocalDateString, getUserToday, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS, TimePeriod, PERIOD_LABELS, getLoggingPeriod } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import { parseTimeFromText, getHighlightedSegments, ParseResult } from '@/lib/time-parser'
@@ -55,6 +55,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dismissedSuggestion, setDismissedSuggestion] = useState<string | null>(null)
+  const [isInputFocused, setIsInputFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Smart suggestions state
@@ -271,6 +272,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setOriginalTimes(null)
       setShowPostSubmit(false)
       setLastLoggedActivity('')
+      setIsInputFocused(false)
       timesInitialized.current = false // Reset flag when modal opens
       // Focus the activity input after a brief delay
       setTimeout(() => inputRef.current?.focus(), 100)
@@ -370,13 +372,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       const entryDate = selectedDate || today
 
       // Check for duplicate/overlapping entries first
-      const { data: existingEntries } = await supabase
-        .from('time_entries')
-        .select('id, start_time, end_time, activity')
-        .eq('user_id', userId)
-        .eq('date', entryDate)
+      const existingEntries = await fetchEntries({ date: entryDate, fields: 'id,start_time,end_time,activity' })
 
-      if (existingEntries && existingEntries.length > 0 && startTime && endTime) {
+      if (existingEntries.length > 0 && startTime && endTime) {
         const newStart = timeToMinutes(startTime)
         const newEnd = timeToMinutes(endTime)
 
@@ -403,8 +401,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
       if (isPlanningMode) {
         // Future/planned entry - save as pending without AI categorization/commentary
-        const newEntry = {
-          user_id: userId,
+        await createEntry({
           date: entryDate,
           activity,
           category: null, // No category until confirmed
@@ -414,15 +411,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           description: notes || null,
           commentary: PENDING_COMMENTARY.planned, // Static message
           status: 'pending',
-        }
-
-        const { error: insertError } = await supabase
-          .from('time_entries')
-          .insert(newEntry)
-
-        if (insertError) {
-          throw new Error(insertError.message)
-        }
+        })
 
         onEntryAdded()
         // For future/planned entries, just close (no period summary for planning)
@@ -442,8 +431,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
         const { category } = await categoryResponse.json()
 
-        const newEntry = {
-          user_id: userId,
+        const insertedEntry = await createEntry({
           date: entryDate,
           activity,
           category,
@@ -452,24 +440,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           end_time: endTime,
           description: notes || null,
           status: 'confirmed',
-        }
-
-        const { data: insertedEntry, error: insertError } = await supabase
-          .from('time_entries')
-          .insert(newEntry)
-          .select()
-          .single()
-
-        if (insertError) {
-          throw new Error(insertError.message)
-        }
+        })
 
         // Skip per-entry commentary - we'll show period summary instead
         // Just save a placeholder commentary for the entry
-        await supabase
-          .from('time_entries')
-          .update({ commentary: 'Logged' })
-          .eq('id', insertedEntry.id)
+        await updateEntry(insertedEntry.id, { commentary: 'Logged' })
 
         onEntryAdded()
 
@@ -522,14 +497,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }[currentPeriod]
 
     // Get entries that fall within this period
-    const { data: allEntries } = await supabase
-      .from('time_entries')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', today)
-      .eq('status', 'confirmed')
+    const allEntries = await fetchEntries({ date: today, status: 'confirmed' })
 
-    const periodEntries = (allEntries || []).filter(entry => {
+    const periodEntries = allEntries.filter(entry => {
       if (!entry.start_time) return false
       const hour = parseInt(entry.start_time.split(':')[0])
       return hour >= periodRange.start && hour < periodRange.end
@@ -624,8 +594,8 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Smart suggestions chips */}
-          {!activity && suggestions.length > 0 && (
+          {/* Smart suggestions chips - only show when input is focused AND empty */}
+          {isInputFocused && !activity && suggestions.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Sparkles className="h-3 w-3" />
@@ -656,8 +626,8 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             </div>
           )}
 
-          {/* Calendar suggestion chip */}
-          {suggestedEvent && !activity && (
+          {/* Calendar suggestion chip - also only when input focused AND empty */}
+          {isInputFocused && suggestedEvent && !activity && (
             <div className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 border border-blue-500/20">
               <button
                 type="button"
@@ -695,6 +665,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                   setActivity(e.target.value)
                   setIsAutoParseApplied(false) // Reset when user types
                   setOriginalTimes(null) // Reset so new parse can save new original times
+                }}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => {
+                  // Small delay to allow clicking suggestions before blur hides them
+                  setTimeout(() => setIsInputFocused(false), 150)
                 }}
                 placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., "coded for 2 hours" or "lunch 12-1pm"'}
               />

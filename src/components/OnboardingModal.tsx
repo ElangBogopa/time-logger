@@ -2,8 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { IntentionType, INTENTION_LABELS } from '@/lib/types'
-import IntentionCard from './IntentionCard'
+import {
+  WeeklyTargetType,
+  WEEKLY_TARGET_CONFIGS,
+  WEEKLY_TARGET_TYPES,
+  MAX_WEEKLY_TARGETS,
+  formatTargetValue,
+} from '@/lib/types'
+import { createWeeklyTargets } from '@/lib/api'
 import {
   Dialog,
   DialogContent,
@@ -16,10 +22,9 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { ArrowRight, ArrowLeft, Loader2, Sparkles, Check, User } from 'lucide-react'
 
-interface SelectedIntention {
-  type: IntentionType
-  customText?: string
-  weeklyTargetMinutes?: number | null
+interface SelectedTarget {
+  type: WeeklyTargetType
+  minutes: number
 }
 
 interface OnboardingModalProps {
@@ -27,35 +32,14 @@ interface OnboardingModalProps {
   onComplete: () => void
 }
 
-const INTENTION_TYPES: IntentionType[] = [
-  'deep_work',
-  'less_distraction',
-  'work_life_balance',
-  'exercise',
-  'self_care',
-  'relationships',
-  'learning',
-  'custom',
-]
-
-// Suggested weekly targets in hours for each intention type
-const SUGGESTED_TARGETS: Partial<Record<IntentionType, { min: number; max: number; default: number }>> = {
-  deep_work: { min: 5, max: 40, default: 15 },
-  exercise: { min: 1, max: 15, default: 5 },
-  learning: { min: 1, max: 20, default: 5 },
-  relationships: { min: 2, max: 20, default: 7 },
-  self_care: { min: 2, max: 15, default: 5 },
-}
-
 export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
   const { data: session } = useSession()
-  const [step, setStep] = useState(0) // Start at step 0 (name)
+  const [step, setStep] = useState(0)
   const [preferredName, setPreferredName] = useState('')
-  const [selectedIntentions, setSelectedIntentions] = useState<SelectedIntention[]>([])
+  const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Pre-fill preferred name from session
   useEffect(() => {
     if (session?.user) {
       const name = session.user.preferredName || session.user.name || ''
@@ -63,32 +47,23 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     }
   }, [session])
 
-  const toggleIntention = (type: IntentionType) => {
-    setSelectedIntentions((prev) => {
-      const exists = prev.find((i) => i.type === type)
+  const toggleTarget = (type: WeeklyTargetType) => {
+    setSelectedTargets(prev => {
+      const exists = prev.find(t => t.type === type)
       if (exists) {
-        return prev.filter((i) => i.type !== type)
+        return prev.filter(t => t.type !== type)
       }
-      if (prev.length >= 3) {
-        return prev // Max 3 intentions
+      if (prev.length >= MAX_WEEKLY_TARGETS) {
+        return prev
       }
-      return [...prev, { type, customText: '', weeklyTargetMinutes: null }]
+      const config = WEEKLY_TARGET_CONFIGS[type]
+      return [...prev, { type, minutes: config.defaultMinutes }]
     })
   }
 
-  const updateCustomText = (text: string) => {
-    setSelectedIntentions((prev) =>
-      prev.map((i) => (i.type === 'custom' ? { ...i, customText: text } : i))
-    )
-  }
-
-  const updateTarget = (type: IntentionType, hours: number | null) => {
-    setSelectedIntentions((prev) =>
-      prev.map((i) =>
-        i.type === type
-          ? { ...i, weeklyTargetMinutes: hours ? hours * 60 : null }
-          : i
-      )
+  const updateMinutes = (type: WeeklyTargetType, minutes: number) => {
+    setSelectedTargets(prev =>
+      prev.map(t => (t.type === type ? { ...t, minutes } : t))
     )
   }
 
@@ -96,12 +71,10 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     setError(null)
 
     if (step === 0) {
-      // Save preferred name
       if (!preferredName.trim()) {
         setError('Please enter your name')
         return
       }
-
       setIsSubmitting(true)
       try {
         const response = await fetch('/api/user', {
@@ -109,12 +82,10 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ preferredName: preferredName.trim() }),
         })
-
         if (!response.ok) {
           const data = await response.json()
           throw new Error(data.error || 'Failed to save name')
         }
-
         setStep(1)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -125,19 +96,11 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     }
 
     if (step === 1) {
-      if (selectedIntentions.length === 0) {
-        setError('Please select at least one intention')
-        return
-      }
-      // Check if custom intention has text
-      const customIntention = selectedIntentions.find((i) => i.type === 'custom')
-      if (customIntention && !customIntention.customText?.trim()) {
-        setError('Please describe your custom goal')
+      if (selectedTargets.length === 0) {
+        setError('Please select at least one target')
         return
       }
       setStep(2)
-    } else if (step === 2) {
-      setStep(3)
     }
   }
 
@@ -153,24 +116,12 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     setError(null)
 
     try {
-      const response = await fetch('/api/intentions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          intentions: selectedIntentions.map((intention, index) => ({
-            intention_type: intention.type,
-            custom_text: intention.type === 'custom' ? intention.customText : null,
-            weekly_target_minutes: intention.weeklyTargetMinutes,
-            priority: index + 1,
-          })),
-        }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to save intentions')
-      }
-
+      await createWeeklyTargets(
+        selectedTargets.map(t => ({
+          target_type: t.type,
+          weekly_target_minutes: t.minutes,
+        }))
+      )
       onComplete()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -178,14 +129,6 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
       setIsSubmitting(false)
     }
   }
-
-  // Get intentions that have suggested targets
-  const intentionsWithTargets = selectedIntentions.filter(
-    (i) => SUGGESTED_TARGETS[i.type]
-  )
-
-  // Total steps: 0 (name) + 1 (intentions) + 2 (targets) + 3 (confirm) = 4 steps
-  const totalSteps = 4
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
@@ -201,17 +144,17 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
 
         {/* Progress indicator */}
         <div className="mb-6 flex items-center justify-center gap-2">
-          {[0, 1, 2, 3].map((s) => (
+          {[0, 1, 2].map(s => (
             <div
               key={s}
-              className={`h-2 w-12 rounded-full transition-colors ${
+              className={`h-2 w-16 rounded-full transition-colors ${
                 s <= step ? 'bg-primary' : 'bg-zinc-200 dark:bg-zinc-700'
               }`}
             />
           ))}
         </div>
 
-        {/* Step 0: Preferred Name */}
+        {/* Step 0: Name */}
         {step === 0 && (
           <div className="space-y-6">
             <div className="text-center">
@@ -232,7 +175,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                 id="preferredName"
                 type="text"
                 value={preferredName}
-                onChange={(e) => setPreferredName(e.target.value)}
+                onChange={e => setPreferredName(e.target.value)}
                 placeholder="e.g., Alex"
                 autoFocus
                 className="text-lg"
@@ -244,155 +187,149 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
           </div>
         )}
 
-        {/* Step 1: Select intentions */}
+        {/* Step 1: Select targets */}
         {step === 1 && (
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                What do you want to change?
+                Set your weekly targets
               </h2>
               <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-                Pick 1-3 intentions to focus on. We&apos;ll help you track progress.
+                Pick up to {MAX_WEEKLY_TARGETS} targets to track. Each is backed by research.
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              {INTENTION_TYPES.map((type) => (
-                <IntentionCard
-                  key={type}
-                  type={type}
-                  selected={selectedIntentions.some((i) => i.type === type)}
-                  onSelect={() => toggleIntention(type)}
-                  disabled={
-                    selectedIntentions.length >= 3 &&
-                    !selectedIntentions.some((i) => i.type === type)
-                  }
-                  customText={
-                    selectedIntentions.find((i) => i.type === type)?.customText
-                  }
-                  onCustomTextChange={updateCustomText}
-                />
-              ))}
-            </div>
+              {WEEKLY_TARGET_TYPES.map(type => {
+                const config = WEEKLY_TARGET_CONFIGS[type]
+                const isSelected = selectedTargets.some(t => t.type === type)
+                const isDisabled = !isSelected && selectedTargets.length >= MAX_WEEKLY_TARGETS
 
-            {selectedIntentions.length === 3 && (
-              <p className="text-center text-sm text-zinc-500">
-                Maximum 3 intentions selected
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Step 2: Set targets (optional) */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                Set weekly targets
-              </h2>
-              <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-                Optional: How much time feels right per week?
-              </p>
-            </div>
-
-            {intentionsWithTargets.length > 0 ? (
-              <div className="space-y-6">
-                {intentionsWithTargets.map((intention) => {
-                  const config = SUGGESTED_TARGETS[intention.type]!
-                  const currentHours = intention.weeklyTargetMinutes
-                    ? intention.weeklyTargetMinutes / 60
-                    : config.default
-
-                  return (
-                    <div
-                      key={intention.type}
-                      className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"
-                    >
-                      <div className="mb-4 flex items-center justify-between">
-                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                          {INTENTION_LABELS[intention.type]}
-                        </h3>
-                        <span className="text-lg font-bold text-primary">
-                          {intention.weeklyTargetMinutes
-                            ? `${currentHours}h/week`
-                            : 'No target'}
-                        </span>
+                return (
+                  <button
+                    key={type}
+                    onClick={() => toggleTarget(type)}
+                    disabled={isDisabled}
+                    className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+                      isSelected
+                        ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                        : isDisabled
+                          ? 'border-zinc-100 dark:border-zinc-800 opacity-40 cursor-not-allowed'
+                          : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                    }`}
+                  >
+                    {/* Selection check */}
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="h-3 w-3 text-white" />
                       </div>
+                    )}
 
-                      <Slider
-                        value={[intention.weeklyTargetMinutes ? currentHours : 0]}
-                        onValueChange={([value]) =>
-                          updateTarget(intention.type, value || null)
-                        }
-                        min={0}
-                        max={config.max}
-                        step={1}
-                        className="mb-2"
-                      />
-
-                      <div className="flex justify-between text-xs text-zinc-500">
-                        <span>Skip</span>
-                        <span>{config.max}h</span>
-                      </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl">{config.icon}</span>
+                      <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                        {config.label}
+                      </span>
                     </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-700 dark:bg-zinc-800/50">
-                <p className="text-zinc-500 dark:text-zinc-400">
-                  Your selected intentions don&apos;t have suggested time targets.
-                  <br />
-                  We&apos;ll track your progress based on your logged activities.
-                </p>
-              </div>
-            )}
 
-            <p className="text-center text-sm text-zinc-500">
-              You can always adjust these later in settings.
-            </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+                      {config.description}
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        config.direction === 'at_least'
+                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                      }`}>
+                        {config.direction === 'at_least' ? 'At least' : 'At most'}
+                      </span>
+                      <span className="text-xs text-zinc-400">
+                        Default: {formatTargetValue(config.defaultMinutes, config.unit)}/wk
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedTargets.length >= MAX_WEEKLY_TARGETS && (
+              <p className="text-center text-sm text-zinc-500">
+                Maximum {MAX_WEEKLY_TARGETS} targets selected
+              </p>
+            )}
           </div>
         )}
 
-        {/* Step 3: Confirmation */}
-        {step === 3 && (
+        {/* Step 2: Set values + confirm */}
+        {step === 2 && (
           <div className="space-y-6">
             <div className="text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
                 <Sparkles className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
               <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                You&apos;re all set, {preferredName}!
+                Tune your targets, {preferredName}
               </h2>
               <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-                We&apos;ll help you track progress toward:
+                Adjust the weekly amount for each target. Defaults are research-backed.
               </p>
             </div>
 
-            <div className="space-y-3">
-              {selectedIntentions.map((intention, index) => (
-                <div
-                  key={intention.type}
-                  className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                      {intention.type === 'custom'
-                        ? intention.customText
-                        : INTENTION_LABELS[intention.type]}
+            <div className="space-y-5">
+              {selectedTargets.map(target => {
+                const config = WEEKLY_TARGET_CONFIGS[target.type]
+                const isHours = config.unit === 'hours'
+                const sliderMin = isHours ? Math.floor(config.minMinutes / 60) : config.minMinutes
+                const sliderMax = isHours ? Math.floor(config.maxMinutes / 60) : config.maxMinutes
+                const sliderValue = isHours ? Math.round(target.minutes / 60) : target.minutes
+                const sliderStep = isHours ? 1 : 15
+
+                return (
+                  <div
+                    key={target.type}
+                    className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-4"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{config.icon}</span>
+                        <span className="font-semibold text-sm">{config.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          config.direction === 'at_least'
+                            ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                            : 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}>
+                          {config.direction === 'at_least' ? 'At least' : 'At most'}
+                        </span>
+                      </div>
+                      <span className="text-lg font-bold text-primary">
+                        {formatTargetValue(target.minutes, config.unit)}/wk
+                      </span>
+                    </div>
+
+                    <Slider
+                      value={[sliderValue]}
+                      onValueChange={([val]) => {
+                        const mins = isHours ? val * 60 : val
+                        updateMinutes(target.type, mins)
+                      }}
+                      min={sliderMin}
+                      max={sliderMax}
+                      step={sliderStep}
+                      className="mb-2"
+                    />
+
+                    <div className="flex justify-between text-[10px] text-zinc-400">
+                      <span>{formatTargetValue(config.minMinutes, config.unit)}</span>
+                      <span>{formatTargetValue(config.maxMinutes, config.unit)}</span>
+                    </div>
+
+                    <p className="mt-2 text-[10px] text-zinc-400 italic">
+                      {config.researchNote}
                     </p>
-                    {intention.weeklyTargetMinutes && (
-                      <p className="text-sm text-zinc-500">
-                        Target: {intention.weeklyTargetMinutes / 60}h per week
-                      </p>
-                    )}
                   </div>
-                  <Check className="h-5 w-5 text-green-500" />
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -402,7 +339,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
           <p className="mt-4 text-center text-sm text-red-500">{error}</p>
         )}
 
-        {/* Navigation buttons */}
+        {/* Navigation */}
         <div className="mt-6 flex gap-3">
           {step > 0 && (
             <Button
@@ -417,11 +354,15 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
             </Button>
           )}
 
-          {step < 3 ? (
+          {step < 2 ? (
             <Button
               type="button"
               onClick={handleNext}
-              disabled={isSubmitting || (step === 0 && !preferredName.trim()) || (step === 1 && selectedIntentions.length === 0)}
+              disabled={
+                isSubmitting ||
+                (step === 0 && !preferredName.trim()) ||
+                (step === 1 && selectedTargets.length === 0)
+              }
               className="flex-1"
             >
               {isSubmitting ? (

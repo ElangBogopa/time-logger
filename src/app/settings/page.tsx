@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { Bell, BellOff, Clock, Loader2, Calendar, ChevronRight, Target } from 'lucide-react'
+import { Bell, BellOff, Clock, Loader2, Calendar, ChevronRight, Target, Moon, Sun } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import Toast from '@/components/Toast'
 import { ReminderTime, DEFAULT_REMINDER_TIMES } from '@/lib/types'
@@ -15,6 +16,13 @@ export default function SettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const push = usePushNotifications()
+  const { setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // Avoid hydration mismatch for theme
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const [toast, setToast] = useState<{ message: string; variant?: 'default' | 'success' | 'error' } | null>(null)
   const [isLoadingPrefs, setIsLoadingPrefs] = useState(true)
@@ -257,6 +265,35 @@ export default function SettingsPage() {
                 </p>
               )}
             </CardContent>
+          </Card>
+
+          {/* Appearance Card */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10">
+                    {mounted && resolvedTheme === 'dark' ? (
+                      <Moon className="h-5 w-5 text-indigo-500" />
+                    ) : (
+                      <Sun className="h-5 w-5 text-indigo-500" />
+                    )}
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Dark Mode</CardTitle>
+                    <CardDescription>
+                      {mounted && resolvedTheme === 'dark' ? 'Dark theme active' : 'Light theme active'}
+                    </CardDescription>
+                  </div>
+                </div>
+                {mounted && (
+                  <Switch
+                    checked={resolvedTheme === 'dark'}
+                    onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                  />
+                )}
+              </div>
+            </CardHeader>
           </Card>
 
           {/* My Intentions Link */}

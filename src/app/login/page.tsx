@@ -307,11 +307,25 @@ function LoginContent() {
         {/* Email Step - Enter email and send magic link */}
         {step === 'email' && !showGooglePrompt && (
           <>
-            <div className="space-y-2 text-center">
+            <div className="space-y-3 text-center">
               <h1 className="text-2xl font-semibold tracking-tight">
                 Sign in to Time Logger
               </h1>
               <p className="text-sm text-muted-foreground">
+                Track your time. Build better habits.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  📊 Weekly Reviews
+                </span>
+                <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  🤖 AI Categories
+                </span>
+                <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  📅 Calendar Sync
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
                 Enter your email to receive a sign-in link
               </p>
             </div>

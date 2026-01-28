@@ -9,9 +9,9 @@ import {
   CATEGORY_LABELS,
   TimePeriod,
   PERIOD_LABELS,
-  UserIntention,
-  INTENTION_LABELS,
-  INTENTION_CATEGORY_MAP,
+  WeeklyTarget,
+  WeeklyTargetType,
+  WEEKLY_TARGET_CONFIGS,
 } from '@/lib/types'
 import { formatDurationLong } from '@/lib/time-utils'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
@@ -25,7 +25,7 @@ interface PeriodCommentaryRequest {
 function buildPeriodContext(
   period: TimePeriod,
   entries: TimeEntry[],
-  intentions: UserIntention[]
+  targets: WeeklyTarget[]
 ): string {
   const periodLabel = PERIOD_LABELS[period]
   const totalMinutes = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
@@ -59,27 +59,26 @@ BREAKDOWN BY CATEGORY:
 `
   })
 
-  // Add intentions context
-  if (intentions.length > 0) {
+  // Add targets context
+  if (targets.length > 0) {
     context += `
-USER'S INTENTIONS:
+USER'S WEEKLY TARGETS:
 `
-    intentions.forEach((intention, idx) => {
-      const label = intention.intention_type === 'custom'
-        ? intention.custom_text
-        : INTENTION_LABELS[intention.intention_type]
+    targets.forEach((target, idx) => {
+      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
+      if (!config) return
 
       // Check if this period had any related activities
-      const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
       const relatedMinutes = sortedCategories
-        .filter(([cat]) => relatedCategories.includes(cat as TimeCategory))
+        .filter(([cat]) => config.categories.includes(cat as TimeCategory))
         .reduce((sum, [, data]) => sum + data.minutes, 0)
 
+      const directionLabel = target.direction === 'at_least' ? 'at least' : 'at most'
       if (relatedMinutes > 0) {
-        context += `${idx + 1}. ${label} - ${formatDurationLong(relatedMinutes)} this ${periodLabel.toLowerCase()}
+        context += `${idx + 1}. ${config.label} (${directionLabel}) - ${formatDurationLong(relatedMinutes)} this ${periodLabel.toLowerCase()}
 `
       } else {
-        context += `${idx + 1}. ${label} - no related activities this ${periodLabel.toLowerCase()}
+        context += `${idx + 1}. ${config.label} (${directionLabel}) - no related activities this ${periodLabel.toLowerCase()}
 `
       }
     })
@@ -133,20 +132,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Period and entries are required' }, { status: 400 })
     }
 
-    // Get session to fetch user's intentions
+    // Get session to fetch user's targets
     const session = await getServerSession(authOptions)
-    let intentions: UserIntention[] = []
+    let targets: WeeklyTarget[] = []
 
     if (session?.user?.id) {
-      const { data: userIntentions } = await supabase
-        .from('user_intentions')
+      const { data: userTargets } = await supabase
+        .from('weekly_targets')
         .select('*')
         .eq('user_id', session.user.id)
         .eq('active', true)
-        .order('priority', { ascending: true })
+        .order('sort_order', { ascending: true })
 
-      if (userIntentions) {
-        intentions = userIntentions as UserIntention[]
+      if (userTargets) {
+        targets = userTargets as WeeklyTarget[]
       }
     }
 
@@ -155,7 +154,7 @@ export async function POST(request: NextRequest) {
       timeout: 30000,
     })
 
-    const context = buildPeriodContext(period, entries, intentions)
+    const context = buildPeriodContext(period, entries, targets)
     const periodLabel = PERIOD_LABELS[period]
 
     // Determine overall tone
@@ -187,7 +186,7 @@ STYLE:
 - Sound like a supportive friend who's genuinely interested in how their day is going
 - Be specific about what they did (reference actual activities)
 - Notice patterns worth mentioning
-- If they have intentions, briefly note progress toward them when relevant
+- If they have targets, briefly note progress toward them when relevant
 - NO emojis
 - Don't be preachy or give unsolicited advice
 - Don't start with "Great" or generic praise

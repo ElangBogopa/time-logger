@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { fetchEntries } from '@/lib/api'
 import {
   TimeEntry,
   TimeCategory,
@@ -117,32 +117,23 @@ export default function WeeklySummary({ userId }: WeeklySummaryProps) {
 
       setWeekRange(currentWeek)
 
-      // Fetch current week entries
-      const { data: currentEntries } = await supabase
-        .from('time_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('date', currentWeek.start)
-        .lte('date', currentWeek.end)
+      try {
+        // Fetch current week entries
+        const currentEntries = await fetchEntries({ dateFrom: currentWeek.start, dateTo: currentWeek.end })
 
-      // Fetch previous week entries
-      const { data: previousEntries } = await supabase
-        .from('time_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('date', previousWeek.start)
-        .lte('date', previousWeek.end)
+        // Fetch previous week entries
+        const previousEntries = await fetchEntries({ dateFrom: previousWeek.start, dateTo: previousWeek.end })
 
       // Calculate stats by category (skip entries without a category - pending entries)
       const currentByCategory: Record<string, number> = {}
       const previousByCategory: Record<string, number> = {}
 
-      ;(currentEntries || []).forEach((entry: TimeEntry) => {
+      currentEntries.forEach((entry: TimeEntry) => {
         if (!entry.category) return // Skip pending entries
         currentByCategory[entry.category] = (currentByCategory[entry.category] || 0) + entry.duration_minutes
       })
 
-      ;(previousEntries || []).forEach((entry: TimeEntry) => {
+      previousEntries.forEach((entry: TimeEntry) => {
         if (!entry.category) return // Skip pending entries
         previousByCategory[entry.category] = (previousByCategory[entry.category] || 0) + entry.duration_minutes
       })
@@ -186,9 +177,13 @@ export default function WeeklySummary({ userId }: WeeklySummaryProps) {
 
       setStats(categoryStats)
       setAggregatedStats(aggregatedStatsArray)
-      setTotalMinutes((currentEntries || []).reduce((sum: number, e: TimeEntry) => sum + e.duration_minutes, 0))
-      setPreviousTotalMinutes((previousEntries || []).reduce((sum: number, e: TimeEntry) => sum + e.duration_minutes, 0))
-      setIsLoading(false)
+      setTotalMinutes(currentEntries.reduce((sum: number, e: TimeEntry) => sum + e.duration_minutes, 0))
+      setPreviousTotalMinutes(previousEntries.reduce((sum: number, e: TimeEntry) => sum + e.duration_minutes, 0))
+      } catch (error) {
+        console.error('Failed to fetch weekly data:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     fetchWeeklyData()

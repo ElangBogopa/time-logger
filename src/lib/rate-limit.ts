@@ -94,6 +94,8 @@ export function checkRateLimit(key: string, config: RateLimitConfig): RateLimitR
 
 // Pre-configured rate limiters for different endpoints
 export const RATE_LIMITS = {
+  // Auth endpoints - strict (5 requests per minute)
+  auth: { limit: 5, windowMs: 60 * 1000 },
   // AI endpoints - more restrictive (10 requests per minute)
   ai: { limit: 10, windowMs: 60 * 1000 },
   // Calendar API - moderate (30 requests per minute)

@@ -7,9 +7,9 @@ import {
   TimeEntry,
   TimeCategory,
   CATEGORY_LABELS,
-  UserIntention,
-  INTENTION_LABELS,
-  INTENTION_CATEGORY_MAP,
+  WeeklyTarget,
+  WeeklyTargetType,
+  WEEKLY_TARGET_CONFIGS,
 } from '@/lib/types'
 import { getTimeOfDay, formatDurationLong } from '@/lib/time-utils'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
@@ -55,14 +55,14 @@ function getWeekStart(dateStr: string): string {
 }
 
 // Simple in-memory cache for weekly category totals (avoids N+1 queries)
-// Cache invalidates after 2 minutes or when a new week starts
+// Cache invalidates after 10 minutes or when a new week starts
 interface WeeklyCacheEntry {
   totals: Map<TimeCategory, number>
   weekStart: string
   timestamp: number
 }
 const weeklyTotalsCache = new Map<string, WeeklyCacheEntry>()
-const CACHE_TTL = 10 * 60 * 1000 // 10 minutes (optimized from 2 min to reduce DB queries)
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
 async function getCachedWeeklyTotals(
   userId: string,
@@ -112,63 +112,53 @@ async function getCachedWeeklyTotals(
   return totals
 }
 
-// Calculate weekly progress for intention-related categories
+// Calculate weekly progress for target-related categories
 // Uses cached weekly totals to avoid N+1 queries
-async function getWeeklyIntentionProgress(
+async function getWeeklyTargetProgress(
   userId: string,
-  intentions: UserIntention[],
+  targets: WeeklyTarget[],
   entryDate: string
-): Promise<Map<string, { minutes: number; target: number | null; intentionLabel: string }>> {
-  const progress = new Map<string, { minutes: number; target: number | null; intentionLabel: string }>()
+): Promise<Map<string, { minutes: number; target: number; targetLabel: string }>> {
+  const progress = new Map<string, { minutes: number; target: number; targetLabel: string }>()
 
-  if (intentions.length === 0) return progress
+  if (targets.length === 0) return progress
 
   // Use cached weekly totals instead of fetching each time
   const categoryTotals = await getCachedWeeklyTotals(userId, entryDate)
 
-  // Map intentions to their progress
-  intentions.forEach((intention) => {
-    const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
-    let totalMinutes = 0
+  // Map targets to their progress
+  targets.forEach((target) => {
+    const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
+    if (!config) return
 
-    relatedCategories.forEach((cat) => {
+    let totalMinutes = 0
+    config.categories.forEach((cat) => {
       totalMinutes += categoryTotals.get(cat) || 0
     })
 
-    // For "less_distraction", we track entertainment time (formerly 'distraction')
-    if (intention.intention_type === 'less_distraction') {
-      totalMinutes = categoryTotals.get('entertainment') || 0
-    }
-
-    progress.set(intention.intention_type, {
+    progress.set(target.target_type, {
       minutes: totalMinutes,
-      target: intention.weekly_target_minutes,
-      intentionLabel: intention.intention_type === 'custom'
-        ? intention.custom_text || 'Custom goal'
-        : INTENTION_LABELS[intention.intention_type],
+      target: target.weekly_target_minutes,
+      targetLabel: config.label,
     })
   })
 
   return progress
 }
 
-// Check if entry category relates to any intention
-function getRelatedIntention(
+// Check if entry category relates to any target
+function getRelatedTarget(
   category: TimeCategory | null,
-  intentions: UserIntention[]
-): UserIntention | null {
+  targets: WeeklyTarget[]
+): WeeklyTarget | null {
   if (!category) return null
 
-  for (const intention of intentions) {
-    const relatedCategories = INTENTION_CATEGORY_MAP[intention.intention_type]
+  for (const target of targets) {
+    const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
+    if (!config) continue
 
-    // Special case: "less_distraction" relates to entertainment category (formerly 'distraction')
-    if (intention.intention_type === 'less_distraction' && category === 'entertainment') {
-      return intention
-    }
-
-    if (relatedCategories.includes(category)) {
-      return intention
+    if (config.categories.includes(category)) {
+      return target
     }
   }
 
@@ -178,8 +168,8 @@ function getRelatedIntention(
 function buildContext(
   entry: TimeEntry,
   dayEntries: TimeEntry[],
-  intentions: UserIntention[],
-  weeklyProgress: Map<string, { minutes: number; target: number | null; intentionLabel: string }>
+  targets: WeeklyTarget[],
+  weeklyProgress: Map<string, { minutes: number; target: number; targetLabel: string }>
 ): string {
   const timeOfDay = getTimeOfDay(entry.start_time)
   const duration = formatDurationLong(entry.duration_minutes)
@@ -235,51 +225,49 @@ ${entry.category ? `- This is ${categoryLabel} session #${positionInCategory} of
   context += `- Today's breakdown: ${categoryBreakdown}
 `
 
-  // Add intentions context
-  if (intentions.length > 0) {
+  // Add targets context
+  if (targets.length > 0) {
     context += `
-USER'S INTENTIONS (what they want to change):
+USER'S WEEKLY TARGETS (what they're tracking):
 `
-    intentions.forEach((intention, idx) => {
-      const progress = weeklyProgress.get(intention.intention_type)
-      const label = intention.intention_type === 'custom'
-        ? intention.custom_text
-        : INTENTION_LABELS[intention.intention_type]
+    targets.forEach((target, idx) => {
+      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
+      if (!config) return
+      const progress = weeklyProgress.get(target.target_type)
 
       let progressStr = ''
       if (progress) {
         const hours = Math.round(progress.minutes / 60 * 10) / 10
-        if (progress.target) {
-          const targetHours = progress.target / 60
-          const percentage = Math.round((progress.minutes / progress.target) * 100)
-          progressStr = ` — ${hours}h logged this week (${percentage}% of ${targetHours}h target)`
-        } else {
-          progressStr = ` — ${hours}h logged this week`
-        }
+        const targetHours = progress.target / 60
+        const percentage = Math.round((progress.minutes / progress.target) * 100)
+        progressStr = ` — ${hours}h logged this week (${percentage}% of ${targetHours}h target)`
       }
 
-      context += `${idx + 1}. ${label}${progressStr}
+      const directionLabel = target.direction === 'at_least' ? 'at least' : 'at most'
+      context += `${idx + 1}. ${config.label} (${directionLabel})${progressStr}
 `
     })
 
-    // Check if this entry relates to an intention
-    const relatedIntention = getRelatedIntention(entry.category, intentions)
-    if (relatedIntention) {
-      const progress = weeklyProgress.get(relatedIntention.intention_type)
-      if (progress) {
-        const isDistraction = relatedIntention.intention_type === 'less_distraction'
-        if (isDistraction) {
+    // Check if this entry relates to a target
+    const relatedTarget = getRelatedTarget(entry.category, targets)
+    if (relatedTarget) {
+      const config = WEEKLY_TARGET_CONFIGS[relatedTarget.target_type as WeeklyTargetType]
+      const progress = weeklyProgress.get(relatedTarget.target_type)
+      if (progress && config) {
+        const isLimitTarget = relatedTarget.direction === 'at_most'
+        if (isLimitTarget) {
           context += `
-THIS ENTRY RELATES TO USER'S INTENTION: "${progress.intentionLabel}"
-- They want LESS of this (distraction)
-- This week so far: ${Math.round(progress.minutes / 60 * 10) / 10}h of distraction
+THIS ENTRY RELATES TO USER'S TARGET: "${config.label}"
+- They want LESS of this (limit target)
+- This week so far: ${Math.round(progress.minutes / 60 * 10) / 10}h
+- Weekly limit: ${progress.target / 60}h
 `
         } else {
           context += `
-THIS ENTRY RELATES TO USER'S INTENTION: "${progress.intentionLabel}"
+THIS ENTRY RELATES TO USER'S TARGET: "${config.label}"
 - They want MORE of this
 - This week so far: ${Math.round(progress.minutes / 60 * 10) / 10}h
-${progress.target ? `- Weekly target: ${progress.target / 60}h (${Math.round((progress.minutes / progress.target) * 100)}% complete)` : ''}
+- Weekly target: ${progress.target / 60}h (${Math.round((progress.minutes / progress.target) * 100)}% complete)
 `
         }
       }
@@ -289,76 +277,68 @@ ${progress.target ? `- Weekly target: ${progress.target / 60}h (${Math.round((pr
   return context
 }
 
-function buildIntentionInstructions(
+function buildTargetInstructions(
   entry: TimeEntry,
-  intentions: UserIntention[],
-  weeklyProgress: Map<string, { minutes: number; target: number | null; intentionLabel: string }>
+  targets: WeeklyTarget[],
+  weeklyProgress: Map<string, { minutes: number; target: number; targetLabel: string }>
 ): string {
-  if (intentions.length === 0) return ''
+  if (targets.length === 0) return ''
 
-  const relatedIntention = getRelatedIntention(entry.category, intentions)
-  if (!relatedIntention) return ''
+  const relatedTarget = getRelatedTarget(entry.category, targets)
+  if (!relatedTarget) return ''
 
-  const progress = weeklyProgress.get(relatedIntention.intention_type)
+  const progress = weeklyProgress.get(relatedTarget.target_type)
   if (!progress) return ''
 
-  const isDistraction = relatedIntention.intention_type === 'less_distraction'
+  const isLimitTarget = relatedTarget.direction === 'at_most'
   const hoursLogged = Math.round(progress.minutes / 60 * 10) / 10
-  const targetHours = progress.target ? progress.target / 60 : null
-  const percentage = progress.target ? Math.round((progress.minutes / progress.target) * 100) : null
+  const targetHours = progress.target / 60
+  const percentage = Math.round((progress.minutes / progress.target) * 100)
 
   let instructions = `
-INTENTION-AWARE COMMENTARY:
-This entry relates to the user's intention: "${progress.intentionLabel}"
+TARGET-AWARE COMMENTARY:
+This entry relates to the user's target: "${progress.targetLabel}"
 `
 
-  if (isDistraction) {
+  if (isLimitTarget) {
     instructions += `
-- The user wants LESS distraction time
+- The user has a LIMIT target — they want to keep this under ${targetHours}h/week
 - Be supportive, not judgmental
 - Acknowledge their self-awareness in logging it
-- If they've had multiple distraction entries: gently note the pattern
-- Ask a reflective question about what they might be avoiding
+- If they've exceeded the limit: gently note it
 - Don't pile on guilt; they're already tracking it which shows intent to change
-- You might reference their goal: "You wanted less scrolling time..."
+- You might reference their limit: "You wanted to keep ${progress.targetLabel.toLowerCase()} under ${targetHours}h..."
 `
   } else {
-    // Positive intention (more of something)
-    if (targetHours && percentage !== null) {
-      if (percentage >= 100) {
-        instructions += `
+    // Growth target (at_least)
+    if (percentage >= 100) {
+      instructions += `
 - They've HIT their weekly target (${hoursLogged}h of ${targetHours}h goal)!
 - Celebrate this achievement
-- Example: "That's ${hoursLogged} hours of deep work this week—you hit your target!"
+- Example: "That's ${hoursLogged} hours of ${progress.targetLabel.toLowerCase()} this week—you hit your target!"
 `
-      } else if (percentage >= 75) {
-        instructions += `
+    } else if (percentage >= 75) {
+      instructions += `
 - They're CLOSE to their weekly target (${percentage}% there)
-- Encourage them: "X more hours to hit your ${targetHours}h target"
+- Encourage them: "${Math.round((targetHours - hoursLogged) * 10) / 10} more hours to hit your ${targetHours}h target"
 - Build momentum
 `
-      } else if (percentage >= 50) {
-        instructions += `
+    } else if (percentage >= 50) {
+      instructions += `
 - They're HALFWAY to their weekly target
 - Acknowledge progress: "${hoursLogged}h down, ${Math.round((targetHours - hoursLogged) * 10) / 10}h to go"
 `
-      } else {
-        instructions += `
+    } else {
+      instructions += `
 - They're building toward their target (${percentage}% so far)
 - Encourage without pressure
 - Every session counts toward the goal
-`
-      }
-    } else {
-      instructions += `
-- Acknowledge this supports their intention
-- Note the progress without specific targets: "Another ${entry.duration_minutes} minutes toward your ${progress.intentionLabel.toLowerCase()} goal"
 `
     }
   }
 
   instructions += `
-IMPORTANT: Only reference their intention if it feels natural and meaningful. Don't force it into every comment.
+IMPORTANT: Only reference their target if it feels natural and meaningful. Don't force it into every comment.
 `
 
   return instructions
@@ -384,23 +364,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Entry is required' }, { status: 400 })
     }
 
-    // Get session to fetch user's intentions
+    // Get session to fetch user's targets
     const session = await getServerSession(authOptions)
-    let intentions: UserIntention[] = []
-    let weeklyProgress = new Map<string, { minutes: number; target: number | null; intentionLabel: string }>()
+    let targets: WeeklyTarget[] = []
+    let weeklyProgress = new Map<string, { minutes: number; target: number; targetLabel: string }>()
 
     if (session?.user?.id) {
-      // Fetch user's active intentions
-      const { data: userIntentions } = await supabase
-        .from('user_intentions')
+      // Fetch user's active weekly targets
+      const { data: userTargets } = await supabase
+        .from('weekly_targets')
         .select('*')
         .eq('user_id', session.user.id)
         .eq('active', true)
-        .order('priority', { ascending: true })
+        .order('sort_order', { ascending: true })
 
-      if (userIntentions) {
-        intentions = userIntentions as UserIntention[]
-        weeklyProgress = await getWeeklyIntentionProgress(session.user.id, intentions, entry.date)
+      if (userTargets) {
+        targets = userTargets as WeeklyTarget[]
+        weeklyProgress = await getWeeklyTargetProgress(session.user.id, targets, entry.date)
       }
     }
 
@@ -410,10 +390,10 @@ export async function POST(request: NextRequest) {
     })
 
     const tone = getCategoryTone(entry.category)
-    const context = buildContext(entry, dayEntries || [], intentions, weeklyProgress)
+    const context = buildContext(entry, dayEntries || [], targets, weeklyProgress)
     const durationCategory = getDurationCategory(entry.duration_minutes)
     const isMixedActivity = detectMixedActivity(entry.activity)
-    const intentionInstructions = buildIntentionInstructions(entry, intentions, weeklyProgress)
+    const targetInstructions = buildTargetInstructions(entry, targets, weeklyProgress)
 
     let toneInstructions = ''
     const categoryForTone = entry.category || 'other'
@@ -488,7 +468,7 @@ Examples of good commentary:
 - "2 hours of learning—building momentum."
 
 ${toneInstructions}
-${intentionInstructions}
+${targetInstructions}
 
 STRICT RULES:
 - ONE short sentence only (under 15 words)

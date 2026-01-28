@@ -3,7 +3,7 @@
  * Provides type safety for client-server communication
  */
 
-import { TimeCategory, TimeEntry, UserIntention } from './types'
+import { TimeCategory, TimeEntry, WeeklyTarget } from './types'
 
 // ============================================================================
 // Categorize API
@@ -78,33 +78,6 @@ export interface CalendarStatusResponse {
 }
 
 // ============================================================================
-// Intentions API
-// ============================================================================
-
-export interface IntentionsResponse {
-  intentions: UserIntention[]
-}
-
-export interface CreateIntentionRequest {
-  intention_type: string
-  custom_text?: string
-  weekly_target_minutes?: number
-  priority: number
-}
-
-export interface UpdateIntentionRequest {
-  intention_type?: string
-  custom_text?: string
-  weekly_target_minutes?: number
-  priority?: number
-  active?: boolean
-}
-
-export interface IntentionResponse {
-  intention: UserIntention
-}
-
-// ============================================================================
 // User Preferences API
 // ============================================================================
 
@@ -144,8 +117,8 @@ export interface WeeklyReviewResponse {
   totalMinutes: number
   categoryBreakdown: Record<TimeCategory, number>
   dailyTotals: Record<string, number>
-  intentions: Array<{
-    intention: UserIntention
+  targets: Array<{
+    target: WeeklyTarget
     actualMinutes: number
     targetMinutes: number | null
     percentComplete: number | null

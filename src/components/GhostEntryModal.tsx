@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { getLocalDateString } from '@/lib/types'
-import { supabase } from '@/lib/supabase'
+import { fetchEntries, createEntry, updateEntry } from '@/lib/api'
 import { CalendarEvent } from './TimelineView'
 import TimeRangePicker from './TimeRangePicker'
 import {
@@ -119,13 +119,9 @@ export default function GhostEntryModal({
 
     try {
       // Check for duplicate/overlapping entries first
-      const { data: existingEntries } = await supabase
-        .from('time_entries')
-        .select('id, start_time, end_time, activity')
-        .eq('user_id', userId)
-        .eq('date', selectedDate)
+      const existingEntries = await fetchEntries({ date: selectedDate, fields: 'id,start_time,end_time,activity' })
 
-      if (existingEntries && existingEntries.length > 0) {
+      if (existingEntries.length > 0) {
         const newStart = timeToMinutes(startTime)
         const newEnd = timeToMinutes(endTime)
 
@@ -163,44 +159,28 @@ export default function GhostEntryModal({
         category = categoryData.category
       }
 
-      // Save to Supabase
-      const newEntry = {
-        user_id: userId,
+      // Save via API
+      const insertedEntry = await createEntry({
         date: selectedDate,
         activity,
-        category,
+        category: category as import('@/lib/types').TimeCategory,
         duration_minutes: duration,
         start_time: startTime,
         end_time: endTime,
         description: notes || null,
-      }
-
-      const { data: insertedEntry, error: insertError } = await supabase
-        .from('time_entries')
-        .insert(newEntry)
-        .select()
-        .single()
-
-      if (insertError) {
-        throw new Error(insertError.message)
-      }
+      })
 
       // Generate commentary
       let generatedCommentary: string | null = null
       try {
-        const { data: dayEntries } = await supabase
-          .from('time_entries')
-          .select('*')
-          .eq('date', selectedDate)
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true })
+        const dayEntries = await fetchEntries({ date: selectedDate, orderBy: 'created_at', orderAsc: true })
 
         const commentaryResponse = await fetch('/api/commentary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             entry: insertedEntry,
-            dayEntries: dayEntries || [],
+            dayEntries,
           }),
         })
 
@@ -208,10 +188,7 @@ export default function GhostEntryModal({
           const { commentary } = await commentaryResponse.json()
           generatedCommentary = commentary
 
-          await supabase
-            .from('time_entries')
-            .update({ commentary })
-            .eq('id', insertedEntry.id)
+          await updateEntry(insertedEntry.id, { commentary })
         } else {
           generatedCommentary = null
         }

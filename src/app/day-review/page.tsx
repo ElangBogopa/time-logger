@@ -25,58 +25,69 @@ import {
   AggregatedCategory,
 } from '@/lib/types'
 
-// Category colors for timeline
-const CATEGORY_COLORS: Record<TimeCategory, string> = {
-  // Productive
-  deep_work: 'bg-blue-500',
-  shallow_work: 'bg-slate-500',
-  meetings: 'bg-violet-400',
-  learning: 'bg-cyan-500',
-  creating: 'bg-purple-500',
-  // Maintenance
-  admin: 'bg-slate-400',
-  errands: 'bg-stone-500',
-  chores: 'bg-zinc-400',
-  commute: 'bg-neutral-500',
-  // Body
-  exercise: 'bg-green-500',
-  movement: 'bg-green-300',
-  meals: 'bg-amber-400',
-  sleep: 'bg-indigo-800',
-  // Mind
-  rest: 'bg-violet-300',
-  self_care: 'bg-purple-300',
-  // Connection
-  social: 'bg-pink-500',
-  calls: 'bg-pink-400',
-  // Leisure
-  entertainment: 'bg-zinc-500',
-  // Fallback
-  other: 'bg-zinc-600',
+// Map each TimeCategory → aggregated category (mirrors ENERGY_VIEW)
+const CATEGORY_TO_AGGREGATED: Record<TimeCategory, AggregatedCategory> = {
+  deep_work: 'focus',
+  learning: 'focus',
+  creating: 'focus',
+  shallow_work: 'ops',
+  meetings: 'ops',
+  admin: 'ops',
+  errands: 'ops',
+  chores: 'ops',
+  commute: 'ops',
+  exercise: 'body',
+  movement: 'body',
+  meals: 'body',
+  sleep: 'body',
+  rest: 'recovery',
+  self_care: 'recovery',
+  social: 'connection',
+  calls: 'connection',
+  entertainment: 'escape',
+  other: 'escape',
 }
+
+// Muted 6-color palette for aggregated categories
+const AGGREGATED_HEX: Record<AggregatedCategory, string> = {
+  focus: '#6B8CAE',      // Slate blue
+  ops: '#8B8680',        // Warm gray
+  body: '#7D9B8A',       // Sage green
+  recovery: '#B5A07A',   // Dusty amber
+  connection: '#A0848E', // Muted rose
+  escape: '#7A7D82',     // Cool gray
+}
+
+// Category colors for timeline strip — uses aggregated hex colors
+const CATEGORY_COLORS: Record<TimeCategory, string> = Object.fromEntries(
+  (Object.keys(CATEGORY_TO_AGGREGATED) as TimeCategory[]).map(cat => [
+    cat,
+    `bg-[${AGGREGATED_HEX[CATEGORY_TO_AGGREGATED[cat]]}]`,
+  ])
+) as Record<TimeCategory, string>
 
 // Aggregated category colors (for the 6-category energy view)
 const AGGREGATED_COLORS: Record<AggregatedCategory, string> = {
-  focus: 'bg-blue-500',
-  ops: 'bg-slate-500',
-  body: 'bg-green-500',
-  recovery: 'bg-amber-500',
-  connection: 'bg-pink-500',
-  escape: 'bg-zinc-500',
+  focus: 'bg-[#6B8CAE]',
+  ops: 'bg-[#8B8680]',
+  body: 'bg-[#7D9B8A]',
+  recovery: 'bg-[#B5A07A]',
+  connection: 'bg-[#A0848E]',
+  escape: 'bg-[#7A7D82]',
 }
 
 const AGGREGATED_TEXT_COLORS: Record<AggregatedCategory, string> = {
-  focus: 'text-blue-500',
-  ops: 'text-slate-500',
-  body: 'text-green-500',
-  recovery: 'text-amber-500',
-  connection: 'text-pink-500',
-  escape: 'text-zinc-500',
+  focus: 'text-[#6B8CAE]',
+  ops: 'text-[#8B8680]',
+  body: 'text-[#7D9B8A]',
+  recovery: 'text-[#B5A07A]',
+  connection: 'text-[#A0848E]',
+  escape: 'text-[#7A7D82]',
 }
 
-interface IntentionProgress {
-  intentionId: string
-  intentionType: string
+interface TargetProgress {
+  targetId: string
+  targetType: string
   label: string
   todayMinutes: number
   yesterdayMinutes: number
@@ -85,7 +96,7 @@ interface IntentionProgress {
   weeklyTarget: number
   weekMinutes: number
   progress: number
-  direction: 'maximize' | 'minimize'
+  direction: 'at_least' | 'at_most'
   trend: 'up' | 'down' | 'same'
   vsLastWeekTrend: 'up' | 'down' | 'same'
 }
@@ -122,7 +133,7 @@ interface AggregatedBreakdown {
   label: string
   minutes: number
   percentage: number
-  isIntentionLinked: boolean
+  isTargetLinked: boolean
 }
 
 interface DaySummary {
@@ -133,7 +144,7 @@ interface DaySummary {
   totalMinutesLogged: number
   hasEveningPassed: boolean
   date: string
-  intentionProgress: IntentionProgress[]
+  targetProgress: TargetProgress[]
   wins: Win[]
   timeline: TimelineBlock[]
   longestFocusSession: { activity: string; minutes: number } | null
@@ -299,19 +310,19 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
 }
 
 // Trend Icon Component (extracted to avoid creating components during render)
-function TrendIcon({ trend, direction }: { trend: 'up' | 'down' | 'same'; direction: 'maximize' | 'minimize' }) {
-  const isGood = direction === 'maximize' ? trend === 'up' : trend === 'down'
+function TrendIcon({ trend, direction }: { trend: 'up' | 'down' | 'same'; direction: 'at_least' | 'at_most' }) {
+  const isGood = direction === 'at_least' ? trend === 'up' : trend === 'down'
 
   if (trend === 'same') return <Minus className="h-3 w-3 text-zinc-400" />
   if (trend === 'up') return <TrendingUp className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
   return <TrendingDown className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
 }
 
-// Intention Progress Card
-function IntentionCard({ intention }: { intention: IntentionProgress }) {
+// Target Progress Card
+function TargetCard({ target }: { target: TargetProgress }) {
   const getBarColor = () => {
-    if (intention.progress >= 80) return 'bg-green-500'
-    if (intention.progress >= 50) return 'bg-amber-500'
+    if (target.progress >= 80) return 'bg-green-500'
+    if (target.progress >= 50) return 'bg-amber-500'
     return 'bg-red-500'
   }
 
@@ -319,22 +330,22 @@ function IntentionCard({ intention }: { intention: IntentionProgress }) {
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 space-y-3">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-medium text-foreground">{intention.label}</h3>
+          <h3 className="font-medium text-foreground">{target.label}</h3>
           <p className="text-2xl font-bold text-foreground mt-1">
-            {formatMinutes(intention.todayMinutes)}
+            {formatMinutes(target.todayMinutes)}
             <span className="text-sm font-normal text-muted-foreground ml-1">
-              / {formatMinutes(intention.dailyTarget)}
+              / {formatMinutes(target.dailyTarget)}
             </span>
           </p>
         </div>
         <div className="text-right">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <span>vs yesterday</span>
-            <TrendIcon trend={intention.trend} direction={intention.direction} />
+            <TrendIcon trend={target.trend} direction={target.direction} />
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
             <span>vs last week</span>
-            <TrendIcon trend={intention.vsLastWeekTrend} direction={intention.direction} />
+            <TrendIcon trend={target.vsLastWeekTrend} direction={target.direction} />
           </div>
         </div>
       </div>
@@ -343,14 +354,14 @@ function IntentionCard({ intention }: { intention: IntentionProgress }) {
       <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
         <div
           className={cn('h-full rounded-full transition-all duration-500', getBarColor())}
-          style={{ width: `${Math.min(intention.progress, 100)}%` }}
+          style={{ width: `${Math.min(target.progress, 100)}%` }}
         />
       </div>
 
       {/* Comparison stats */}
       <div className="flex justify-between text-xs text-muted-foreground">
-        <span>Yesterday: {formatMinutes(intention.yesterdayMinutes)}</span>
-        <span>Last {new Date().toLocaleDateString('en-US', { weekday: 'short' })}: {formatMinutes(intention.sameDayLastWeekMinutes)}</span>
+        <span>Yesterday: {formatMinutes(target.yesterdayMinutes)}</span>
+        <span>Last {new Date().toLocaleDateString('en-US', { weekday: 'short' })}: {formatMinutes(target.sameDayLastWeekMinutes)}</span>
       </div>
     </div>
   )
@@ -358,8 +369,8 @@ function IntentionCard({ intention }: { intention: IntentionProgress }) {
 
 // Aggregated Category Breakdown (6 energy categories)
 function AggregatedBreakdownSection({ breakdown }: { breakdown: AggregatedBreakdown[] }) {
-  // Filter to only show categories with time (or intention-linked)
-  const visibleCategories = breakdown.filter(cat => cat.minutes > 0 || cat.isIntentionLinked)
+  // Filter to only show categories with time (or target-linked)
+  const visibleCategories = breakdown.filter(cat => cat.minutes > 0 || cat.isTargetLinked)
 
   if (visibleCategories.length === 0) return null
 
@@ -376,18 +387,18 @@ function AggregatedBreakdownSection({ breakdown }: { breakdown: AggregatedBreakd
                 <div className={cn('w-3 h-3 rounded-full', AGGREGATED_COLORS[cat.category])} />
                 <span className={cn(
                   'text-sm font-medium',
-                  cat.isIntentionLinked ? 'text-foreground' : 'text-muted-foreground'
+                  cat.isTargetLinked ? 'text-foreground' : 'text-muted-foreground'
                 )}>
                   {cat.label}
                 </span>
-                {cat.isIntentionLinked && (
+                {cat.isTargetLinked && (
                   <Target className="h-3 w-3 text-blue-500" />
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <span className={cn(
                   'text-sm font-medium',
-                  cat.isIntentionLinked ? 'text-foreground' : 'text-muted-foreground'
+                  cat.isTargetLinked ? 'text-foreground' : 'text-muted-foreground'
                 )}>
                   {formatMinutes(cat.minutes)}
                 </span>
@@ -484,7 +495,7 @@ export default function DayReviewPage() {
           score: summaryData.score,
           totalMinutesLogged: summaryData.totalMinutesLogged,
           wins: summaryData.wins,
-          intentionProgress: summaryData.intentionProgress,
+          targetProgress: summaryData.targetProgress,
           mood: summaryData.todayMood?.mood || null,
           longestFocusSession: summaryData.longestFocusSession,
         }),
@@ -592,13 +603,13 @@ export default function DayReviewPage() {
           <TimelineStrip timeline={summary.timeline} />
         </div>
 
-        {/* Intention Progress */}
-        {summary.intentionProgress.length > 0 && (
+        {/* Target Progress */}
+        {summary.targetProgress.length > 0 && (
           <section className="mb-6 space-y-3">
             <h2 className="font-semibold text-foreground">Goal Progress</h2>
             <div className="space-y-3">
-              {summary.intentionProgress.map(intention => (
-                <IntentionCard key={intention.intentionId} intention={intention} />
+              {summary.targetProgress.map(tp => (
+                <TargetCard key={tp.targetId} target={tp} />
               ))}
             </div>
           </section>

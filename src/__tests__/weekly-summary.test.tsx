@@ -6,22 +6,14 @@ let currentWeekData: TimeEntry[] = []
 let previousWeekData: TimeEntry[] = []
 let callIndex = 0
 
-// Create a mock chain that resolves with test data
-const createMockChain = () => ({
-  select: jest.fn().mockReturnThis(),
-  eq: jest.fn().mockReturnThis(),
-  gte: jest.fn().mockReturnThis(),
-  lte: jest.fn().mockImplementation(() => {
-    const data = callIndex === 0 ? currentWeekData : previousWeekData
-    callIndex++
-    return Promise.resolve({ data })
-  }),
+const mockFetchEntries = jest.fn().mockImplementation(() => {
+  const data = callIndex === 0 ? currentWeekData : previousWeekData
+  callIndex++
+  return Promise.resolve(data)
 })
 
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(() => createMockChain()),
-  },
+jest.mock('@/lib/api', () => ({
+  fetchEntries: (...args: unknown[]) => mockFetchEntries(...args),
 }))
 
 // Import after mocks are set up

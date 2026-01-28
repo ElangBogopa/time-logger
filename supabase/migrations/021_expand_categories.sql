@@ -13,6 +13,8 @@ ALTER TYPE time_category ADD VALUE IF NOT EXISTS 'sleep';
 ALTER TYPE time_category ADD VALUE IF NOT EXISTS 'social';
 ALTER TYPE time_category ADD VALUE IF NOT EXISTS 'calls';
 ALTER TYPE time_category ADD VALUE IF NOT EXISTS 'entertainment';
+ALTER TYPE time_category ADD VALUE IF NOT EXISTS 'meals';
+ALTER TYPE time_category ADD VALUE IF NOT EXISTS 'self_care';
 
 -- Note: PostgreSQL doesn't support removing enum values directly.
 -- The old values ('distraction', 'relationships') will remain in the enum

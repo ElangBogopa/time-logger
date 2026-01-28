@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { fetchEntries, fetchWeeklyTargets, fetchStreaks, upsertStreak } from '@/lib/api'
 import {
   TimeEntry,
   getLocalDateString,
@@ -12,10 +12,10 @@ import {
   calculateDailyTarget,
   formatMinutesForStreak,
   UserStreak,
-  UserIntention,
-  INTENTION_CATEGORY_MAP,
+  WeeklyTarget,
+  WeeklyTargetType,
+  TARGET_TO_STREAK_MAP,
   StreakConfig,
-  IntentionType,
 } from '@/lib/types'
 import { Flame, ChevronRight, Sparkles } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -35,42 +35,30 @@ function getDateDaysAgo(daysAgo: number): string {
   return getLocalDateString(date)
 }
 
-// Map intention type to streak type
-const INTENTION_TO_STREAK_MAP: Partial<Record<IntentionType, StreakType>> = {
-  deep_work: 'deep_work',
-  exercise: 'exercise',
-  less_distraction: 'focus',
-  learning: 'learning',
-  relationships: 'relationships',
-}
-
-// Map intentions to streak types with their weekly targets
+// Map weekly targets to streak types with their weekly target values
 interface StreakTypeWithTarget {
   type: StreakType
   weeklyTargetMinutes: number | null
-  intentionType: IntentionType | null
 }
 
-function getStreakTypesFromIntentions(intentions: UserIntention[]): StreakTypeWithTarget[] {
+function getStreakTypesFromTargets(targets: WeeklyTarget[]): StreakTypeWithTarget[] {
   const streakMap = new Map<StreakType, StreakTypeWithTarget>()
 
-  intentions.forEach(intention => {
-    const streakType = INTENTION_TO_STREAK_MAP[intention.intention_type]
+  targets.forEach(target => {
+    const streakType = TARGET_TO_STREAK_MAP[target.target_type as WeeklyTargetType]
     if (streakType) {
-      // Use the intention's weekly target
       streakMap.set(streakType, {
         type: streakType,
-        weeklyTargetMinutes: intention.weekly_target_minutes,
-        intentionType: intention.intention_type,
+        weeklyTargetMinutes: target.weekly_target_minutes,
       })
     }
   })
 
-  // Add defaults if no intentions set
+  // Add defaults if no targets map to streaks
   if (streakMap.size === 0) {
-    streakMap.set('deep_work', { type: 'deep_work', weeklyTargetMinutes: null, intentionType: null })
-    streakMap.set('exercise', { type: 'exercise', weeklyTargetMinutes: null, intentionType: null })
-    streakMap.set('focus', { type: 'focus', weeklyTargetMinutes: null, intentionType: null })
+    streakMap.set('deep_work', { type: 'deep_work', weeklyTargetMinutes: null })
+    streakMap.set('exercise', { type: 'exercise', weeklyTargetMinutes: null })
+    streakMap.set('focus', { type: 'focus', weeklyTargetMinutes: null })
   }
 
   return Array.from(streakMap.values())
@@ -122,28 +110,11 @@ export default function StatsCard({ userId }: StatsCardProps) {
       const sixtyDaysAgo = getDateDaysAgo(60)
       const today = getLocalDateString()
 
-      const [entriesResult, intentionsResult, streakRecordsResult] = await Promise.all([
-        supabase
-          .from('time_entries')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('status', 'confirmed')
-          .gte('date', sixtyDaysAgo)
-          .lte('date', today),
-        supabase
-          .from('user_intentions')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('active', true),
-        supabase
-          .from('user_streaks')
-          .select('*')
-          .eq('user_id', userId),
-      ])
-
-      const entries = (entriesResult.data || []) as TimeEntry[]
-      const intentions = (intentionsResult.data || []) as UserIntention[]
-      const existingStreaks = (streakRecordsResult.data || []) as UserStreak[]
+      const [entries, targets, existingStreaks] = await Promise.all([
+        fetchEntries({ status: 'confirmed', dateFrom: sixtyDaysAgo, dateTo: today }),
+        fetchWeeklyTargets(),
+        fetchStreaks(),
+      ]) as [TimeEntry[], WeeklyTarget[], UserStreak[]]
 
       // Build personal bests map
       const pbMap = new Map<StreakType, number>()
@@ -158,8 +129,8 @@ export default function StatsCard({ userId }: StatsCardProps) {
         entriesByDate.set(entry.date, [...existing, entry])
       })
 
-      // Get streak types based on intentions (with their targets)
-      const streakTypesWithTargets = getStreakTypesFromIntentions(intentions)
+      // Get streak types based on weekly targets
+      const streakTypesWithTargets = getStreakTypesFromTargets(targets)
 
       // Calculate all streaks with intention-based thresholds
       const calculatedStreaks: StreakDisplay[] = streakTypesWithTargets
@@ -196,19 +167,13 @@ export default function StatsCard({ userId }: StatsCardProps) {
         const celebrationKey = `${streak.type}-${streak.currentStreak}`
 
         if (streak.isNewPersonalBest && streak.currentStreak >= 3) {
-          await supabase
-            .from('user_streaks')
-            .upsert({
-              user_id: userId,
-              streak_type: streak.type,
-              personal_best_days: streak.personalBest,
-              personal_best_achieved_at: new Date().toISOString(),
-              current_streak_days: streak.currentStreak,
-              current_streak_start_date: streak.streakStartDate,
-              last_calculated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'user_id,streak_type',
-            })
+          await upsertStreak({
+            streak_type: streak.type,
+            personal_best_days: streak.personalBest,
+            personal_best_achieved_at: new Date().toISOString(),
+            current_streak_days: streak.currentStreak,
+            current_streak_start_date: streak.streakStartDate,
+          })
 
           // Show celebration for new PB (only once ever)
           if (!shownCelebrations.has(celebrationKey)) {

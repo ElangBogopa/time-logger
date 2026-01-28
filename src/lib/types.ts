@@ -34,28 +34,6 @@ export type TimeCategory =
 
 export type EntryStatus = 'confirmed' | 'pending'
 
-// Intention types for user goals
-export type IntentionType =
-  | 'deep_work'
-  | 'less_distraction'
-  | 'work_life_balance'
-  | 'exercise'
-  | 'self_care'
-  | 'relationships'
-  | 'learning'
-  | 'custom'
-
-export interface UserIntention {
-  id: string
-  user_id: string
-  intention_type: IntentionType
-  custom_text: string | null
-  weekly_target_minutes: number | null
-  priority: number // 1-3
-  active: boolean
-  created_at: string
-}
-
 // Reminder time configuration
 export interface ReminderTime {
   id: string
@@ -64,14 +42,13 @@ export interface ReminderTime {
   enabled: boolean
 }
 
-// Pending intention change (for delayed updates)
+// Pending target change (for delayed updates)
 export interface PendingIntentionChange {
   action: 'add' | 'remove' | 'update'
-  intention_type?: IntentionType
-  intention_id?: string
-  custom_text?: string | null
+  target_type?: WeeklyTargetType
+  target_id?: string
   weekly_target_minutes?: number | null
-  priority?: number
+  sort_order?: number
   queued_at: string // ISO date when the change was requested
   effective_date: string // ISO date when it takes effect (next Monday)
 }
@@ -296,164 +273,194 @@ export function getLoggingPeriod(hour: number = new Date().getHours()): TimePeri
   return 'evening'
 }
 
-export const INTENTION_LABELS: Record<IntentionType, string> = {
-  deep_work: 'Deep focused work',
-  less_distraction: 'Less scrolling & distractions',
-  work_life_balance: 'Better work-life balance',
-  exercise: 'Consistent exercise',
-  self_care: 'More rest & self-care',
-  relationships: 'Quality time with people',
-  learning: 'More learning',
-  custom: 'Custom goal',
+// ============================================================================
+// WEEKLY TARGETS SYSTEM
+// ============================================================================
+
+export type WeeklyTargetType =
+  | 'deep_focus'
+  | 'exercise'
+  | 'social_time'
+  | 'recovery'
+  | 'leisure'
+  | 'meetings'
+
+export type TargetDirection = 'at_least' | 'at_most'
+
+export interface WeeklyTarget {
+  id: string
+  user_id: string
+  target_type: WeeklyTargetType
+  direction: TargetDirection
+  weekly_target_minutes: number
+  sort_order: number
+  active: boolean
+  created_at: string
 }
 
-export const INTENTION_DESCRIPTIONS: Record<IntentionType, string> = {
-  deep_work: 'Spend more time in focused, uninterrupted work sessions',
-  less_distraction: 'Reduce time spent on social media and aimless browsing',
-  work_life_balance: 'Create clearer boundaries between work and personal time',
-  exercise: 'Build a regular exercise habit and stay active',
-  self_care: 'Prioritize rest, recovery, and taking care of yourself',
-  relationships: 'Make time for friends, family, and meaningful connections',
-  learning: 'Dedicate time to learning new skills and knowledge',
-  custom: 'Set your own personalized goal',
-}
-
-// Map intentions to relevant time categories for tracking
-export const INTENTION_CATEGORY_MAP: Record<IntentionType, TimeCategory[]> = {
-  deep_work: ['deep_work'],
-  less_distraction: ['entertainment'], // Track to minimize (was 'distraction')
-  work_life_balance: ['rest', 'social', 'self_care', 'calls'],
-  exercise: ['exercise', 'movement'],
-  self_care: ['self_care', 'rest'],
-  relationships: ['social', 'calls'],
-  learning: ['learning'],
-  custom: [], // User defines what to track
-}
-
-// Research-based intention configurations
-export interface IntentionConfig {
+export interface WeeklyTargetConfig {
   label: string
   description: string
-  direction: 'maximize' | 'minimize'
-  defaultTargetMinutes: number
-  minTargetMinutes: number
-  maxTargetMinutes: number
-  optimalRangeMin: number
-  optimalRangeMax: number
+  direction: TargetDirection
+  defaultMinutes: number
+  minMinutes: number
+  maxMinutes: number
   unit: 'hours' | 'minutes'
-  researchNote: string
   categories: TimeCategory[]
+  color: string       // Tailwind color name (e.g. 'blue', 'green')
+  ringColor: string   // SVG stroke color hex
+  icon: string        // Emoji icon
+  researchNote: string
 }
 
-export const INTENTION_CONFIGS: Record<IntentionType, IntentionConfig> = {
-  deep_work: {
-    label: 'Deep focused work',
-    description: 'Distraction-free concentration on cognitively demanding tasks (coding, writing, design, problem-solving)',
-    direction: 'maximize',
-    defaultTargetMinutes: 20 * 60, // 20 hours/week
-    minTargetMinutes: 5 * 60,      // 5 hours/week
-    maxTargetMinutes: 25 * 60,     // 25 hours/week (5 hrs/day × 5 days)
-    optimalRangeMin: 15 * 60,      // 15 hours
-    optimalRangeMax: 20 * 60,      // 20 hours
+export const WEEKLY_TARGET_CONFIGS: Record<WeeklyTargetType, WeeklyTargetConfig> = {
+  deep_focus: {
+    label: 'Deep Focus',
+    description: 'Focused work, learning, and creative output',
+    direction: 'at_least',
+    defaultMinutes: 15 * 60, // 15 hrs/wk
+    minMinutes: 5 * 60,
+    maxMinutes: 25 * 60,
     unit: 'hours',
-    researchNote: 'Cal Newport: Experts can sustain ~4 hours/day of deep work. Test: "Would it take months to train someone to do this task?"',
-    categories: ['deep_work'],
-  },
-  less_distraction: {
-    label: 'Less distractions',
-    description: 'Reduce social media scrolling, aimless browsing, and non-productive screen time',
-    direction: 'minimize',
-    defaultTargetMinutes: 7 * 60,  // 7 hours/week max (1 hr/day)
-    minTargetMinutes: 0,           // 0 hours (ideal)
-    maxTargetMinutes: 14 * 60,     // 14 hours/week (2 hrs/day limit)
-    optimalRangeMin: 0,
-    optimalRangeMax: 7 * 60,       // Under 7 hours is good
-    unit: 'hours',
-    researchNote: 'Research links >2 hrs/day non-productive screen time to anxiety and depression. Average attention span has dropped to 47 seconds.',
-    categories: ['entertainment'],
-  },
-  work_life_balance: {
-    label: 'Work-life balance',
-    description: 'Combined rest, relationships, and self-care time outside of work obligations',
-    direction: 'maximize',
-    defaultTargetMinutes: 15 * 60, // 15 hours/week
-    minTargetMinutes: 7 * 60,      // 7 hours/week
-    maxTargetMinutes: 30 * 60,     // 30 hours/week
-    optimalRangeMin: 10 * 60,
-    optimalRangeMax: 20 * 60,
-    unit: 'hours',
-    researchNote: 'Work hours are a key barrier to social connection. Intentional non-work time prevents burnout and supports relationships.',
-    categories: ['rest', 'social', 'self_care', 'calls'],
+    categories: ['deep_work', 'learning', 'creating'],
+    color: 'blue',
+    ringColor: '#3b82f6',
+    icon: '🧠',
+    researchNote: 'Cal Newport: Experts sustain ~4 hrs/day of deep work. 15-20 hrs/week is a strong target.',
   },
   exercise: {
     label: 'Exercise',
-    description: 'Moderate intensity (can talk, not sing): brisk walking, cycling, swimming, sports, yoga, strength training',
-    direction: 'maximize',
-    defaultTargetMinutes: 150,     // 2.5 hours/week (WHO minimum)
-    minTargetMinutes: 75,          // 75 min vigorous OR
-    maxTargetMinutes: 450,         // 7.5 hours/week
-    optimalRangeMin: 150,          // WHO minimum
-    optimalRangeMax: 300,          // WHO recommended
+    description: 'Intentional physical activity and movement',
+    direction: 'at_least',
+    defaultMinutes: 150, // 2.5 hrs/wk (WHO minimum)
+    minMinutes: 60,
+    maxMinutes: 450,
     unit: 'minutes',
-    researchNote: 'WHO: 150-300 min/week moderate OR 75-150 min vigorous. 31% of adults globally don\'t meet minimum.',
     categories: ['exercise', 'movement'],
+    color: 'green',
+    ringColor: '#22c55e',
+    icon: '💪',
+    researchNote: 'WHO: 150-300 min/week moderate activity. Only 31% of adults meet this minimum.',
   },
-  self_care: {
-    label: 'Rest & self-care',
-    description: 'Recovery activities: relaxation, meditation, hobbies, mindful entertainment, personal care routines',
-    direction: 'maximize',
-    defaultTargetMinutes: 10 * 60, // 10 hours/week
-    minTargetMinutes: 5 * 60,      // 5 hours/week
-    maxTargetMinutes: 20 * 60,     // 20 hours/week
-    optimalRangeMin: 7 * 60,
-    optimalRangeMax: 14 * 60,
+  social_time: {
+    label: 'Social Time',
+    description: 'Quality time with friends, family, and community',
+    direction: 'at_least',
+    defaultMinutes: 10 * 60, // 10 hrs/wk
+    minMinutes: 3 * 60,
+    maxMinutes: 21 * 60,
     unit: 'hours',
-    researchNote: 'Self-care is a coping strategy that reduces burnout. 75% of employees report burnout. Short breaks improve mood and focus.',
-    categories: ['self_care', 'rest', 'sleep'],
-  },
-  relationships: {
-    label: 'Social connection',
-    description: 'Quality time with others: conversations, shared activities, family time, social calls, gatherings',
-    direction: 'maximize',
-    defaultTargetMinutes: 12 * 60, // 12 hours/week (research sweet spot)
-    minTargetMinutes: 7 * 60,      // 7 hours/week (research minimum)
-    maxTargetMinutes: 21 * 60,     // 21 hours/week
-    optimalRangeMin: 9 * 60,       // 9 hours (loneliness threshold)
-    optimalRangeMax: 21 * 60,      // 21 hours
-    unit: 'hours',
-    researchNote: 'Research: 9-12 hrs/week minimum to avoid loneliness. Aim for 3-5 close friendships. Social connection increases survival odds by 50%.',
     categories: ['social', 'calls'],
+    color: 'pink',
+    ringColor: '#ec4899',
+    icon: '💬',
+    researchNote: 'Research: 9-12 hrs/week minimum to avoid loneliness. Social connection increases survival odds by 50%.',
   },
-  learning: {
-    label: 'Learning',
-    description: 'Deliberate practice: structured skill-building with goals and feedback (courses, tutorials, practice sessions)',
-    direction: 'maximize',
-    defaultTargetMinutes: 7 * 60,  // 7 hours/week (1 hr/day)
-    minTargetMinutes: 3 * 60,      // 3 hours/week
-    maxTargetMinutes: 14 * 60,     // 14 hours/week (2 hrs/day)
-    optimalRangeMin: 5 * 60,
-    optimalRangeMax: 10 * 60,
+  recovery: {
+    label: 'Recovery',
+    description: 'Rest, self-care, and sleep for recharging',
+    direction: 'at_least',
+    defaultMinutes: 7 * 60, // 7 hrs/wk
+    minMinutes: 3 * 60,
+    maxMinutes: 14 * 60,
     unit: 'hours',
-    researchNote: 'Ericsson: Beginners sustain ~1 hr/day, experts 4-5 hrs. Deliberate practice requires specific goals and feedback, not just repetition.',
-    categories: ['learning'],
+    categories: ['rest', 'self_care', 'sleep'],
+    color: 'amber',
+    ringColor: '#f59e0b',
+    icon: '🔋',
+    researchNote: '75% of employees report burnout. Intentional recovery prevents it. Short breaks improve mood and focus.',
   },
-  custom: {
-    label: 'Custom goal',
-    description: 'Set your own personalized goal',
-    direction: 'maximize',
-    defaultTargetMinutes: 5 * 60,  // 5 hours/week
-    minTargetMinutes: 30,          // 30 min/week
-    maxTargetMinutes: 40 * 60,     // 40 hours/week
-    optimalRangeMin: 0,
-    optimalRangeMax: 40 * 60,
+  leisure: {
+    label: 'Leisure',
+    description: 'Entertainment and passive screen time',
+    direction: 'at_most',
+    defaultMinutes: 10 * 60, // 10 hrs/wk
+    minMinutes: 0,
+    maxMinutes: 21 * 60,
     unit: 'hours',
-    researchNote: 'Custom goals let you track what matters most to you.',
-    categories: [],
+    categories: ['entertainment'],
+    color: 'zinc',
+    ringColor: '#71717a',
+    icon: '📺',
+    researchNote: 'Research links >2 hrs/day recreational screen time to increased anxiety. Average attention span is 47 seconds.',
+  },
+  meetings: {
+    label: 'Meetings',
+    description: 'Synchronous work meetings and calls',
+    direction: 'at_most',
+    defaultMinutes: 10 * 60, // 10 hrs/wk
+    minMinutes: 0,
+    maxMinutes: 20 * 60,
+    unit: 'hours',
+    categories: ['meetings'],
+    color: 'indigo',
+    ringColor: '#6366f1',
+    icon: '📅',
+    researchNote: 'Microsoft research: Workers spend 57% of time in meetings/email. Reducing meetings increases deep focus.',
   },
 }
 
-// Helper to format target for display
-export function formatTarget(minutes: number, unit: 'hours' | 'minutes'): string {
+// All target types ordered for display
+export const WEEKLY_TARGET_TYPES: WeeklyTargetType[] = [
+  'deep_focus', 'exercise', 'social_time', 'recovery', 'leisure', 'meetings',
+]
+
+// Maximum number of targets a user can select
+export const MAX_WEEKLY_TARGETS = 5
+
+/**
+ * Calculate progress for a weekly target.
+ * For at_least: 0-100% filling toward goal.
+ * For at_most: 100% when under limit, decreasing as you exceed it.
+ */
+export function calculateTargetProgress(
+  actualMinutes: number,
+  targetMinutes: number,
+  direction: TargetDirection
+): number {
+  if (targetMinutes === 0) return direction === 'at_most' ? 100 : 0
+
+  if (direction === 'at_least') {
+    return Math.min(100, Math.round((actualMinutes / targetMinutes) * 100))
+  } else {
+    // at_most: under limit = 100%, over = decreasing
+    if (actualMinutes <= targetMinutes) {
+      return 100
+    }
+    const overageRatio = actualMinutes / targetMinutes
+    return Math.max(0, Math.round(100 - (overageRatio - 1) * 100))
+  }
+}
+
+/**
+ * Get feedback for target progress display
+ */
+export function getTargetFeedback(
+  actualMinutes: number,
+  targetMinutes: number,
+  direction: TargetDirection
+): { message: string; tone: 'success' | 'warning' | 'neutral' | 'danger' } {
+  const progress = calculateTargetProgress(actualMinutes, targetMinutes, direction)
+
+  if (direction === 'at_least') {
+    if (progress >= 100) return { message: 'Target reached!', tone: 'success' }
+    if (progress >= 75) return { message: 'Almost there', tone: 'neutral' }
+    if (progress >= 50) return { message: 'Halfway', tone: 'neutral' }
+    if (progress >= 25) return { message: 'Getting started', tone: 'warning' }
+    return { message: 'Needs attention', tone: 'danger' }
+  } else {
+    if (actualMinutes === 0) return { message: 'Perfect!', tone: 'success' }
+    if (actualMinutes <= targetMinutes * 0.5) return { message: 'Great restraint', tone: 'success' }
+    if (actualMinutes <= targetMinutes) return { message: 'Within limit', tone: 'neutral' }
+    if (actualMinutes <= targetMinutes * 1.5) return { message: 'Slightly over', tone: 'warning' }
+    return { message: 'Over limit', tone: 'danger' }
+  }
+}
+
+/**
+ * Format target value for display (e.g. "15 hrs" or "150 min")
+ */
+export function formatTargetValue(minutes: number, unit: 'hours' | 'minutes'): string {
   if (unit === 'minutes' || minutes < 60) {
     return `${minutes} min`
   }
@@ -464,61 +471,11 @@ export function formatTarget(minutes: number, unit: 'hours' | 'minutes'): string
   return `${hours.toFixed(1)} hrs`
 }
 
-// Helper to calculate progress percentage
-export function calculateIntentionProgress(
-  actualMinutes: number,
-  targetMinutes: number,
-  direction: 'maximize' | 'minimize'
-): number {
-  if (targetMinutes === 0) return direction === 'minimize' ? 100 : 0
-
-  if (direction === 'maximize') {
-    return Math.min(100, Math.round((actualMinutes / targetMinutes) * 100))
-  } else {
-    // For minimize: being under target is good (100%), over is bad (decreasing %)
-    if (actualMinutes <= targetMinutes) {
-      return 100
-    }
-    // Gradually decrease from 100% as you exceed target
-    const overageRatio = actualMinutes / targetMinutes
-    return Math.max(0, Math.round(100 - (overageRatio - 1) * 100))
-  }
-}
-
-// Get feedback message based on progress
-export function getIntentionFeedback(
-  actualMinutes: number,
-  targetMinutes: number,
-  config: IntentionConfig
-): { message: string; tone: 'success' | 'warning' | 'neutral' | 'danger' } {
-  const progress = calculateIntentionProgress(actualMinutes, targetMinutes, config.direction)
-
-  if (config.direction === 'maximize') {
-    if (progress >= 100) {
-      return { message: 'Target reached!', tone: 'success' }
-    } else if (progress >= 75) {
-      return { message: 'Almost there', tone: 'neutral' }
-    } else if (progress >= 50) {
-      return { message: 'Halfway', tone: 'neutral' }
-    } else if (progress >= 25) {
-      return { message: 'Getting started', tone: 'warning' }
-    } else {
-      return { message: 'Needs attention', tone: 'danger' }
-    }
-  } else {
-    // Minimize direction
-    if (actualMinutes === 0) {
-      return { message: 'Perfect!', tone: 'success' }
-    } else if (actualMinutes <= targetMinutes * 0.5) {
-      return { message: 'Great restraint', tone: 'success' }
-    } else if (actualMinutes <= targetMinutes) {
-      return { message: 'Within limit', tone: 'neutral' }
-    } else if (actualMinutes <= targetMinutes * 1.5) {
-      return { message: 'Slightly over', tone: 'warning' }
-    } else {
-      return { message: 'Over limit', tone: 'danger' }
-    }
-  }
+// Map weekly target types to streak types for continuity
+export const TARGET_TO_STREAK_MAP: Partial<Record<WeeklyTargetType, StreakType>> = {
+  deep_focus: 'deep_work',
+  exercise: 'exercise',
+  social_time: 'relationships',
 }
 
 export interface TimeEntry {

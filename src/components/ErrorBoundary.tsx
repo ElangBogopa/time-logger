@@ -3,6 +3,7 @@
 import { Component, ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import * as Sentry from '@sentry/nextjs'
 
 interface Props {
   children: ReactNode
@@ -25,7 +26,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error to console in development
+    Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } })
     if (process.env.NODE_ENV === 'development') {
       console.error('ErrorBoundary caught an error:', error, errorInfo)
     }

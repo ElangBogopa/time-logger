@@ -11,12 +11,12 @@ interface DayData {
   score: number
   totalMinutesLogged: number
   wins: { text: string }[]
-  intentionProgress: {
+  targetProgress: {
     label: string
     todayMinutes: number
     dailyTarget: number
     progress: number
-    direction: 'maximize' | 'minimize'
+    direction: 'at_least' | 'at_most'
     trend: 'up' | 'down' | 'same'
   }[]
   mood?: 'low' | 'okay' | 'great' | null
@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
       ? `Wins today: ${dayData.wins.map(w => w.text).join(', ')}.`
       : 'No specific wins detected.'
 
-    const intentionsText = dayData.intentionProgress.length > 0
-      ? dayData.intentionProgress.map(i => {
-          const status = i.progress >= 100 ? 'met' : i.progress >= 50 ? 'partially met' : 'not met'
-          const directionWord = i.direction === 'maximize' ? 'toward' : 'staying under'
-          return `${i.label}: ${i.todayMinutes} min ${directionWord} ${i.dailyTarget} min target (${status}, ${i.trend} vs yesterday)`
+    const targetsText = dayData.targetProgress.length > 0
+      ? dayData.targetProgress.map(t => {
+          const status = t.progress >= 100 ? 'met' : t.progress >= 50 ? 'partially met' : 'not met'
+          const directionWord = t.direction === 'at_least' ? 'toward' : 'staying under'
+          return `${t.label}: ${t.todayMinutes} min ${directionWord} ${t.dailyTarget} min target (${status}, ${t.trend} vs yesterday)`
         }).join('. ')
-      : 'No intentions set.'
+      : 'No targets set.'
 
     const moodText = dayData.mood
       ? `Evening mood: ${dayData.mood}.`
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 Day Score: ${dayData.score}/100
 Total Time Tracked: ${dayData.totalMinutesLogged} minutes
 ${winsText}
-${intentionsText}
+${targetsText}
 ${moodText}
 ${focusText}
 

@@ -7,8 +7,8 @@ import {
   getAggregatedCategory,
   aggregateByView,
   CATEGORY_LABELS,
-  INTENTION_CATEGORY_MAP,
-  IntentionType,
+  WEEKLY_TARGET_CONFIGS,
+  WeeklyTargetType,
 } from '@/lib/types'
 
 describe('ENERGY_VIEW configuration', () => {
@@ -308,57 +308,48 @@ describe('aggregateByView', () => {
   })
 })
 
-describe('INTENTION_CATEGORY_MAP integration with aggregated categories', () => {
-  it('deep_work intention maps to focus category', () => {
-    const categories = INTENTION_CATEGORY_MAP.deep_work
+describe('WEEKLY_TARGET_CONFIGS integration with aggregated categories', () => {
+  it('deep_focus target maps to focus category', () => {
+    const categories = WEEKLY_TARGET_CONFIGS.deep_focus.categories
     categories.forEach(cat => {
       expect(getAggregatedCategory(cat)).toBe('focus')
     })
   })
 
-  it('less_distraction intention maps to escape category', () => {
-    const categories = INTENTION_CATEGORY_MAP.less_distraction
+  it('leisure target maps to escape category', () => {
+    const categories = WEEKLY_TARGET_CONFIGS.leisure.categories
     categories.forEach(cat => {
       expect(getAggregatedCategory(cat)).toBe('escape')
     })
   })
 
-  it('exercise intention maps to body category', () => {
-    const categories = INTENTION_CATEGORY_MAP.exercise
+  it('exercise target maps to body category', () => {
+    const categories = WEEKLY_TARGET_CONFIGS.exercise.categories
     categories.forEach(cat => {
       expect(getAggregatedCategory(cat)).toBe('body')
     })
   })
 
-  it('relationships intention maps to connection category', () => {
-    const categories = INTENTION_CATEGORY_MAP.relationships
+  it('social_time target maps to connection category', () => {
+    const categories = WEEKLY_TARGET_CONFIGS.social_time.categories
     categories.forEach(cat => {
       expect(getAggregatedCategory(cat)).toBe('connection')
     })
   })
 
-  it('self_care intention maps to recovery or body categories', () => {
-    const categories = INTENTION_CATEGORY_MAP.self_care
+  it('recovery target maps to recovery or body categories', () => {
+    const categories = WEEKLY_TARGET_CONFIGS.recovery.categories
     const validAggCategories = ['recovery', 'body']
     categories.forEach(cat => {
       expect(validAggCategories).toContain(getAggregatedCategory(cat))
     })
   })
 
-  it('learning intention maps to focus category', () => {
-    const categories = INTENTION_CATEGORY_MAP.learning
+  it('meetings target maps to ops category', () => {
+    const categories = WEEKLY_TARGET_CONFIGS.meetings.categories
     categories.forEach(cat => {
-      expect(getAggregatedCategory(cat)).toBe('focus')
+      expect(getAggregatedCategory(cat)).toBe('ops')
     })
-  })
-
-  it('work_life_balance intention maps to multiple categories', () => {
-    const categories = INTENTION_CATEGORY_MAP.work_life_balance
-    const aggCategories = new Set(categories.map(cat => getAggregatedCategory(cat)))
-
-    // Should include recovery and connection at minimum
-    expect(aggCategories.has('recovery')).toBe(true)
-    expect(aggCategories.has('connection')).toBe(true)
   })
 })
 

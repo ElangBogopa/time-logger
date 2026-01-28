@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { fetchEntries, updateEntry, deleteEntry } from '@/lib/api'
 import { TimeEntry, TimeCategory, CATEGORY_LABELS, isPendingEntryReadyToConfirm } from '@/lib/types'
 import {
   Dialog,
@@ -160,30 +160,17 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
         description: description || null,
       }
 
-      const { error: updateError } = await supabase
-        .from('time_entries')
-        .update(updatedEntry)
-        .eq('id', entry.id)
-
-      if (updateError) {
-        throw new Error(updateError.message)
-      }
+      await updateEntry(entry.id, updatedEntry)
 
       // Only regenerate commentary if activity or description changed
       // This saves ~1790 tokens per edit that only changes time/duration
       if (needsCommentaryUpdate) {
         // Fetch nearby entries for context (±2 entries instead of full day)
-        const { data: dayEntries } = await supabase
-          .from('time_entries')
-          .select('*')
-          .eq('date', date)
-          .eq('user_id', entry.user_id)
-          .order('start_time', { ascending: true })
+        const dayEntries = await fetchEntries({ date, orderBy: 'start_time', orderAsc: true })
 
         // Filter to nearby entries only (reduce context tokens)
-        const allEntries = dayEntries || []
-        const entryIndex = allEntries.findIndex(e => e.id === entry.id)
-        const nearbyEntries = allEntries.filter((_, i) =>
+        const entryIndex = dayEntries.findIndex(e => e.id === entry.id)
+        const nearbyEntries = dayEntries.filter((_, i) =>
           Math.abs(i - entryIndex) <= 2 || entryIndex === -1
         )
 
@@ -200,10 +187,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
           if (commentaryResponse.ok) {
             const { commentary } = await commentaryResponse.json()
 
-            await supabase
-              .from('time_entries')
-              .update({ commentary })
-              .eq('id', entry.id)
+            await updateEntry(entry.id, { commentary })
           }
         } catch {
           // Commentary regeneration failed, but entry was updated
@@ -225,14 +209,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
     setError(null)
 
     try {
-      const { error: deleteError } = await supabase
-        .from('time_entries')
-        .delete()
-        .eq('id', entry.id)
-
-      if (deleteError) {
-        throw new Error(deleteError.message)
-      }
+      await deleteEntry(entry.id)
 
       onDelete()
       onClose()
@@ -273,30 +250,17 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       const { category } = await categoryResponse.json()
 
       // Update entry with confirmed status and category
-      const { error: updateError } = await supabase
-        .from('time_entries')
-        .update({ status: 'confirmed', category })
-        .eq('id', entry.id)
-
-      if (updateError) {
-        throw new Error(updateError.message)
-      }
+      await updateEntry(entry.id, { status: 'confirmed', category })
 
       // Generate commentary
       let generatedCommentary: string | null = null
       try {
         // Fetch nearby entries for context (±2 entries to reduce tokens)
-        const { data: dayEntries } = await supabase
-          .from('time_entries')
-          .select('*')
-          .eq('date', entry.date)
-          .eq('user_id', entry.user_id)
-          .order('start_time', { ascending: true })
+        const dayEntries = await fetchEntries({ date: entry.date, orderBy: 'start_time', orderAsc: true })
 
         // Filter to nearby entries only (reduce context tokens)
-        const allEntries = dayEntries || []
-        const entryIndex = allEntries.findIndex(e => e.id === entry.id)
-        const nearbyEntries = allEntries.filter((_, i) =>
+        const entryIndex = dayEntries.findIndex(e => e.id === entry.id)
+        const nearbyEntries = dayEntries.filter((_, i) =>
           Math.abs(i - entryIndex) <= 2 || entryIndex === -1
         )
 
@@ -313,10 +277,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
           const { commentary } = await commentaryResponse.json()
           generatedCommentary = commentary
 
-          await supabase
-            .from('time_entries')
-            .update({ commentary })
-            .eq('id', entry.id)
+          await updateEntry(entry.id, { commentary })
         } else {
           generatedCommentary = null
         }

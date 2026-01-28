@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import {
   TimeEntry,
-  UserIntention,
+  WeeklyTarget,
+  WeeklyTargetType,
+  WEEKLY_TARGET_CONFIGS,
   SessionCompletion,
-  INTENTION_CONFIGS,
-  INTENTION_CATEGORY_MAP,
+  calculateTargetProgress,
   getLocalDateString,
   getUserToday,
   getUserCurrentHour,
-  calculateIntentionProgress,
   TimeCategory,
   CATEGORY_LABELS,
   MoodCheckin,
@@ -21,9 +21,9 @@ import {
   aggregateByView,
 } from '@/lib/types'
 
-interface IntentionProgress {
-  intentionId: string
-  intentionType: string
+interface TargetProgress {
+  targetId: string
+  targetType: string
   label: string
   todayMinutes: number
   yesterdayMinutes: number
@@ -32,7 +32,7 @@ interface IntentionProgress {
   weeklyTarget: number
   weekMinutes: number
   progress: number
-  direction: 'maximize' | 'minimize'
+  direction: 'at_least' | 'at_most'
   trend: 'up' | 'down' | 'same'
   vsLastWeekTrend: 'up' | 'down' | 'same'
 }
@@ -69,7 +69,7 @@ interface AggregatedBreakdown {
   label: string
   minutes: number
   percentage: number
-  isIntentionLinked: boolean // true if user has an intention tracking this category
+  isTargetLinked: boolean // true if user has a target tracking this category
 }
 
 interface DaySummary {
@@ -82,8 +82,8 @@ interface DaySummary {
   hasEveningPassed: boolean
   date: string
 
-  // Intention progress
-  intentionProgress: IntentionProgress[]
+  // Target progress
+  targetProgress: TargetProgress[]
 
   // Wins
   wins: Win[]
@@ -135,21 +135,21 @@ function getWeekDates(userToday: string): string[] {
 }
 
 function calculateDayScore(
-  intentionProgress: IntentionProgress[],
+  targetProgress: TargetProgress[],
   sessionsLogged: number,
   totalSessions: number
 ): number {
-  if (intentionProgress.length === 0) {
+  if (targetProgress.length === 0) {
     return Math.round((sessionsLogged / Math.max(totalSessions, 1)) * 100)
   }
 
-  const intentionWeight = 0.7
+  const targetWeight = 0.7
   const sessionWeight = 0.3
-  const avgIntentionProgress =
-    intentionProgress.reduce((sum, p) => sum + p.progress, 0) / intentionProgress.length
+  const avgTargetProgress =
+    targetProgress.reduce((sum, p) => sum + p.progress, 0) / targetProgress.length
   const sessionScore = (sessionsLogged / Math.max(totalSessions, 1)) * 100
 
-  return Math.round(avgIntentionProgress * intentionWeight + sessionScore * sessionWeight)
+  return Math.round(avgTargetProgress * targetWeight + sessionScore * sessionWeight)
 }
 
 function getScoreColor(score: number): 'green' | 'orange' | 'red' {
@@ -160,41 +160,41 @@ function getScoreColor(score: number): 'green' | 'orange' | 'red' {
 
 function generateWins(
   entries: TimeEntry[],
-  intentionProgress: IntentionProgress[],
+  targetProgress: TargetProgress[],
   longestFocus: { activity: string; minutes: number } | null,
   categoryBreakdown: CategoryBreakdown[]
 ): Win[] {
   const wins: Win[] = []
 
   // Check for goals met
-  for (const intention of intentionProgress) {
-    if (intention.direction === 'maximize' && intention.progress >= 100) {
+  for (const tp of targetProgress) {
+    if (tp.direction === 'at_least' && tp.progress >= 100) {
       wins.push({
-        id: `goal-${intention.intentionId}`,
-        text: `Hit your ${intention.label.toLowerCase()} goal`,
+        id: `goal-${tp.targetId}`,
+        text: `Hit your ${tp.label.toLowerCase()} goal`,
         type: 'goal_met',
-        value: intention.todayMinutes,
+        value: tp.todayMinutes,
       })
-    } else if (intention.direction === 'minimize' && intention.progress >= 100) {
+    } else if (tp.direction === 'at_most' && tp.progress >= 100) {
       wins.push({
-        id: `goal-${intention.intentionId}`,
-        text: `Stayed under your ${intention.label.toLowerCase()} limit`,
+        id: `goal-${tp.targetId}`,
+        text: `Stayed under your ${tp.label.toLowerCase()} limit`,
         type: 'goal_met',
-        value: intention.todayMinutes,
+        value: tp.todayMinutes,
       })
     }
   }
 
   // Check for improvements vs yesterday
-  for (const intention of intentionProgress) {
-    if (intention.trend === 'up' && intention.progress < 100) {
-      const diff = intention.direction === 'maximize'
-        ? intention.todayMinutes - intention.yesterdayMinutes
-        : intention.yesterdayMinutes - intention.todayMinutes
+  for (const tp of targetProgress) {
+    if (tp.trend === 'up' && tp.progress < 100) {
+      const diff = tp.direction === 'at_least'
+        ? tp.todayMinutes - tp.yesterdayMinutes
+        : tp.yesterdayMinutes - tp.todayMinutes
       if (diff > 15) { // At least 15 min improvement
         wins.push({
-          id: `improve-${intention.intentionId}`,
-          text: `${Math.round(diff)} min ${intention.direction === 'maximize' ? 'more' : 'less'} ${intention.label.toLowerCase()} than yesterday`,
+          id: `improve-${tp.targetId}`,
+          text: `${Math.round(diff)} min ${tp.direction === 'at_least' ? 'more' : 'less'} ${tp.label.toLowerCase()} than yesterday`,
           type: 'improvement',
           value: diff,
         })
@@ -212,11 +212,11 @@ function generateWins(
     })
   }
 
-  // No entertainment/distractions (if tracking less distractions)
+  // No entertainment (if tracking leisure limit)
   const entertainmentEntry = categoryBreakdown.find(c => c.category === 'entertainment')
   if (!entertainmentEntry || entertainmentEntry.minutes === 0) {
-    const hasLessDistraction = intentionProgress.some(i => i.intentionType === 'less_distraction')
-    if (hasLessDistraction) {
+    const hasLeisureTarget = targetProgress.some(t => t.targetType === 'leisure')
+    if (hasLeisureTarget) {
       wins.push({
         id: 'no-distraction',
         text: 'Zero leisure/entertainment logged today',
@@ -313,7 +313,7 @@ function buildCategoryBreakdown(entries: TimeEntry[]): CategoryBreakdown[] {
 
 function buildAggregatedBreakdown(
   entries: TimeEntry[],
-  intentions: UserIntention[]
+  targets: WeeklyTarget[]
 ): AggregatedBreakdown[] {
   // Build category minutes map
   const categoryMinutes = new Map<TimeCategory, number>()
@@ -330,15 +330,16 @@ function buildAggregatedBreakdown(
   // Aggregate using the energy view
   const aggregated = aggregateByView(categoryMinutes, ENERGY_VIEW)
 
-  // Determine which aggregated categories are linked to user intentions
-  const intentionLinkedCategories = new Set<AggregatedCategory>()
-  for (const intention of intentions) {
-    const intentionCategories = INTENTION_CATEGORY_MAP[intention.intention_type] || []
-    for (const cat of intentionCategories) {
+  // Determine which aggregated categories are linked to user targets
+  const targetLinkedCategories = new Set<AggregatedCategory>()
+  for (const target of targets) {
+    const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
+    if (!config) continue
+    for (const cat of config.categories) {
       // Find which aggregated category this belongs to
       for (const [aggCat, group] of Object.entries(ENERGY_VIEW)) {
         if (group.categories.includes(cat)) {
-          intentionLinkedCategories.add(aggCat as AggregatedCategory)
+          targetLinkedCategories.add(aggCat as AggregatedCategory)
         }
       }
     }
@@ -355,15 +356,15 @@ function buildAggregatedBreakdown(
       label: AGGREGATED_CATEGORY_LABELS[aggCat],
       minutes,
       percentage: totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0,
-      isIntentionLinked: intentionLinkedCategories.has(aggCat),
+      isTargetLinked: targetLinkedCategories.has(aggCat),
     })
   }
 
-  // Sort by minutes descending, but keep intention-linked ones prominent
+  // Sort by minutes descending, but keep target-linked ones prominent
   breakdown.sort((a, b) => {
-    // Intention-linked with time first
-    if (a.isIntentionLinked && a.minutes > 0 && !(b.isIntentionLinked && b.minutes > 0)) return -1
-    if (b.isIntentionLinked && b.minutes > 0 && !(a.isIntentionLinked && a.minutes > 0)) return 1
+    // Target-linked with time first
+    if (a.isTargetLinked && a.minutes > 0 && !(b.isTargetLinked && b.minutes > 0)) return -1
+    if (b.isTargetLinked && b.minutes > 0 && !(a.isTargetLinked && a.minutes > 0)) return 1
     // Then by minutes
     return b.minutes - a.minutes
   })
@@ -393,7 +394,7 @@ export async function GET(request: NextRequest) {
       yesterdayEntriesResult,
       lastWeekEntriesResult,
       weekEntriesResult,
-      intentionsResult,
+      targetsResult,
       completionsResult,
       moodResult,
     ] = await Promise.all([
@@ -427,11 +428,11 @@ export async function GET(request: NextRequest) {
         .eq('status', 'confirmed'),
 
       supabase
-        .from('user_intentions')
+        .from('weekly_targets')
         .select('*')
         .eq('user_id', userId)
         .eq('active', true)
-        .order('priority'),
+        .order('sort_order'),
 
       supabase
         .from('session_completions')
@@ -452,18 +453,36 @@ export async function GET(request: NextRequest) {
     const yesterdayEntries = (yesterdayEntriesResult.data || []) as TimeEntry[]
     const lastWeekEntries = (lastWeekEntriesResult.data || []) as TimeEntry[]
     const weekEntries = (weekEntriesResult.data || []) as TimeEntry[]
-    const intentions = (intentionsResult.data || []) as UserIntention[]
+    const targets = (targetsResult.data || []) as WeeklyTarget[]
     const completions = (completionsResult.data || []) as SessionCompletion[]
     const todayMood = (moodResult.data?.[0] as MoodCheckin) || null
 
     const totalMinutesLogged = todayEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
     const sessionsLogged = completions.filter(c => !c.skipped).length
 
-    // Calculate intention progress with same day last week comparison
-    const intentionProgress: IntentionProgress[] = intentions.map(intention => {
-      const config = INTENTION_CONFIGS[intention.intention_type]
-      const categories = INTENTION_CATEGORY_MAP[intention.intention_type]
-      const weeklyTarget = intention.weekly_target_minutes || config.defaultTargetMinutes
+    // Calculate target progress with same day last week comparison
+    const targetProgress: TargetProgress[] = targets.map(target => {
+      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
+      if (!config) {
+        return {
+          targetId: target.id,
+          targetType: target.target_type,
+          label: target.target_type,
+          todayMinutes: 0,
+          yesterdayMinutes: 0,
+          sameDayLastWeekMinutes: 0,
+          dailyTarget: 0,
+          weeklyTarget: target.weekly_target_minutes,
+          weekMinutes: 0,
+          progress: 0,
+          direction: target.direction as 'at_least' | 'at_most',
+          trend: 'same' as const,
+          vsLastWeekTrend: 'same' as const,
+        }
+      }
+
+      const categories = config.categories
+      const weeklyTarget = target.weekly_target_minutes
       const dailyTarget = Math.round(weeklyTarget / 7)
 
       const todayMinutes = todayEntries
@@ -482,25 +501,26 @@ export async function GET(request: NextRequest) {
         .filter(e => e.category && categories.includes(e.category))
         .reduce((sum, e) => sum + e.duration_minutes, 0)
 
-      const progress = calculateIntentionProgress(todayMinutes, dailyTarget, config.direction)
+      const progress = calculateTargetProgress(todayMinutes, dailyTarget, target.direction as 'at_least' | 'at_most')
 
       let trend: 'up' | 'down' | 'same'
-      if (config.direction === 'maximize') {
+      if (target.direction === 'at_least') {
         trend = todayMinutes > yesterdayMinutes ? 'up' : todayMinutes < yesterdayMinutes ? 'down' : 'same'
       } else {
+        // at_most: less is better
         trend = todayMinutes < yesterdayMinutes ? 'up' : todayMinutes > yesterdayMinutes ? 'down' : 'same'
       }
 
       let vsLastWeekTrend: 'up' | 'down' | 'same'
-      if (config.direction === 'maximize') {
+      if (target.direction === 'at_least') {
         vsLastWeekTrend = todayMinutes > sameDayLastWeekMinutes ? 'up' : todayMinutes < sameDayLastWeekMinutes ? 'down' : 'same'
       } else {
         vsLastWeekTrend = todayMinutes < sameDayLastWeekMinutes ? 'up' : todayMinutes > sameDayLastWeekMinutes ? 'down' : 'same'
       }
 
       return {
-        intentionId: intention.id,
-        intentionType: intention.intention_type,
+        targetId: target.id,
+        targetType: target.target_type,
         label: config.label,
         todayMinutes,
         yesterdayMinutes,
@@ -509,21 +529,21 @@ export async function GET(request: NextRequest) {
         weeklyTarget,
         weekMinutes,
         progress,
-        direction: config.direction,
+        direction: target.direction as 'at_least' | 'at_most',
         trend,
         vsLastWeekTrend,
       }
     })
 
-    const score = calculateDayScore(intentionProgress, sessionsLogged, sessionsPassed)
+    const score = calculateDayScore(targetProgress, sessionsLogged, sessionsPassed)
     const scoreColor = getScoreColor(score)
 
     // Build additional data
     const timeline = buildTimeline(todayEntries)
     const longestFocusSession = findLongestFocusSession(todayEntries)
     const categoryBreakdown = buildCategoryBreakdown(todayEntries)
-    const aggregatedBreakdown = buildAggregatedBreakdown(todayEntries, intentions)
-    const wins = generateWins(todayEntries, intentionProgress, longestFocusSession, categoryBreakdown)
+    const aggregatedBreakdown = buildAggregatedBreakdown(todayEntries, targets)
+    const wins = generateWins(todayEntries, targetProgress, longestFocusSession, categoryBreakdown)
 
     const summary: DaySummary = {
       score,
@@ -533,7 +553,7 @@ export async function GET(request: NextRequest) {
       totalMinutesLogged,
       hasEveningPassed,
       date: today,
-      intentionProgress,
+      targetProgress,
       wins,
       timeline,
       longestFocusSession,

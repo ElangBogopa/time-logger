@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface IntentionProgress {
-  intentionId: string
-  intentionType: string
+interface TargetProgress {
+  targetId: string
+  targetType: string
   label: string
   todayMinutes: number
   yesterdayMinutes: number
@@ -15,14 +15,14 @@ interface IntentionProgress {
   weeklyTarget: number
   weekMinutes: number
   progress: number
-  direction: 'maximize' | 'minimize'
+  direction: 'at_least' | 'at_most'
   trend: 'up' | 'down' | 'same'
 }
 
 interface DaySummary {
   score: number
   scoreColor: 'green' | 'orange' | 'red'
-  intentionProgress: IntentionProgress[]
+  targetProgress: TargetProgress[]
   sessionsLogged: number
   totalSessions: number
   totalMinutesLogged: number
@@ -96,52 +96,6 @@ function ScoreCircle({ score, color }: { score: number; color: 'green' | 'orange
   )
 }
 
-function TrendIcon({ trend, direction }: { trend: 'up' | 'down' | 'same'; direction: 'maximize' | 'minimize' }) {
-  // For maximize goals: up is good (green), down is bad (red)
-  // For minimize goals: down is good (green), up is bad (red)
-  const isGood = direction === 'maximize' ? trend === 'up' : trend === 'down'
-  const isBad = direction === 'maximize' ? trend === 'down' : trend === 'up'
-
-  if (trend === 'same') {
-    return <Minus className="h-3.5 w-3.5 text-zinc-400" />
-  }
-
-  if (trend === 'up') {
-    return (
-      <TrendingUp
-        className={cn('h-3.5 w-3.5', isGood ? 'text-green-500' : 'text-red-500')}
-      />
-    )
-  }
-
-  return (
-    <TrendingDown
-      className={cn('h-3.5 w-3.5', isGood ? 'text-green-500' : 'text-red-500')}
-    />
-  )
-}
-
-function ProgressBar({ progress }: { progress: number }) {
-  // Progress is already normalized: higher = better for both maximize and minimize goals
-  // For minimize goals, being under target = 100%, over target = decreasing %
-  // Research: >2hrs/day distraction linked to anxiety/depression (WHO, mental health studies)
-  // Thresholds: >=80% = great, >=50% = moderate concern, <50% = needs attention
-  const getBarColor = () => {
-    if (progress >= 80) return 'bg-green-500'
-    if (progress >= 50) return 'bg-amber-500'
-    return 'bg-red-500'
-  }
-
-  return (
-    <div className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-      <div
-        className={cn('h-full rounded-full transition-all duration-500', getBarColor())}
-        style={{ width: `${Math.min(progress, 100)}%` }}
-      />
-    </div>
-  )
-}
-
 export default function DayInReview({ className }: DayInReviewProps) {
   const router = useRouter()
   const [summary, setSummary] = useState<DaySummary | null>(null)
@@ -188,8 +142,6 @@ export default function DayInReview({ className }: DayInReviewProps) {
   if (!summary.hasEveningPassed) {
     return null
   }
-
-  const topIntentions = summary.intentionProgress.slice(0, 3)
 
   return (
     <button

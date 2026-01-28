@@ -28,10 +28,10 @@ const createMockDaySummary = (overrides = {}) => ({
   totalMinutesLogged: 420,
   hasEveningPassed: false,
   date: '2024-01-15',
-  intentionProgress: [
+  targetProgress: [
     {
-      intentionId: '1',
-      intentionType: 'deep_work',
+      targetId: '1',
+      targetType: 'deep_focus',
       label: 'Deep Work',
       todayMinutes: 180,
       yesterdayMinutes: 120,
@@ -40,7 +40,7 @@ const createMockDaySummary = (overrides = {}) => ({
       weeklyTarget: 1260,
       weekMinutes: 600,
       progress: 100,
-      direction: 'maximize' as const,
+      direction: 'at_least' as const,
       trend: 'up' as const,
       vsLastWeekTrend: 'up' as const,
     },
@@ -63,11 +63,11 @@ const createMockDaySummary = (overrides = {}) => ({
     { category: 'entertainment' as const, label: 'Entertainment', minutes: 30, percentage: 7 },
   ],
   aggregatedBreakdown: [
-    { category: 'focus' as const, label: 'Focus', minutes: 180, percentage: 43, isIntentionLinked: true },
-    { category: 'ops' as const, label: 'Ops', minutes: 60, percentage: 14, isIntentionLinked: false },
-    { category: 'body' as const, label: 'Body', minutes: 105, percentage: 25, isIntentionLinked: false },
-    { category: 'connection' as const, label: 'Connection', minutes: 45, percentage: 11, isIntentionLinked: false },
-    { category: 'escape' as const, label: 'Escape', minutes: 30, percentage: 7, isIntentionLinked: false },
+    { category: 'focus' as const, label: 'Focus', minutes: 180, percentage: 43, isTargetLinked: true },
+    { category: 'ops' as const, label: 'Ops', minutes: 60, percentage: 14, isTargetLinked: false },
+    { category: 'body' as const, label: 'Body', minutes: 105, percentage: 25, isTargetLinked: false },
+    { category: 'connection' as const, label: 'Connection', minutes: 45, percentage: 11, isTargetLinked: false },
+    { category: 'escape' as const, label: 'Escape', minutes: 30, percentage: 7, isTargetLinked: false },
   ],
   todayMood: null,
   entries: [],
@@ -175,11 +175,11 @@ describe('DayReviewPage', () => {
     expect(screen.getByText('Escape')).toBeInTheDocument()
   })
 
-  it('shows intention-linked indicator for Focus category', async () => {
+  it('shows target-linked indicator for Focus category', async () => {
     const mockSummary = createMockDaySummary({
       aggregatedBreakdown: [
-        { category: 'focus', label: 'Focus', minutes: 180, percentage: 43, isIntentionLinked: true },
-        { category: 'body', label: 'Body', minutes: 60, percentage: 14, isIntentionLinked: false },
+        { category: 'focus', label: 'Focus', minutes: 180, percentage: 43, isTargetLinked: true },
+        { category: 'body', label: 'Body', minutes: 60, percentage: 14, isTargetLinked: false },
       ],
     })
 
@@ -199,7 +199,7 @@ describe('DayReviewPage', () => {
       expect(screen.getByText('Focus')).toBeInTheDocument()
     })
 
-    // The Target icon should be rendered for intention-linked categories
+    // The Target icon should be rendered for target-linked categories
     // We can check the container has the expected structure
     const focusLabel = screen.getByText('Focus')
     expect(focusLabel).toBeInTheDocument()
@@ -233,12 +233,12 @@ describe('DayReviewPage', () => {
     expect(screen.getByText('90 min focus session')).toBeInTheDocument()
   })
 
-  it('displays intention progress cards', async () => {
+  it('displays target progress cards', async () => {
     const mockSummary = createMockDaySummary({
-      intentionProgress: [
+      targetProgress: [
         {
-          intentionId: '1',
-          intentionType: 'deep_work',
+          targetId: '1',
+          targetType: 'deep_focus',
           label: 'Deep Work Goal',
           todayMinutes: 180,
           yesterdayMinutes: 120,
@@ -247,13 +247,13 @@ describe('DayReviewPage', () => {
           weeklyTarget: 1260,
           weekMinutes: 600,
           progress: 100,
-          direction: 'maximize',
+          direction: 'at_least',
           trend: 'up',
           vsLastWeekTrend: 'up',
         },
         {
-          intentionId: '2',
-          intentionType: 'exercise',
+          targetId: '2',
+          targetType: 'exercise',
           label: 'Exercise Goal',
           todayMinutes: 45,
           yesterdayMinutes: 60,
@@ -262,7 +262,7 @@ describe('DayReviewPage', () => {
           weeklyTarget: 210,
           weekMinutes: 150,
           progress: 150,
-          direction: 'maximize',
+          direction: 'at_least',
           trend: 'down',
           vsLastWeekTrend: 'up',
         },
@@ -401,7 +401,7 @@ describe('DayReviewPage', () => {
     const mockSummary = createMockDaySummary({
       totalMinutesLogged: 135, // 2h 15m
       aggregatedBreakdown: [
-        { category: 'focus', label: 'Focus', minutes: 135, percentage: 100, isIntentionLinked: false },
+        { category: 'focus', label: 'Focus', minutes: 135, percentage: 100, isTargetLinked: false },
       ],
     })
 
@@ -422,12 +422,12 @@ describe('DayReviewPage', () => {
     })
   })
 
-  it('shows categories with 0 minutes if intention-linked', async () => {
+  it('shows categories with 0 minutes if target-linked', async () => {
     const mockSummary = createMockDaySummary({
       aggregatedBreakdown: [
-        { category: 'focus', label: 'Focus', minutes: 120, percentage: 80, isIntentionLinked: true },
-        { category: 'body', label: 'Body', minutes: 30, percentage: 20, isIntentionLinked: false },
-        { category: 'connection', label: 'Connection', minutes: 0, percentage: 0, isIntentionLinked: true },
+        { category: 'focus', label: 'Focus', minutes: 120, percentage: 80, isTargetLinked: true },
+        { category: 'body', label: 'Body', minutes: 30, percentage: 20, isTargetLinked: false },
+        { category: 'connection', label: 'Connection', minutes: 0, percentage: 0, isTargetLinked: true },
       ],
     })
 
@@ -446,7 +446,7 @@ describe('DayReviewPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Focus')).toBeInTheDocument()
       expect(screen.getByText('Body')).toBeInTheDocument()
-      // Connection should show even with 0 minutes because it's intention-linked
+      // Connection should show even with 0 minutes because it's target-linked
       expect(screen.getByText('Connection')).toBeInTheDocument()
     })
   })

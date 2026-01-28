@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { fetchEntries } from '@/lib/api'
 import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
@@ -117,18 +117,14 @@ function CalendarContent() {
     }, null as string | null)
   }, [entries])
 
-  const fetchEntries = useCallback(async () => {
+  const fetchEntriesForDate = useCallback(async () => {
     if (!userId) return
     setIsLoading(true)
-    const { data, error } = await supabase
-      .from('time_entries')
-      .select('*')
-      .eq('date', selectedDate)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setEntries(data as TimeEntry[])
+    try {
+      const data = await fetchEntries({ date: selectedDate })
+      setEntries(data)
+    } catch (error) {
+      console.error('Failed to fetch entries:', error)
     }
     setIsLoading(false)
   }, [selectedDate, userId])
@@ -136,11 +132,11 @@ function CalendarContent() {
   // Fetch entries and calendar events for the selected date
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching in effect is a standard pattern
-    fetchEntries()
+    fetchEntriesForDate()
     if (!isDateInCache(selectedDate)) {
       fetchEventsForDate(selectedDate)
     }
-  }, [fetchEntries, refreshKey, selectedDate, isDateInCache, fetchEventsForDate])
+  }, [fetchEntriesForDate, refreshKey, selectedDate, isDateInCache, fetchEventsForDate])
 
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate)
@@ -273,7 +269,7 @@ function CalendarContent() {
               entries={entries}
               calendarEvents={calendarEvents}
               isLoading={isLoading}
-              onEntryDeleted={fetchEntries}
+              onEntryDeleted={fetchEntriesForDate}
               onGhostEntryClick={setSelectedGhostEvent}
               onDragCreate={canLog ? handleDragCreate : undefined}
               onShowToast={showToast}
@@ -293,7 +289,7 @@ function CalendarContent() {
             setDragCreateData(null)
           }}
           onEntryAdded={() => {
-            fetchEntries()
+            fetchEntriesForDate()
             setDragCreateData(null)
           }}
           lastEntryEndTime={lastEntryEndTime}
@@ -314,7 +310,7 @@ function CalendarContent() {
           onClose={() => setSelectedGhostEvent(null)}
           onConfirm={() => {
             setSelectedGhostEvent(null)
-            fetchEntries()
+            fetchEntriesForDate()
           }}
           onShowToast={showToast}
           userId={userId}
