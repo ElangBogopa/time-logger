@@ -175,7 +175,7 @@ export default function MoodCheckIn({ period, onMoodSelected, className = '' }: 
                 transition-all duration-200 border-2
                 ${isSelected
                   ? 'border-primary bg-primary/5 scale-105'
-                  : 'border-transparent bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                  : 'border-transparent bg-secondary hover:bg-accent'
                 }
                 ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               `}

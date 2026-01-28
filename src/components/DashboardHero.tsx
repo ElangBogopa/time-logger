@@ -18,35 +18,58 @@ interface MetricsResponse {
   nudge: string
 }
 
-/* ── Color map — Whoop palette ── */
-const COLOR_MAP = {
-  green: { stroke: '#00dc82', text: 'text-[#00dc82]', glow: '#00dc82' },
-  yellow: { stroke: '#f5c842', text: 'text-[#f5c842]', glow: '#f5c842' },
-  red: { stroke: '#ef4444', text: 'text-[#ef4444]', glow: '#ef4444' },
+/* ── Per-metric color identity (like Whoop: each circle = unique color) ── */
+const METRIC_IDENTITY = {
+  focus: {
+    active: '#3b82f6',   // blue — cognitive output
+    track: '#1e3a5f',    // dark blue track
+    trackDim: '#162d4a', // dimmer when 0%
+  },
+  balance: {
+    active: '#f5c842',   // gold/yellow — recovery
+    track: '#3d3520',    // dark gold track
+    trackDim: '#2a2618', // dimmer when 0%
+  },
+  rhythm: {
+    active: '#00dc82',   // green — consistency
+    track: '#0d3a2a',    // dark green track
+    trackDim: '#0a2d22', // dimmer when 0%
+  },
 }
 
-/* ── Compact Metric Circle ── */
+/* ── Status color for labels ── */
+const STATUS_COLORS = {
+  green: 'text-[#00dc82]',
+  yellow: 'text-[#f5c842]',
+  red: 'text-[#ef4444]',
+}
+
+/* ── Metric Circle — Whoop style with unique identity color ── */
 function MetricCircle({
   value,
   label,
-  emoji,
-  color,
-  size = 90,
-  strokeWidth = 6,
+  metricKey,
+  size = 96,
+  strokeWidth = 7,
 }: {
   value: number
   label: string
-  emoji: string
-  color: 'green' | 'yellow' | 'red'
+  metricKey: 'focus' | 'balance' | 'rhythm'
   size?: number
   strokeWidth?: number
 }) {
+  const identity = METRIC_IDENTITY[metricKey]
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(100, value))
   const offset = circumference - (clamped / 100) * circumference
   const center = size / 2
-  const colors = COLOR_MAP[color]
+  const hasProgress = value > 0
+
+  // When 0%, show dimmer track and gray text. When > 0%, show identity color.
+  const trackColor = hasProgress ? identity.track : identity.trackDim
+  const activeColor = identity.active
+  const textColor = hasProgress ? activeColor : '#4a5f78'
 
   return (
     <div className="flex flex-col items-center">
@@ -57,44 +80,47 @@ function MetricCircle({
           className="transform -rotate-90"
           viewBox={`0 0 ${size} ${size}`}
         >
-          {/* Background track */}
+          {/* Background track — visible, tinted per metric */}
           <circle
             cx={center}
             cy={center}
             r={radius}
             fill="none"
-            stroke="currentColor"
+            stroke={trackColor}
             strokeWidth={strokeWidth}
-            className="text-[#1b3044]"
           />
           {/* Progress arc */}
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke={colors.stroke}
-            strokeWidth={strokeWidth}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            className="transition-all duration-1000 ease-out"
-            style={{ filter: `drop-shadow(0 0 6px ${colors.glow}40)` }}
-          />
+          {hasProgress && (
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke={activeColor}
+              strokeWidth={strokeWidth}
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              className="transition-all duration-1000 ease-out"
+              style={{ filter: `drop-shadow(0 0 8px ${activeColor}50)` }}
+            />
+          )}
         </svg>
-        {/* Center content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-xl font-bold tabular-nums ${colors.text}`}>
-            {value}%
+        {/* Center value */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="text-[22px] font-bold tabular-nums"
+            style={{ color: textColor }}
+          >
+            {value}
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-1 mt-1.5">
-        <span className="text-sm">{emoji}</span>
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          {label}
-        </span>
-      </div>
+      {/* Label below */}
+      <span className="text-[11px] font-semibold uppercase tracking-wider mt-2"
+        style={{ color: hasProgress ? '#c8d6e0' : '#4a5f78' }}>
+        {label} ›
+      </span>
     </div>
   )
 }
@@ -128,16 +154,15 @@ export default function DashboardHero() {
 
   if (isLoading) {
     return (
-      <div className="mb-4">
-        <div className="flex justify-center gap-5">
+      <div className="mb-5">
+        <div className="flex justify-center gap-6">
           {[0, 1, 2].map(i => (
-            <div key={i} className="flex flex-col items-center gap-1.5">
-              <Skeleton className={`rounded-full ${i === 1 ? 'h-[100px] w-[100px]' : 'h-[90px] w-[90px]'}`} />
+            <div key={i} className="flex flex-col items-center gap-2">
+              <Skeleton className="h-24 w-24 rounded-full" />
               <Skeleton className="h-3 w-14" />
             </div>
           ))}
         </div>
-        <Skeleton className="h-4 w-3/4 mx-auto mt-3" />
       </div>
     )
   }
@@ -146,48 +171,34 @@ export default function DashboardHero() {
 
   return (
     <div className="mb-4">
-      {/* Three Metric Circles */}
-      <div className="flex justify-center items-start gap-5 mb-3">
+      {/* Three Metric Circles — each with unique identity color */}
+      <div className="flex justify-center items-start gap-4 mb-3">
         <MetricCircle
           value={metrics.focus.value}
           label="Focus"
-          emoji="⚡"
-          color={metrics.focus.color}
+          metricKey="focus"
         />
         <MetricCircle
           value={metrics.balance.value}
           label="Balance"
-          emoji="⚖️"
-          color={metrics.balance.color}
-          size={100}
-          strokeWidth={7}
+          metricKey="balance"
+          size={104}
+          strokeWidth={8}
         />
         <MetricCircle
           value={metrics.rhythm.value}
           label="Rhythm"
-          emoji="🔄"
-          color={metrics.rhythm.color}
+          metricKey="rhythm"
         />
       </div>
 
-      {/* Status labels */}
-      <div className="flex justify-center gap-8 mb-3">
-        {[
-          { label: metrics.focus.label, color: metrics.focus.color },
-          { label: metrics.balance.label, color: metrics.balance.color },
-          { label: metrics.rhythm.label, color: metrics.rhythm.color },
-        ].map((m, i) => (
-          <span key={i} className={`text-[11px] font-medium ${COLOR_MAP[m.color].text}`}>
-            {m.label}
-          </span>
-        ))}
-      </div>
-
-      {/* Nudge */}
+      {/* Insight card — Whoop style */}
       {metrics.nudge && (
-        <p className="text-center text-xs text-muted-foreground px-4">
-          {metrics.nudge}
-        </p>
+        <div className="mx-2 rounded-xl bg-[#152535] border border-[rgba(255,255,255,0.05)] px-4 py-3">
+          <p className="text-[13px] text-[#c8d6e0] leading-relaxed">
+            {metrics.nudge}
+          </p>
+        </div>
       )}
     </div>
   )

@@ -222,7 +222,7 @@ export default function MorningCheckin({ className = '' }: MorningCheckinProps) 
                 transition-all duration-200 border-2
                 ${sleepQuality === option.value
                   ? 'border-primary bg-primary/5 scale-105'
-                  : 'border-transparent bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                  : 'border-transparent bg-secondary hover:bg-accent'
                 }
               `}
             >
@@ -248,7 +248,7 @@ export default function MorningCheckin({ className = '' }: MorningCheckinProps) 
                 transition-all duration-200 border-2
                 ${energyLevel === option.value
                   ? 'border-primary bg-primary/5 scale-105'
-                  : 'border-transparent bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                  : 'border-transparent bg-secondary hover:bg-accent'
                 }
                 ${energyLevel === option.value ? option.color : 'text-muted-foreground'}
               `}
@@ -272,7 +272,7 @@ export default function MorningCheckin({ className = '' }: MorningCheckinProps) 
           onChange={(e) => setPriorityText(e.target.value)}
           placeholder="e.g., Ship the landing page"
           maxLength={100}
-          className="w-full rounded-lg border border-border bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+          className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
         />
       </div>
 
