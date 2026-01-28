@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { CATEGORIES, TimeCategory } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
@@ -25,9 +27,15 @@ function cleanExpiredCache() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limit by IP address (fallback to 'unknown')
+    // Authentication check — prevent unauthorized OpenAI credit burn
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit by user ID (authenticated) with IP fallback
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
-    const rateLimitKey = `categorize:${ip}`
+    const rateLimitKey = `categorize:${session.user.id || ip}`
     const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMITS.ai)
 
     if (!rateLimitResult.success) {

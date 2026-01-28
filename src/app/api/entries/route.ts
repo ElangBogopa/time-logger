@@ -16,9 +16,18 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
     const status = searchParams.get('status')
-    const fields = searchParams.get('fields') // e.g. "id,start_time,end_time,activity"
-    const orderBy = searchParams.get('orderBy') || 'created_at'
+    // Whitelist allowed select fields to prevent injection
+    const ALLOWED_FIELDS = ['id', 'user_id', 'date', 'activity', 'category', 'duration_minutes', 'start_time', 'end_time', 'description', 'commentary', 'status', 'created_at', 'updated_at', 'mood', 'energy', 'deleted_at']
+    const rawFields = searchParams.get('fields') // e.g. "id,start_time,end_time,activity"
+    const fields = rawFields
+      ? rawFields.split(',').filter(f => ALLOWED_FIELDS.includes(f.trim())).join(',') || '*'
+      : '*'
     const orderAsc = searchParams.get('orderAsc') === 'true'
+
+    // Whitelist allowed orderBy columns to prevent SQL injection
+    const ALLOWED_ORDER_COLUMNS = ['created_at', 'start_time', 'end_time', 'date', 'duration_minutes', 'activity', 'category']
+    const requestedOrderBy = searchParams.get('orderBy') || 'created_at'
+    const orderBy = ALLOWED_ORDER_COLUMNS.includes(requestedOrderBy) ? requestedOrderBy : 'created_at'
 
     let query = supabase
       .from('time_entries')
