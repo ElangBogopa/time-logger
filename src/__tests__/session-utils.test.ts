@@ -12,6 +12,8 @@ function createEntry(startTime: string, endTime: string): TimeEntry {
     duration_minutes: 60,
     start_time: startTime,
     end_time: endTime,
+    description: null,
+    commentary: null,
     status: 'confirmed',
     created_at: new Date().toISOString(),
   }

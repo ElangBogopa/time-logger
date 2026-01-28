@@ -5,28 +5,31 @@
 // Mock dependencies BEFORE importing the route
 jest.mock('next/server', () => ({
   NextRequest: class MockNextRequest {
-    constructor(url, options = {}) {
+    _url: URL
+    _options: any
+    
+    constructor(url: string, options: any = {}) {
       this._url = new URL(url)
       this._options = options
     }
     
-    get url() {
+    get url(): string {
       return this._url.toString()
     }
     
-    get method() {
+    get method(): string {
       return this._options.method || 'GET'
     }
     
     get headers() {
       return {
-        get: (name) => {
+        get: (name: string) => {
           return this._options.headers?.[name.toLowerCase()] || null
         }
       }
     }
     
-    async json() {
+    async json(): Promise<any> {
       if (!this._options.body) return {}
       return typeof this._options.body === 'string' 
         ? JSON.parse(this._options.body) 
@@ -34,23 +37,27 @@ jest.mock('next/server', () => ({
     }
   },
   NextResponse: class MockNextResponse {
-    constructor(body, options = {}) {
+    body: any
+    status: number
+    headers: Map<string, string>
+    
+    constructor(body: any, options: any = {}) {
       this.body = body
       this.status = options.status || 200
       this.headers = new Map()
       
       if (options.headers) {
         Object.entries(options.headers).forEach(([key, value]) => {
-          this.headers.set(key, value)
+          this.headers.set(key, value as string)
         })
       }
     }
     
-    async json() {
+    async json(): Promise<any> {
       return typeof this.body === 'string' ? JSON.parse(this.body) : this.body
     }
     
-    static json(data, init = {}) {
+    static json(data: any, init: any = {}) {
       return new this(JSON.stringify(data), {
         ...init,
         headers: {

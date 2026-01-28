@@ -57,23 +57,26 @@ describe('Ghost Entry Filtering', () => {
   const mockCalendarEvents: CalendarEvent[] = [
     {
       id: 'cal-1',
-      summary: 'Team Meeting',
+      title: 'Team Meeting',
       startTime: '09:00',
       endTime: '10:00',
+      date: '2024-01-15',
       isAllDay: false,
     },
     {
       id: 'cal-2',
-      summary: 'Lunch',
+      title: 'Lunch',
       startTime: '12:00',
       endTime: '13:00',
+      date: '2024-01-15',
       isAllDay: false,
     },
     {
       id: 'cal-3',
-      summary: 'Code Review',
+      title: 'Code Review',
       startTime: '14:00',
       endTime: '15:00',
+      date: '2024-01-15',
       isAllDay: false,
     },
   ]

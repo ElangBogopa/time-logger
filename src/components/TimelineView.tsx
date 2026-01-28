@@ -6,15 +6,11 @@ import { formatDuration, timeToMinutes } from '@/lib/time-utils'
 import TimeEntryModal from './TimeEntryModal'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Eye } from 'lucide-react'
-
-// Import all the extracted hooks
 import { useTimelineData, type PlacedEntry } from '@/hooks/useTimelineData'
 import { useTimelineMouseCreate, type DragCreateData } from '@/hooks/useTimelineMouseCreate'
 import { useTimelineTouchCreate } from '@/hooks/useTimelineTouchCreate'
 import { useEntryAdjustment } from '@/hooks/useEntryAdjustment'
 import { useGhostEvents } from '@/hooks/useGhostEvents'
-
-// Import all the extracted components and utilities
 import TimelineGrid from './timeline/TimelineGrid'
 import TimelineEntry from './timeline/TimelineEntry'
 import TimelineGap from './timeline/TimelineGap'
@@ -22,11 +18,7 @@ import TimelineGhost, { type CalendarEvent } from './timeline/TimelineGhost'
 import { CurrentTimeIndicator, DragPreview } from './timeline'
 import { yToTime as createYToTime } from './timeline/utils'
 
-// Export CalendarEvent for use in other components and hooks
-export type { CalendarEvent, DragCreateData }
-
-// Export PlacedEntry for compatibility
-export type { PlacedEntry }
+export type { CalendarEvent, DragCreateData, PlacedEntry }
 
 export interface TimelineViewProps {
   entries: TimeEntry[]
@@ -41,7 +33,6 @@ export interface TimelineViewProps {
   isFutureDay?: boolean
   isPastDay?: boolean
   canLog?: boolean
-  // Optional hour range to show (defaults to full 24h)
   visibleStartHour?: number
   visibleEndHour?: number
 }

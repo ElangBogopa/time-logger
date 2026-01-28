@@ -328,6 +328,7 @@ describe('calculateWeeklyConsistency', () => {
     const originalDate = Date
     global.Date = class extends originalDate {
       constructor(...args: (string | number | Date)[]) {
+        super()
         if (args.length === 0) {
           return mockToday as unknown as Date
         }
@@ -361,6 +362,7 @@ describe('calculateWeeklyConsistency', () => {
     const originalDate = Date
     global.Date = class extends originalDate {
       constructor(...args: (string | number | Date)[]) {
+        super()
         if (args.length === 0) {
           return mockToday as unknown as Date
         }
@@ -406,6 +408,7 @@ describe('calculateStreakWithGrace', () => {
     const originalDate = Date
     global.Date = class extends originalDate {
       constructor(...args: (string | number | Date)[]) {
+        super()
         if (args.length === 0) {
           return mockToday as unknown as Date
         }
@@ -442,6 +445,7 @@ describe('calculateStreakWithGrace', () => {
     const originalDate = Date
     global.Date = class extends originalDate {
       constructor(...args: (string | number | Date)[]) {
+        super()
         if (args.length === 0) {
           return mockToday as unknown as Date
         }
@@ -478,6 +482,7 @@ describe('calculateStreakWithGrace', () => {
     const originalDate = Date
     global.Date = class extends originalDate {
       constructor(...args: (string | number | Date)[]) {
+        super()
         if (args.length === 0) {
           return mockToday as unknown as Date
         }
@@ -517,6 +522,7 @@ describe('calculateStreakWithGrace', () => {
     const originalDate = Date
     global.Date = class extends originalDate {
       constructor(...args: (string | number | Date)[]) {
+        super()
         if (args.length === 0) {
           return mockToday as unknown as Date
         }
