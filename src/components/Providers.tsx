@@ -12,7 +12,7 @@ import { ReactNode } from 'react'
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
       <SessionProvider>
         <CalendarProvider>
           <GoogleReauthBanner />
