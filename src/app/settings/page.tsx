@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { Bell, BellOff, Clock, Loader2, Calendar, ChevronRight, Target, Moon, Sun } from 'lucide-react'
+import { Bell, BellOff, Clock, Loader2, Calendar, ChevronRight, Target, Moon, Sun, LogOut } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import Toast from '@/components/Toast'
@@ -343,12 +343,23 @@ export default function SettingsPage() {
           </Card>
         </div>
 
-        {/* Account info */}
+        {/* Account info + Sign out */}
         <div className="mt-8 rounded-lg border border-border bg-muted/30 p-4">
-          <p className="text-xs text-muted-foreground">
-            Signed in as <span className="font-medium text-foreground">{session?.user?.email}</span>
-            {session?.authProvider === 'google' && ' via Google'}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Signed in as <span className="font-medium text-foreground">{session?.user?.email}</span>
+              {session?.authProvider === 'google' && ' via Google'}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+              onClick={() => signOut({ callbackUrl: '/login' })}
+            >
+              <LogOut className="h-4 w-4 mr-1.5" />
+              Sign out
+            </Button>
+          </div>
         </div>
       </div>
 
