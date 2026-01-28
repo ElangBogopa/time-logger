@@ -21,6 +21,7 @@ interface TimelineGhostProps {
   overlappingGhostIds: Set<string>
   onMouseDown: (e: React.MouseEvent, event: CalendarEvent) => void
   onTouchStart: (e: React.TouchEvent, event: CalendarEvent) => void
+  onTouchEnd?: (e: React.TouchEvent) => void
   onDismiss: (eventId: string) => void
 }
 
@@ -35,6 +36,7 @@ export default function TimelineGhost({
   overlappingGhostIds,
   onMouseDown,
   onTouchStart,
+  onTouchEnd,
   onDismiss,
 }: TimelineGhostProps) {
   const startMinutes = timeToMinutes(event.startTime)
@@ -62,6 +64,10 @@ export default function TimelineGhost({
       onTouchStart={(e) => {
         if (isDismissed) return
         onTouchStart(e, event)
+      }}
+      onTouchEnd={(e) => {
+        if (isDismissed) return
+        onTouchEnd?.(e)
       }}
       className={`absolute overflow-hidden rounded-xl border-2 border-dotted transition-all ${
         isDismissed

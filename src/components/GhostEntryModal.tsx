@@ -223,13 +223,33 @@ export default function GhostEntryModal({
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
-          {/* Activity */}
+          {/* Activity — shown as text by default, tap to edit */}
           <div className="space-y-2">
             <Label htmlFor="ghost-activity">Activity</Label>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 text-sm font-medium text-foreground py-2 px-3 rounded-md bg-zinc-100 dark:bg-zinc-800">
+                {activity}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('ghost-activity-edit') as HTMLInputElement
+                  if (el) {
+                    el.classList.toggle('hidden')
+                    el.focus()
+                  }
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
+              >
+                Edit
+              </button>
+            </div>
             <Input
-              id="ghost-activity"
+              id="ghost-activity-edit"
+              className="hidden"
               value={activity}
               onChange={(e) => setActivity(e.target.value)}
+              placeholder="Edit activity name..."
             />
           </div>
 

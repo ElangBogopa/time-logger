@@ -450,16 +450,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
         onEntryAdded()
 
-        // If disablePostSubmit (calendar bulk logging), just close silently
-        if (disablePostSubmit) {
-          onClose()
-          return
-        }
-
-        // Show post-submit options instead of closing
-        setLastLoggedActivity(activity)
-        setShowPostSubmit(true)
-        // Reset form for potential next entry
+        // Reset form for next entry (no popup, just keep logging)
         setActivity('')
         setNotes('')
         setError(null)
@@ -469,6 +460,10 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         // Set start time to end of last entry for next entry
         setStartTime(endTime)
         setEndTime(getCurrentTime())
+        // Show brief toast confirmation
+        onShowToast(`"${activity}" logged`)
+        // Focus input for next entry
+        setTimeout(() => inputRef.current?.focus(), 100)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')

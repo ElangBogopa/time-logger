@@ -165,12 +165,22 @@ export default function TimelineView({
     onGhostEntryClick?.(event)
   }, [onGhostEntryClick])
 
+  // Track ghost touch to distinguish tap vs scroll
+  const ghostTouchRef = useRef<{ startY: number; event: CalendarEvent } | null>(null)
+
   const handleGhostTouchStart = useCallback((e: React.TouchEvent, event: CalendarEvent) => {
     e.stopPropagation()
-    
-    // For simplicity, just open the ghost entry click handler
-    // In the future, this could integrate with the drag creation hooks
-    onGhostEntryClick?.(event)
+    ghostTouchRef.current = { startY: e.touches[0].clientY, event }
+  }, [])
+
+  const handleGhostTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!ghostTouchRef.current) return
+    const deltaY = Math.abs(e.changedTouches[0].clientY - ghostTouchRef.current.startY)
+    // Only trigger if finger moved less than 10px (tap, not scroll)
+    if (deltaY < 10) {
+      onGhostEntryClick?.(ghostTouchRef.current.event)
+    }
+    ghostTouchRef.current = null
   }, [onGhostEntryClick])
 
   // Update the timeline data hook with the correct dismissed events
@@ -407,6 +417,9 @@ export default function TimelineView({
                   const isCurrentlyDragging = mouseCreateHook.isDragging || touchCreateHook.isTouchDragging
                   if (isCurrentlyDragging) return
                   handleGhostTouchStart(e, event)
+                }}
+                onTouchEnd={(e) => {
+                  handleGhostTouchEnd(e)
                 }}
                 onDismiss={dismissGhostEvent}
               />
