@@ -102,8 +102,8 @@ export default function MoodCheckIn({ period, onMoodSelected, className = '' }: 
   // Show loading skeleton
   if (isLoading) {
     return (
-      <div className={`rounded-xl border border-zinc-200 dark:border-zinc-700 bg-card p-4 ${className}`}>
-        <div className="h-14 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-lg" />
+      <div className={`rounded-xl border border-border bg-card p-4 ${className}`}>
+        <div className="h-14 animate-pulse bg-secondary rounded-lg" />
       </div>
     )
   }
@@ -118,7 +118,7 @@ export default function MoodCheckIn({ period, onMoodSelected, className = '' }: 
 
     return (
       <div
-        className={`rounded-xl border border-zinc-200 dark:border-zinc-700 bg-card p-4 transition-all duration-300 ${justSaved ? 'border-green-300 dark:border-green-700' : ''} ${className}`}
+        className={`rounded-xl border border-border bg-card p-4 transition-all duration-300 ${justSaved ? 'border-green-300 dark:border-green-700' : ''} ${className}`}
       >
         {/* Header with emoji and label */}
         <div className="flex items-center gap-3 mb-3">
@@ -153,7 +153,7 @@ export default function MoodCheckIn({ period, onMoodSelected, className = '' }: 
 
   // Expanded state: show mood picker
   return (
-    <div className={`rounded-xl border border-zinc-200 dark:border-zinc-700 bg-card p-4 transition-all duration-300 ${className}`}>
+    <div className={`rounded-xl border border-border bg-card p-4 transition-all duration-300 ${className}`}>
       <p className="text-sm text-muted-foreground mb-3">
         {config.prompt}
       </p>

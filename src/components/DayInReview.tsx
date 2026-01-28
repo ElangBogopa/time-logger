@@ -122,7 +122,7 @@ export default function DayInReview({ className }: DayInReviewProps) {
   // Don't show if loading, error, or evening hasn't passed
   if (isLoading) {
     return (
-      <div className={cn('rounded-xl border border-zinc-200 dark:border-zinc-800 p-4', className)}>
+      <div className={cn('rounded-xl border border-border p-4', className)}>
         <div className="flex items-center gap-4 animate-pulse">
           <div className="w-20 h-20 rounded-full bg-zinc-200 dark:bg-zinc-700" />
           <div className="flex-1 space-y-2">
@@ -147,7 +147,7 @@ export default function DayInReview({ className }: DayInReviewProps) {
     <button
       onClick={() => router.push('/day-review')}
       className={cn(
-        'w-full text-left rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4',
+        'w-full text-left rounded-xl border border-border bg-card p-4',
         'hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition-all',
         'active:scale-[0.99]',
         className

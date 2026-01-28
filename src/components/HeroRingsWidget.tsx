@@ -285,7 +285,7 @@ export default function HeroRingsWidget({ userId }: HeroRingsWidgetProps) {
               className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
                 isComplete
                   ? 'bg-green-500/10 text-green-600 dark:text-green-400 ring-1 ring-green-500/20'
-                  : 'bg-zinc-100 dark:bg-zinc-800/80 text-muted-foreground'
+                  : 'bg-secondary/80 text-muted-foreground'
               }`}
             >
               <span

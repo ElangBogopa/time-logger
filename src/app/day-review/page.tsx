@@ -273,7 +273,7 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
         <Calendar className="h-5 w-5 text-muted-foreground" />
         <h2 className="font-semibold text-foreground">Your Day</h2>
       </div>
-      <div className="flex gap-0.5 h-12 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+      <div className="flex gap-0.5 h-12 rounded-lg overflow-hidden bg-secondary">
         {visibleHours.map(block => {
           const hasEntries = block.entries.length > 0
           const primaryCategory = block.entries[0]?.category
@@ -329,7 +329,7 @@ function TargetCard({ target }: { target: TargetProgress }) {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <div className="flex items-start justify-between">
         <div>
           <h3 className="font-medium text-foreground">{target.label}</h3>
@@ -410,7 +410,7 @@ function AggregatedBreakdownSection({ breakdown }: { breakdown: AggregatedBreakd
               </div>
             </div>
             {/* Progress bar */}
-            <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-2 bg-secondary rounded-full overflow-hidden">
               <div
                 className={cn('h-full rounded-full transition-all duration-500', AGGREGATED_COLORS[cat.category])}
                 style={{ width: `${(cat.minutes / maxMinutes) * 100}%` }}
@@ -452,7 +452,7 @@ function MoodSection({ mood }: { mood: MoodCheckin | null }) {
   const label = config.labels[mood.mood]
 
   return (
-    <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
         <span className="text-3xl">{MOOD_EMOJIS[mood.mood]}</span>
         <div>
@@ -640,7 +640,7 @@ export default function DayReviewPage() {
 
         {/* Longest Focus */}
         {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
-          <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+          <section className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
                 <Clock className="h-5 w-5 text-blue-500" />

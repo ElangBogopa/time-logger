@@ -314,7 +314,7 @@ export default function TargetsPage() {
                   {/* Progress ring inline */}
                   <div className="mt-3 flex items-center gap-4">
                     <div className="flex-1">
-                      <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                      <div className="h-2 rounded-full bg-secondary overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{
@@ -415,7 +415,7 @@ export default function TargetsPage() {
                     className={`relative rounded-xl border-2 p-4 text-left transition-all ${
                       isSelected
                         ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                        : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                        : 'border-border hover:border-zinc-300 dark:hover:border-zinc-600'
                     }`}
                   >
                     {isSelected && (

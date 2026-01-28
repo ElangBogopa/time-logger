@@ -50,7 +50,7 @@ export default function TimelineGap({ gap, startHour, onDragCreate }: TimelineGa
           // Prevent the touch from also firing a click + prevent long-press passthrough issues
           e.stopPropagation()
         }}
-        className="pointer-events-auto flex items-center gap-1 px-2.5 py-1 rounded-full border border-dotted border-zinc-400/30 dark:border-zinc-500/25 bg-zinc-100/50 dark:bg-zinc-800/50 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/50 hover:border-zinc-400/50 dark:hover:border-zinc-400/30 active:scale-95 transition-all text-zinc-400 dark:text-zinc-500 hover:text-zinc-500 dark:hover:text-zinc-400"
+        className="pointer-events-auto flex items-center gap-1 px-2.5 py-1 rounded-full border border-dotted border-zinc-400/30 dark:border-zinc-500/25 bg-secondary/50 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/50 hover:border-zinc-400/50 dark:hover:border-zinc-400/30 active:scale-95 transition-all text-zinc-400 dark:text-zinc-500 hover:text-zinc-500 dark:hover:text-zinc-400"
       >
         <Plus className="h-3 w-3 shrink-0" />
         <span className="text-[10px] font-medium whitespace-nowrap">

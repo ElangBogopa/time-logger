@@ -73,7 +73,7 @@ export default function TimeEntriesList({ entries, isLoading, onEntryDeleted }: 
   if (entries.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
           <ClipboardList className="h-6 w-6 text-zinc-400 dark:text-zinc-500" />
         </div>
         <div>

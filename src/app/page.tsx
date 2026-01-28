@@ -78,13 +78,13 @@ function HomeContent() {
           </div>
 
           {/* Quote skeleton */}
-          <div className="mb-3 rounded-xl border border-zinc-200/50 dark:border-zinc-700/50 p-3">
+          <div className="mb-3 rounded-xl border border-border p-3">
             <Skeleton className="h-3.5 w-3/4 mb-1.5" />
             <Skeleton className="h-3 w-1/2" />
           </div>
 
           {/* Mood check-in skeleton */}
-          <div className="mb-3 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3">
+          <div className="mb-3 rounded-xl border border-border p-3">
             <Skeleton className="h-4 w-32 mb-2" />
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -96,7 +96,7 @@ function HomeContent() {
           {/* Session cards skeleton */}
           <div className="space-y-3">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-3">
+              <div key={i} className="rounded-xl border border-border p-3">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-9 w-9 rounded-full" />
                   <div className="flex-1 space-y-1.5">
@@ -201,7 +201,7 @@ function HomeContent() {
 export default function Home() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-900">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     }>

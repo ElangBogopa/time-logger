@@ -415,7 +415,7 @@ export default function TimelineView({
                       </div>
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-zinc-800 rounded-lg px-4 py-2 border border-zinc-200 dark:border-zinc-700 shadow-lg">
+                  <div className="bg-card rounded-lg px-4 py-2 border border-border shadow-lg">
                     <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       Hold to create entry
                     </p>

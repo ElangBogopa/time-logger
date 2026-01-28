@@ -652,12 +652,12 @@ export default function LogPeriodPage() {
             </div>
 
             {/* View mode toggle */}
-            <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+            <div className="flex rounded-lg border border-border overflow-hidden">
               <button
                 onClick={() => setViewMode('form')}
                 className={`p-2 transition-colors ${
                   viewMode === 'form'
-                    ? 'bg-zinc-100 dark:bg-zinc-800 text-foreground'
+                    ? 'bg-secondary text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
                 aria-label="List view"
@@ -669,7 +669,7 @@ export default function LogPeriodPage() {
                 onClick={() => setViewMode('timeline')}
                 className={`p-2 transition-colors ${
                   viewMode === 'timeline'
-                    ? 'bg-zinc-100 dark:bg-zinc-800 text-foreground'
+                    ? 'bg-secondary text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
                 aria-label="Timeline view"

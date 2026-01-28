@@ -454,7 +454,7 @@ export default function WeeklyReviewPage() {
                   </div>
 
                   {/* Preview mockup of what the review looks like */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-5 opacity-50 pointer-events-none select-none">
+                  <div className="rounded-xl border border-border bg-card p-5 opacity-50 pointer-events-none select-none">
                     <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-3">
                       Preview — What you&apos;ll unlock
                     </p>

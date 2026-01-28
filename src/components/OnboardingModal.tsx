@@ -219,7 +219,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                         ? 'border-primary bg-primary/5 dark:bg-primary/10'
                         : isDisabled
                           ? 'border-zinc-100 dark:border-zinc-800 opacity-40 cursor-not-allowed'
-                          : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                          : 'border-border hover:border-zinc-300 dark:hover:border-zinc-600'
                     }`}
                   >
                     {/* Selection check */}
@@ -292,7 +292,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                 return (
                   <div
                     key={target.type}
-                    className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-4"
+                    className="rounded-xl border border-border p-4"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">

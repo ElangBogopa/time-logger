@@ -81,7 +81,7 @@ function ScoreCircle({ score, color, size = 'large' }: { score: number; color: s
 
 function WinsSection({ wins }: { wins: Win[] }) {
   return (
-    <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-2 mb-3">
         <Trophy className="h-4 w-4 text-amber-500" />
         <h2 className="font-semibold text-foreground text-sm">Today&apos;s Wins</h2>
@@ -98,7 +98,7 @@ function WinsSection({ wins }: { wins: Win[] }) {
 function TargetCard({ target }: { target: TargetProgress }) {
   const pct = Math.min(target.percentComplete, 100)
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+    <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span>{target.emoji}</span>
@@ -106,7 +106,7 @@ function TargetCard({ target }: { target: TargetProgress }) {
         </div>
         <span className="text-xs text-muted-foreground">{formatMinutes(target.currentMinutes)} / {formatMinutes(target.targetMinutes)}</span>
       </div>
-      <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+      <div className="h-2 rounded-full bg-secondary overflow-hidden">
         <div className={cn('h-full rounded-full transition-all', pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-blue-500' : 'bg-zinc-400')}
           style={{ width: `${pct}%` }} />
       </div>
@@ -122,7 +122,7 @@ function TimelineStrip({ timeline }: { timeline: TimelineSlot[] }) {
         {timeline.map((slot, i) => (
           <div key={i} title={`${slot.hour}:00 - ${slot.hasEntry ? slot.category : 'empty'}`}
             className={cn('h-8 flex-1 rounded-sm transition-colors',
-              slot.hasEntry ? AGGREGATED_CATEGORY_COLORS[getAggregatedCategory(slot.category!)] || 'bg-blue-500' : 'bg-zinc-100 dark:bg-zinc-800'
+              slot.hasEntry ? AGGREGATED_CATEGORY_COLORS[getAggregatedCategory(slot.category!)] || 'bg-blue-500' : 'bg-secondary'
             )} />
         ))}
       </div>
@@ -160,7 +160,7 @@ function MoodSection({ mood }: { mood: MoodCheckin | null }) {
   const config = SESSION_MOOD_CONFIG[mood.period]
   const label = config.labels[mood.mood]
   return (
-    <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
         <span className="text-3xl">{MOOD_EMOJIS[mood.mood]}</span>
         <div>
@@ -285,7 +285,7 @@ export default function DayReviewContent() {
       )}
       {summary.todayMood && <div className="mb-6"><MoodSection mood={summary.todayMood} /></div>}
       {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
-        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+        <section className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
               <Clock className="h-5 w-5 text-blue-500" />

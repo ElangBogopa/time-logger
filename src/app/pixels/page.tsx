@@ -222,19 +222,19 @@ export default function YearInPixelsPage() {
             {/* Stats Summary */}
             {stats && stats.total > 0 && (
               <div className="mb-6 grid grid-cols-4 gap-3">
-                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
+                <div className="rounded-lg bg-secondary p-3 text-center">
                   <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.avgScore}</p>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Avg Score</p>
                 </div>
-                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
+                <div className="rounded-lg bg-secondary p-3 text-center">
                   <p className="text-2xl font-bold text-emerald-500">{stats.greatDays}</p>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Great</p>
                 </div>
-                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
+                <div className="rounded-lg bg-secondary p-3 text-center">
                   <p className="text-2xl font-bold text-amber-500">{stats.okayDays}</p>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Okay</p>
                 </div>
-                <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-center">
+                <div className="rounded-lg bg-secondary p-3 text-center">
                   <p className="text-2xl font-bold text-red-400">{stats.roughDays}</p>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Rough</p>
                 </div>

@@ -71,7 +71,7 @@ export default function SessionCard({
   // Upcoming state - grayed out
   if (state === 'upcoming') {
     return (
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 opacity-60">
+      <div className="rounded-xl border border-border bg-background/50 p-4 opacity-60">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-800`}>
             <Icon className="h-5 w-5 text-zinc-400" />
@@ -89,7 +89,7 @@ export default function SessionCard({
   // Skipped state - dimmed with label
   if (state === 'skipped') {
     return (
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
+      <div className="rounded-xl border border-border bg-background/50 p-4">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-full ${colors.iconBg}`}>
             <Icon className={`h-5 w-5 ${colors.icon} opacity-50`} />

@@ -227,7 +227,7 @@ export default function GhostEntryModal({
           <div className="space-y-2">
             <Label htmlFor="ghost-activity">Activity</Label>
             <div className="flex items-center gap-2">
-              <p className="flex-1 text-sm font-medium text-foreground py-2 px-3 rounded-md bg-zinc-100 dark:bg-zinc-800">
+              <p className="flex-1 text-sm font-medium text-foreground py-2 px-3 rounded-md bg-secondary">
                 {activity}
               </p>
               <button

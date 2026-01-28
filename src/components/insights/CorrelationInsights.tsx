@@ -161,7 +161,7 @@ function SessionPatternCard({ pattern }: { pattern: SessionPatternInsight }) {
   const toMoodEmoji = pattern.toMoodAvg >= 1.5 ? '⚡' : pattern.toMoodAvg >= 0.5 ? '😐' : '😴'
 
   return (
-    <Card className="border border-zinc-200 dark:border-zinc-800">
+    <Card className="border border-border">
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           {/* From period */}
@@ -198,7 +198,7 @@ function EmptyState({ daysNeeded, totalDaysTracked }: { daysNeeded: number; tota
     <Card className="border border-dashed border-zinc-300 dark:border-zinc-700">
       <CardContent className="p-8 text-center">
         <div className="flex justify-center mb-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
             <Lightbulb className="h-8 w-8 text-zinc-400" />
           </div>
         </div>
@@ -232,7 +232,7 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-4">
       {[0, 1, 2].map(i => (
-        <Card key={i} className="border border-zinc-200 dark:border-zinc-800">
+        <Card key={i} className="border border-border">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
@@ -302,7 +302,7 @@ export default function CorrelationInsights({
   if (error) {
     return (
       <div className={className}>
-        <Card className="border border-zinc-200 dark:border-zinc-800">
+        <Card className="border border-border">
           <CardContent className="p-6 text-center">
             <p className="text-sm text-muted-foreground">Unable to load insights</p>
           </CardContent>
@@ -326,7 +326,7 @@ export default function CorrelationInsights({
   if (data.insights.length === 0 && data.sessionPatterns.length === 0) {
     return (
       <div className={className}>
-        <Card className="border border-zinc-200 dark:border-zinc-800">
+        <Card className="border border-border">
           <CardContent className="p-6 text-center">
             <Lightbulb className="h-8 w-8 text-zinc-400 mx-auto mb-3" />
             <h3 className="font-medium text-foreground mb-1">No strong patterns yet</h3>

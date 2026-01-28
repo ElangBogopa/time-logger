@@ -206,7 +206,7 @@ export default function WeeklyReviewContent() {
   return (
     <div>
       {/* Week Navigation */}
-      <div className="flex items-center justify-between rounded-xl bg-zinc-100 dark:bg-zinc-800 p-3 mb-5">
+      <div className="flex items-center justify-between rounded-xl bg-secondary p-3 mb-5">
         <button onClick={goToPreviousWeek} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg">
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -254,7 +254,7 @@ export default function WeeklyReviewContent() {
       {reviewData.highlights.length > 0 && (
         <div className="grid grid-cols-2 gap-2 mb-5">
           {reviewData.highlights.map((h, i) => (
-            <div key={i} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+            <div key={i} className="rounded-xl border border-border bg-card p-3">
               <span className="text-lg">{h.icon}</span>
               <p className="text-sm font-medium mt-1">{h.text}</p>
               {h.subtext && <p className="text-[11px] text-muted-foreground">{h.subtext}</p>}
@@ -277,15 +277,15 @@ export default function WeeklyReviewContent() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-2 mb-5">
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-[11px] text-muted-foreground">Logged</p>
           <p className="text-lg font-bold">{formatMinutes(reviewData.totalMinutes)}</p>
         </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-[11px] text-muted-foreground">Active Days</p>
           <p className="text-lg font-bold">{reviewData.activeDays}/7</p>
         </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-[11px] text-muted-foreground">Entries</p>
           <p className="text-lg font-bold">{reviewData.entryCount}</p>
         </div>
@@ -300,7 +300,7 @@ export default function WeeklyReviewContent() {
           </h2>
           <div className="space-y-3">
             {reviewData.targetScorecards.map((sc) => (
-              <div key={sc.targetId} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+              <div key={sc.targetId} className="rounded-xl border border-border bg-card p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">{sc.targetLabel}</span>
                   <span className="text-[11px] text-muted-foreground">
@@ -332,7 +332,7 @@ export default function WeeklyReviewContent() {
               const pct = Math.min(tp.percentage ?? 0, 100)
               const trendIcon = tp.trend === 'up' ? '↑' : tp.trend === 'down' ? '↓' : ''
               return (
-                <div key={tp.target.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+                <div key={tp.target.id} className="rounded-lg border border-border bg-card p-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium">{tp.label}</span>
                     <span className="text-xs text-muted-foreground">
@@ -340,7 +340,7 @@ export default function WeeklyReviewContent() {
                       {trendIcon && <span className="ml-1">{trendIcon}</span>}
                     </span>
                   </div>
-                  <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                  <div className="h-2 rounded-full bg-secondary overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-blue-500' : 'bg-zinc-400'}`}
                       style={{ width: `${pct}%` }}

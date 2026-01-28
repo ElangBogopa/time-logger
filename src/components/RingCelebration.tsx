@@ -179,7 +179,7 @@ export default function RingCelebration({ celebration, onDone }: RingCelebration
           ))}
 
           {/* Toast card */}
-          <div className="relative bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200/50 dark:border-zinc-700/50 rounded-2xl px-5 py-3 shadow-2xl shadow-black/20">
+          <div className="relative bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-border rounded-2xl px-5 py-3 shadow-2xl shadow-black/20">
             <div className="flex items-center gap-3">
               {/* Pulsing ring indicator */}
               <div className="relative flex items-center justify-center w-10 h-10">

@@ -18,11 +18,11 @@ interface MetricsResponse {
   nudge: string
 }
 
-/* ── Color map ── */
+/* ── Color map — Whoop palette ── */
 const COLOR_MAP = {
-  green: { stroke: '#22c55e', text: 'text-green-500', glow: '#22c55e' },
-  yellow: { stroke: '#f59e0b', text: 'text-amber-500', glow: '#f59e0b' },
-  red: { stroke: '#ef4444', text: 'text-red-500', glow: '#ef4444' },
+  green: { stroke: '#00dc82', text: 'text-[#00dc82]', glow: '#00dc82' },
+  yellow: { stroke: '#f5c842', text: 'text-[#f5c842]', glow: '#f5c842' },
+  red: { stroke: '#ef4444', text: 'text-[#ef4444]', glow: '#ef4444' },
 }
 
 /* ── Compact Metric Circle ── */
@@ -65,7 +65,7 @@ function MetricCircle({
             fill="none"
             stroke="currentColor"
             strokeWidth={strokeWidth}
-            className="text-zinc-200/30 dark:text-zinc-700/40"
+            className="text-[#1b3044]"
           />
           {/* Progress arc */}
           <circle

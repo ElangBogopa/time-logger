@@ -19,9 +19,9 @@ const WeeklyReviewContent = dynamic(() => import('@/components/review/WeeklyRevi
 function TabSkeleton() {
   return (
     <div className="space-y-4 py-6">
-      <div className="h-8 w-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
-      <div className="h-32 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
-      <div className="h-32 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      <div className="h-8 w-48 animate-pulse rounded-lg bg-secondary" />
+      <div className="h-32 animate-pulse rounded-xl bg-secondary" />
+      <div className="h-32 animate-pulse rounded-xl bg-secondary" />
     </div>
   )
 }

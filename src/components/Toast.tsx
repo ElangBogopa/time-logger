@@ -78,7 +78,7 @@ export default function Toast({ title, message, onClose, duration = 4000 }: Toas
             <h3 className="mb-3 text-center text-xl font-bold text-zinc-900 dark:text-white">{title}</h3>
 
             {/* Commentary message */}
-            <div className="rounded-xl bg-zinc-100 dark:bg-zinc-800/50 p-4">
+            <div className="rounded-xl bg-secondary/50 p-4">
               <p className="text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
                 &ldquo;{message}&rdquo;
               </p>
