@@ -160,7 +160,7 @@ export default function LogPeriodPage() {
 
   // Fetch entries for this date
   const fetchEntries = useCallback(async () => {
-    if (!userId) return
+    if (!userId || !selectedDate) return
     setIsLoading(true)
 
     try {

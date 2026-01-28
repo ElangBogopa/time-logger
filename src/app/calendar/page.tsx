@@ -118,7 +118,7 @@ function CalendarContent() {
   }, [entries])
 
   const fetchEntriesForDate = useCallback(async () => {
-    if (!userId) return
+    if (!userId || !selectedDate) return
     setIsLoading(true)
     try {
       const data = await fetchEntries({ date: selectedDate })
