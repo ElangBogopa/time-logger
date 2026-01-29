@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { MetricTrendChart } from '@/components/charts/MetricTrendChart'
 import { StatusDelta } from '@/components/charts/StatusDelta'
 import { METRIC_COLORS, getStatusLabel, getStatusTailwind } from '@/lib/chart-colors'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
 import { ChevronLeft, CheckCircle2, Circle, Sparkles } from 'lucide-react'
 import type { MetricKey, TrendDataPoint, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
 
@@ -318,9 +320,27 @@ export default function MetricDetailSheet({
     }
   }, [isOpen])
 
+  const reducedMotion = useReducedMotion()
+
   const metricData = data?.[metric]
   const metricColor = METRIC_COLORS[metric].hex
   const metricLabel = METRIC_LABELS[metric]
+
+  // Stagger animation styles
+  const staggerStyle = useMemo(() => ({
+    hero: {
+      animation: reducedMotion ? 'none' : 'fadeIn 300ms ease-out both',
+      animationDelay: '0ms',
+    },
+    chart: {
+      animation: reducedMotion ? 'none' : 'fadeIn 300ms ease-out both',
+      animationDelay: reducedMotion ? '0ms' : '150ms',
+    },
+    breakdown: {
+      animation: reducedMotion ? 'none' : 'fadeIn 300ms ease-out both',
+      animationDelay: reducedMotion ? '0ms' : '300ms',
+    },
+  }), [reducedMotion])
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -356,8 +376,8 @@ export default function MetricDetailSheet({
           </div>
         ) : metricData ? (
           <>
-            {/* Hero score */}
-            <div className="text-center mb-6 px-4">
+            {/* Hero score — stagger 1 */}
+            <div className="text-center mb-6 px-4" style={staggerStyle.hero}>
               <div className="flex items-baseline justify-center gap-1">
                 <span
                   className="text-5xl font-bold tabular-nums"
@@ -379,8 +399,9 @@ export default function MetricDetailSheet({
               </div>
             </div>
 
-            {/* Trend chart */}
-            <div className="px-4 mb-6">
+            {/* Trend chart — stagger 2 */}
+            <div className="px-4 mb-6" style={staggerStyle.chart}>
+              <ChartErrorBoundary fallbackValue={metricData.current} fallbackLabel={metricLabel} height={160}>
               <MetricTrendChart
                 data={metricData.trend}
                 metricColor={metricColor}
@@ -390,27 +411,30 @@ export default function MetricDetailSheet({
                 onPeriodChange={setPeriod}
                 height={160}
               />
+              </ChartErrorBoundary>
             </div>
 
-            {/* Metric-specific breakdown */}
-            {metric === 'focus' && (
-              <FocusBreakdown
-                details={metricData.details as unknown as FocusDetails}
-                metricColor={metricColor}
-              />
-            )}
-            {metric === 'balance' && (
-              <BalanceBreakdown
-                details={metricData.details as unknown as BalanceDetails}
-                metricColor={metricColor}
-              />
-            )}
-            {metric === 'rhythm' && (
-              <RhythmBreakdown
-                details={metricData.details as unknown as RhythmDetails}
-                trend={metricData.trend}
-              />
-            )}
+            {/* Metric-specific breakdown — stagger 3 */}
+            <div style={staggerStyle.breakdown}>
+              {metric === 'focus' && (
+                <FocusBreakdown
+                  details={metricData.details as unknown as FocusDetails}
+                  metricColor={metricColor}
+                />
+              )}
+              {metric === 'balance' && (
+                <BalanceBreakdown
+                  details={metricData.details as unknown as BalanceDetails}
+                  metricColor={metricColor}
+                />
+              )}
+              {metric === 'rhythm' && (
+                <RhythmBreakdown
+                  details={metricData.details as unknown as RhythmDetails}
+                  trend={metricData.trend}
+                />
+              )}
+            </div>
 
             {/* Personal best badge */}
             {metricData.personalBest && metricData.personalBest.value > 0 && (

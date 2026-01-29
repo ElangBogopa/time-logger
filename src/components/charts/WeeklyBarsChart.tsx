@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import {
   BarChart,
   Bar,
@@ -60,7 +60,7 @@ function TodayAwareXTick({ x, y, payload, todayIndex }: CustomTickProps) {
 
 // ── Main Component ──
 
-export function WeeklyBarsChart({
+function WeeklyBarsChartInner({
   data,
   average,
   todayIndex,
@@ -178,3 +178,5 @@ export function WeeklyBarsChart({
     </div>
   )
 }
+
+export const WeeklyBarsChart = React.memo(WeeklyBarsChartInner)

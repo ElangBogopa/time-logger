@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import {
   AreaChart,
   Area,
@@ -83,7 +83,12 @@ function ActiveDot({ cx, cy }: ActiveDotProps) {
 
 // ── Main Component ──
 
-export function MetricTrendChart({
+interface MetricTrendChartFullProps extends MetricTrendChartProps {
+  /** Show loading skeleton */
+  isLoading?: boolean
+}
+
+function MetricTrendChartInner({
   data,
   metricColor,
   metricLabel,
@@ -91,7 +96,8 @@ export function MetricTrendChart({
   height = 160,
   period,
   onPeriodChange,
-}: MetricTrendChartProps) {
+  isLoading = false,
+}: MetricTrendChartFullProps) {
   const reducedMotion = useReducedMotion()
   const gradientId = `trend-gradient-${metricLabel}`
 
@@ -100,6 +106,43 @@ export function MetricTrendChart({
     const values = data.map(d => `${d.label} ${d.value}`).join(', ')
     return `${metricLabel} trend chart, ${period === '7d' ? '7 day' : '30 day'} view. Average score ${average}. Values: ${values}.`
   }, [data, metricLabel, period, average])
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div>
+        {onPeriodChange && (
+          <div className="flex justify-end mb-2">
+            <PeriodToggle value={period} onChange={onPeriodChange} />
+          </div>
+        )}
+        <div className="animate-pulse bg-muted rounded-lg" style={{ height }} />
+      </div>
+    )
+  }
+
+  // Empty state — not enough data
+  if (!data || data.length < 2) {
+    return (
+      <div>
+        {onPeriodChange && (
+          <div className="flex justify-end mb-2">
+            <PeriodToggle value={period} onChange={onPeriodChange} />
+          </div>
+        )}
+        <div
+          className="flex items-center justify-center text-sm text-muted-foreground"
+          style={{ height }}
+          role="img"
+          aria-label={`${metricLabel} trend chart: not enough data`}
+        >
+          {data?.length === 1
+            ? `Score: ${data[0].value}`
+            : 'Log a few days to see trends'}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -110,8 +153,14 @@ export function MetricTrendChart({
         </div>
       )}
 
-      {/* Accessible chart wrapper (C4) */}
-      <div role="img" aria-label={ariaLabel}>
+      {/* Accessible chart wrapper with crossfade transition on period switch */}
+      <div
+        role="img"
+        aria-label={ariaLabel}
+        className="transition-opacity duration-200"
+        key={period}
+        style={{ animation: reducedMotion ? 'none' : 'fadeIn 300ms ease-out' }}
+      >
         <ResponsiveContainer width="100%" height={height}>
           <AreaChart data={data} margin={CHART_THEME.margin.standard}>
             <defs>
@@ -182,3 +231,5 @@ export function MetricTrendChart({
     </div>
   )
 }
+
+export const MetricTrendChart = React.memo(MetricTrendChartInner)

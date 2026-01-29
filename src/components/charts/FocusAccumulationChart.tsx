@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import {
   AreaChart,
   Area,
@@ -95,7 +95,7 @@ function AccumTooltip({ active, payload, label }: AccumTooltipProps) {
 
 // ── Main Component ──
 
-export function FocusAccumulationChart({
+function FocusAccumulationChartInner({
   entries,
   targetMinutes,
   currentTime = new Date(),
@@ -258,7 +258,7 @@ export function FocusAccumulationChart({
               fill="url(#focus-accum-gradient)"
               dot={false}
               isAnimationActive={!reducedMotion}
-              animationDuration={reducedMotion ? 0 : 800}
+              animationDuration={reducedMotion ? 0 : CHART_THEME.animation.slow}
             />
             {/* Ghost projection line */}
             <Area
@@ -270,7 +270,7 @@ export function FocusAccumulationChart({
               fill="none"
               dot={false}
               isAnimationActive={!reducedMotion}
-              animationDuration={reducedMotion ? 0 : 400}
+              animationDuration={reducedMotion ? 0 : CHART_THEME.animation.fast}
               connectNulls={false}
             />
           </AreaChart>
@@ -327,3 +327,5 @@ export function FocusAccumulationChart({
     </div>
   )
 }
+
+export const FocusAccumulationChart = React.memo(FocusAccumulationChartInner)

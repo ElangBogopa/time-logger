@@ -1,7 +1,9 @@
 'use client'
 
+import React from 'react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { CHART_THEME } from '@/lib/chart-config'
 import { ChartGradient } from './ChartGradient'
 import { StatusDelta } from './StatusDelta'
 
@@ -23,9 +25,11 @@ interface MiniSparklineProps {
    * Use when nested inside a labeled parent button (a11y note N2).
    */
   decorative?: boolean
+  /** Loading state — show shimmer skeleton */
+  isLoading?: boolean
 }
 
-export function MiniSparkline({
+function MiniSparklineInner({
   data,
   color,
   average,
@@ -33,8 +37,36 @@ export function MiniSparkline({
   height = 32,
   gradientId = 'sparkline',
   decorative = false,
+  isLoading = false,
 }: MiniSparklineProps) {
   const reducedMotion = useReducedMotion()
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div style={{ height: height + 20 }}>
+        <div className="animate-pulse bg-muted rounded" style={{ height, width: '100%' }} />
+        <div className="flex items-center justify-center gap-1.5 mt-0.5">
+          <div className="animate-pulse bg-muted rounded h-3 w-12" />
+        </div>
+      </div>
+    )
+  }
+
+  // Empty state — not enough data
+  if (!data || data.length < 2) {
+    return (
+      <div
+        className="flex items-center justify-center text-[10px] text-muted-foreground"
+        style={{ height: height + 20 }}
+        role={decorative ? undefined : 'img'}
+        aria-label={decorative ? undefined : 'Not enough data for trend'}
+        aria-hidden={decorative ? 'true' : undefined}
+      >
+        {data?.length === 1 ? `${data[0]}` : '—'}
+      </div>
+    )
+  }
 
   const chartData = data.map((value, i) => ({ value, index: i }))
   const trendDirection = delta > 0 ? 'up' : delta < 0 ? 'down' : 'no change'
@@ -51,7 +83,7 @@ export function MiniSparkline({
       aria-hidden={decorative ? 'true' : undefined}
     >
       <ResponsiveContainer width="100%" height={height}>
-        <AreaChart data={chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+        <AreaChart data={chartData} margin={CHART_THEME.margin.compact}>
           <defs>
             <ChartGradient id={gId} color={color} topOpacity={0.2} />
           </defs>
@@ -63,7 +95,7 @@ export function MiniSparkline({
             fill={`url(#${gId})`}
             dot={false}
             isAnimationActive={!reducedMotion}
-            animationDuration={reducedMotion ? 0 : 800}
+            animationDuration={reducedMotion ? 0 : CHART_THEME.animation.slow}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -76,3 +108,5 @@ export function MiniSparkline({
     </div>
   )
 }
+
+export const MiniSparkline = React.memo(MiniSparklineInner)

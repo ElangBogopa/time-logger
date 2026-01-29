@@ -154,6 +154,12 @@
   animation: confetti-fall 2.5s ease-in forwards;
 }
 
+/* Chart crossfade animation for period switching */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* Chart "today" pulsing dot indicator */
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -178,3 +184,8 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Utility for staggered chart entrance */
+.chart-stagger-1 { animation-delay: 0ms; }
+.chart-stagger-2 { animation-delay: 150ms; }
+.chart-stagger-3 { animation-delay: 300ms; }

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MiniSparkline } from '@/components/charts/MiniSparkline'
+import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
 import { METRIC_COLORS } from '@/lib/chart-colors'
 import type { MetricKey } from '@/lib/chart-colors'
 import type { TrendAPIResponse } from '@/lib/trend-types'
@@ -206,14 +207,16 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
               />
               {/* MiniSparkline inside the button for unified tap target (W2) */}
               <div className="w-full mt-0.5" style={{ maxWidth: size }}>
-                <MiniSparkline
-                  data={trendValues}
-                  color={METRIC_COLORS[key].hex}
-                  average={metricTrend.average}
-                  delta={metricTrend.vsLastWeek?.change ?? 0}
-                  gradientId={`sparkline-hero-${key}`}
-                  decorative={true}
-                />
+                <ChartErrorBoundary height={52}>
+                  <MiniSparkline
+                    data={trendValues}
+                    color={METRIC_COLORS[key].hex}
+                    average={metricTrend.average}
+                    delta={metricTrend.vsLastWeek?.change ?? 0}
+                    gradientId={`sparkline-hero-${key}`}
+                    decorative={true}
+                  />
+                </ChartErrorBoundary>
               </div>
             </button>
           )

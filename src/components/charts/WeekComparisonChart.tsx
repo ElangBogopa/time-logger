@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import {
   ComposedChart,
   Area,
@@ -69,7 +69,7 @@ function ComparisonTooltip({ active, payload, label }: ComparisonTooltipProps) {
 
 // ── Main Component ──
 
-export function WeekComparisonChart({
+function WeekComparisonChartInner({
   currentWeek,
   previousWeek,
   metricColor,
@@ -199,3 +199,5 @@ export function WeekComparisonChart({
     </div>
   )
 }
+
+export const WeekComparisonChart = React.memo(WeekComparisonChartInner)

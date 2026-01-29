@@ -40,6 +40,7 @@ import { csrfFetch } from '@/lib/api'
 import { WeeklyBarsChart, type WeeklyBarDataPoint } from '@/components/charts/WeeklyBarsChart'
 import { WeekComparisonChart, type WeekDataPoint } from '@/components/charts/WeekComparisonChart'
 import { MiniSparkline } from '@/components/charts/MiniSparkline'
+import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
 import { METRIC_COLORS } from '@/lib/chart-colors'
 import type { TrendAPIResponse } from '@/lib/trend-types'
 
@@ -587,12 +588,14 @@ export default function WeeklyReviewPage() {
                           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 mx-2">
                             Daily Focus Scores
                           </p>
-                          <WeeklyBarsChart
-                            data={barsData}
-                            average={trendData.focus.average}
-                            todayIndex={todayIdx >= 0 ? todayIdx : focusTrend.length - 1}
-                            height={160}
-                          />
+                          <ChartErrorBoundary fallbackValue={reviewData.weekScore} fallbackLabel="Week Score" height={160}>
+                            <WeeklyBarsChart
+                              data={barsData}
+                              average={trendData.focus.average}
+                              todayIndex={todayIdx >= 0 ? todayIdx : focusTrend.length - 1}
+                              height={160}
+                            />
+                          </ChartErrorBoundary>
                         </div>
                       )
                     })()}
@@ -616,14 +619,16 @@ export default function WeeklyReviewPage() {
                                 {md.current}
                               </p>
                               <div className="mt-1">
-                                <MiniSparkline
-                                  data={last7.map(d => d.value)}
-                                  color={METRIC_COLORS[metric].hex}
-                                  average={md.average}
-                                  delta={md.vsLastWeek?.change ?? 0}
-                                  gradientId={`weekly-sparkline-${metric}`}
-                                  height={28}
-                                />
+                                <ChartErrorBoundary fallbackValue={md.current} fallbackLabel={metric} height={28}>
+                                  <MiniSparkline
+                                    data={last7.map(d => d.value)}
+                                    color={METRIC_COLORS[metric].hex}
+                                    average={md.average}
+                                    delta={md.vsLastWeek?.change ?? 0}
+                                    gradientId={`weekly-sparkline-${metric}`}
+                                    height={28}
+                                  />
+                                </ChartErrorBoundary>
                               </div>
                             </div>
                           )
@@ -645,13 +650,15 @@ export default function WeeklyReviewPage() {
                         const prevWeek = trend.slice(0, 7)
                         const currWeek = trend.slice(7, 14)
                         return (
-                          <WeekComparisonChart
-                            currentWeek={currWeek.map((d, i) => ({ day: DAYS[i] || d.label, value: d.value }))}
-                            previousWeek={prevWeek.map((d, i) => ({ day: DAYS[i] || d.label, value: d.value }))}
-                            metricColor={METRIC_COLORS.focus.hex}
-                            metricName="Focus"
-                            height={140}
-                          />
+                          <ChartErrorBoundary fallbackLabel="Focus comparison" height={140}>
+                            <WeekComparisonChart
+                              currentWeek={currWeek.map((d, i) => ({ day: DAYS[i] || d.label, value: d.value }))}
+                              previousWeek={prevWeek.map((d, i) => ({ day: DAYS[i] || d.label, value: d.value }))}
+                              metricColor={METRIC_COLORS.focus.hex}
+                              metricName="Focus"
+                              height={140}
+                            />
+                          </ChartErrorBoundary>
                         )
                       })()}
                     </div>
