@@ -372,7 +372,7 @@ export default function MetricDetailSheet({
               </p>
               <div className="flex items-center justify-center mt-2">
                 <StatusDelta
-                  value={metricData.vsLastWeek.change}
+                  value={metricData.vsLastWeek?.change ?? null}
                   size="sm"
                   label="vs last week"
                 />

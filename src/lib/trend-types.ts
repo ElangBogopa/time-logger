@@ -24,7 +24,7 @@ export interface MetricTrendData {
   average: number
   trend: TrendDataPoint[]
   personalBest: PersonalBest | null
-  vsLastWeek: VsLastWeek
+  vsLastWeek: VsLastWeek | null
   // Details varies by metric — typed loosely here, cast at usage site
   details: Record<string, unknown>
 }

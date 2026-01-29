@@ -179,13 +179,15 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
         {metrics.map(({ key, label, size, strokeWidth }) => {
           const metricTrend = trendData[key]
           const trendValues = metricTrend.trend.map(t => t.value)
-          const ariaLabel = `${label} score: ${metricTrend.current} out of 100. 7-day average ${metricTrend.average}, trending ${
-            metricTrend.vsLastWeek.direction === 'up'
-              ? `up by ${metricTrend.vsLastWeek.change}`
-              : metricTrend.vsLastWeek.direction === 'down'
-                ? `down by ${Math.abs(metricTrend.vsLastWeek.change)}`
+          const vsLw = metricTrend.vsLastWeek
+          const trendDesc = vsLw == null
+            ? 'comparison unavailable'
+            : vsLw.direction === 'up'
+              ? `up by ${vsLw.change}`
+              : vsLw.direction === 'down'
+                ? `down by ${Math.abs(vsLw.change)}`
                 : 'same'
-          }. Tap to view details.`
+          const ariaLabel = `${label} score: ${metricTrend.current} out of 100. 7-day average ${metricTrend.average}, trending ${trendDesc}. Tap to view details.`
 
           return (
             <button
@@ -208,7 +210,7 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
                   data={trendValues}
                   color={METRIC_COLORS[key].hex}
                   average={metricTrend.average}
-                  delta={metricTrend.vsLastWeek.change}
+                  delta={metricTrend.vsLastWeek?.change ?? 0}
                   gradientId={`sparkline-hero-${key}`}
                   decorative={true}
                 />
