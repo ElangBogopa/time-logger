@@ -37,6 +37,11 @@ import {
 } from '@/components/ui/dialog'
 import ShareableStatsCard, { type ShareableStatsCardProps } from '@/components/ShareableStatsCard'
 import { csrfFetch } from '@/lib/api'
+import { WeeklyBarsChart, type WeeklyBarDataPoint } from '@/components/charts/WeeklyBarsChart'
+import { WeekComparisonChart, type WeekDataPoint } from '@/components/charts/WeekComparisonChart'
+import { MiniSparkline } from '@/components/charts/MiniSparkline'
+import { METRIC_COLORS } from '@/lib/chart-colors'
+import type { TrendAPIResponse } from '@/lib/trend-types'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
@@ -195,6 +200,7 @@ export default function WeeklyReviewPage() {
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [trendData, setTrendData] = useState<TrendAPIResponse | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -232,6 +238,23 @@ export default function WeeklyReviewPage() {
       fetchReview()
     }
   }, [status, fetchReview])
+
+  // Fetch trend data for metric charts (only for current week)
+  // Use 14d period to get both current and previous week for comparison
+  useEffect(() => {
+    if (status !== 'authenticated' || !isCurrentWeek(weekStart)) {
+      setTrendData(null)
+      return
+    }
+
+    const controller = new AbortController()
+    fetch('/api/metrics/trend?period=14d', { signal: controller.signal })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setTrendData(data) })
+      .catch(() => {/* ignore abort */})
+
+    return () => controller.abort()
+  }, [status, weekStart])
 
   const goToPreviousWeek = () => {
     const d = new Date(weekStart + 'T00:00:00')
@@ -500,7 +523,7 @@ export default function WeeklyReviewPage() {
                 </div>
               ) : (
                 <>
-                  {/* Hero Week Score */}
+                  {/* Hero Week Score + Weekly Bars Chart */}
                   <div className="rounded-xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-6 dark:border-zinc-700 dark:from-zinc-800 dark:to-zinc-800/50">
                     <div className="flex items-center justify-between mb-4">
                       <div>
@@ -547,7 +570,92 @@ export default function WeeklyReviewPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Weekly Bars Chart — hero visual showing daily scores */}
+                    {trendData && (() => {
+                      // Use last 7 entries (current week) from the trend data
+                      const focusTrend = trendData.focus.trend.slice(-7)
+                      const todayDate = new Date().toISOString().split('T')[0]
+                      const barsData: WeeklyBarDataPoint[] = focusTrend.map(d => ({
+                        day: d.label,
+                        value: d.value,
+                        date: d.date,
+                      }))
+                      const todayIdx = focusTrend.findIndex(d => d.date === todayDate)
+                      return (
+                        <div className="mt-4 -mx-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 mx-2">
+                            Daily Focus Scores
+                          </p>
+                          <WeeklyBarsChart
+                            data={barsData}
+                            average={trendData.focus.average}
+                            todayIndex={todayIdx >= 0 ? todayIdx : focusTrend.length - 1}
+                            height={160}
+                          />
+                        </div>
+                      )
+                    })()}
                   </div>
+
+                  {/* Metric Sparklines — Focus / Balance / Rhythm trends */}
+                  {trendData && (
+                    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
+                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                        Metric Trends
+                      </h2>
+                      <div className="grid grid-cols-3 gap-4">
+                        {(['focus', 'balance', 'rhythm'] as const).map(metric => {
+                          const md = trendData[metric]
+                          // Use last 7 data points for sparkline
+                          const last7 = md.trend.slice(-7)
+                          return (
+                            <div key={metric} className="text-center">
+                              <p className="text-xs font-medium text-foreground mb-1 capitalize">{metric}</p>
+                              <p className="text-2xl font-bold tabular-nums" style={{ color: METRIC_COLORS[metric].hex }}>
+                                {md.current}
+                              </p>
+                              <div className="mt-1">
+                                <MiniSparkline
+                                  data={last7.map(d => d.value)}
+                                  color={METRIC_COLORS[metric].hex}
+                                  average={md.average}
+                                  delta={md.vsLastWeek?.change ?? 0}
+                                  gradientId={`weekly-sparkline-${metric}`}
+                                  height={28}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Week Comparison Chart — This Week vs Last Week */}
+                  {trendData && trendData.focus.trend.length >= 14 && (
+                    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
+                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                        This Week vs Last Week
+                      </h2>
+                      {(() => {
+                        const trend = trendData.focus.trend
+                        const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                        // Last 7 = current week, first 7 = previous week
+                        const prevWeek = trend.slice(0, 7)
+                        const currWeek = trend.slice(7, 14)
+                        return (
+                          <WeekComparisonChart
+                            currentWeek={currWeek.map((d, i) => ({ day: DAYS[i] || d.label, value: d.value }))}
+                            previousWeek={prevWeek.map((d, i) => ({ day: DAYS[i] || d.label, value: d.value }))}
+                            metricColor={METRIC_COLORS.focus.hex}
+                            metricName="Focus"
+                            height={140}
+                          />
+                        )
+                      })()}
+                    </div>
+                  )}
 
                   {/* AI Coach Summary */}
                   {reviewData.coachSummary && (

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     // Parse period — default 7d
     const searchParams = request.nextUrl.searchParams
     const periodParam = searchParams.get('period') || '7d'
-    const days = periodParam === '30d' ? 30 : 7
+    const days = periodParam === '30d' ? 30 : periodParam === '14d' ? 14 : 7
 
     const today = getUserToday()
     // For rhythm, we need 7 days lookback for each day, so fetch extra
