@@ -1,50 +1,41 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { MiniSparkline } from '@/components/charts/MiniSparkline'
+import { METRIC_COLORS } from '@/lib/chart-colors'
+import type { MetricKey } from '@/lib/chart-colors'
+import type { TrendAPIResponse } from '@/lib/trend-types'
 
-/* ── Types ── */
-interface MetricData {
-  value: number
-  color: 'green' | 'yellow' | 'red'
-  label: string
-  details: Record<string, unknown>
-}
-
-interface MetricsResponse {
-  focus: MetricData
-  balance: MetricData
-  rhythm: MetricData
-  nudge: string
-}
+export type { TrendAPIResponse }
 
 /* ── Per-metric color identity ── */
 const METRIC_IDENTITY = {
   focus: {
-    active: '#3b82f6',   // blue — cognitive output
-    track: '#3b82f620',  // blue track (transparent)
+    active: '#3b82f6',
+    track: '#3b82f620',
     trackDim: '#3b82f610',
   },
   balance: {
-    active: '#f59e0b',   // amber — recovery
+    active: '#f59e0b',
     track: '#f59e0b20',
     trackDim: '#f59e0b10',
   },
   rhythm: {
-    active: '#22c55e',   // green — consistency
+    active: '#22c55e',
     track: '#22c55e20',
     trackDim: '#22c55e10',
   },
 }
 
-/* ── Status color for labels ── */
-const STATUS_COLORS = {
-  green: 'text-green-500',
-  yellow: 'text-amber-500',
-  red: 'text-destructive',
+/* ── Props ── */
+interface DashboardHeroProps {
+  onMetricTap?: (metric: MetricKey) => void
+  activeMetric?: MetricKey | null
+  onTrendDataLoaded?: (data: TrendAPIResponse) => void
 }
 
-/* ── Metric Circle — Whoop style with unique identity color ── */
+/* ── Metric Circle ── */
 function MetricCircle({
   value,
   label,
@@ -54,7 +45,7 @@ function MetricCircle({
 }: {
   value: number
   label: string
-  metricKey: 'focus' | 'balance' | 'rhythm'
+  metricKey: MetricKey
   size?: number
   strokeWidth?: number
 }) {
@@ -66,7 +57,6 @@ function MetricCircle({
   const center = size / 2
   const hasProgress = value > 0
 
-  // When 0%, show dimmer track and gray text. When > 0%, show identity color.
   const trackColor = hasProgress ? identity.track : identity.trackDim
   const activeColor = identity.active
   const textColor = hasProgress ? activeColor : 'var(--muted-foreground)'
@@ -79,8 +69,8 @@ function MetricCircle({
           height={size}
           className="transform -rotate-90"
           viewBox={`0 0 ${size} ${size}`}
+          aria-hidden="true"
         >
-          {/* Background track — visible, tinted per metric */}
           <circle
             cx={center}
             cy={center}
@@ -89,7 +79,6 @@ function MetricCircle({
             stroke={trackColor}
             strokeWidth={strokeWidth}
           />
-          {/* Progress arc */}
           {hasProgress && (
             <circle
               cx={center}
@@ -106,18 +95,22 @@ function MetricCircle({
             />
           )}
         </svg>
-        {/* Center value */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span
             className="text-[22px] font-bold tabular-nums"
             style={{ color: textColor }}
+            aria-hidden="true"
           >
             {value}
           </span>
         </div>
       </div>
-      {/* Label below */}
-      <span className={`text-[11px] font-semibold uppercase tracking-wider mt-2 ${hasProgress ? 'text-foreground' : 'text-muted-foreground'}`}>
+      <span
+        className={`text-[11px] font-semibold uppercase tracking-wider mt-1 ${
+          hasProgress ? 'text-foreground' : 'text-muted-foreground'
+        }`}
+        aria-hidden="true"
+      >
         {label} ›
       </span>
     </div>
@@ -125,31 +118,31 @@ function MetricCircle({
 }
 
 /* ── Main Component ── */
-export default function DashboardHero() {
-  const [metrics, setMetrics] = useState<MetricsResponse | null>(null)
+export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLoaded }: DashboardHeroProps) {
+  const [trendData, setTrendData] = useState<TrendAPIResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  const fetchTrendData = useCallback(async (signal: AbortSignal) => {
+    try {
+      const res = await fetch('/api/metrics/trend?period=7d', { signal })
+      if (res.ok) {
+        const data: TrendAPIResponse = await res.json()
+        setTrendData(data)
+        onTrendDataLoaded?.(data)
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      console.error('Failed to fetch trend data:', err)
+    } finally {
+      if (!signal.aborted) setIsLoading(false)
+    }
+  }, [onTrendDataLoaded])
 
   useEffect(() => {
     const controller = new AbortController()
-
-    async function fetchMetrics() {
-      try {
-        const res = await fetch('/api/metrics', { signal: controller.signal })
-        if (res.ok) {
-          const data = await res.json()
-          setMetrics(data)
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return
-        console.error('Failed to fetch metrics:', err)
-      } finally {
-        if (!controller.signal.aborted) setIsLoading(false)
-      }
-    }
-
-    fetchMetrics()
+    fetchTrendData(controller.signal)
     return () => controller.abort()
-  }, [])
+  }, [fetchTrendData])
 
   if (isLoading) {
     return (
@@ -157,7 +150,7 @@ export default function DashboardHero() {
         <div className="flex justify-center gap-6">
           {[0, 1, 2].map(i => (
             <div key={i} className="flex flex-col items-center gap-2">
-              <Skeleton className="h-24 w-24 rounded-full" />
+              <Skeleton className={`rounded-full ${i === 1 ? 'h-[100px] w-[100px]' : 'h-[90px] w-[90px]'}`} />
               <Skeleton className="h-3 w-14" />
             </div>
           ))}
@@ -166,36 +159,70 @@ export default function DashboardHero() {
     )
   }
 
-  if (!metrics) return null
+  if (!trendData) return null
+
+  const metrics: Array<{
+    key: MetricKey
+    label: string
+    size: number
+    strokeWidth: number
+  }> = [
+    { key: 'focus', label: 'Focus', size: 96, strokeWidth: 7 },
+    { key: 'balance', label: 'Balance', size: 104, strokeWidth: 8 },
+    { key: 'rhythm', label: 'Rhythm', size: 96, strokeWidth: 7 },
+  ]
 
   return (
     <div className="mb-4">
-      {/* Three Metric Circles — each with unique identity color */}
+      {/* Three Metric Circles — each is a tappable button with sparkline inside */}
       <div className="flex justify-center items-start gap-4 mb-3">
-        <MetricCircle
-          value={metrics.focus.value}
-          label="Focus"
-          metricKey="focus"
-        />
-        <MetricCircle
-          value={metrics.balance.value}
-          label="Balance"
-          metricKey="balance"
-          size={104}
-          strokeWidth={8}
-        />
-        <MetricCircle
-          value={metrics.rhythm.value}
-          label="Rhythm"
-          metricKey="rhythm"
-        />
+        {metrics.map(({ key, label, size, strokeWidth }) => {
+          const metricTrend = trendData[key]
+          const trendValues = metricTrend.trend.map(t => t.value)
+          const ariaLabel = `${label} score: ${metricTrend.current} out of 100. 7-day average ${metricTrend.average}, trending ${
+            metricTrend.vsLastWeek.direction === 'up'
+              ? `up by ${metricTrend.vsLastWeek.change}`
+              : metricTrend.vsLastWeek.direction === 'down'
+                ? `down by ${Math.abs(metricTrend.vsLastWeek.change)}`
+                : 'same'
+          }. Tap to view details.`
+
+          return (
+            <button
+              key={key}
+              onClick={() => onMetricTap?.(key)}
+              aria-expanded={activeMetric === key}
+              aria-label={ariaLabel}
+              className="appearance-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95 transition-transform rounded-full flex flex-col items-center"
+            >
+              <MetricCircle
+                value={metricTrend.current}
+                label={label}
+                metricKey={key}
+                size={size}
+                strokeWidth={strokeWidth}
+              />
+              {/* MiniSparkline inside the button for unified tap target (W2) */}
+              <div className="w-full mt-0.5" style={{ maxWidth: size }}>
+                <MiniSparkline
+                  data={trendValues}
+                  color={METRIC_COLORS[key].hex}
+                  average={metricTrend.average}
+                  delta={metricTrend.vsLastWeek.change}
+                  gradientId={`sparkline-hero-${key}`}
+                  decorative={true}
+                />
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Insight card — Whoop style */}
-      {metrics.nudge && (
-        <div className="mx-2 rounded-xl bg-card border border-border px-4 py-3">
+      {trendData.nudge && (
+        <div className="mx-2 rounded-xl bg-card border border-border px-4 py-3" aria-live="polite">
           <p className="text-[13px] text-secondary-foreground leading-relaxed">
-            {metrics.nudge}
+            {trendData.nudge}
           </p>
         </div>
       )}

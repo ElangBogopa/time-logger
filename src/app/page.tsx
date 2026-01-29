@@ -1,6 +1,7 @@
 'use client'
 
-import { Suspense, useMemo } from 'react'
+import { Suspense, useMemo, useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { getUserToday, TimePeriod } from '@/lib/types'
@@ -9,6 +10,8 @@ import { useSessionData } from '@/hooks/useSessionData'
 import { useGreeting } from '@/hooks/useGreeting'
 import { useDashboardState } from '@/hooks/useDashboardState'
 import DashboardHero from '@/components/DashboardHero'
+import type { TrendAPIResponse } from '@/lib/trend-types'
+import StatsCard from '@/components/StatsCard'
 import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import MoodCheckIn from '@/components/MoodCheckIn'
@@ -19,6 +22,13 @@ import GreetingHeader from '@/components/dashboard/GreetingHeader'
 import MotivationalQuote from '@/components/dashboard/MotivationalQuote'
 import { Sun, Cloud, Moon, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import type { MetricKey } from '@/lib/chart-colors'
+
+// Dynamic import MetricDetailSheet to keep Recharts out of initial bundle
+const MetricDetailSheet = dynamic(
+  () => import('@/components/MetricDetailSheet'),
+  { ssr: false, loading: () => null }
+)
 
 function HomeContent() {
   const { data: session, status } = useSession()
@@ -31,6 +41,22 @@ function HomeContent() {
   const { showOnboarding, setShowOnboarding, currentHour } = useDashboardState({ session, status })
   const { greeting, quotes, currentPeriod } = useGreeting(session?.user?.preferredName, currentHour)
   const { entries, completions, isLoading } = useSessionData({ userId, today, currentHour })
+
+  // Sprint 2: Metric detail sheet state
+  const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null)
+  const [trendData, setTrendData] = useState<TrendAPIResponse | null>(null)
+
+  const handleMetricTap = useCallback((metric: MetricKey) => {
+    setActiveMetric(metric)
+  }, [])
+
+  const handleSheetClose = useCallback(() => {
+    setActiveMetric(null)
+  }, [])
+
+  const handleTrendDataLoaded = useCallback((data: TrendAPIResponse) => {
+    setTrendData(data)
+  }, [])
 
   // Build session infos (use 12 as fallback for server render)
   const sessionInfos = useMemo(() => {
@@ -114,20 +140,31 @@ function HomeContent() {
     <ErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
         <div className="mx-auto max-w-2xl px-4 py-4">
-          {/* Header - compact greeting */}
+          {/* 1. Header - compact greeting */}
           <GreetingHeader greeting={greeting} currentPeriod={currentPeriod} />
 
-          {/* === HERO SECTION: Compact metric circles === */}
-          <DashboardHero />
+          {/* 2. HERO SECTION: Tappable metric circles + sparklines */}
+          <DashboardHero
+            onMetricTap={handleMetricTap}
+            activeMetric={activeMetric}
+            onTrendDataLoaded={handleTrendDataLoaded}
+          />
 
-          {/* ═══ MY DAY SECTION — Whoop style ═══ */}
+          {/* 3. StatsCard — streaks, personal bests, consistency dots */}
+          {userId && (
+            <div className="mb-3">
+              <StatsCard userId={userId} />
+            </div>
+          )}
+
+          {/* ═══ MY DAY SECTION ═══ */}
           <div className="mt-2">
             {/* Section header */}
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold text-foreground">My Day</h2>
             </div>
 
-            {/* Day in Review banner — shows after 9pm */}
+            {/* Day in Review banner */}
             <DayInReview className="mb-3" />
 
             {/* MOOD CHECKER */}
@@ -194,13 +231,21 @@ function HomeContent() {
               <FocusSession />
             </div>
 
-            {/* Motivational quote */}
-            <MotivationalQuote quote={quotes[currentPeriod]} currentPeriod={currentPeriod} />
-
             {/* Insights teaser */}
-            <InsightsTeaser className="mt-3" />
+            <InsightsTeaser className="mb-3" />
+
+            {/* Motivational quote — moved to bottom per spec */}
+            <MotivationalQuote quote={quotes[currentPeriod]} currentPeriod={currentPeriod} />
           </div>
         </div>
+
+        {/* MetricDetailSheet — rendered at page level */}
+        <MetricDetailSheet
+          metric={activeMetric ?? 'focus'}
+          isOpen={activeMetric !== null}
+          onClose={handleSheetClose}
+          initialData={trendData}
+        />
 
         <OnboardingModal
           isOpen={showOnboarding}
