@@ -24,6 +24,7 @@ import { timeToMinutes } from '@/lib/time-utils'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
+import ActivityList from '@/components/ActivityList'
 import GhostEntryModal from '@/components/GhostEntryModal'
 import QuickLogModal from '@/components/QuickLogModal'
 import { Button } from '@/components/ui/button'
@@ -410,29 +411,31 @@ export default function LogPeriodPage() {
                 </p>
               </div>
             </div>
-            {/* Sync Calendar Button */}
-            <button
-              onClick={handleSyncCalendar}
-              disabled={isSyncing || syncDone}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-2 transition-all duration-300 ${
-                syncDone
-                  ? 'bg-green-500/15 border border-green-500/30'
-                  : 'bg-secondary hover:bg-accent disabled:opacity-50'
-              }`}
-              aria-label="Sync calendar"
-            >
-              {syncDone ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                  <span className="text-xs font-medium text-green-500">Synced!</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span className="text-xs font-medium text-muted-foreground">{isSyncing ? 'Syncing...' : 'Sync Calendar'}</span>
-                </>
-              )}
-            </button>
+            {/* Sync Calendar Button — only for editable days */}
+            {!isLocked && (
+              <button
+                onClick={handleSyncCalendar}
+                disabled={isSyncing || syncDone}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-2 transition-all duration-300 ${
+                  syncDone
+                    ? 'bg-green-500/15 border border-green-500/30'
+                    : 'bg-secondary hover:bg-accent disabled:opacity-50'
+                }`}
+                aria-label="Sync calendar"
+              >
+                {syncDone ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <span className="text-xs font-medium text-green-500">Synced!</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span className="text-xs font-medium text-muted-foreground">{isSyncing ? 'Syncing...' : 'Sync Calendar'}</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           {/* Session stats */}
@@ -448,28 +451,32 @@ export default function LogPeriodPage() {
           )}
         </header>
 
-        {/* Timeline View */}
+        {/* Session content — Whoop-style cards for locked days, timeline for editable */}
         <section className="mb-6">
-          <TimelineView
-            entries={visibleEntries}
-            calendarEvents={calendarEvents}
-            isLoading={isLoading}
-            onEntryDeleted={fetchEntries}
-            onGhostEntryClick={handleTimelineGhostClick}
-            onDragCreate={handleDragCreate}
-            onShowToast={setToast}
-            selectedDate={selectedDate}
-            isToday={selectedDate === getUserToday()}
-            isFutureDay={false}
-            isPastDay={selectedDate !== "" && selectedDate !== getUserToday()}
-            canLog={!isLocked}
-            visibleStartHour={range.start}
-            visibleEndHour={range.end}
-          />
-          {!isLocked && (
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Drag to create entries, tap calendar events to confirm
-            </p>
+          {isLocked ? (
+            <ActivityList entries={periodEntries} />
+          ) : (
+            <>
+              <TimelineView
+                entries={visibleEntries}
+                calendarEvents={calendarEvents}
+                isLoading={isLoading}
+                onEntryDeleted={fetchEntries}
+                onGhostEntryClick={handleTimelineGhostClick}
+                onDragCreate={handleDragCreate}
+                onShowToast={setToast}
+                selectedDate={selectedDate}
+                isToday={selectedDate === getUserToday()}
+                isFutureDay={false}
+                isPastDay={selectedDate !== "" && selectedDate !== getUserToday()}
+                canLog={!isLocked}
+                visibleStartHour={range.start}
+                visibleEndHour={range.end}
+              />
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Drag to create entries, tap calendar events to confirm
+              </p>
+            </>
           )}
         </section>
 
