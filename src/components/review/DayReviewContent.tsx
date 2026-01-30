@@ -30,7 +30,7 @@ import {
 } from '@/lib/types'
 
 interface Win { icon: string; label: string }
-interface TargetProgress { targetId: string; label: string; emoji: string; currentMinutes: number; targetMinutes: number; percentComplete: number }
+interface TargetProgress { targetId: string; label: string; emoji: string; currentMinutes: number; targetMinutes: number; percentComplete: number; todayMinutes?: number; dailyTarget?: number; progress?: number }
 interface CategoryBreakdown { category: TimeCategory; label: string; totalMinutes: number; percentage: number }
 interface AggregatedBreakdown { category: AggregatedCategory; label: string; totalMinutes: number; percentage: number }
 interface TimelineSlot { hour: number; period: 'morning' | 'afternoon' | 'evening'; hasEntry: boolean; category?: TimeCategory; minutes?: number }
@@ -96,15 +96,18 @@ function WinsSection({ wins }: { wins: Win[] }) {
 }
 
 function TargetCard({ target }: { target: TargetProgress }) {
-  const pct = Math.min(target.percentComplete, 100)
+  // Handle both field naming conventions from different API responses
+  const current = target.currentMinutes ?? target.todayMinutes ?? 0
+  const total = target.targetMinutes ?? target.dailyTarget ?? 0
+  const pct = Math.min(target.percentComplete ?? target.progress ?? (total > 0 ? (current / total) * 100 : 0), 100)
   return (
     <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span>{target.emoji}</span>
+          {target.emoji && <span>{target.emoji}</span>}
           <span className="text-sm font-medium">{target.label}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{formatMinutes(target.currentMinutes)} / {formatMinutes(target.targetMinutes)}</span>
+        <span className="text-xs text-muted-foreground">{formatMinutes(current)} / {formatMinutes(total)}</span>
       </div>
       <div className="h-2 rounded-full bg-secondary overflow-hidden">
         <div className={cn('h-full rounded-full transition-all', pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-blue-500' : 'bg-zinc-400')}
@@ -180,6 +183,13 @@ export default function DayReviewContent() {
   const [error, setError] = useState<string | null>(null)
   const [commentary, setCommentary] = useState<string | null>(null)
   const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
+  const [currentHour, setCurrentHour] = useState<number | null>(null)
+
+  useEffect(() => {
+    setCurrentHour(new Date().getHours())
+  }, [])
+
+  const isLocked = currentHour !== null && currentHour < 21
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -221,12 +231,32 @@ export default function DayReviewContent() {
   }, [])
 
   useEffect(() => {
-    if (status === 'authenticated') fetchSummary()
-  }, [status, fetchSummary])
+    if (status === 'authenticated' && !isLocked) fetchSummary()
+  }, [status, fetchSummary, isLocked])
 
   useEffect(() => {
     if (summary && !commentary && !isLoadingCommentary) fetchCommentary(summary)
   }, [summary, commentary, isLoadingCommentary, fetchCommentary])
+
+  // Locked before 9pm
+  if (isLocked) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary mb-5">
+          <Clock className="h-7 w-7 text-muted-foreground/50" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-2">Not available yet</h2>
+        <p className="text-sm text-muted-foreground text-center max-w-xs mb-1">
+          Your daily review unlocks at 9:00 PM once your day is wrapping up.
+        </p>
+        {currentHour !== null && (
+          <p className="text-xs text-muted-foreground/50">
+            {21 - currentHour} hour{21 - currentHour !== 1 ? 's' : ''} to go
+          </p>
+        )}
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
