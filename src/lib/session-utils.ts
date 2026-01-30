@@ -180,6 +180,8 @@ export function buildSessionInfos(
       entryCount: stats.entryCount,
       totalMinutes: stats.totalMinutes,
       completedAt: completion?.completed_at,
+      hasCompletion: !!completion && !completion.skipped,
+      hasEntries: stats.entryCount > 0,
     }
   })
 }

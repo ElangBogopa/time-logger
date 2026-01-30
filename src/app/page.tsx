@@ -14,7 +14,7 @@ import type { TrendAPIResponse } from '@/lib/trend-types'
 import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
-import { Sun, Cloud, Moon, CheckCircle2, ChevronRight, ClipboardList } from 'lucide-react'
+import { Sun, Cloud, Moon, ChevronRight, ClipboardList } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
 
@@ -202,26 +202,54 @@ function HomeContent() {
               <div className="space-y-2">
                 {sessionInfos.map(info => {
                   const isActive = isToday && info.period === currentPeriod
-                  const isLogged = info.state === 'logged'
                   const Icon = info.period === 'morning' ? Sun : info.period === 'afternoon' ? Cloud : Moon
                   const periodLabel = info.period === 'morning' ? 'Morning' : info.period === 'afternoon' ? 'Afternoon' : 'Evening'
+
+                  // Three visual states:
+                  // 1. Green: user pressed "Done" (hasCompletion)
+                  // 2. Orange: entries exist but no "Done" (hasEntries && !hasCompletion)
+                  // 3. Neutral: nothing logged
+                  const isDone = info.hasCompletion
+                  const hasEntries = info.hasEntries
+                  const isPartial = hasEntries && !isDone
+
+                  // Background styles
+                  const bgClass = isDone
+                    ? 'bg-green-500/10 border border-green-500/20'
+                    : isPartial
+                      ? 'bg-amber-500/10 border border-amber-500/20'
+                      : isActive
+                        ? 'bg-accent border border-primary/20'
+                        : 'bg-secondary/50 border border-transparent hover:bg-accent/50'
+
+                  // Icon container styles
+                  const iconBgClass = isDone
+                    ? 'bg-green-500/15'
+                    : isPartial
+                      ? 'bg-amber-500/15'
+                      : isActive ? 'bg-blue-500/15' : 'bg-secondary'
+
+                  const iconColorClass = isDone
+                    ? 'text-green-500'
+                    : isPartial
+                      ? 'text-amber-500'
+                      : isActive ? 'text-blue-500' : 'text-muted-foreground'
+
+                  // Subtitle text
+                  const subtitle = (isDone || hasEntries)
+                    ? `${info.entryCount} entries · ${Math.round(info.totalMinutes)}m logged`
+                    : isToday
+                      ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
+                      : 'Not logged'
 
                   return (
                     <button
                       key={info.period}
-                      onClick={() => isLogged ? handleViewClick(info.period) : handleLogClick(info.period)}
-                      className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 transition-all ${
-                        isActive
-                          ? 'bg-accent border border-primary/20'
-                          : 'bg-secondary/50 border border-transparent hover:bg-accent/50'
-                      }`}
+                      onClick={() => (isDone || hasEntries) ? handleViewClick(info.period) : handleLogClick(info.period)}
+                      className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 transition-all ${bgClass}`}
                     >
-                      <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                        isLogged ? 'bg-primary/15' : isActive ? 'bg-blue-500/15' : 'bg-secondary'
-                      }`}>
-                        <Icon className={`h-4 w-4 ${
-                          isLogged ? 'text-primary' : isActive ? 'text-blue-500' : 'text-muted-foreground'
-                        }`} />
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-full ${iconBgClass}`}>
+                        <Icon className={`h-4 w-4 ${iconColorClass}`} />
                       </div>
                       <div className="flex-1 text-left">
                         <p className={`text-sm font-medium ${
@@ -230,19 +258,9 @@ function HomeContent() {
                           {periodLabel}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          {isLogged
-                            ? `${info.entryCount} entries · ${Math.round(info.totalMinutes)}m logged`
-                            : isToday
-                              ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
-                              : 'Not logged'
-                          }
+                          {subtitle}
                         </p>
                       </div>
-                      {isLogged && (
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary">
-                          <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
-                        </div>
-                      )}
                       <ChevronRight className={`h-4 w-4 ${isActive ? 'text-muted-foreground' : 'text-muted-foreground/50'}`} />
                     </button>
                   )

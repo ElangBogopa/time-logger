@@ -121,6 +121,8 @@ export interface SessionInfo {
   entryCount: number
   totalMinutes: number
   completedAt?: string
+  hasCompletion: boolean // user pressed "Done"
+  hasEntries: boolean    // entries exist in this period
 }
 
 // Mood/energy levels for session check-in
