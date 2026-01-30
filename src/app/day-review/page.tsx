@@ -475,23 +475,8 @@ function DayReviewContent() {
   const [commentary, setCommentary] = useState<string | null>(null)
   const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      const url = dateParam ? `/api/day-summary?date=${dateParam}` : '/api/day-summary'
-      const response = await fetch(url)
-      if (!response.ok) throw new Error('Failed to fetch')
-      const data = await response.json()
-      setSummary(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [dateParam])
-
-  // Fetch AI commentary when summary is loaded
-  const fetchCommentary = useCallback(async (summaryData: DaySummary) => {
-    setIsLoadingCommentary(true)
+  // Generate AI commentary from summary data
+  const generateCommentary = useCallback(async (summaryData: DaySummary): Promise<string | null> => {
     try {
       const response = await csrfFetch('/api/day-commentary', {
         method: 'POST',
@@ -507,29 +492,92 @@ function DayReviewContent() {
       })
       if (response.ok) {
         const data = await response.json()
-        setCommentary(data.commentary)
+        return data.commentary || null
       }
     } catch (err) {
       console.error('Failed to fetch commentary:', err)
-    } finally {
-      setIsLoadingCommentary(false)
+    }
+    return null
+  }, [])
+
+  // Save a finalized review to the database
+  const saveReview = useCallback(async (summaryData: DaySummary, commentaryText: string | null) => {
+    try {
+      await fetch('/api/day-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: summaryData.date,
+          score: summaryData.score,
+          scoreColor: summaryData.scoreColor,
+          sessionsLogged: summaryData.sessionsLogged,
+          totalSessions: summaryData.totalSessions,
+          totalMinutesLogged: summaryData.totalMinutesLogged,
+          commentary: commentaryText,
+          wins: summaryData.wins,
+          targetProgress: summaryData.targetProgress,
+          categoryBreakdown: summaryData.categoryBreakdown,
+          aggregatedBreakdown: summaryData.aggregatedBreakdown,
+          timeline: summaryData.timeline,
+          longestFocusSession: summaryData.longestFocusSession,
+          mood: summaryData.todayMood,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to save day review:', err)
     }
   }, [])
 
+  // Main fetch logic — checks persistence layer first
+  const fetchData = useCallback(async () => {
+    try {
+      // Step 1: Check persistence status
+      const reviewUrl = dateParam ? `/api/day-review?date=${dateParam}` : '/api/day-review'
+      const reviewRes = await fetch(reviewUrl)
+      if (!reviewRes.ok) throw new Error('Failed to fetch review status')
+      const reviewData = await reviewRes.json()
+
+      if (reviewData.source === 'saved') {
+        // Locked & finalized — use saved data directly
+        const saved = reviewData.review
+        setSummary(saved)
+        setCommentary(saved.commentary || null)
+        setIsLoading(false)
+        return
+      }
+
+      // Either 'live' (editable) or 'needs_finalization' (locked but not saved yet)
+      // In both cases, fetch fresh summary
+      const summaryUrl = dateParam ? `/api/day-summary?date=${dateParam}` : '/api/day-summary'
+      const summaryRes = await fetch(summaryUrl)
+      if (!summaryRes.ok) throw new Error('Failed to fetch summary')
+      const summaryData: DaySummary = await summaryRes.json()
+      setSummary(summaryData)
+      setIsLoading(false)
+
+      // Fetch AI commentary
+      setIsLoadingCommentary(true)
+      const commentaryText = await generateCommentary(summaryData)
+      setCommentary(commentaryText)
+      setIsLoadingCommentary(false)
+
+      // If needs finalization (locked date, first view), save to DB
+      if (reviewData.source === 'needs_finalization') {
+        await saveReview(summaryData, commentaryText)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load')
+      setIsLoading(false)
+    }
+  }, [dateParam, generateCommentary, saveReview])
+
   useEffect(() => {
     if (status === 'authenticated') {
-      fetchSummary()
+      fetchData()
     } else if (status === 'unauthenticated') {
       router.push('/login')
     }
-  }, [status, fetchSummary, router])
-
-  // Fetch commentary after summary loads
-  useEffect(() => {
-    if (summary && !commentary && !isLoadingCommentary) {
-      fetchCommentary(summary)
-    }
-  }, [summary, commentary, isLoadingCommentary, fetchCommentary])
+  }, [status, fetchData, router])
 
   if (status === 'loading' || isLoading) {
     return (

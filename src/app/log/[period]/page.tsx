@@ -97,6 +97,17 @@ export default function LogPeriodPage() {
     }
   }, [selectedDate, isYesterday, dateParam])
 
+  // Edit window: only today and yesterday are editable
+  const isLocked = (() => {
+    if (!selectedDate) return false
+    const today = getUserToday()
+    const [y, m, d] = today.split('-').map(Number)
+    const yesterdayDate = new Date(y, m - 1, d)
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterday = yesterdayDate.toISOString().split('T')[0]
+    return selectedDate !== today && selectedDate !== yesterday
+  })()
+
   // State
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -401,45 +412,57 @@ export default function LogPeriodPage() {
             isToday={selectedDate === getUserToday()}
             isFutureDay={false}
             isPastDay={selectedDate !== "" && selectedDate !== getUserToday()}
-            canLog={true}
+            canLog={!isLocked}
             visibleStartHour={range.start}
             visibleEndHour={range.end}
           />
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            Drag to create entries, tap calendar events to confirm
-          </p>
+          {!isLocked && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Drag to create entries, tap calendar events to confirm
+            </p>
+          )}
         </section>
 
-        {/* Action buttons */}
-        <div className="space-y-3">
-          <Button
-            onClick={handleDone}
-            className={`w-full bg-gradient-to-r ${colors.gradient} text-white`}
-            size="lg"
-          >
-            <CheckCircle2 className="h-5 w-5" />
-            Done with {label}
-          </Button>
-
-          {periodEntries.length === 0 && (
-            <button
-              onClick={handleSkip}
-              className="w-full text-center text-sm text-muted-foreground hover:text-foreground py-2"
+        {/* Action buttons — hidden for locked dates */}
+        {!isLocked && (
+          <div className="space-y-3">
+            <Button
+              onClick={handleDone}
+              className={`w-full bg-gradient-to-r ${colors.gradient} text-white`}
+              size="lg"
             >
-              Nothing to log for this session
-            </button>
-          )}
-        </div>
+              <CheckCircle2 className="h-5 w-5" />
+              Done with {label}
+            </Button>
+
+            {periodEntries.length === 0 && (
+              <button
+                onClick={handleSkip}
+                className="w-full text-center text-sm text-muted-foreground hover:text-foreground py-2"
+              >
+                Nothing to log for this session
+              </button>
+            )}
+          </div>
+        )}
+
+        {isLocked && (
+          <div className="rounded-lg bg-secondary/50 border border-border px-4 py-3 text-center">
+            <p className="text-sm text-muted-foreground">This day is locked — entries can no longer be edited</p>
+          </div>
+        )}
       </div>
 
-      {/* Floating Action Button */}
-      <button
-        onClick={() => setIsQuickLogOpen(true)}
-        className={`fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r ${colors.gradient} shadow-lg active:scale-95 transition-transform`}
-        aria-label="Add activity"
-      >
-        <Plus className="h-6 w-6 text-white" />
-      </button>
+      {/* Floating Action Button — hidden for locked dates */}
+      {!isLocked && (
+        <button
+          onClick={() => setIsQuickLogOpen(true)}
+          className={`fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r ${colors.gradient} shadow-lg active:scale-95 transition-transform`}
+          aria-label="Add activity"
+        >
+          <Plus className="h-6 w-6 text-white" />
+        </button>
+      )}
 
       {/* Period Summary Popup */}
       <PeriodSummaryPopup
