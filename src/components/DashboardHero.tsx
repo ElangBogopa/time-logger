@@ -116,35 +116,51 @@ function MetricCircle({
   )
 }
 
+/* ── Client-side cache for trend data per date ── */
+const trendCache = new Map<string, TrendAPIResponse>()
+
 /* ── Main Component ── */
 export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLoaded, date }: DashboardHeroProps) {
-  const [trendData, setTrendData] = useState<TrendAPIResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  const fetchTrendData = useCallback(async (signal: AbortSignal) => {
-    try {
-      setIsLoading(true)
-      const params = new URLSearchParams({ period: '7d' })
-      if (date) params.set('date', date)
-      const res = await fetch(`/api/metrics/trend?${params}`, { signal })
-      if (res.ok) {
-        const data: TrendAPIResponse = await res.json()
-        setTrendData(data)
-        onTrendDataLoaded?.(data)
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return
-      console.error('Failed to fetch trend data:', err)
-    } finally {
-      if (!signal.aborted) setIsLoading(false)
-    }
-  }, [onTrendDataLoaded, date])
+  const cacheKey = date || '__today__'
+  const cached = trendCache.get(cacheKey)
+  const [trendData, setTrendData] = useState<TrendAPIResponse | null>(cached || null)
+  const [isLoading, setIsLoading] = useState(!cached)
 
   useEffect(() => {
+    // If we have cached data for this date, use it immediately
+    const cachedData = trendCache.get(cacheKey)
+    if (cachedData) {
+      setTrendData(cachedData)
+      setIsLoading(false)
+      onTrendDataLoaded?.(cachedData)
+    }
+
     const controller = new AbortController()
-    fetchTrendData(controller.signal)
+    const fetchTrendData = async () => {
+      try {
+        // Only show loading skeleton if we have NO data at all for this date
+        if (!cachedData) setIsLoading(true)
+        const params = new URLSearchParams({ period: '7d' })
+        if (date) params.set('date', date)
+        const res = await fetch(`/api/metrics/trend?${params}`, { signal: controller.signal })
+        if (res.ok) {
+          const data: TrendAPIResponse = await res.json()
+          trendCache.set(cacheKey, data)
+          if (!controller.signal.aborted) {
+            setTrendData(data)
+            onTrendDataLoaded?.(data)
+          }
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        console.error('Failed to fetch trend data:', err)
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false)
+      }
+    }
+    fetchTrendData()
     return () => controller.abort()
-  }, [fetchTrendData])
+  }, [cacheKey, date, onTrendDataLoaded])
 
   if (isLoading) {
     return (
