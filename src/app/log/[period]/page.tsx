@@ -400,10 +400,11 @@ export default function LogPeriodPage() {
             <button
               onClick={handleSyncCalendar}
               disabled={isSyncing}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary hover:bg-accent transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full bg-secondary hover:bg-accent px-3 py-2 transition-colors disabled:opacity-50"
               aria-label="Sync calendar"
             >
-              <RefreshCw className={`h-4 w-4 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="text-xs font-medium text-muted-foreground">{isSyncing ? 'Syncing...' : 'Sync Calendar'}</span>
             </button>
           </div>
 

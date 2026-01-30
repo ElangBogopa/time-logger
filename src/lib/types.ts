@@ -1049,7 +1049,7 @@ export const LOGGING_DISABLED_MESSAGE = "You can only log activities from the pa
 /**
  * Returns a message for the viewing-only state.
  */
-export const VIEWING_PAST_MESSAGE = "You're viewing past entries. Logging is only available for the last 2 days."
+export const VIEWING_PAST_MESSAGE = "You're viewing past entries. Logging is only available for today and yesterday."
 
 /**
  * Checks if a pending entry's end time has passed and is ready to confirm.
