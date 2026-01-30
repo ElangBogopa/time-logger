@@ -35,6 +35,7 @@ import {
   Loader2,
   Plus,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react'
 import { toast as sonnerToast } from 'sonner'
 
@@ -126,7 +127,19 @@ export default function LogPeriodPage() {
   const deleteTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   // Calendar context for ghost events
-  const { getEventsForDate } = useCalendar()
+  const { getEventsForDate, refreshCalendar, isLoading: isCalendarLoading } = useCalendar()
+  const [isSyncing, setIsSyncing] = useState(false)
+
+  const handleSyncCalendar = async () => {
+    setIsSyncing(true)
+    try {
+      await refreshCalendar()
+    } catch (err) {
+      console.error('Failed to sync calendar:', err)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   const userId = session?.user?.id || session?.user?.email || ''
 

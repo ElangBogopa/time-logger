@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Calendar, BarChart3, Settings } from 'lucide-react'
+import { Home, Calendar, BarChart3, Menu } from 'lucide-react'
 
 interface TabItem {
   label: string
@@ -32,10 +32,10 @@ const tabs: TabItem[] = [
     matchPaths: ['/review', '/insights', '/weekly-review', '/day-review'],
   },
   {
-    label: 'Settings',
-    icon: Settings,
+    label: 'More',
+    icon: Menu,
     path: '/settings',
-    matchPaths: ['/settings', '/settings/connections', '/intentions'],
+    matchPaths: ['/settings', '/settings/connections', '/settings/notifications', '/intentions'],
   },
 ]
 
