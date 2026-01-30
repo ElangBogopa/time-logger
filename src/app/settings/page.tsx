@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Bell,
+  BookOpen,
   Calendar,
   ChevronRight,
   Target,
@@ -291,13 +292,21 @@ export default function MorePage() {
           />
         </div>
 
-        {/* Support */}
-        <SectionLabel>Support</SectionLabel>
+        {/* About */}
+        <SectionLabel>About</SectionLabel>
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
-            icon={MessageSquare}
+            icon={BookOpen}
             iconBg="bg-amber-500/10"
             iconColor="text-amber-500"
+            label="The Science"
+            description="Research and books behind Better"
+            onClick={() => router.push('/library')}
+          />
+          <RowItem
+            icon={MessageSquare}
+            iconBg="bg-pink-500/10"
+            iconColor="text-pink-500"
             label="Send Feedback"
             description="Rate the app and share your thoughts"
             onClick={() => setShowFeedback(true)}
