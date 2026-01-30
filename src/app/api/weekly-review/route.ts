@@ -81,7 +81,8 @@ interface WeeklyReviewData {
   // New hero metrics
   weekScore: number // 0-100
   weekScoreLabel: string // "Strong week", "Good progress", etc.
-  activeDays: number // Days with entries out of 7
+  activeDays: number // Days with entries
+  evaluatedDays: number // Days included in review (excludes today for current week)
   highlights: WeekHighlight[]
   // Existing
   totalMinutes: number
@@ -201,14 +202,36 @@ export async function POST(request: NextRequest) {
     const previousWeekStart = getPreviousWeekStart(weekStart)
     const previousWeekEnd = getWeekEnd(previousWeekStart)
 
-    // Fetch current week entries
+    // For the current week, exclude today since the day hasn't ended yet
+    // (daily review isn't ready). Use yesterday as the effective end date.
+    const currentWeekStart = getWeekStart(today)
+    const isCurrentWeek = weekStart === currentWeekStart
+    let effectiveEndDate = weekEnd
+    if (isCurrentWeek) {
+      // Get yesterday's date in the user's timezone
+      const todayDate = new Date(today + 'T12:00:00') // noon to avoid DST edge cases
+      todayDate.setDate(todayDate.getDate() - 1)
+      const y = todayDate.getFullYear()
+      const m = String(todayDate.getMonth() + 1).padStart(2, '0')
+      const d = String(todayDate.getDate()).padStart(2, '0')
+      const yesterday = `${y}-${m}-${d}`
+      // Only exclude today if yesterday is still within or after the week start
+      // (handles edge case of viewing on the first day of the week)
+      if (yesterday >= weekStart) {
+        effectiveEndDate = yesterday
+      }
+      // If today IS the first day (Sunday), effectiveEndDate stays as weekEnd
+      // but there won't be prior-day data anyway — show what's available
+    }
+
+    // Fetch current week entries (up to effectiveEndDate)
     const { data: currentWeekEntries } = await supabase
       .from('time_entries')
       .select('*')
       .eq('user_id', session.user.id)
       .eq('status', 'confirmed')
       .gte('date', weekStart)
-      .lte('date', weekEnd)
+      .lte('date', effectiveEndDate)
       .order('date', { ascending: true })
 
     // Fetch previous week entries
@@ -275,11 +298,13 @@ export async function POST(request: NextRequest) {
     })
 
     // Calculate entries by day for scorecard
+    // Only include days up to effectiveEndDate (excludes today for current week)
     const entriesByDay = new Map<string, TimeEntry[]>()
     for (let i = 0; i < 7; i++) {
       const d = new Date(weekStart + 'T00:00:00')
       d.setDate(d.getDate() + i)
       const dateStr = d.toISOString().split('T')[0]
+      if (dateStr > effectiveEndDate) break
       entriesByDay.set(dateStr, [])
     }
     entries.forEach((entry) => {
@@ -364,7 +389,7 @@ export async function POST(request: NextRequest) {
       const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
       const isLimitTarget = target.direction === 'at_most'
       const targetMinutes = target.weekly_target_minutes
-      const dailyTarget = targetMinutes / 7
+      const dailyTarget = targetMinutes / (evaluatedDays || 7)
 
       const days: TargetDayScore[] = []
       let goodDays = 0
@@ -496,16 +521,18 @@ export async function POST(request: NextRequest) {
 
     // Calculate active days (days with at least one entry)
     const activeDays = Array.from(entriesByDay.values()).filter(dayEntries => dayEntries.length > 0).length
+    // How many days are we actually evaluating (excludes today for current week)
+    const evaluatedDays = entriesByDay.size
 
     // Calculate Week Score (0-100)
     // Components:
-    // - Active days: 0-7 days → 0-35 points (5 points per day)
+    // - Active days: 0-N days → 0-35 points (scaled to evaluated days)
     // - Target progress: average % across targets → 0-45 points
     // - Consistency: ratio of good days to total active days → 0-20 points
     let weekScore = 0
 
-    // Active days component (35 points max)
-    const activeDaysScore = Math.round((activeDays / 7) * 35)
+    // Active days component (35 points max, scaled to evaluated days)
+    const activeDaysScore = evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 35) : 0
     weekScore += activeDaysScore
 
     // Target progress component (45 points max)
@@ -525,7 +552,7 @@ export async function POST(request: NextRequest) {
       weekScore += targetScore
     } else {
       // No targets set, give partial credit based on activity
-      weekScore += Math.round((activeDays / 7) * 20)
+      weekScore += evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 20) : 0
     }
 
     // Consistency component (20 points max)
@@ -538,7 +565,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // No scorecards, give partial credit
-      weekScore += Math.round((activeDays / 7) * 10)
+      weekScore += evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 10) : 0
     }
 
     // Cap at 100
@@ -706,6 +733,7 @@ For limit targets like "leisure" or "meetings", celebrate decreases and gently n
       weekScore,
       weekScoreLabel,
       activeDays,
+      evaluatedDays,
       highlights: topHighlights,
       // Existing
       totalMinutes,

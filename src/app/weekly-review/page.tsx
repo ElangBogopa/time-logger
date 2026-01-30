@@ -110,6 +110,7 @@ interface WeeklyReviewData {
   weekScore: number
   weekScoreLabel: string
   activeDays: number
+  evaluatedDays: number
   highlights: WeekHighlight[]
   // Existing
   totalMinutes: number
@@ -540,7 +541,7 @@ export default function WeeklyReviewPage() {
                       </div>
                       <div className="text-right">
                         <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                          <span className="font-medium text-foreground text-lg">{reviewData.activeDays}/7</span>
+                          <span className="font-medium text-foreground text-lg">{reviewData.activeDays}/{reviewData.evaluatedDays || 7}</span>
                           <span>days active</span>
                         </div>
                         {/* Mini progress ring */}
