@@ -550,17 +550,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                 </div>
               )}
 
-              {/* AI Commentary - only for confirmed entries */}
-              {!isPending && entry.commentary && (
-                <div className="rounded-lg border bg-card p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Commentary
-                  </p>
-                  <p className="mt-2 text-sm italic text-muted-foreground">
-                    &ldquo;{entry.commentary}&rdquo;
-                  </p>
-                </div>
-              )}
+              {/* AI Commentary removed — unnecessary clutter */}
             </div>
           )}
 
