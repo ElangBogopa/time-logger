@@ -101,10 +101,10 @@ function ReviewContent() {
           })}
         </div>
 
-        {/* Tab Content */}
-        {activeTab === 'insights' && <InsightsContent />}
-        {activeTab === 'day' && <DayReviewContent />}
-        {activeTab === 'weekly' && <WeeklyReviewContent />}
+        {/* Tab Content — keep all tabs mounted but hidden to preserve state */}
+        <div className={activeTab === 'insights' ? '' : 'hidden'}><InsightsContent /></div>
+        <div className={activeTab === 'day' ? '' : 'hidden'}><DayReviewContent /></div>
+        <div className={activeTab === 'weekly' ? '' : 'hidden'}><WeeklyReviewContent /></div>
       </div>
     </div>
   )

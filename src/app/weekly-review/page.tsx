@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dialog'
 import ShareableStatsCard, { type ShareableStatsCardProps } from '@/components/ShareableStatsCard'
 import { csrfFetch } from '@/lib/api'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { WeeklyBarsChart, type WeeklyBarDataPoint } from '@/components/charts/WeeklyBarsChart'
 import { WeekComparisonChart, type WeekDataPoint } from '@/components/charts/WeekComparisonChart'
 import { MiniSparkline } from '@/components/charts/MiniSparkline'
@@ -211,9 +212,16 @@ export default function WeeklyReviewPage() {
   }, [status, router])
 
   const fetchReview = useCallback(async () => {
-    setIsLoading(true)
     setError(null)
+    const cacheKey = `weekly-review:${weekStart}`
+    const cached = cacheGet<WeeklyReviewData>(cacheKey)
+    if (cached) {
+      setReviewData(cached)
+      setIsLoading(false)
+      return
+    }
 
+    setIsLoading(true)
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const response = await csrfFetch('/api/weekly-review', {
@@ -227,6 +235,7 @@ export default function WeeklyReviewPage() {
       }
 
       const data = await response.json()
+      cacheSet(cacheKey, data)
       setReviewData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')

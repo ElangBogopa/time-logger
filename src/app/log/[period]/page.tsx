@@ -104,7 +104,7 @@ export default function LogPeriodPage() {
     if (selectedDate && selectedDate !== today) {
       router.push(`/?date=${selectedDate}`)
     } else {
-      goHome()
+      router.push('/')
     }
   }
 

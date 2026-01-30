@@ -9,6 +9,7 @@ import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
 import { ChevronLeft, CheckCircle2, Circle, Sparkles } from 'lucide-react'
 import type { MetricKey, TrendDataPoint, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
 
 // ── Detail types (cast from the generic Record at usage site) ──
 
@@ -288,6 +289,14 @@ export default function MetricDetailSheet({
       return
     }
 
+    // Check cache for 30d data
+    const cacheKey = `metric-trend:${period}`
+    const cached = cacheGet<TrendAPIResponse>(cacheKey)
+    if (cached) {
+      setData(cached)
+      return
+    }
+
     setIsLoading(true)
     const controller = new AbortController()
 
@@ -297,6 +306,7 @@ export default function MetricDetailSheet({
       })
       if (res.ok) {
         const json = await res.json()
+        cacheSet(cacheKey, json)
         setData(json)
       }
     } catch (err) {

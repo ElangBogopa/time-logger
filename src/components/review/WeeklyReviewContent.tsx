@@ -15,6 +15,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { ENERGY_VIEW, getAggregatedCategory, TimeCategory, AGGREGATED_CATEGORY_COLORS } from '@/lib/types'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
 
 // ─── Types matching API route response ────────────────
 
@@ -69,6 +70,7 @@ interface WeeklyReviewData {
   weekScore: number
   weekScoreLabel: string
   activeDays: number
+  evaluatedDays?: number
   highlights: WeekHighlight[]
   totalMinutes: number
   entryCount: number
@@ -127,8 +129,16 @@ export default function WeeklyReviewContent() {
   const [error, setError] = useState<string | null>(null)
 
   const fetchReview = useCallback(async () => {
-    setIsLoading(true)
     setError(null)
+    const cacheKey = `weekly-review:${weekStart}`
+    const cached = cacheGet<WeeklyReviewData>(cacheKey)
+    if (cached) {
+      setReviewData(cached)
+      setIsLoading(false)
+      return
+    }
+
+    setIsLoading(true)
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const response = await csrfFetch('/api/weekly-review', {
@@ -138,6 +148,7 @@ export default function WeeklyReviewContent() {
       })
       if (!response.ok) throw new Error('Failed to fetch review')
       const data = await response.json()
+      cacheSet(cacheKey, data)
       setReviewData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -283,7 +294,7 @@ export default function WeeklyReviewContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-[11px] text-muted-foreground">Active Days</p>
-          <p className="text-lg font-bold">{reviewData.activeDays}/7</p>
+          <p className="text-lg font-bold">{reviewData.activeDays}/{reviewData.evaluatedDays || 7}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-[11px] text-muted-foreground">Entries</p>

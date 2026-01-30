@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation'
 import { ChevronRight, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CorrelationsResponse } from '@/lib/correlation-types'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
 import CorrelationInsights from './CorrelationInsights'
+
+const CORRELATIONS_CACHE_KEY = 'correlations'
+const CORRELATIONS_TTL = 5 * 60 * 1000 // 5 minutes
 
 interface InsightsTeaserProps {
   className?: string
@@ -13,25 +17,35 @@ interface InsightsTeaserProps {
 
 export default function InsightsTeaser({ className }: InsightsTeaserProps) {
   const router = useRouter()
-  const [data, setData] = useState<CorrelationsResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  const fetchInsights = useCallback(async () => {
-    try {
-      const response = await fetch('/api/correlations')
-      if (!response.ok) return
-      const result: CorrelationsResponse = await response.json()
-      setData(result)
-    } catch {
-      // Silently fail — this is a teaser, not critical
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+  const cached = cacheGet<CorrelationsResponse>(CORRELATIONS_CACHE_KEY, CORRELATIONS_TTL)
+  const [data, setData] = useState<CorrelationsResponse | null>(cached || null)
+  const [isLoading, setIsLoading] = useState(!cached)
 
   useEffect(() => {
+    const cachedData = cacheGet<CorrelationsResponse>(CORRELATIONS_CACHE_KEY, CORRELATIONS_TTL)
+    if (cachedData) {
+      setData(cachedData)
+      setIsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const fetchInsights = async () => {
+      try {
+        const response = await fetch('/api/correlations')
+        if (!response.ok) return
+        const result: CorrelationsResponse = await response.json()
+        cacheSet(CORRELATIONS_CACHE_KEY, result)
+        if (!cancelled) setData(result)
+      } catch {
+        // Silently fail — this is a teaser, not critical
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
     fetchInsights()
-  }, [fetchInsights])
+    return () => { cancelled = true }
+  }, [])
 
   // Don't show if loading, no data, or no insights
   if (isLoading || !data) return null

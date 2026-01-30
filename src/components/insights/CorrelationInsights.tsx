@@ -23,6 +23,10 @@ import {
   CorrelationInsight,
   SessionPatternInsight,
 } from '@/lib/correlation-types'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
+
+const CORRELATIONS_CACHE_KEY = 'correlations'
+const CORRELATIONS_TTL = 5 * 60 * 1000 // 5 minutes
 import {
   TimeCategory,
   AggregatedCategory,
@@ -270,26 +274,37 @@ export default function CorrelationInsights({
   showSections = true,
   className,
 }: CorrelationInsightsProps) {
-  const [data, setData] = useState<CorrelationsResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const cached = cacheGet<CorrelationsResponse>(CORRELATIONS_CACHE_KEY, CORRELATIONS_TTL)
+  const [data, setData] = useState<CorrelationsResponse | null>(cached || null)
+  const [isLoading, setIsLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchInsights = useCallback(async () => {
-    try {
-      const response = await fetch('/api/correlations')
-      if (!response.ok) throw new Error('Failed to fetch insights')
-      const result: CorrelationsResponse = await response.json()
-      setData(result)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
+    // If we have fresh cached data, skip the fetch
+    const cachedData = cacheGet<CorrelationsResponse>(CORRELATIONS_CACHE_KEY, CORRELATIONS_TTL)
+    if (cachedData) {
+      setData(cachedData)
+      setIsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const fetchInsights = async () => {
+      try {
+        const response = await fetch('/api/correlations')
+        if (!response.ok) throw new Error('Failed to fetch insights')
+        const result: CorrelationsResponse = await response.json()
+        cacheSet(CORRELATIONS_CACHE_KEY, result)
+        if (!cancelled) setData(result)
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load')
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
     fetchInsights()
-  }, [fetchInsights])
+    return () => { cancelled = true }
+  }, [])
 
   if (isLoading) {
     return (

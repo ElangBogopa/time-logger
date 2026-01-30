@@ -1,6 +1,7 @@
 'use client'
 
 import { csrfFetch } from '@/lib/api'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
 
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -476,8 +477,12 @@ function DayReviewContent() {
   const [commentary, setCommentary] = useState<string | null>(null)
   const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
 
-  // Generate AI commentary from summary data
+  // Generate AI commentary from summary data (with cache)
   const generateCommentary = useCallback(async (summaryData: DaySummary): Promise<string | null> => {
+    const cacheKey = `day-commentary:${summaryData.date}`
+    const cached = cacheGet<string>(cacheKey)
+    if (cached) return cached
+
     try {
       const response = await csrfFetch('/api/day-commentary', {
         method: 'POST',
@@ -493,7 +498,9 @@ function DayReviewContent() {
       })
       if (response.ok) {
         const data = await response.json()
-        return data.commentary || null
+        const text = data.commentary || null
+        if (text) cacheSet(cacheKey, text)
+        return text
       }
     } catch (err) {
       console.error('Failed to fetch commentary:', err)
@@ -529,8 +536,20 @@ function DayReviewContent() {
     }
   }, [])
 
-  // Main fetch logic — checks persistence layer first
+  // Main fetch logic — checks persistence layer first (with cache)
   const fetchData = useCallback(async () => {
+    const dateKey = dateParam || 'today'
+    const reviewCacheKey = `day-review:${dateKey}`
+
+    // Check if we have a fully cached review (summary + commentary)
+    const cachedReview = cacheGet<{ summary: DaySummary; commentary: string | null }>(reviewCacheKey)
+    if (cachedReview) {
+      setSummary(cachedReview.summary)
+      setCommentary(cachedReview.commentary)
+      setIsLoading(false)
+      return
+    }
+
     try {
       // Step 1: Check persistence status
       const reviewUrl = dateParam ? `/api/day-review?date=${dateParam}` : '/api/day-review'
@@ -544,6 +563,8 @@ function DayReviewContent() {
         setSummary(saved)
         setCommentary(saved.commentary || null)
         setIsLoading(false)
+        // Cache finalized reviews permanently (they don't change)
+        cacheSet(reviewCacheKey, { summary: saved, commentary: saved.commentary || null })
         return
       }
 
@@ -561,6 +582,9 @@ function DayReviewContent() {
       const commentaryText = await generateCommentary(summaryData)
       setCommentary(commentaryText)
       setIsLoadingCommentary(false)
+
+      // Cache the complete review
+      cacheSet(reviewCacheKey, { summary: summaryData, commentary: commentaryText })
 
       // If needs finalization (locked date, first view), save to DB
       if (reviewData.source === 'needs_finalization') {

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
 import {
   Trophy,
   TrendingUp,
@@ -192,10 +193,24 @@ export default function DayReviewContent() {
   const isLocked = currentHour !== null && currentHour < 21
 
   const fetchSummary = useCallback(async () => {
+    // Check cache for summary
+    const summaryCache = cacheGet<DaySummary>('day-summary:today')
+    if (summaryCache) {
+      setSummary(summaryCache)
+      setIsLoading(false)
+      // Still check for cached commentary
+      const commentaryCache = cacheGet<string>('day-commentary:today')
+      if (commentaryCache) {
+        setCommentary(commentaryCache)
+        return
+      }
+    }
+
     try {
       const response = await fetch('/api/day-summary')
       if (!response.ok) throw new Error('Failed to fetch')
       const data = await response.json()
+      cacheSet('day-summary:today', data)
       setSummary(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
@@ -205,6 +220,13 @@ export default function DayReviewContent() {
   }, [])
 
   const fetchCommentary = useCallback(async (summaryData: DaySummary) => {
+    // Check cache first — avoids redundant OpenAI calls
+    const cached = cacheGet<string>('day-commentary:today')
+    if (cached) {
+      setCommentary(cached)
+      return
+    }
+
     setIsLoadingCommentary(true)
     try {
       const response = await csrfFetch('/api/day-commentary', {
@@ -221,6 +243,7 @@ export default function DayReviewContent() {
       })
       if (response.ok) {
         const data = await response.json()
+        cacheSet('day-commentary:today', data.commentary)
         setCommentary(data.commentary)
       }
     } catch (err) {
