@@ -37,8 +37,18 @@ export default function GreetingHeader({
 }: GreetingHeaderProps) {
   return (
     <header className="mb-3">
+      {/* Greeting — only show for today, above the date */}
+      {isToday && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-2xl" role="img" aria-label={currentPeriod}>
+            {greeting.emoji}
+          </span>
+          <h1 className="text-xl font-bold text-foreground">{greeting.text}</h1>
+        </div>
+      )}
+
       {/* Date navigation bar */}
-      <div className="flex items-center justify-center gap-3 mb-2">
+      <div className="flex items-center justify-center gap-3">
         <button
           onClick={() => onDateChange(shiftDate(selectedDate, -1))}
           className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -62,16 +72,6 @@ export default function GreetingHeader({
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
-
-      {/* Greeting — only show for today */}
-      {isToday && (
-        <div className="flex items-center gap-2">
-          <span className="text-2xl" role="img" aria-label={currentPeriod}>
-            {greeting.emoji}
-          </span>
-          <h1 className="text-xl font-bold text-foreground">{greeting.text}</h1>
-        </div>
-      )}
     </header>
   )
 }
