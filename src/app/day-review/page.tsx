@@ -16,6 +16,7 @@ import {
   Target,
   Zap,
   Calendar,
+  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -571,15 +572,65 @@ function DayReviewContent() {
     }
   }, [dateParam, generateCommentary, saveReview])
 
+  // Check if today and before 9pm — block access
+  const [currentHour, setCurrentHour] = useState<number | null>(null)
   useEffect(() => {
-    if (status === 'authenticated') {
+    setCurrentHour(new Date().getHours())
+  }, [])
+
+  const isTodayReview = !dateParam
+  const isLocked = isTodayReview && currentHour !== null && currentHour < 21
+
+  useEffect(() => {
+    if (status === 'authenticated' && !isLocked) {
       fetchData()
     } else if (status === 'unauthenticated') {
       router.push('/login')
     }
-  }, [status, fetchData, router])
+  }, [status, fetchData, router, isLocked])
 
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  // Locked state — today before 9pm
+  if (isLocked) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="mx-auto max-w-2xl px-4 py-6">
+          <header className="mb-6">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              Back
+            </button>
+            <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+          </header>
+
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-secondary mb-6">
+              <Lock className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground mb-2">Not available yet</h2>
+            <p className="text-sm text-muted-foreground text-center max-w-xs mb-1">
+              Your daily review unlocks at 9:00 PM once your day is wrapping up.
+            </p>
+            <p className="text-xs text-muted-foreground/50">
+              {currentHour !== null && `${21 - currentHour} hour${21 - currentHour !== 1 ? 's' : ''} to go`}
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
