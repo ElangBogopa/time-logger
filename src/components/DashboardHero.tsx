@@ -31,6 +31,7 @@ interface DashboardHeroProps {
   onMetricTap?: (metric: MetricKey) => void
   activeMetric?: MetricKey | null
   onTrendDataLoaded?: (data: TrendAPIResponse) => void
+  date?: string // YYYY-MM-DD, defaults to today
 }
 
 /* ── Metric Circle ── */
@@ -116,13 +117,16 @@ function MetricCircle({
 }
 
 /* ── Main Component ── */
-export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLoaded }: DashboardHeroProps) {
+export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLoaded, date }: DashboardHeroProps) {
   const [trendData, setTrendData] = useState<TrendAPIResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchTrendData = useCallback(async (signal: AbortSignal) => {
     try {
-      const res = await fetch('/api/metrics/trend?period=7d', { signal })
+      setIsLoading(true)
+      const params = new URLSearchParams({ period: '7d' })
+      if (date) params.set('date', date)
+      const res = await fetch(`/api/metrics/trend?${params}`, { signal })
       if (res.ok) {
         const data: TrendAPIResponse = await res.json()
         setTrendData(data)
@@ -134,7 +138,7 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
     } finally {
       if (!signal.aborted) setIsLoading(false)
     }
-  }, [onTrendDataLoaded])
+  }, [onTrendDataLoaded, date])
 
   useEffect(() => {
     const controller = new AbortController()

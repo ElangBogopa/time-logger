@@ -31,10 +31,14 @@ function HomeContent() {
   const userId = session?.user?.id || session?.user?.email || ''
   const today = getUserToday()
 
+  // Date navigation state
+  const [selectedDate, setSelectedDate] = useState(today)
+  const isToday = selectedDate === today
+
   // Custom hooks
   const { showOnboarding, setShowOnboarding, currentHour } = useDashboardState({ session, status })
   const { greeting, quotes, currentPeriod } = useGreeting(session?.user?.preferredName, currentHour)
-  const { entries, completions, isLoading } = useSessionData({ userId, today, currentHour })
+  const { entries, completions, isLoading } = useSessionData({ userId, today: selectedDate, currentHour: isToday ? currentHour : 23 })
 
   // Sprint 2: Metric detail sheet state
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null)
@@ -122,14 +126,21 @@ function HomeContent() {
     <ErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
         <div className="mx-auto max-w-2xl px-4 py-4">
-          {/* 1. Header - compact greeting */}
-          <GreetingHeader greeting={greeting} currentPeriod={currentPeriod} />
+          {/* 1. Header - date nav + greeting */}
+          <GreetingHeader
+            greeting={greeting}
+            currentPeriod={currentPeriod}
+            selectedDate={selectedDate}
+            onDateChange={setSelectedDate}
+            isToday={isToday}
+          />
 
           {/* 2. HERO SECTION: Tappable metric circles + sparklines */}
           <DashboardHero
             onMetricTap={handleMetricTap}
             activeMetric={activeMetric}
             onTrendDataLoaded={handleTrendDataLoaded}
+            date={selectedDate}
           />
 
           {/* 3. MY DAY section */}
@@ -142,10 +153,11 @@ function HomeContent() {
             {(() => {
               const eveningLogged = sessionInfos.find(s => s.period === 'evening')?.state === 'logged'
               const pastNine = (currentHour ?? 0) >= 21
-              if (!eveningLogged && !pastNine) return null
+              const showReview = !isToday || eveningLogged || pastNine
+              if (!showReview) return null
               return (
                 <button
-                  onClick={() => router.push('/day-review')}
+                  onClick={() => router.push(isToday ? '/day-review' : `/day-review?date=${selectedDate}`)}
                   className="w-full flex items-center gap-3 rounded-xl bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20 px-4 py-3.5 mb-3 transition-all hover:from-primary/30 hover:to-primary/10"
                 >
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
@@ -168,7 +180,7 @@ function HomeContent() {
               </div>
               <div className="space-y-2">
                 {sessionInfos.map(info => {
-                  const isActive = info.period === currentPeriod
+                  const isActive = isToday && info.period === currentPeriod
                   const isLogged = info.state === 'logged'
                   const Icon = info.period === 'morning' ? Sun : info.period === 'afternoon' ? Cloud : Moon
                   const periodLabel = info.period === 'morning' ? 'Morning' : info.period === 'afternoon' ? 'Afternoon' : 'Evening'
@@ -199,7 +211,9 @@ function HomeContent() {
                         <p className="text-[11px] text-muted-foreground">
                           {isLogged
                             ? `${info.entryCount} entries · ${Math.round(info.totalMinutes)}m logged`
-                            : isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged'
+                            : isToday
+                              ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
+                              : 'Not logged'
                           }
                         </p>
                       </div>

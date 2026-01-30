@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
@@ -22,14 +22,15 @@ import {
   getNudge,
 } from '@/lib/metrics-calc'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const today = getUserToday()
+    const dateParam = request.nextUrl.searchParams.get('date')
+    const today = dateParam || getUserToday()
     const weekAgo = getDateNDaysAgo(today, 6) // 7 days including today
 
     // Fetch all confirmed entries for the past 7 days
