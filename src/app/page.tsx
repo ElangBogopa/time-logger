@@ -72,14 +72,8 @@ function HomeContent() {
   // Build session infos — for past dates, treat all sessions as past (hour=23)
   const effectiveHour = isToday ? (currentHour ?? 12) : 23
   const sessionInfos = useMemo(() => {
-    if (!isToday && entries.length > 0) {
-      console.log('[DEBUG] Building session infos for past date:', selectedDate)
-      console.log('[DEBUG] Total entries:', entries.length)
-      console.log('[DEBUG] Entry start_times:', entries.map(e => ({ activity: e.activity, start_time: e.start_time, date: e.date })))
-      console.log('[DEBUG] Completions:', completions.map(c => ({ period: c.period, skipped: c.skipped })))
-    }
     return buildSessionInfos(entries, completions, effectiveHour)
-  }, [entries, completions, effectiveHour, isToday, selectedDate])
+  }, [entries, completions, effectiveHour])
 
   // Navigate to logging page — pass date for non-today
   const handleLogClick = (period: TimePeriod) => {
