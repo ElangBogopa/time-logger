@@ -139,11 +139,15 @@ export default function LogPeriodPage() {
   // Calendar context for ghost events
   const { getEventsForDate, refreshCalendar, isLoading: isCalendarLoading } = useCalendar()
   const [isSyncing, setIsSyncing] = useState(false)
+  const [syncDone, setSyncDone] = useState(false)
 
   const handleSyncCalendar = async () => {
     setIsSyncing(true)
+    setSyncDone(false)
     try {
       await refreshCalendar()
+      setSyncDone(true)
+      setTimeout(() => setSyncDone(false), 5000)
     } catch (err) {
       console.error('Failed to sync calendar:', err)
     } finally {
@@ -409,12 +413,25 @@ export default function LogPeriodPage() {
             {/* Sync Calendar Button */}
             <button
               onClick={handleSyncCalendar}
-              disabled={isSyncing}
-              className="flex items-center gap-1.5 rounded-full bg-secondary hover:bg-accent px-3 py-2 transition-colors disabled:opacity-50"
+              disabled={isSyncing || syncDone}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-2 transition-all duration-300 ${
+                syncDone
+                  ? 'bg-green-500/15 border border-green-500/30'
+                  : 'bg-secondary hover:bg-accent disabled:opacity-50'
+              }`}
               aria-label="Sync calendar"
             >
-              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
-              <span className="text-xs font-medium text-muted-foreground">{isSyncing ? 'Syncing...' : 'Sync Calendar'}</span>
+              {syncDone ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  <span className="text-xs font-medium text-green-500">Synced!</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span className="text-xs font-medium text-muted-foreground">{isSyncing ? 'Syncing...' : 'Sync Calendar'}</span>
+                </>
+              )}
             </button>
           </div>
 
