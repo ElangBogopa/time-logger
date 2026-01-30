@@ -98,6 +98,16 @@ export default function LogPeriodPage() {
     }
   }, [selectedDate, isYesterday, dateParam])
 
+  // Navigate home preserving the date context
+  const goHome = () => {
+    const today = getUserToday()
+    if (selectedDate && selectedDate !== today) {
+      router.push(`/?date=${selectedDate}`)
+    } else {
+      goHome()
+    }
+  }
+
   // Edit window: only today and yesterday are editable
   const isLocked = (() => {
     if (!selectedDate) return false
@@ -276,13 +286,13 @@ export default function LogPeriodPage() {
       console.error('Failed to save skip:', err)
     }
 
-    router.push('/')
+    goHome()
   }
 
   // Handle summary close
   const handleSummaryClose = () => {
     setShowSummary(false)
-    router.push('/')
+    goHome()
   }
 
   // Delete entry with undo support
@@ -374,7 +384,7 @@ export default function LogPeriodPage() {
         {/* Header */}
         <header className="mb-6">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => goHome()}
             className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="h-4 w-4" />

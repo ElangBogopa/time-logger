@@ -1,9 +1,9 @@
 'use client'
 
-import { Suspense, useMemo, useState, useCallback } from 'react'
+import { Suspense, useMemo, useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getUserToday, TimePeriod } from '@/lib/types'
 import { buildSessionInfos } from '@/lib/session-utils'
 import { useSessionData } from '@/hooks/useSessionData'
@@ -27,13 +27,26 @@ const MetricDetailSheet = dynamic(
 function HomeContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const userId = session?.user?.id || session?.user?.email || ''
   const today = getUserToday()
 
-  // Date navigation state
-  const [selectedDate, setSelectedDate] = useState(today)
+  // Date navigation state — read initial value from URL param
+  const dateFromUrl = searchParams.get('date')
+  const [selectedDate, setSelectedDate] = useState(dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl) ? dateFromUrl : today)
   const isToday = selectedDate === today
+
+  // Update URL when date changes (without full navigation)
+  const handleDateChange = useCallback((newDate: string) => {
+    setSelectedDate(newDate)
+    const newToday = getUserToday()
+    if (newDate === newToday) {
+      window.history.replaceState(null, '', '/')
+    } else {
+      window.history.replaceState(null, '', `/?date=${newDate}`)
+    }
+  }, [])
 
   // Custom hooks
   const { showOnboarding, setShowOnboarding, currentHour } = useDashboardState({ session, status })
@@ -133,7 +146,7 @@ function HomeContent() {
             greeting={greeting}
             currentPeriod={currentPeriod}
             selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
+            onDateChange={handleDateChange}
             isToday={isToday}
           />
 
