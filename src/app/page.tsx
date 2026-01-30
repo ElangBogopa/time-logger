@@ -69,10 +69,11 @@ function HomeContent() {
     setTrendData(data)
   }, [])
 
-  // Build session infos (use 12 as fallback for server render)
+  // Build session infos — for past dates, treat all sessions as past (hour=23)
+  const effectiveHour = isToday ? (currentHour ?? 12) : 23
   const sessionInfos = useMemo(() => {
-    return buildSessionInfos(entries, completions, currentHour ?? 12)
-  }, [entries, completions, currentHour])
+    return buildSessionInfos(entries, completions, effectiveHour)
+  }, [entries, completions, effectiveHour])
 
   // Navigate to logging page — pass date for non-today
   const handleLogClick = (period: TimePeriod) => {
