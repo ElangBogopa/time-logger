@@ -78,17 +78,24 @@ export default function LogPeriodPage() {
   const label = PERIOD_LABELS[safePeriod]
   const range = PERIOD_TIME_RANGES[safePeriod]
 
-  // Date handling - support yesterday's evening
+  // Date handling - support yesterday's evening and arbitrary dates (YYYY-MM-DD)
   // Initialize empty for hydration safety, set on client
-  const isYesterday = searchParams.get('date') === 'yesterday'
+  const dateParam = searchParams.get('date')
+  const isYesterday = dateParam === 'yesterday'
   const [selectedDate, setSelectedDate] = useState('')
 
   // Set selected date on client to avoid hydration mismatch
   useEffect(() => {
     if (!selectedDate) {
-      setSelectedDate(isYesterday ? getYesterdayDateString() : getUserToday())
+      if (isYesterday) {
+        setSelectedDate(getYesterdayDateString())
+      } else if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        setSelectedDate(dateParam)
+      } else {
+        setSelectedDate(getUserToday())
+      }
     }
-  }, [selectedDate, isYesterday])
+  }, [selectedDate, isYesterday, dateParam])
 
   // State
   const [entries, setEntries] = useState<TimeEntry[]>([])
@@ -359,7 +366,9 @@ export default function LogPeriodPage() {
                 <h1 className="text-xl font-bold">{label} Session</h1>
                 <p className="text-sm text-muted-foreground">
                   {getPeriodStartTime(period)} - {getPeriodEndTime(period)}
-                  {isYesterday && ' (Yesterday)'}
+                  {selectedDate && selectedDate !== getUserToday() && (
+                    <> · {isYesterday ? 'Yesterday' : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
+                  )}
                 </p>
               </div>
             </div>
@@ -391,7 +400,7 @@ export default function LogPeriodPage() {
             selectedDate={selectedDate}
             isToday={selectedDate === getUserToday()}
             isFutureDay={false}
-            isPastDay={isYesterday}
+            isPastDay={selectedDate !== "" && selectedDate !== getUserToday()}
             canLog={true}
             visibleStartHour={range.start}
             visibleEndHour={range.end}
@@ -469,7 +478,7 @@ export default function LogPeriodPage() {
         entries={visibleEntries}
         selectedDate={selectedDate}
         isFutureDay={false}
-        isPastDay={isYesterday}
+        isPastDay={selectedDate !== "" && selectedDate !== getUserToday()}
         disablePostSubmit={true}
       />
 

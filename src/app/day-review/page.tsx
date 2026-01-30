@@ -2,8 +2,8 @@
 
 import { csrfFetch } from '@/lib/api'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   ArrowLeft,
@@ -464,9 +464,11 @@ function MoodSection({ mood }: { mood: MoodCheckin | null }) {
   )
 }
 
-export default function DayReviewPage() {
+function DayReviewContent() {
   const { status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const dateParam = searchParams.get('date')
   const [summary, setSummary] = useState<DaySummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -475,7 +477,8 @@ export default function DayReviewPage() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const response = await fetch('/api/day-summary')
+      const url = dateParam ? `/api/day-summary?date=${dateParam}` : '/api/day-summary'
+      const response = await fetch(url)
       if (!response.ok) throw new Error('Failed to fetch')
       const data = await response.json()
       setSummary(data)
@@ -484,7 +487,7 @@ export default function DayReviewPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [dateParam])
 
   // Fetch AI commentary when summary is loaded
   const fetchCommentary = useCallback(async (summaryData: DaySummary) => {
@@ -656,5 +659,17 @@ export default function DayReviewPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function DayReviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    }>
+      <DayReviewContent />
+    </Suspense>
   )
 }

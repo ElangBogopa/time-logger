@@ -61,14 +61,16 @@ function HomeContent() {
     return buildSessionInfos(entries, completions, currentHour ?? 12)
   }, [entries, completions, currentHour])
 
-  // Navigate to logging page
+  // Navigate to logging page — pass date for non-today
   const handleLogClick = (period: TimePeriod) => {
-    router.push(`/log/${period}`)
+    const url = isToday ? `/log/${period}` : `/log/${period}?date=${selectedDate}`
+    router.push(url)
   }
 
-  // Navigate to view session (same as log for now)
+  // Navigate to view session
   const handleViewClick = (period: TimePeriod) => {
-    router.push(`/log/${period}`)
+    const url = isToday ? `/log/${period}` : `/log/${period}?date=${selectedDate}`
+    router.push(url)
   }
 
   // Show loading state with skeleton session cards

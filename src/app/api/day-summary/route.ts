@@ -379,14 +379,19 @@ export async function GET(request: NextRequest) {
   }
 
   const userId = session.user.id
-  const today = getUserToday()
+  const dateParam = request.nextUrl.searchParams.get('date')
+  const today = dateParam || getUserToday()
+  const isViewingToday = today === getUserToday()
   const yesterday = getYesterdayDateString(today)
   const sameDayLastWeek = getSameDayLastWeek(today)
   const weekDates = getWeekDates(today)
   const currentHour = getUserCurrentHour()
 
-  const sessionsPassed = currentHour >= 24 ? 3 : currentHour >= 18 ? 3 : currentHour >= 12 ? 2 : 1
-  const hasEveningPassed = currentHour >= 21
+  // For past dates, all sessions have passed
+  const sessionsPassed = isViewingToday
+    ? (currentHour >= 24 ? 3 : currentHour >= 18 ? 3 : currentHour >= 12 ? 2 : 1)
+    : 3
+  const hasEveningPassed = isViewingToday ? currentHour >= 21 : true
 
   try {
     const [
