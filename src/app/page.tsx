@@ -14,7 +14,7 @@ import type { TrendAPIResponse } from '@/lib/trend-types'
 import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
-import { Sun, Cloud, Moon, ChevronRight, ClipboardList } from 'lucide-react'
+import { Sun, Cloud, Moon, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
 
@@ -170,25 +170,44 @@ function HomeContent() {
               My Day
             </h3>
 
-            {/* Your Day In Review — shows after evening logged or past 9pm */}
+            {/* Your Day In Review */}
             {(() => {
-              const eveningLogged = sessionInfos.find(s => s.period === 'evening')?.state === 'logged'
               const pastNine = (currentHour ?? 0) >= 21
-              const showReview = !isToday || eveningLogged || pastNine
-              if (!showReview) return null
+              const unlocked = !isToday || pastNine
+
               return (
-                <button
-                  onClick={() => router.push(isToday ? '/day-review' : `/day-review?date=${selectedDate}`)}
-                  className="w-full flex items-center gap-3 rounded-xl bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20 px-4 py-3.5 mb-3 transition-all hover:from-primary/30 hover:to-primary/10"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
-                    <ClipboardList className="h-4.5 w-4.5 text-primary" />
-                  </div>
-                  <span className="flex-1 text-left text-sm font-medium text-foreground">
-                    Your Day In Review
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
+                <div className="relative mb-3">
+                  <button
+                    onClick={() => unlocked && router.push(isToday ? '/day-review' : `/day-review?date=${selectedDate}`)}
+                    disabled={!unlocked}
+                    className={`w-full flex items-center gap-3 rounded-xl px-4 py-3.5 transition-all ${
+                      unlocked
+                        ? 'bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20 hover:from-primary/30 hover:to-primary/10'
+                        : 'bg-secondary/30 border border-border cursor-default'
+                    }`}
+                  >
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      unlocked ? 'bg-primary/15' : 'bg-secondary'
+                    }`}>
+                      {unlocked ? (
+                        <ClipboardList className="h-4.5 w-4.5 text-primary" />
+                      ) : (
+                        <Lock className="h-4 w-4 text-muted-foreground/50" />
+                      )}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <span className={`text-sm font-medium ${unlocked ? 'text-foreground' : 'text-muted-foreground/60'}`}>
+                        Your Day In Review
+                      </span>
+                      {!unlocked && (
+                        <p className="text-[10px] text-muted-foreground/40 mt-0.5">
+                          Unlocks at 9:00 PM
+                        </p>
+                      )}
+                    </div>
+                    {unlocked && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                </div>
               )
             })()}
 
