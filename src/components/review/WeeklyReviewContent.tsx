@@ -146,7 +146,11 @@ export default function WeeklyReviewContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ weekStart, timezone }),
       })
-      if (!response.ok) throw new Error('Failed to fetch review')
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => '')
+        console.error('Weekly review API error:', response.status, errBody)
+        throw new Error(`Failed to fetch review (${response.status})`)
+      }
       const data = await response.json()
       cacheSet(cacheKey, data)
       setReviewData(data)

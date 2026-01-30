@@ -384,6 +384,9 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Calculate evaluatedDays early (needed for scorecard daily targets)
+    const evaluatedDays = entriesByDay.size
+
     // Build target scorecards
     const targetScorecards: TargetScorecard[] = targets.map((target) => {
       const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
@@ -521,8 +524,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate active days (days with at least one entry)
     const activeDays = Array.from(entriesByDay.values()).filter(dayEntries => dayEntries.length > 0).length
-    // How many days are we actually evaluating (excludes today for current week)
-    const evaluatedDays = entriesByDay.size
+    // evaluatedDays already calculated above (before scorecards)
 
     // Calculate Week Score (0-100)
     // Components:
