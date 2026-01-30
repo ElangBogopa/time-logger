@@ -317,13 +317,7 @@ function CalendarContent() {
           selectedDate={selectedDate}
         />
 
-        {toast && (
-          <Toast
-            title="Entry added"
-            message={toast.message}
-            onClose={() => setToast(null)}
-          />
-        )}
+        {/* Toast removed — no popups on entry add/confirm */}
       </div>
     </ErrorBoundary>
   )

@@ -21,7 +21,7 @@ interface GhostEntryModalProps {
   event: CalendarEvent | null
   onClose: () => void
   onConfirm: () => void
-  onShowToast: (message: string) => void
+  onShowToast?: (message: string) => void
   userId: string
   selectedDate: string
 }
@@ -197,12 +197,6 @@ export default function GhostEntryModal({
       }
 
       onConfirm()
-      // Show different toast based on whether commentary generated
-      if (generatedCommentary) {
-        onShowToast(generatedCommentary)
-      } else {
-        onShowToast('Calendar event confirmed! (AI commentary unavailable)')
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save entry')
     } finally {

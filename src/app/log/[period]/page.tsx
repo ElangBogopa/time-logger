@@ -99,7 +99,7 @@ export default function LogPeriodPage() {
   const [summaryPrediction, setSummaryPrediction] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null) // kept for legacy compat, not shown
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [quickLogDragData, setQuickLogDragData] = useState<DragCreateData | null>(null)
 
@@ -486,12 +486,7 @@ export default function LogPeriodPage() {
         selectedDate={selectedDate}
       />
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      )}
+      {/* Toast removed — no popups on entry add/confirm */}
     </div>
   )
 }

@@ -36,7 +36,7 @@ interface QuickLogModalProps {
   lastEntryEndTime: string | null
   initialStartTime?: string
   initialEndTime?: string
-  onShowToast: (message: string) => void
+  onShowToast?: (message: string) => void
   userId: string
   calendarEvents?: CalendarEvent[]
   entries?: TimeEntry[]
@@ -418,7 +418,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         onEntryAdded()
         // For future/planned entries, just close (no period summary for planning)
         onClose()
-        onShowToast('Planned! Confirm this entry after it happens.')
+        // Toast removed
       } else {
         // Past/current entry - normal flow with AI categorization + commentary
         const categoryResponse = await csrfFetch('/api/categorize', {
@@ -461,7 +461,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         setStartTime(endTime)
         setEndTime(getCurrentTime())
         // Show brief toast confirmation
-        onShowToast(`"${activity}" logged`)
+        // Toast removed
         // Focus input for next entry
         setTimeout(() => inputRef.current?.focus(), 100)
       }
