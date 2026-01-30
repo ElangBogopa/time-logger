@@ -14,7 +14,7 @@ import type { TrendAPIResponse } from '@/lib/trend-types'
 import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
-import { Sun, Cloud, Moon, CheckCircle2, ChevronRight } from 'lucide-react'
+import { Sun, Cloud, Moon, CheckCircle2, ChevronRight, ClipboardList } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
 
@@ -132,8 +132,34 @@ function HomeContent() {
             onTrendDataLoaded={handleTrendDataLoaded}
           />
 
-          {/* 3. SESSIONS card — Morning / Afternoon / Evening */}
+          {/* 3. MY DAY section */}
           <div className="mt-4">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              My Day
+            </h3>
+
+            {/* Your Day In Review — shows after evening logged or past 9pm */}
+            {(() => {
+              const eveningLogged = sessionInfos.find(s => s.period === 'evening')?.state === 'logged'
+              const pastNine = (currentHour ?? 0) >= 21
+              if (!eveningLogged && !pastNine) return null
+              return (
+                <button
+                  onClick={() => router.push('/day-review')}
+                  className="w-full flex items-center gap-3 rounded-xl bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20 px-4 py-3.5 mb-3 transition-all hover:from-primary/30 hover:to-primary/10"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
+                    <ClipboardList className="h-4.5 w-4.5 text-primary" />
+                  </div>
+                  <span className="flex-1 text-left text-sm font-medium text-foreground">
+                    Your Day In Review
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )
+            })()}
+
+            {/* Sessions card */}
             <div className="rounded-xl bg-card border border-border p-4 mb-3">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
