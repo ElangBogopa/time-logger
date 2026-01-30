@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Time Logger",
-  description: "Track your time and boost productivity",
+  title: "Better",
+  description: "Be better every day",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Time Logger",
+    title: "Better",
   },
 };
 

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Chart Accessibility Helpers — "Whoopify" Time Logger
+// Chart Accessibility Helpers — Better
 // Shape-based status indicators (C5 a11y fix).
 // Never rely on color alone to convey meaning.
 // ═══════════════════════════════════════════════════════════

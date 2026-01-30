@@ -150,7 +150,12 @@ function HomeContent() {
             isToday={isToday}
           />
 
-          {/* 2. HERO SECTION: Tappable metric circles + sparklines */}
+          {/* 2. Brand wordmark */}
+          <p className="text-center text-[13px] font-bold uppercase tracking-[0.3em] text-muted-foreground mb-3">
+            Better
+          </p>
+
+          {/* 3. HERO SECTION: Tappable metric circles + sparklines */}
           <DashboardHero
             onMetricTap={handleMetricTap}
             activeMetric={activeMetric}

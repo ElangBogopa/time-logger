@@ -142,7 +142,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
         <VisuallyHidden>
           <DialogTitle>Set up your account</DialogTitle>
           <DialogDescription>
-            Welcome to Time Logger! Complete the setup process by entering your name and choosing weekly targets to track your productivity goals.
+            Welcome to Better! Complete the setup process by entering your name and choosing weekly targets to track your productivity goals.
           </DialogDescription>
         </VisuallyHidden>
 
@@ -166,7 +166,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                 <User className="h-8 w-8 text-primary" />
               </div>
               <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                Welcome to Time Logger!
+                Welcome to Better!
               </h2>
               <p className="mt-2 text-zinc-500 dark:text-zinc-400">
                 What should we call you?

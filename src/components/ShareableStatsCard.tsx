@@ -221,7 +221,7 @@ const ShareableStatsCard = forwardRef<HTMLDivElement, ShareableStatsCardProps>(
           <div className="flex items-center justify-center gap-2 pt-4">
             <div className="h-px flex-1 bg-white/[0.06]" />
             <p className="text-[10px] font-medium tracking-wider text-zinc-600">
-              Tracked with Time Logger
+              Tracked with Better
             </p>
             <div className="h-px flex-1 bg-white/[0.06]" />
           </div>

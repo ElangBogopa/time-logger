@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Chart Color System — "Whoopify" Time Logger
+// Chart Color System — Better
 // Single source of truth for all metric & status colors.
 // ═══════════════════════════════════════════════════════════
 

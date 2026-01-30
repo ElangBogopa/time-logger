@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Recharts Theme Config — "Whoopify" Time Logger
+// Recharts Theme Config — Better
 // Consistent theming for all chart components.
 // Uses shadcn zinc dark theme tokens.
 // ═══════════════════════════════════════════════════════════

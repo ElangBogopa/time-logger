@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Time Logger",
-  "short_name": "TimeLog",
-  "description": "Track your time with AI-powered categorization",
+  "name": "Better",
+  "short_name": "Better",
+  "description": "Be better every day. Track your time, build your rhythm.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

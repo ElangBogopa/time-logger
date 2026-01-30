@@ -64,7 +64,7 @@ export const authOptions: NextAuthOptions = {
   adapter: SupabaseAdapter(),
   providers: [
     EmailProvider({
-      from: process.env.EMAIL_FROM || 'Time Logger <noreply@timelogger.app>',
+      from: process.env.EMAIL_FROM || 'Better <noreply@timelogger.app>',
       maxAge: 10 * 60, // 10 minutes
       async sendVerificationRequest({ identifier: email, url }) {
         console.log('[Auth] sendVerificationRequest called')
@@ -80,7 +80,7 @@ export const authOptions: NextAuthOptions = {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 40px 20px;">
   <div style="max-width: 400px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
     <h1 style="font-size: 24px; font-weight: 600; color: #111827; margin: 0 0 16px 0; text-align: center;">
-      Sign in to Time Logger
+      Sign in to Better
     </h1>
     <p style="font-size: 15px; color: #6b7280; margin: 0 0 32px 0; text-align: center; line-height: 1.5;">
       Click the button below to sign in. This link will expire in 10 minutes.
@@ -95,7 +95,7 @@ export const authOptions: NextAuthOptions = {
 </body>
 </html>`
 
-        const textContent = `Sign in to Time Logger
+        const textContent = `Sign in to Better
 
 Click the link below to sign in. This link will expire in 10 minutes.
 
@@ -108,9 +108,9 @@ If you didn't request this email, you can safely ignore it.`
 
         try {
           const emailPayload = {
-            from: process.env.EMAIL_FROM || 'Time Logger <noreply@timelogger.app>',
+            from: process.env.EMAIL_FROM || 'Better <noreply@timelogger.app>',
             to: email,
-            subject: 'Sign in to Time Logger',
+            subject: 'Sign in to Better',
             html: htmlContent,
             text: textContent,
           }

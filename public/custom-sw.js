@@ -20,7 +20,7 @@ self.addEventListener('push', (event) => {
     }
 
     event.waitUntil(
-      self.registration.showNotification(data.title || 'Time Logger', options)
+      self.registration.showNotification(data.title || 'Better', options)
     )
   } catch (error) {
     console.error('Push event error:', error)

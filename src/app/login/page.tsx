@@ -311,7 +311,7 @@ function LoginContent() {
           <>
             <div className="space-y-3 text-center">
               <h1 className="text-2xl font-semibold tracking-tight">
-                Sign in to Time Logger
+                Sign in to Better
               </h1>
               <p className="text-sm text-muted-foreground">
                 Track your time. Build better habits.
