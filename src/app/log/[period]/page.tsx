@@ -3,15 +3,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { fetchEntries as apiFetchEntries, createEntry, deleteEntry, upsertSessionCompletion, csrfFetch } from '@/lib/api'
+import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch } from '@/lib/api'
 import {
   TimePeriod,
   TimeEntry,
   PERIOD_LABELS,
   PERIOD_TIME_RANGES,
-  getLocalDateString,
   getUserToday,
-  PENDING_COMMENTARY,
 } from '@/lib/types'
 import {
   getEntriesForPeriod,
@@ -21,31 +19,22 @@ import {
   getPeriodEndTime,
   getFlexiblePeriodRange,
   getYesterdayDateString,
-  canLogYesterdayEvening,
-  findFirstGapInPeriod,
 } from '@/lib/session-utils'
-import { getCurrentTime, calculateDuration, timeToMinutes } from '@/lib/time-utils'
+import { timeToMinutes } from '@/lib/time-utils'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
-import TimeRangePicker from '@/components/TimeRangePicker'
 import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import GhostEntryModal from '@/components/GhostEntryModal'
 import QuickLogModal from '@/components/QuickLogModal'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   ArrowLeft,
   Sun,
   Cloud,
   Moon,
   Loader2,
-  Calendar,
   Plus,
   CheckCircle2,
-  Trash2,
-  List,
-  LayoutGrid,
 } from 'lucide-react'
 import { toast as sonnerToast } from 'sonner'
 
@@ -104,23 +93,15 @@ export default function LogPeriodPage() {
   // State
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activity, setActivity] = useState('')
-  const [notes, setNotes] = useState('')
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
   const [summaryInsight, setSummaryInsight] = useState<string | null>(null)
   const [summaryPrediction, setSummaryPrediction] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'form' | 'timeline'>('form')
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [quickLogDragData, setQuickLogDragData] = useState<DragCreateData | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   // Soft-delete: track entry IDs pending deletion (hidden from UI, deleted after toast expires)
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
@@ -166,26 +147,6 @@ export default function LogPeriodPage() {
     }
   }, [toast])
 
-  // Initialize times based on period and existing entries - find first gap
-  useEffect(() => {
-    // Get current time for constraining suggestions
-    const now = new Date()
-    const currentMins = now.getHours() * 60 + now.getMinutes()
-
-    // Find the first available gap in this period
-    const gap = findFirstGapInPeriod(entries, period, 60, currentMins)
-
-    if (gap) {
-      setStartTime(gap.startTime)
-      setEndTime(gap.endTime)
-    } else {
-      // No gaps available, default to period start with 1 hour
-      const hour = range.start
-      setStartTime(`${hour.toString().padStart(2, '0')}:00`)
-      setEndTime(`${Math.min(hour + 1, range.end).toString().padStart(2, '0')}:00`)
-    }
-  }, [entries, period, range])
-
   // Get period-relevant entries (excluding soft-deleted ones)
   const visibleEntries = entries.filter(e => !pendingDeletes.has(e.id))
   const periodEntries = getEntriesForPeriod(visibleEntries, period)
@@ -225,90 +186,6 @@ export default function LogPeriodPage() {
     })
   })
 
-  const duration = calculateDuration(startTime, endTime)
-
-  // Handle form submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!activity.trim() || duration <= 0) {
-      setError('Please enter an activity and valid time range')
-      return
-    }
-
-    setError(null)
-    setIsSubmitting(true)
-
-    try {
-      // Check for overlapping entries
-      const newStart = timeToMinutes(startTime)
-      const newEnd = timeToMinutes(endTime)
-
-      const overlapping = entries.find(entry => {
-        if (!entry.start_time || !entry.end_time) return false
-        const entryStart = timeToMinutes(entry.start_time)
-        const entryEnd = timeToMinutes(entry.end_time)
-        const overlapStart = Math.max(newStart, entryStart)
-        const overlapEnd = Math.min(newEnd, entryEnd)
-        const overlap = Math.max(0, overlapEnd - overlapStart)
-        return overlap > (newEnd - newStart) * 0.5
-      })
-
-      if (overlapping) {
-        setError(`This overlaps with "${overlapping.activity}"`)
-        setIsSubmitting(false)
-        return
-      }
-
-      // Categorize with AI
-      const categoryResponse = await csrfFetch('/api/categorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activity }),
-      })
-
-      if (!categoryResponse.ok) {
-        throw new Error('Failed to categorize')
-      }
-
-      const { category } = await categoryResponse.json()
-
-      // Insert entry
-      await createEntry({
-        date: selectedDate,
-        activity,
-        category,
-        duration_minutes: duration,
-        start_time: startTime,
-        end_time: endTime,
-        description: notes || null,
-        commentary: 'Logged',
-        status: 'confirmed',
-      })
-
-      // Refresh and reset form
-      await fetchEntries()
-      setActivity('')
-      setNotes('')
-      setStartTime(endTime)
-      setEndTime(getCurrentTime())
-      setError(null)
-
-      // Focus input for next entry
-      setTimeout(() => inputRef.current?.focus(), 100)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  // Handle ghost event confirmation
-  const handleConfirmGhost = async (event: CalendarEvent) => {
-    setActivity(event.title)
-    setStartTime(event.startTime)
-    setEndTime(event.endTime)
-    setTimeout(() => inputRef.current?.focus(), 100)
-  }
 
   // Handle "Done with period"
   const handleDone = async () => {
@@ -429,16 +306,9 @@ export default function LogPeriodPage() {
 
   // Handle drag-to-create from timeline view
   const handleDragCreate = (data: DragCreateData) => {
-    if (viewMode === 'timeline') {
-      // In timeline mode, open QuickLogModal (same as Calendar page)
-      setQuickLogDragData(data)
-      setIsQuickLogOpen(true)
-    } else {
-      // In form mode, pre-fill the form
-      setStartTime(data.startTime)
-      setEndTime(data.endTime)
-      setTimeout(() => inputRef.current?.focus(), 100)
-    }
+    // Open QuickLogModal with drag data
+    setQuickLogDragData(data)
+    setIsQuickLogOpen(true)
   }
 
   // Handle ghost entry click from timeline
@@ -493,34 +363,6 @@ export default function LogPeriodPage() {
                 </p>
               </div>
             </div>
-
-            {/* View mode toggle */}
-            <div className="flex rounded-lg border border-border overflow-hidden">
-              <button
-                onClick={() => setViewMode('form')}
-                className={`p-2 transition-colors ${
-                  viewMode === 'form'
-                    ? 'bg-secondary text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                aria-label="List view"
-                title="List view"
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('timeline')}
-                className={`p-2 transition-colors ${
-                  viewMode === 'timeline'
-                    ? 'bg-secondary text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                aria-label="Timeline view"
-                title="Timeline view"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-            </div>
           </div>
 
           {/* Session stats */}
@@ -536,152 +378,28 @@ export default function LogPeriodPage() {
           )}
         </header>
 
-        {/* Form View */}
-        {viewMode === 'form' && (
-          <>
-            {/* Ghost calendar events */}
-            {ghostEvents.length > 0 && (
-              <section className="mb-6">
-                <h2 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  From your calendar
-                </h2>
-                <div className="space-y-2">
-                  {ghostEvents.map((event: CalendarEvent) => (
-                    <button
-                      key={event.id}
-                      onClick={() => handleConfirmGhost(event)}
-                      className="w-full rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-3 text-left hover:border-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors"
-                    >
-                      <p className="font-medium text-sm">{event.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {event.startTime} - {event.endTime}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Logged entries */}
-            {periodEntries.length > 0 && (
-              <section className="mb-6">
-                <h2 className="text-sm font-medium text-muted-foreground mb-2">
-                  Logged this {label.toLowerCase()}
-                </h2>
-                <div className="space-y-2">
-                  {periodEntries.map(entry => (
-                    <div
-                      key={entry.id}
-                      className="flex items-center justify-between rounded-lg border bg-card p-3"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{entry.activity}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.start_time} - {entry.end_time} ({entry.duration_minutes}m)
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteEntry(entry.id)}
-                        className="p-1.5 text-zinc-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30"
-                        aria-label="Delete entry"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Entry form */}
-            <section className="mb-6">
-              <h2 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add activity
-              </h2>
-
-              <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border bg-card p-4">
-                <div className="space-y-2">
-                  <Label htmlFor="activity">Activity</Label>
-                  <Input
-                    ref={inputRef}
-                    id="activity"
-                    value={activity}
-                    onChange={(e) => setActivity(e.target.value)}
-                    placeholder="What did you do?"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Time</Label>
-                  <TimeRangePicker
-                    startTime={startTime}
-                    endTime={endTime}
-                    onStartTimeChange={setStartTime}
-                    onEndTimeChange={setEndTime}
-                    variant="quicklog"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (optional)</Label>
-                  <Input
-                    id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Any details..."
-                  />
-                </div>
-
-                {error && <p className="text-sm text-destructive">{error}</p>}
-
-                <Button
-                  type="submit"
-                  disabled={isSubmitting || !activity.trim() || duration <= 0}
-                  className={`w-full bg-gradient-to-r ${colors.gradient} text-white`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Adding...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4" />
-                      Add Entry
-                    </>
-                  )}
-                </Button>
-              </form>
-            </section>
-          </>
-        )}
-
         {/* Timeline View */}
-        {viewMode === 'timeline' && (
-          <section className="mb-6">
-            <TimelineView
-              entries={visibleEntries}
-              calendarEvents={calendarEvents}
-              isLoading={isLoading}
-              onEntryDeleted={fetchEntries}
-              onGhostEntryClick={handleTimelineGhostClick}
-              onDragCreate={handleDragCreate}
-              onShowToast={setToast}
-              selectedDate={selectedDate}
-              isToday={selectedDate === getUserToday()}
-              isFutureDay={false}
-              isPastDay={isYesterday}
-              canLog={true}
-              visibleStartHour={range.start}
-              visibleEndHour={range.end}
-            />
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Drag to create entries, tap calendar events to confirm
-            </p>
-          </section>
-        )}
+        <section className="mb-6">
+          <TimelineView
+            entries={visibleEntries}
+            calendarEvents={calendarEvents}
+            isLoading={isLoading}
+            onEntryDeleted={fetchEntries}
+            onGhostEntryClick={handleTimelineGhostClick}
+            onDragCreate={handleDragCreate}
+            onShowToast={setToast}
+            selectedDate={selectedDate}
+            isToday={selectedDate === getUserToday()}
+            isFutureDay={false}
+            isPastDay={isYesterday}
+            canLog={true}
+            visibleStartHour={range.start}
+            visibleEndHour={range.end}
+          />
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Drag to create entries, tap calendar events to confirm
+          </p>
+        </section>
 
         {/* Action buttons */}
         <div className="space-y-3">
@@ -704,6 +422,15 @@ export default function LogPeriodPage() {
           )}
         </div>
       </div>
+
+      {/* Floating Action Button */}
+      <button
+        onClick={() => setIsQuickLogOpen(true)}
+        className={`fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r ${colors.gradient} shadow-lg active:scale-95 transition-transform`}
+        aria-label="Add activity"
+      >
+        <Plus className="h-6 w-6 text-white" />
+      </button>
 
       {/* Period Summary Popup */}
       <PeriodSummaryPopup
