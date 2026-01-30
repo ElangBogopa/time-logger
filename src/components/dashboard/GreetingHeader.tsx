@@ -37,15 +37,13 @@ export default function GreetingHeader({
 }: GreetingHeaderProps) {
   return (
     <header className="mb-3">
-      {/* Greeting — only show for today, above the date */}
-      {isToday && (
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-2xl" role="img" aria-label={currentPeriod}>
-            {greeting.emoji}
-          </span>
-          <h1 className="text-xl font-bold text-foreground">{greeting.text}</h1>
-        </div>
-      )}
+      {/* Greeting — visible for today, invisible placeholder on other dates to keep layout stable */}
+      <div className={`flex items-center gap-2 mb-2 ${isToday ? '' : 'invisible'}`}>
+        <span className="text-2xl" role="img" aria-label={currentPeriod}>
+          {greeting.emoji}
+        </span>
+        <h1 className="text-xl font-bold text-foreground">{greeting.text}</h1>
+      </div>
 
       {/* Date navigation bar */}
       <div className="flex items-center justify-center gap-3">
