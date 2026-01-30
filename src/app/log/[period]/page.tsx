@@ -396,6 +396,15 @@ export default function LogPeriodPage() {
                 </p>
               </div>
             </div>
+            {/* Sync Calendar Button */}
+            <button
+              onClick={handleSyncCalendar}
+              disabled={isSyncing}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary hover:bg-accent transition-colors disabled:opacity-50"
+              aria-label="Sync calendar"
+            >
+              <RefreshCw className={`h-4 w-4 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
+            </button>
           </div>
 
           {/* Session stats */}

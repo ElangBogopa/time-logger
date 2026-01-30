@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Calendar, BarChart3, Menu } from 'lucide-react'
+import { Home, BarChart3, Menu } from 'lucide-react'
 
 interface TabItem {
   label: string
@@ -18,12 +18,6 @@ const tabs: TabItem[] = [
     path: '/',
     matchPaths: ['/'],
     matchPrefix: ['/log'],
-  },
-  {
-    label: 'Calendar',
-    icon: Calendar,
-    path: '/calendar',
-    matchPaths: ['/calendar'],
   },
   {
     label: 'Review',
