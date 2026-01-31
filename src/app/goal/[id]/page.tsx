@@ -332,26 +332,26 @@ export default function GoalPage() {
                       onChange={e => handleTaskChange(idx, e.target.value)}
                       placeholder={placeholder}
                       className={`w-full rounded-xl border bg-card pl-10 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all ${
-                        isCommitted ? 'border-[#8B7E74]/30 pr-20' : 'border-border pr-10'
+                        isCommitted ? 'border-[#8B7E74]/30 pr-24' : 'border-border pr-12'
                       }`}
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-3">
                       {/* Commit button — only show when task is saved */}
                       {saved && plan && task.trim() && (
                         <button
                           onClick={() => setCommitModalIdx(idx)}
-                          className={`rounded-md p-1 transition-colors ${
+                          className={`rounded-lg p-1.5 transition-colors ${
                             isCommitted
                               ? 'text-[#8B7E74] hover:bg-[#8B7E74]/10'
-                              : 'text-muted-foreground/30 hover:text-muted-foreground/60 hover:bg-secondary/50'
+                              : 'text-muted-foreground/40 hover:text-muted-foreground/70 hover:bg-secondary/50'
                           }`}
                           title={isCommitted ? `${plan.committed_start?.slice(0,5)} – ${plan.committed_end?.slice(0,5)}` : 'Commit to a time'}
                         >
-                          <Clock className="h-3.5 w-3.5" />
+                          <Clock className="h-5 w-5" />
                         </button>
                       )}
                       {task && (
-                        <button onClick={() => clearTask(idx)} className="text-muted-foreground/40 hover:text-muted-foreground">
+                        <button onClick={() => clearTask(idx)} className="rounded-lg p-1 text-muted-foreground/40 hover:text-muted-foreground">
                           <X className="h-4 w-4" />
                         </button>
                       )}
