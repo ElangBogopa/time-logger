@@ -65,17 +65,16 @@ export function useEntryAdjustment({
   const entryStillnessTimerRef = useRef<NodeJS.Timeout | null>(null)
   const entryHoldTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Detect which zone of an entry was clicked (top edge, bottom edge, or middle)
+  // Detect which zone of an entry was clicked (bottom edge or middle)
+  // Only bottom edge resizing is supported
   const detectEntryDragType = useCallback((
     clientY: number,
     entryTop: number,
     entryHeight: number
   ): EntryDragType => {
     const relativeY = clientY - entryTop
-    const topZone = entryHeight * ENTRY_EDGE_ZONE
     const bottomZone = entryHeight * (1 - ENTRY_EDGE_ZONE)
 
-    if (relativeY <= topZone) return 'resize-top'
     if (relativeY >= bottomZone) return 'resize-bottom'
     return 'move'
   }, [])

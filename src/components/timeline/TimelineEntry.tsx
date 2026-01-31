@@ -186,13 +186,6 @@ export default function TimelineEntry({
         right: entryHasOverlap ? '50%' : '4px',
       }}
     >
-      {/* Top resize handle (visual indicator) */}
-      {!entry.isEstimated && height >= 50 && (
-        <div className="absolute inset-x-0 top-0 h-3 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-ns-resize">
-          <div className="h-0.5 w-8 rounded-full bg-white/50" />
-        </div>
-      )}
-
       <div className={`flex h-full flex-col justify-center px-2 py-1 ${colors.text}`}>
         {isShort ? (
           <div className="flex items-center gap-2">
@@ -222,10 +215,10 @@ export default function TimelineEntry({
         )}
       </div>
 
-      {/* Bottom resize handle (visual indicator) */}
-      {!entry.isEstimated && height >= 50 && (
-        <div className="absolute inset-x-0 bottom-0 h-3 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-ns-resize">
-          <div className="h-0.5 w-8 rounded-full bg-white/50" />
+      {/* Bottom resize handle — subtle bar to hint at drag-to-adjust */}
+      {!entry.isEstimated && (
+        <div className="absolute inset-x-0 bottom-0 h-3 flex items-center justify-center cursor-ns-resize">
+          <div className="h-[2px] w-10 rounded-full bg-current opacity-15" />
         </div>
       )}
     </div>
