@@ -224,7 +224,7 @@ function CalendarContent() {
                 Calendar
               </h1>
 
-              {calendarStatus?.connected && !taskFromParam && (
+              {calendarStatus?.connected && (
                 <Button
                   variant="ghost"
                   size="sm"
