@@ -98,10 +98,9 @@ export default function GoalPage() {
         const { plans } = await plansRes.json()
         setExistingPlans(plans || [])
         if (plans && plans.length > 0) {
-          const filled = ['', '', '']
-          plans.forEach((p: PlanItem, i: number) => {
-            if (i < 3) filled[i] = p.title
-          })
+          const filled = plans.map((p: PlanItem) => p.title)
+          // Ensure at least 3 slots
+          while (filled.length < 3) filled.push('')
           setTasks(filled)
           setSaved(true)
         }
@@ -171,7 +170,16 @@ export default function GoalPage() {
     if (saved) setSaved(false)
   }
 
-  const clearTask = (index: number) => handleTaskChange(index, '')
+  const clearTask = (index: number) => {
+    if (index >= 3 && tasks.length > 3) {
+      // Remove extra slots entirely
+      const updated = tasks.filter((_, i) => i !== index)
+      setTasks(updated)
+      if (saved) setSaved(false)
+    } else {
+      handleTaskChange(index, '')
+    }
+  }
 
   if (status === 'loading' || isLoading) {
     return (
@@ -220,27 +228,40 @@ export default function GoalPage() {
           </p>
 
           <div className="space-y-3">
-            {[
-              { idx: 0, icon: <Star className="h-4 w-4 text-primary fill-primary" />, placeholder: 'Most important task' },
-              { idx: 1, icon: <Plus className="h-4 w-4 text-muted-foreground/30" />, placeholder: 'Another task (optional)' },
-              { idx: 2, icon: <Plus className="h-4 w-4 text-muted-foreground/30" />, placeholder: 'One more (optional)' },
-            ].map(({ idx, icon, placeholder }) => (
-              <div key={idx} className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">{icon}</div>
-                <input
-                  type="text"
-                  value={tasks[idx]}
-                  onChange={e => handleTaskChange(idx, e.target.value)}
-                  placeholder={placeholder}
-                  className="w-full rounded-xl border border-border bg-card pl-10 pr-10 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
-                />
-                {tasks[idx] && (
-                  <button onClick={() => clearTask(idx)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
+            {tasks.map((task, idx) => {
+              const icon = idx === 0
+                ? <Star className="h-4 w-4 text-primary fill-primary" />
+                : <Plus className="h-4 w-4 text-muted-foreground/30" />
+              const placeholder = idx === 0 ? 'Most important task'
+                : idx < 3 ? 'Another task (optional)'
+                : `Task ${idx + 1} (bonus)`
+              return (
+                <div key={idx} className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">{icon}</div>
+                  <input
+                    type="text"
+                    value={task}
+                    onChange={e => handleTaskChange(idx, e.target.value)}
+                    placeholder={placeholder}
+                    className="w-full rounded-xl border border-border bg-card pl-10 pr-10 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                  />
+                  {task && (
+                    <button onClick={() => clearTask(idx)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Add task button */}
+            <button
+              onClick={() => { setTasks([...tasks, '']); if (saved) setSaved(false) }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground/50 hover:text-muted-foreground hover:border-muted-foreground/30 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              Add another task
+            </button>
           </div>
 
           <button

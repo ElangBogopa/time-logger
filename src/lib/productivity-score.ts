@@ -11,11 +11,12 @@
  *   Task 1 (priority):  50 points
  *   Task 2 (optional):  30 points
  *   Task 3 (optional):  20 points
- *   Total possible:    100 points
+ *   Task 4+ (bonus):    10 points each
  *
  * Only tasks that exist are counted in the denominator.
  * If user plans 1 task and completes it → 100%.
  * If user plans 2 tasks and completes both → 100%.
+ * Bonus tasks beyond 3 add to max possible but don't dilute core scoring much.
  * Days without plans are excluded (not penalized).
  */
 
@@ -50,24 +51,14 @@ export interface DailyProductivityScore {
 }
 
 // Weight distribution by slot (sort_order)
-const SLOT_WEIGHTS: Record<number, number> = {
-  0: 50,  // Priority task
-  1: 30,  // Optional task 2
-  2: 20,  // Optional task 3
-}
+// Core 3 tasks: 50/30/20 = 100 points
+// Bonus tasks (4+): 10 points each
+const CORE_WEIGHTS: number[] = [50, 30, 20]
+const BONUS_WEIGHT = 10
 
-/**
- * Get the weight for a task based on how many total tasks exist.
- * If only 1 task planned, it gets 100% weight.
- * If 2 tasks planned, they split 100% proportionally (62.5 / 37.5 roughly → simplified to re-normalized).
- * 
- * Actually, simpler approach per research:
- * - The weights are always 50/30/20 for slots 0/1/2
- * - But maxPossible adjusts based on how many tasks exist
- * - Score = earned / maxPossible * 100
- */
 function getSlotWeight(slot: number): number {
-  return SLOT_WEIGHTS[slot] ?? 0
+  if (slot < CORE_WEIGHTS.length) return CORE_WEIGHTS[slot]
+  return BONUS_WEIGHT
 }
 
 /**
@@ -76,10 +67,8 @@ function getSlotWeight(slot: number): number {
 export function calculateDailyScore(plans: PlanItem[]): DailyProductivityScore {
   // Sort by sort_order to ensure correct slot assignment
   const sorted = [...plans].sort((a, b) => a.sort_order - b.sort_order)
-  // Cap at 3 tasks
-  const capped = sorted.slice(0, 3)
 
-  if (capped.length === 0) {
+  if (sorted.length === 0) {
     return {
       date: plans[0]?.date || '',
       score: 0,
@@ -97,9 +86,9 @@ export function calculateDailyScore(plans: PlanItem[]): DailyProductivityScore {
   let maxPossible = 0
   let earnedPoints = 0
   let completedTasks = 0
-  const priorityCompleted = capped[0]?.completed ?? false
+  const priorityCompleted = sorted[0]?.completed ?? false
 
-  const tasks = capped.map((plan, index) => {
+  const tasks = sorted.map((plan, index) => {
     const weight = getSlotWeight(index)
     maxPossible += weight
     if (plan.completed) {
@@ -118,15 +107,15 @@ export function calculateDailyScore(plans: PlanItem[]): DailyProductivityScore {
   const score = maxPossible > 0 ? Math.round((earnedPoints / maxPossible) * 100) : 0
 
   return {
-    date: capped[0].date,
+    date: sorted[0].date,
     score,
     maxPossible,
     earnedPoints,
-    totalTasks: capped.length,
+    totalTasks: sorted.length,
     completedTasks,
     priorityCompleted,
     tasks,
-    label: getScoreLabel(score, priorityCompleted, capped.length, completedTasks),
+    label: getScoreLabel(score, priorityCompleted, sorted.length, completedTasks),
     hasPlans: true,
   }
 }
