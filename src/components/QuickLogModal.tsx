@@ -536,7 +536,14 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting && !showPostSubmit}>
+      <DialogContent
+        className="sm:max-w-md"
+        showCloseButton={!isSubmitting && !showPostSubmit}
+        onOpenAutoFocus={(e) => {
+          // Prevent Radix from auto-focusing the input when activity is pre-filled
+          if (initialActivity) e.preventDefault()
+        }}
+      >
         {showPostSubmit ? (
           // Post-submit state - show options
           <>
