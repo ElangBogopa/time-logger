@@ -10,6 +10,7 @@ interface CommitTimeModalProps {
   onCommit: (start: string, end: string) => Promise<void>
   taskTitle: string
   date: string
+  planId?: string
   existingStart?: string | null
   existingEnd?: string | null
 }
@@ -20,6 +21,7 @@ export default function CommitTimeModal({
   onCommit,
   taskTitle,
   date,
+  planId,
   existingStart,
   existingEnd,
 }: CommitTimeModalProps) {
@@ -63,7 +65,9 @@ export default function CommitTimeModal({
 
   const handleViewCalendar = () => {
     onClose()
-    router.push(`/calendar?date=${date}&task=${encodeURIComponent(taskTitle)}`)
+    const params = new URLSearchParams({ date, task: taskTitle })
+    if (planId) params.set('planId', planId)
+    router.push(`/calendar?${params.toString()}`)
   }
 
   if (!isOpen) return null

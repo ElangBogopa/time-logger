@@ -563,6 +563,7 @@ export default function GoalPage() {
           onCommit={(start, end) => handleCommitTime(commitModalIdx, start, end)}
           taskTitle={existingPlans[commitModalIdx].title}
           date={tomorrow}
+          planId={existingPlans[commitModalIdx].id}
           existingStart={existingPlans[commitModalIdx].committed_start}
           existingEnd={existingPlans[commitModalIdx].committed_end}
         />

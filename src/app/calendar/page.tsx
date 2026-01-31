@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { fetchEntries } from '@/lib/api'
+import { fetchEntries, csrfFetch } from '@/lib/api'
 import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
@@ -68,13 +68,16 @@ function CalendarContent() {
   const [dragCreateData, setDragCreateData] = useState<DragCreateData | null>(null)
   const [showCalendarPicker, setShowCalendarPicker] = useState(false)
   const [taskFromParam, setTaskFromParam] = useState<string | null>(null)
+  const [planIdFromParam, setPlanIdFromParam] = useState<string | null>(null)
 
-  // Read ?task= param (from "View calendar" in commit modal) — show banner, pre-fill when user creates entry
+  // Read ?task= and ?planId= params (from "View calendar" in commit modal)
   useEffect(() => {
     const taskParam = searchParams.get('task')
+    const planIdParam = searchParams.get('planId')
     if (taskParam) {
       setTaskFromParam(taskParam)
-      // Clean up URL param but keep task in state
+      if (planIdParam) setPlanIdFromParam(planIdParam)
+      // Clean up URL params but keep state
       window.history.replaceState(null, '', selectedDate ? `/calendar?date=${selectedDate}` : '/calendar')
     }
   }, [searchParams, selectedDate])
@@ -367,6 +370,19 @@ function CalendarContent() {
           }}
           onEntryAdded={() => {
             fetchEntriesForDate()
+            // If this entry was created from a goal task, update the plan's committed times
+            if (planIdFromParam && dragCreateData) {
+              csrfFetch('/api/plans', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: planIdFromParam,
+                  committed_start: dragCreateData.startTime,
+                  committed_end: dragCreateData.endTime,
+                }),
+              }).catch(err => console.error('Failed to update plan committed times:', err))
+              setPlanIdFromParam(null) // Only update once
+            }
             setDragCreateData(null)
           }}
           lastEntryEndTime={lastEntryEndTime}
