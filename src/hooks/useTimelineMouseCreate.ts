@@ -69,7 +69,7 @@ export function useTimelineMouseCreate({
 
     setIsDragging(true)
     setDragPreviewStart(time)
-    setDragPreviewEnd(minutesToTime(timeToMinutes(time) + 30)) // Show 30-min preview initially
+    setDragPreviewEnd(minutesToTime(timeToMinutes(time) + 60)) // Show 1-hour preview initially
   }, [yToTime, onDragCreate])
 
   // MOUSE MOVE and MOUSE UP handlers
@@ -130,12 +130,12 @@ export function useTimelineMouseCreate({
         // Ensure minimum 30-minute duration for drags
         const duration = timeToMinutes(finalEnd) - timeToMinutes(finalStart)
         if (duration < 30) {
-          finalEnd = minutesToTime(timeToMinutes(finalStart) + 30)
+          finalEnd = minutesToTime(timeToMinutes(finalStart) + 60)
         }
       } else {
-        // User just clicked - default to 30-minute duration
+        // User just clicked - default to 1-hour duration
         finalStart = startTime
-        finalEnd = minutesToTime(timeToMinutes(startTime) + 30)
+        finalEnd = minutesToTime(timeToMinutes(startTime) + 60)
       }
 
       // Call the callback to open Quick Log modal
