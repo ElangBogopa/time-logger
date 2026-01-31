@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, X, Zap, Calendar, Clock, Sparkles, TrendingUp, History, Plus, CheckCircle2 } from 'lucide-react'
+import { Loader2, X, Zap, Calendar, Clock, CalendarCheck, Sparkles, TrendingUp, History, Plus, CheckCircle2 } from 'lucide-react'
 
 interface ActivitySuggestion {
   activity: string
@@ -607,7 +607,12 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {isPlanningMode ? (
+                {isPlanningMode && initialActivity ? (
+                  <>
+                    <CalendarCheck className="h-5 w-5 text-green-500" />
+                    Commit Task
+                  </>
+                ) : isPlanningMode ? (
                   <>
                     <Clock className="h-5 w-5 text-blue-500" />
                     Plan Ahead
@@ -691,35 +696,46 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             </div>
           )}
 
-          {/* Activity - main input with auto-parse highlighting */}
+          {/* Activity - read-only label when committing a task, editable input otherwise */}
           <div className="space-y-2">
-            <Label htmlFor="quick-activity">
-              {isPlanningMode ? 'What are you planning to do?' : isPastDay ? 'What did you do?' : 'What did you just finish?'}
-            </Label>
-            <div className="relative">
-              <Input
-                ref={inputRef}
-                id="quick-activity"
-                value={activity}
-                onChange={(e) => {
-                  setActivity(e.target.value)
-                  setIsAutoParseApplied(false) // Reset when user types
-                  setOriginalTimes(null) // Reset so new parse can save new original times
-                }}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => {
-                  // Small delay to allow clicking suggestions before blur hides them
-                  setTimeout(() => setIsInputFocused(false), 150)
-                }}
-                placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., "coded for 2 hours" or "lunch 12-1pm"'}
-              />
-              {/* Highlighted overlay showing detected time patterns */}
-              {showHighlightedInput && parseResult && !isAutoParseApplied && (
-                <div className="absolute inset-0 pointer-events-none px-3 py-2 text-sm overflow-hidden">
-                  <span className="invisible">{activity}</span>
+            {initialActivity ? (
+              <>
+                <Label>Task</Label>
+                <div className="rounded-lg border border-border bg-secondary/50 px-3 py-2.5">
+                  <p className="text-sm font-medium text-foreground">{activity}</p>
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <Label htmlFor="quick-activity">
+                  {isPlanningMode ? 'What are you planning to do?' : isPastDay ? 'What did you do?' : 'What did you just finish?'}
+                </Label>
+                <div className="relative">
+                  <Input
+                    ref={inputRef}
+                    id="quick-activity"
+                    value={activity}
+                    onChange={(e) => {
+                      setActivity(e.target.value)
+                      setIsAutoParseApplied(false) // Reset when user types
+                      setOriginalTimes(null) // Reset so new parse can save new original times
+                    }}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => {
+                      // Small delay to allow clicking suggestions before blur hides them
+                      setTimeout(() => setIsInputFocused(false), 150)
+                    }}
+                    placeholder={isPlanningMode ? 'e.g., Team standup meeting' : 'e.g., "coded for 2 hours" or "lunch 12-1pm"'}
+                  />
+                  {/* Highlighted overlay showing detected time patterns */}
+                  {showHighlightedInput && parseResult && !isAutoParseApplied && (
+                    <div className="absolute inset-0 pointer-events-none px-3 py-2 text-sm overflow-hidden">
+                      <span className="invisible">{activity}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Auto-parse preview chip - shows detected times */}
             {showHighlightedInput && parseResult && parseResult.hasTimePattern && !isAutoParseApplied && computedParseTimes && (
@@ -785,18 +801,20 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             />
           </div>
 
-          {/* Optional notes */}
-          <div className="space-y-2">
-            <Label htmlFor="quick-notes">
-              Notes <span className="text-muted-foreground">(optional)</span>
-            </Label>
-            <Input
-              id="quick-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any quick details..."
-            />
-          </div>
+          {/* Optional notes — hide when committing a task */}
+          {!initialActivity && (
+            <div className="space-y-2">
+              <Label htmlFor="quick-notes">
+                Notes <span className="text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id="quick-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any quick details..."
+              />
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>
@@ -806,17 +824,24 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             type="submit"
             disabled={isSubmitting || !activity.trim() || duration <= 0}
             className={`w-full text-white ${
-              isPlanningMode
-                ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
-                : isPastDay
-                  ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
-                  : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+              isPlanningMode && initialActivity
+                ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                : isPlanningMode
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
+                  : isPastDay
+                    ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
+                    : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
             }`}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {isPlanningMode ? 'Planning...' : isPastDay ? 'Adding...' : 'Logging...'}
+                {initialActivity ? 'Committing...' : isPlanningMode ? 'Planning...' : isPastDay ? 'Adding...' : 'Logging...'}
+              </>
+            ) : initialActivity ? (
+              <>
+                <CalendarCheck className="h-4 w-4" />
+                Commit to calendar
               </>
             ) : isPlanningMode ? (
               <>
