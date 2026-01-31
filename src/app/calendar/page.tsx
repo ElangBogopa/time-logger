@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Calendar, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, Loader2, RefreshCw, Clock, X } from 'lucide-react'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
   const date = new Date(dateStr + 'T00:00:00')
@@ -69,13 +69,12 @@ function CalendarContent() {
   const [showCalendarPicker, setShowCalendarPicker] = useState(false)
   const [taskFromParam, setTaskFromParam] = useState<string | null>(null)
 
-  // Auto-open QuickLogModal if ?task= param is present (from "View calendar" in commit modal)
+  // Read ?task= param (from "View calendar" in commit modal) — show banner, pre-fill when user creates entry
   useEffect(() => {
     const taskParam = searchParams.get('task')
     if (taskParam) {
       setTaskFromParam(taskParam)
-      setIsQuickLogOpen(true)
-      // Clean up URL param
+      // Clean up URL param but keep task in state
       window.history.replaceState(null, '', selectedDate ? `/calendar?date=${selectedDate}` : '/calendar')
     }
   }, [searchParams, selectedDate])
@@ -295,6 +294,25 @@ function CalendarContent() {
               <p className="text-sm text-muted-foreground">
                 {VIEWING_PAST_MESSAGE}
               </p>
+            </div>
+          )}
+
+          {/* Task planning banner */}
+          {taskFromParam && (
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-[#8B7E74]/30 bg-[#8B7E74]/10 px-4 py-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <Clock className="h-4 w-4 shrink-0 text-[#8B7E74]" />
+                <div className="min-w-0">
+                  <p className="text-xs text-[#8B7E74]/70">Planning task</p>
+                  <p className="text-sm font-medium text-foreground truncate">{taskFromParam}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTaskFromParam(null)}
+                className="shrink-0 ml-2 text-muted-foreground/40 hover:text-muted-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           )}
 
