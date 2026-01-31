@@ -342,12 +342,12 @@ export default function GoalPage() {
                           onClick={() => setCommitModalIdx(idx)}
                           className={`rounded-lg p-1.5 transition-colors ${
                             isCommitted
-                              ? 'text-[#8B7E74] hover:bg-[#8B7E74]/10'
+                              ? 'text-green-500 hover:bg-green-500/10'
                               : 'text-muted-foreground/40 hover:text-muted-foreground/70 hover:bg-secondary/50'
                           }`}
                           title={isCommitted ? `${plan.committed_start?.slice(0,5)} – ${plan.committed_end?.slice(0,5)}` : 'Commit to a time'}
                         >
-                          <Clock className="h-5 w-5" />
+                          {isCommitted ? <CalendarCheck className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
                         </button>
                       )}
                       {task && (
@@ -360,8 +360,8 @@ export default function GoalPage() {
                   {/* Committed time badge */}
                   {isCommitted && (
                     <div className="mt-1 ml-10 flex items-center gap-1">
-                      <span className="text-[10px] text-[#8B7E74] font-medium">
-                        {plan.committed_start?.slice(0,5)} – {plan.committed_end?.slice(0,5)}
+                      <span className="text-[10px] text-green-500/70 font-medium">
+                        ✓ Scheduled {plan.committed_start?.slice(0,5)} – {plan.committed_end?.slice(0,5)}
                       </span>
                     </div>
                   )}
