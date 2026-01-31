@@ -63,7 +63,7 @@ export default function CommitTimeModal({
 
   const handleViewCalendar = () => {
     onClose()
-    router.push(`/calendar?date=${date}`)
+    router.push(`/calendar?date=${date}&task=${encodeURIComponent(taskTitle)}`)
   }
 
   if (!isOpen) return null

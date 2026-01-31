@@ -67,6 +67,18 @@ function CalendarContent() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [dragCreateData, setDragCreateData] = useState<DragCreateData | null>(null)
   const [showCalendarPicker, setShowCalendarPicker] = useState(false)
+  const [taskFromParam, setTaskFromParam] = useState<string | null>(null)
+
+  // Auto-open QuickLogModal if ?task= param is present (from "View calendar" in commit modal)
+  useEffect(() => {
+    const taskParam = searchParams.get('task')
+    if (taskParam) {
+      setTaskFromParam(taskParam)
+      setIsQuickLogOpen(true)
+      // Clean up URL param
+      window.history.replaceState(null, '', selectedDate ? `/calendar?date=${selectedDate}` : '/calendar')
+    }
+  }, [searchParams, selectedDate])
   const [committedTasks, setCommittedTasks] = useState<CommittedTask[]>([])
 
   // Use cached calendar events from context
@@ -312,6 +324,7 @@ function CalendarContent() {
           onClose={() => {
             setIsQuickLogOpen(false)
             setDragCreateData(null)
+            setTaskFromParam(null)
           }}
           onEntryAdded={() => {
             fetchEntriesForDate()
@@ -328,6 +341,7 @@ function CalendarContent() {
           isFutureDay={isFutureDay}
           isPastDay={isPastDay}
           disablePostSubmit={true}
+          initialActivity={taskFromParam || undefined}
         />
 
         <GhostEntryModal

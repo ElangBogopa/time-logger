@@ -46,14 +46,23 @@ interface QuickLogModalProps {
   onPeriodComplete?: (period: TimePeriod, periodEntries: TimeEntry[]) => void
   /** When true, skip the post-submit popup and just close after logging (for bulk logging in calendar) */
   disablePostSubmit?: boolean
+  /** Pre-fill the activity field (e.g. from a committed task) */
+  initialActivity?: string
 }
 
-export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false, onPeriodComplete, disablePostSubmit = false }: QuickLogModalProps) {
-  const [activity, setActivity] = useState('')
+export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false, onPeriodComplete, disablePostSubmit = false, initialActivity }: QuickLogModalProps) {
+  const [activity, setActivity] = useState(initialActivity || '')
   const [notes, setNotes] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Pre-fill activity from prop when modal opens
+  useEffect(() => {
+    if (initialActivity && isOpen && !activity) {
+      setActivity(initialActivity)
+    }
+  }, [initialActivity, isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = useState<string | null>(null)
   const [dismissedSuggestion, setDismissedSuggestion] = useState<string | null>(null)
   const [isInputFocused, setIsInputFocused] = useState(false)
