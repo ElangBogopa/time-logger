@@ -80,6 +80,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
 
       {/* Streaks card */}
       <div className="rounded-xl bg-card border border-border p-4 mb-3">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Streaks</h4>
         <div className="flex items-center gap-4">
           {/* Planning streak */}
           <div className="flex-1 flex items-center gap-2.5">
@@ -148,6 +149,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
       {/* Goal pills card */}
       {goals.length > 0 ? (
         <div className="rounded-xl bg-card border border-border p-4">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Goals</h4>
           <div className="space-y-2">
             {goals.map(goal => (
               <button
@@ -175,6 +177,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
         </div>
       ) : (
         <div className="rounded-xl bg-card border border-border p-4">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Goals</h4>
           <p className="text-sm text-muted-foreground/60 text-center py-2">
             No goals set yet
           </p>
