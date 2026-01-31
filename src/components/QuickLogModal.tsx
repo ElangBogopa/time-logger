@@ -57,12 +57,6 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const [endTime, setEndTime] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Pre-fill activity from prop whenever modal opens with a task
-  useEffect(() => {
-    if (initialActivity && isOpen) {
-      setActivity(initialActivity)
-    }
-  }, [initialActivity, isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = useState<string | null>(null)
   const [dismissedSuggestion, setDismissedSuggestion] = useState<string | null>(null)
   const [isInputFocused, setIsInputFocused] = useState(false)
@@ -272,7 +266,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   // Reset form fields when modal opens
   useEffect(() => {
     if (isOpen) {
-      setActivity('')
+      setActivity(initialActivity || '')
       setNotes('')
       setError(null)
       setDismissedSuggestion(null)
