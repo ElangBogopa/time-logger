@@ -355,7 +355,6 @@ function CalendarContent() {
           onClose={() => {
             setIsQuickLogOpen(false)
             setDragCreateData(null)
-            setTaskFromParam(null)
           }}
           onEntryAdded={() => {
             fetchEntriesForDate()
