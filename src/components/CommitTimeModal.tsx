@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Clock, Calendar } from 'lucide-react'
+import { X, Clock, Calendar, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface CommitTimeModalProps {
@@ -81,44 +81,55 @@ export default function CommitTimeModal({
 
       {/* Modal */}
       <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg animate-in slide-in-from-bottom duration-200">
-        <div className="rounded-t-2xl border border-border bg-card p-5 pb-8 shadow-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
+        <div className="rounded-t-2xl border border-border bg-card px-5 pt-4 pb-8 shadow-xl">
+          {/* Drag handle */}
+          <div className="flex justify-center mb-3">
+            <div className="h-1 w-8 rounded-full bg-muted-foreground/20" />
+          </div>
+
+          {/* Header row — title + view calendar link */}
+          <div className="flex items-center justify-between mb-3">
+            <div>
               <h3 className="text-sm font-semibold text-foreground">Commit to a time</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
             </div>
-            <button onClick={onClose} className="text-muted-foreground/50 hover:text-muted-foreground">
-              <X className="h-5 w-5" />
+            <button
+              onClick={handleViewCalendar}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+            >
+              <Calendar className="h-3 w-3" />
+              View calendar
+              <ExternalLink className="h-2.5 w-2.5 opacity-50" />
             </button>
           </div>
 
-          {/* Task name + date */}
-          <div className="mb-4 rounded-lg bg-secondary/50 px-3 py-2.5">
+          {/* Task name */}
+          <div className="mb-4 rounded-lg bg-secondary/50 px-3 py-2">
             <p className="text-sm font-medium text-foreground truncate">{taskTitle}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
           </div>
 
-          {/* Time pickers */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Start</label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
-              />
-            </div>
-            <span className="text-muted-foreground/40 mt-5">→</span>
-            <div className="flex-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">End</label>
-              <input
-                type="time"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
-              />
+          {/* Time pickers — compact inline */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-[120px]">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Start</label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+                />
+              </div>
+              <span className="text-muted-foreground/30 mt-4 text-xs">–</span>
+              <div className="w-[120px]">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">End</label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+                />
+              </div>
             </div>
           </div>
 
@@ -128,31 +139,21 @@ export default function CommitTimeModal({
               <button
                 key={p.label}
                 onClick={() => applyPreset(p.minutes)}
-                className="flex-1 rounded-lg border border-border bg-secondary/30 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-colors"
+                className="rounded-lg border border-border bg-secondary/30 px-4 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-colors"
               >
                 {p.label}
               </button>
             ))}
           </div>
 
-          {/* Actions */}
-          <div className="space-y-2">
-            <button
-              onClick={handleCommit}
-              disabled={isSaving || startTime >= endTime}
-              className="w-full rounded-xl bg-primary py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSaving ? 'Saving...' : existingStart ? 'Update time block' : 'Commit to calendar'}
-            </button>
-
-            <button
-              onClick={handleViewCalendar}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all"
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              View in calendar
-            </button>
-          </div>
+          {/* Commit button */}
+          <button
+            onClick={handleCommit}
+            disabled={isSaving || startTime >= endTime}
+            className="w-full rounded-xl bg-primary py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? 'Saving...' : existingStart ? 'Update time block' : 'Commit to calendar'}
+          </button>
         </div>
       </div>
     </>
