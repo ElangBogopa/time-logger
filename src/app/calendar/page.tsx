@@ -224,7 +224,7 @@ function CalendarContent() {
                 Calendar
               </h1>
 
-              {calendarStatus?.connected && (
+              {calendarStatus?.connected && !taskFromParam && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -239,29 +239,33 @@ function CalendarContent() {
 
             {/* Date navigation */}
             <div className="flex items-center justify-between">
-              <button
-                onClick={handlePrevDay}
-                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                aria-label="Previous day"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
+              {!taskFromParam && (
+                <button
+                  onClick={handlePrevDay}
+                  className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  aria-label="Previous day"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+              )}
 
               <button
-                onClick={() => setShowCalendarPicker(!showCalendarPicker)}
-                className="flex flex-col items-center px-4 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => !taskFromParam && setShowCalendarPicker(!showCalendarPicker)}
+                className={`flex flex-col items-center px-4 py-1 rounded-lg ${taskFromParam ? '' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
               >
                 <span className="text-lg font-semibold">{dateDisplay.label}</span>
                 <span className="text-sm text-muted-foreground">{dateDisplay.date}</span>
               </button>
 
-              <button
-                onClick={handleNextDay}
-                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                aria-label="Next day"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
+              {!taskFromParam && (
+                <button
+                  onClick={handleNextDay}
+                  className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  aria-label="Next day"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              )}
             </div>
 
             {/* Calendar picker dropdown */}
@@ -279,14 +283,16 @@ function CalendarContent() {
             )}
           </header>
 
-          {/* Week Strip */}
-          <div className="mb-4">
-            <WeekStrip
-              selectedDate={selectedDate}
-              onDateSelect={handleDateChange}
-              datesWithEntries={entries.map(e => e.date)}
-            />
-          </div>
+          {/* Week Strip — hidden when planning a specific task (date already set) */}
+          {!taskFromParam && (
+            <div className="mb-4">
+              <WeekStrip
+                selectedDate={selectedDate}
+                onDateSelect={handleDateChange}
+                datesWithEntries={entries.map(e => e.date)}
+              />
+            </div>
+          )}
 
           {/* Viewing-only message for old dates */}
           {!canLog && isPastDay && (
