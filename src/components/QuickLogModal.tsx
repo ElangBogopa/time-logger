@@ -57,9 +57,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const [endTime, setEndTime] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Pre-fill activity from prop when modal opens
+  // Pre-fill activity from prop whenever modal opens with a task
   useEffect(() => {
-    if (initialActivity && isOpen && !activity) {
+    if (initialActivity && isOpen) {
       setActivity(initialActivity)
     }
   }, [initialActivity, isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
