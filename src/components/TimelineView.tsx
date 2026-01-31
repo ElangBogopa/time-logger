@@ -488,8 +488,8 @@ export default function TimelineView({
               />
             ))}
 
-            {/* Unlogged time gap indicators */}
-            {updatedTimeGaps.map((gap) => (
+            {/* Unlogged time gap indicators — only show for gaps ≥ 1 hour */}
+            {updatedTimeGaps.filter((gap) => gap.durationMinutes >= 60).map((gap) => (
               <TimelineGap
                 key={`gap-${gap.startTime}-${gap.endTime}`}
                 gap={gap}
