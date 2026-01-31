@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
 import { getUserToday } from '@/lib/types'
+import CommitTimeModal from '@/components/CommitTimeModal'
 
 interface Goal {
   id: string
@@ -20,6 +21,8 @@ interface PlanItem {
   title: string
   completed: boolean
   sort_order: number
+  committed_start: string | null
+  committed_end: string | null
 }
 
 interface DailyScore {
@@ -71,6 +74,7 @@ export default function GoalPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showCoachCard, setShowCoachCard] = useState(false)
+  const [commitModalIdx, setCommitModalIdx] = useState<number | null>(null)
 
   // Check if user has seen the coach card before
   useEffect(() => {
@@ -195,6 +199,22 @@ export default function GoalPage() {
     }
   }
 
+  const handleCommitTime = async (index: number, start: string, end: string) => {
+    const plan = existingPlans[index]
+    if (!plan) return
+    await csrfFetch('/api/plans', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: plan.id, committed_start: start, committed_end: end }),
+    })
+    // Re-fetch plans to get updated data
+    const plansRes = await fetch(`/api/plans?date=${tomorrow}`)
+    if (plansRes.ok) {
+      const { plans } = await plansRes.json()
+      setExistingPlans(plans || [])
+    }
+  }
+
   if (status === 'loading' || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -300,20 +320,50 @@ export default function GoalPage() {
               const placeholder = idx === 0 ? 'Most important task'
                 : idx < 3 ? 'Another task (optional)'
                 : `Task ${idx + 1} (bonus)`
+              const plan = existingPlans[idx]
+              const isCommitted = plan?.committed_start && plan?.committed_end
               return (
-                <div key={idx} className="relative">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2">{icon}</div>
-                  <input
-                    type="text"
-                    value={task}
-                    onChange={e => handleTaskChange(idx, e.target.value)}
-                    placeholder={placeholder}
-                    className="w-full rounded-xl border border-border bg-card pl-10 pr-10 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
-                  />
-                  {task && (
-                    <button onClick={() => clearTask(idx)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground">
-                      <X className="h-4 w-4" />
-                    </button>
+                <div key={idx}>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">{icon}</div>
+                    <input
+                      type="text"
+                      value={task}
+                      onChange={e => handleTaskChange(idx, e.target.value)}
+                      placeholder={placeholder}
+                      className={`w-full rounded-xl border bg-card pl-10 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all ${
+                        isCommitted ? 'border-[#8B7E74]/30 pr-20' : 'border-border pr-10'
+                      }`}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                      {/* Commit button — only show when task is saved */}
+                      {saved && plan && task.trim() && (
+                        <button
+                          onClick={() => setCommitModalIdx(idx)}
+                          className={`rounded-md p-1 transition-colors ${
+                            isCommitted
+                              ? 'text-[#8B7E74] hover:bg-[#8B7E74]/10'
+                              : 'text-muted-foreground/30 hover:text-muted-foreground/60 hover:bg-secondary/50'
+                          }`}
+                          title={isCommitted ? `${plan.committed_start?.slice(0,5)} – ${plan.committed_end?.slice(0,5)}` : 'Commit to a time'}
+                        >
+                          <Clock className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {task && (
+                        <button onClick={() => clearTask(idx)} className="text-muted-foreground/40 hover:text-muted-foreground">
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Committed time badge */}
+                  {isCommitted && (
+                    <div className="mt-1 ml-10 flex items-center gap-1">
+                      <span className="text-[10px] text-[#8B7E74] font-medium">
+                        {plan.committed_start?.slice(0,5)} – {plan.committed_end?.slice(0,5)}
+                      </span>
+                    </div>
                   )}
                 </div>
               )
@@ -504,6 +554,19 @@ export default function GoalPage() {
           </section>
         )}
       </div>
+
+      {/* Commit Time Modal */}
+      {commitModalIdx !== null && existingPlans[commitModalIdx] && (
+        <CommitTimeModal
+          isOpen={true}
+          onClose={() => setCommitModalIdx(null)}
+          onCommit={(start, end) => handleCommitTime(commitModalIdx, start, end)}
+          taskTitle={existingPlans[commitModalIdx].title}
+          date={tomorrow}
+          existingStart={existingPlans[commitModalIdx].committed_start}
+          existingEnd={existingPlans[commitModalIdx].committed_end}
+        />
+      )}
     </div>
   )
 }

@@ -15,6 +15,7 @@ import TimelineGrid from './timeline/TimelineGrid'
 import TimelineEntry from './timeline/TimelineEntry'
 import TimelineGap from './timeline/TimelineGap'
 import TimelineGhost, { type CalendarEvent } from './timeline/TimelineGhost'
+import TimelineCommitted, { type CommittedTask } from './timeline/TimelineCommitted'
 import { CurrentTimeIndicator, DragPreview } from './timeline'
 import { yToTime as createYToTime } from './timeline/utils'
 
@@ -23,6 +24,7 @@ export type { CalendarEvent, DragCreateData, PlacedEntry }
 export interface TimelineViewProps {
   entries: TimeEntry[]
   calendarEvents?: CalendarEvent[]
+  committedTasks?: CommittedTask[]
   isLoading: boolean
   onEntryDeleted: () => void
   onGhostEntryClick?: (event: CalendarEvent) => void
@@ -40,6 +42,7 @@ export interface TimelineViewProps {
 export default function TimelineView({
   entries,
   calendarEvents = [],
+  committedTasks = [],
   isLoading,
   onEntryDeleted,
   onGhostEntryClick,
@@ -473,6 +476,15 @@ export default function TimelineView({
                   handleGhostTouchEnd(e)
                 }}
                 onDismiss={dismissGhostEvent}
+              />
+            ))}
+
+            {/* Committed tasks (from daily plans) */}
+            {committedTasks.map((task) => (
+              <TimelineCommitted
+                key={`committed-${task.id}`}
+                task={task}
+                startHour={updatedStartHour}
               />
             ))}
 

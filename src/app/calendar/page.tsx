@@ -2,10 +2,11 @@
 
 import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchEntries } from '@/lib/api'
 import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
+import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import QuickLogModal from '@/components/QuickLogModal'
 import Toast from '@/components/Toast'
@@ -45,24 +46,28 @@ function formatDateDisplay(dateStr: string): { label: string; date: string; isFu
 function CalendarContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   // Initialize to empty string for hydration safety, set on client
   const [selectedDate, setSelectedDate] = useState('')
 
-  // Set selected date on client to avoid hydration mismatch
+  // Set selected date on client to avoid hydration mismatch — respect ?date= param
   useEffect(() => {
     if (!selectedDate) {
+      const dateParam = searchParams.get('date')
+      const initial = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : getLocalDateString()
       // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only initialization for hydration safety
-      setSelectedDate(getLocalDateString())
+      setSelectedDate(initial)
     }
-  }, [selectedDate])
+  }, [selectedDate, searchParams])
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<{ message: string } | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [dragCreateData, setDragCreateData] = useState<DragCreateData | null>(null)
   const [showCalendarPicker, setShowCalendarPicker] = useState(false)
+  const [committedTasks, setCommittedTasks] = useState<CommittedTask[]>([])
 
   // Use cached calendar events from context
   const {
@@ -121,8 +126,27 @@ function CalendarContent() {
     if (!userId || !selectedDate) return
     setIsLoading(true)
     try {
-      const data = await fetchEntries({ date: selectedDate })
+      const [data, plansRes] = await Promise.all([
+        fetchEntries({ date: selectedDate }),
+        fetch(`/api/plans?date=${selectedDate}`),
+      ])
       setEntries(data)
+
+      // Fetch committed tasks for this date
+      if (plansRes.ok) {
+        const { plans } = await plansRes.json()
+        const committed = (plans || [])
+          .filter((p: CommittedTask & { committed_start: string | null }) => p.committed_start && p.committed_end)
+          .map((p: CommittedTask) => ({
+            id: p.id,
+            title: p.title,
+            date: p.date,
+            committed_start: p.committed_start,
+            committed_end: p.committed_end,
+            completed: p.completed,
+          }))
+        setCommittedTasks(committed)
+      }
     } catch (error) {
       console.error('Failed to fetch entries:', error)
     }
@@ -268,6 +292,7 @@ function CalendarContent() {
               key={refreshKey}
               entries={entries}
               calendarEvents={calendarEvents}
+              committedTasks={committedTasks}
               isLoading={isLoading}
               onEntryDeleted={fetchEntriesForDate}
               onGhostEntryClick={setSelectedGhostEvent}

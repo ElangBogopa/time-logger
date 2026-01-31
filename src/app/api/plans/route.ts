@@ -97,7 +97,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, completed, title } = body
+    const { id, completed, title, committed_start, committed_end } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Plan id required' }, { status: 400 })
@@ -106,6 +106,9 @@ export async function PATCH(request: NextRequest) {
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (typeof completed === 'boolean') updates.completed = completed
     if (typeof title === 'string' && title.trim()) updates.title = title.trim()
+    // Time commitment (HH:MM format or null to clear)
+    if (committed_start !== undefined) updates.committed_start = committed_start
+    if (committed_end !== undefined) updates.committed_end = committed_end
 
     const { data: plan, error } = await supabase
       .from('daily_plans')
