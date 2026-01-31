@@ -456,20 +456,23 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
         onEntryAdded()
 
-        // Reset form for next entry (no popup, just keep logging)
-        setActivity('')
-        setNotes('')
-        setError(null)
-        setParseResult(null)
-        setIsAutoParseApplied(false)
-        setShowHighlightedInput(false)
-        // Set start time to end of last entry for next entry
-        setStartTime(endTime)
-        setEndTime(getCurrentTime())
-        // Show brief toast confirmation
-        // Toast removed
-        // Focus input for next entry
-        setTimeout(() => inputRef.current?.focus(), 100)
+        if (disablePostSubmit) {
+          // Calendar page: just close after logging
+          onClose()
+        } else {
+          // Reset form for next entry (no popup, just keep logging)
+          setActivity('')
+          setNotes('')
+          setError(null)
+          setParseResult(null)
+          setIsAutoParseApplied(false)
+          setShowHighlightedInput(false)
+          // Set start time to end of last entry for next entry
+          setStartTime(endTime)
+          setEndTime(getCurrentTime())
+          // Focus input for next entry
+          setTimeout(() => inputRef.current?.focus(), 100)
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
