@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
+import { calculateDailyScore, DailyProductivityScore, PlanItem } from '@/lib/productivity-score'
 import {
   TimeEntry,
   WeeklyTarget,
@@ -103,6 +104,9 @@ interface DaySummary {
 
   // Entries for detailed view
   entries: TimeEntry[]
+
+  // Productivity plan score (plan-based scoring)
+  productivityScore: DailyProductivityScore | null
 }
 
 function getYesterdayDateString(userToday: string): string {
@@ -402,6 +406,7 @@ export async function GET(request: NextRequest) {
       targetsResult,
       completionsResult,
       moodResult,
+      plansResult,
     ] = await Promise.all([
       supabase
         .from('time_entries')
@@ -452,6 +457,13 @@ export async function GET(request: NextRequest) {
         .eq('date', today)
         .order('created_at', { ascending: false })
         .limit(1),
+
+      supabase
+        .from('daily_plans')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', today)
+        .order('sort_order', { ascending: true }),
     ])
 
     const todayEntries = (todayEntriesResult.data || []) as TimeEntry[]
@@ -461,6 +473,10 @@ export async function GET(request: NextRequest) {
     const targets = (targetsResult.data || []) as WeeklyTarget[]
     const completions = (completionsResult.data || []) as SessionCompletion[]
     const todayMood = (moodResult.data?.[0] as MoodCheckin) || null
+    const todayPlans = (plansResult.data || []) as PlanItem[]
+
+    // Calculate productivity score from plans
+    const productivityScore = todayPlans.length > 0 ? calculateDailyScore(todayPlans) : null
 
     const totalMinutesLogged = todayEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
     const sessionsLogged = completions.filter(c => !c.skipped).length
@@ -566,6 +582,7 @@ export async function GET(request: NextRequest) {
       aggregatedBreakdown,
       todayMood,
       entries: todayEntries,
+      productivityScore,
     }
 
     return NextResponse.json(summary)

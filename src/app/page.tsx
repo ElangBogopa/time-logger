@@ -14,6 +14,7 @@ import type { TrendAPIResponse } from '@/lib/trend-types'
 import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
+import YourPlan from '@/components/YourPlan'
 import { Sun, Cloud, Moon, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
@@ -164,10 +165,10 @@ function HomeContent() {
             date={selectedDate}
           />
 
-          {/* 3. MY DAY section */}
+          {/* 4. YOUR DAY section */}
           <div className="mt-4">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              My Day
+              Your Day
             </h3>
 
             {/* Your Day In Review */}
@@ -287,6 +288,9 @@ function HomeContent() {
               </div>
             </div>
           </div>
+
+          {/* 5. YOUR PLAN section */}
+          <YourPlan date={selectedDate} isToday={isToday} />
         </div>
 
         {/* MetricDetailSheet — rendered at page level */}

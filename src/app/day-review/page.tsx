@@ -140,6 +140,26 @@ interface AggregatedBreakdown {
   isTargetLinked: boolean
 }
 
+interface ProductivityTaskInfo {
+  title: string
+  completed: boolean
+  weight: number
+  slot: number
+}
+
+interface ProductivityScore {
+  date: string
+  score: number
+  maxPossible: number
+  earnedPoints: number
+  totalTasks: number
+  completedTasks: number
+  priorityCompleted: boolean
+  tasks: ProductivityTaskInfo[]
+  label: string
+  hasPlans: boolean
+}
+
 interface DaySummary {
   score: number
   scoreColor: 'green' | 'orange' | 'red'
@@ -155,6 +175,7 @@ interface DaySummary {
   categoryBreakdown: CategoryBreakdown[]
   aggregatedBreakdown: AggregatedBreakdown[]
   todayMood: MoodCheckin | null
+  productivityScore: ProductivityScore | null
   entries: TimeEntry[]
 }
 
@@ -366,6 +387,56 @@ function TargetCard({ target }: { target: TargetProgress }) {
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>Yesterday: {formatMinutes(target.yesterdayMinutes)}</span>
         <span>Last {new Date().toLocaleDateString('en-US', { weekday: 'short' })}: {formatMinutes(target.sameDayLastWeekMinutes)}</span>
+      </div>
+    </div>
+  )
+}
+
+// Productivity Plan Card — shows plan completion in Goal Progress
+function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
+  const barColor = score.score >= 80 ? 'bg-green-500' : score.score >= 50 ? 'bg-amber-500' : 'bg-red-400'
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="font-medium text-foreground">Productivity</h3>
+          <p className="text-2xl font-bold text-foreground mt-1">
+            {score.score}%
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              {score.label}
+            </span>
+          </p>
+        </div>
+        <div className="text-right text-sm text-muted-foreground">
+          {score.completedTasks}/{score.totalTasks} tasks
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${score.score}%` }} />
+      </div>
+
+      {/* Task breakdown */}
+      <div className="space-y-1.5">
+        {score.tasks.map((task, i) => (
+          <div key={i} className="flex items-center gap-2 text-sm">
+            <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+              task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
+            }`}>
+              {task.completed && (
+                <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className={task.completed ? 'line-through text-muted-foreground/50' : 'text-foreground'}>
+              {task.title}
+            </span>
+            <span className="ml-auto text-[10px] text-muted-foreground/40">{task.weight}pts</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -731,11 +802,14 @@ function DayReviewContent() {
           <TimelineStrip timeline={summary.timeline} />
         </div>
 
-        {/* Target Progress */}
-        {summary.targetProgress.length > 0 && (
+        {/* Goal Progress — includes productivity plan score + weekly targets */}
+        {(summary.productivityScore?.hasPlans || summary.targetProgress.length > 0) && (
           <section className="mb-6 space-y-3">
             <h2 className="font-semibold text-foreground">Goal Progress</h2>
             <div className="space-y-3">
+              {summary.productivityScore?.hasPlans && (
+                <ProductivityPlanCard score={summary.productivityScore} />
+              )}
               {summary.targetProgress.map(tp => (
                 <TargetCard key={tp.targetId} target={tp} />
               ))}

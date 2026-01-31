@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check CSRF token on mutating API requests (excluding NextAuth routes)
-  if ((method === 'POST' || method === 'PUT' || method === 'DELETE') && 
+  if ((method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') && 
       pathname.startsWith('/api/') && 
       !pathname.startsWith('/api/auth/')) {
     

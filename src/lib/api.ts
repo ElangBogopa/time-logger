@@ -18,7 +18,7 @@ export function getCsrfToken(): string {
  */
 export async function csrfFetch(url: string, options?: RequestInit): Promise<Response> {
   const method = options?.method?.toUpperCase() || 'GET'
-  const needsCsrf = ['POST', 'PUT', 'DELETE'].includes(method)
+  const needsCsrf = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
   
   const headers = new Headers(options?.headers)
   
@@ -35,7 +35,7 @@ export async function csrfFetch(url: string, options?: RequestInit): Promise<Res
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   // Add CSRF token header for mutating requests
   const method = options?.method?.toUpperCase() || 'GET'
-  const needsCsrf = ['POST', 'PUT', 'DELETE'].includes(method)
+  const needsCsrf = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
   
   const headers = new Headers(options?.headers)
   
