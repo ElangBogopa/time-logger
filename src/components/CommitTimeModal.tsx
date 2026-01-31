@@ -150,7 +150,7 @@ export default function CommitTimeModal({
           <button
             onClick={handleCommit}
             disabled={isSaving || startTime >= endTime}
-            className="w-full rounded-xl bg-primary py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl py-3 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white text-zinc-900 hover:bg-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             {isSaving ? 'Saving...' : existingStart ? 'Update time block' : 'Commit to calendar'}
           </button>
