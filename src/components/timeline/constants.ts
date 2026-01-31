@@ -1,9 +1,10 @@
 import { TimeCategory } from '@/lib/types'
 
 // Timeline layout constants
-export const PIXELS_PER_MINUTE = 1.5
-export const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE // 90px per hour
-export const MIN_BLOCK_HEIGHT = 24 // Minimum height for very short entries
+// 0.75 px/min = 45px/hour → ~13 hours visible on a 600px screen (matches Google/Apple Calendar density)
+export const PIXELS_PER_MINUTE = 0.75
+export const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE // 45px per hour
+export const MIN_BLOCK_HEIGHT = 20 // Minimum height for very short entries
 
 // Interaction thresholds
 export const DRAG_THRESHOLD = 20 // pixels - minimum drag distance to count as intentional drag (after hold confirmed)

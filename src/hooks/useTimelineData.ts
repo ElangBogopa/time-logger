@@ -42,7 +42,7 @@ export interface UseTimelineDataReturn {
   isEmpty: boolean
 }
 
-const PIXELS_PER_MINUTE = 1.5
+import { PIXELS_PER_MINUTE } from '@/components/timeline/constants'
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE // 90px per hour
 
 // Find gaps in the timeline where untimed entries could fit

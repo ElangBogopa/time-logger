@@ -27,8 +27,7 @@ interface TimelineEntryProps {
   onClick?: (entry: PlacedEntry) => void
 }
 
-const PIXELS_PER_MINUTE = 1.5
-const MIN_BLOCK_HEIGHT = 24
+import { PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT } from './constants'
 
 // Aggregated color palette — 6 muted colors mapped to energy categories
 const AGGREGATED_COLORS: Record<string, { border: string; bgLight: string; bgDark: string }> = {

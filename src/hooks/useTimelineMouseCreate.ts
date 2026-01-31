@@ -21,7 +21,7 @@ export interface UseTimelineMouseCreateReturn {
 }
 
 const DRAG_THRESHOLD = 20 // pixels - minimum drag distance to count as intentional drag
-const PIXELS_PER_MINUTE = 1.5
+import { PIXELS_PER_MINUTE } from '@/components/timeline/constants'
 
 export function useTimelineMouseCreate({
   scrollContainerRef,

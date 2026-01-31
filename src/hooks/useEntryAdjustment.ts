@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { timeToMinutes, minutesToTime } from '@/lib/time-utils'
 import { updateEntry } from '@/lib/api'
 import { PlacedEntry } from './useTimelineData'
+import { PIXELS_PER_MINUTE } from '@/components/timeline/constants'
 
 export interface UseEntryAdjustmentParams {
   scrollContainerRef: React.RefObject<HTMLDivElement>
@@ -247,7 +248,7 @@ export function useEntryAdjustment({
 
       if (dragType === 'move') {
         // For move, calculate delta and apply to both start and end
-        const deltaMinutes = Math.round((deltaY / 1.5) / 15) * 15 // PIXELS_PER_MINUTE = 1.5
+        const deltaMinutes = Math.round((deltaY / PIXELS_PER_MINUTE) / 15) * 15
         newStartMins = Math.round((originalStartMins + deltaMinutes) / 15) * 15
         newEndMins = newStartMins + duration
         // Clamp to day bounds (0:00 to 24:00)
@@ -363,7 +364,7 @@ export function useEntryAdjustment({
 
       if (dragType === 'move') {
         // For move, calculate delta and apply to both start and end
-        const deltaMinutes = Math.round((deltaY / 1.5) / 15) * 15 // PIXELS_PER_MINUTE = 1.5
+        const deltaMinutes = Math.round((deltaY / PIXELS_PER_MINUTE) / 15) * 15
         newStartMins = Math.round((originalStartMins + deltaMinutes) / 15) * 15
         newEndMins = newStartMins + duration
         if (newStartMins < 0) {

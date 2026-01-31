@@ -16,7 +16,7 @@ interface TimelineGridProps {
   children?: React.ReactNode
 }
 
-const HOUR_HEIGHT = 60 * 1.5 // 90px per hour (PIXELS_PER_MINUTE = 1.5)
+import { HOUR_HEIGHT } from './constants'
 
 export default function TimelineGrid({
   startHour,

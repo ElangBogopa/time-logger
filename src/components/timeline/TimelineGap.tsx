@@ -18,8 +18,7 @@ interface TimelineGapProps {
   onDragCreate: (data: { startTime: string; endTime: string }) => void
 }
 
-const PIXELS_PER_MINUTE = 1.5
-const MIN_BLOCK_HEIGHT = 24
+import { PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT } from './constants'
 
 export default function TimelineGap({ gap, startHour, onDragCreate }: TimelineGapProps) {
   const top = (gap.startMinutes - startHour * 60) * PIXELS_PER_MINUTE

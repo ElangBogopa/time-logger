@@ -16,7 +16,7 @@ import TimelineEntry from './timeline/TimelineEntry'
 import TimelineGap from './timeline/TimelineGap'
 import TimelineGhost, { type CalendarEvent } from './timeline/TimelineGhost'
 import TimelineCommitted, { type CommittedTask } from './timeline/TimelineCommitted'
-import { CurrentTimeIndicator, DragPreview } from './timeline'
+import { CurrentTimeIndicator, DragPreview, PIXELS_PER_MINUTE } from './timeline'
 import { yToTime as createYToTime } from './timeline/utils'
 
 export type { CalendarEvent, DragCreateData, PlacedEntry }
@@ -281,7 +281,7 @@ export default function TimelineView({
         const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
         // Calculate position of current time
-        const currentTimeOffset = (currentMinutes - updatedStartHour * 60) * 1.5 // PIXELS_PER_MINUTE
+        const currentTimeOffset = (currentMinutes - updatedStartHour * 60) * PIXELS_PER_MINUTE
 
         // Center it in the viewport (subtract half the container height)
         const scrollTo = currentTimeOffset - containerHeight / 2
@@ -296,7 +296,7 @@ export default function TimelineView({
           return timeToMinutes(entry.placedStartTime) < timeToMinutes(earliest.placedStartTime) ? entry : earliest
         }, updatedPlacedEntries[0])
 
-        const entryOffset = (timeToMinutes(firstEntry.placedStartTime) - updatedStartHour * 60) * 1.5 // PIXELS_PER_MINUTE
+        const entryOffset = (timeToMinutes(firstEntry.placedStartTime) - updatedStartHour * 60) * PIXELS_PER_MINUTE
         const scrollTo = entryOffset - 60 // 60px padding above
 
         container.scrollTo({
@@ -309,7 +309,7 @@ export default function TimelineView({
           return timeToMinutes(event.startTime) < timeToMinutes(earliest.startTime) ? event : earliest
         }, updatedGhostEvents[0])
 
-        const ghostOffset = (timeToMinutes(firstGhost.startTime) - updatedStartHour * 60) * 1.5 // PIXELS_PER_MINUTE
+        const ghostOffset = (timeToMinutes(firstGhost.startTime) - updatedStartHour * 60) * PIXELS_PER_MINUTE
         const scrollTo = ghostOffset - 60 // 60px padding above
 
         container.scrollTo({
@@ -318,7 +318,7 @@ export default function TimelineView({
         })
       } else {
         // Empty day: scroll to 9am, centered in viewport
-        const nineAMOffset = (9 * 60 - updatedStartHour * 60) * 1.5 // PIXELS_PER_MINUTE
+        const nineAMOffset = (9 * 60 - updatedStartHour * 60) * PIXELS_PER_MINUTE
         const scrollTo = nineAMOffset - containerHeight / 3
 
         container.scrollTo({

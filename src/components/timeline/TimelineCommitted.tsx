@@ -18,8 +18,7 @@ interface TimelineCommittedProps {
   startHour: number
 }
 
-const PIXELS_PER_MINUTE = 1.5
-const MIN_BLOCK_HEIGHT = 24
+import { PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT } from './constants'
 
 // Warm taupe palette — distinct from calendar ghosts (zinc) and entries (category colors)
 // Neutral, non-bright, earthy tone
