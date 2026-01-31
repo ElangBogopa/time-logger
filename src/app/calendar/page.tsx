@@ -312,19 +312,28 @@ function CalendarContent() {
 
           {/* Task planning banner */}
           {taskFromParam && (
-            <div className="mb-3 flex items-center justify-between rounded-xl border border-[#8B7E74]/30 bg-[#8B7E74]/10 px-4 py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <Clock className="h-4 w-4 shrink-0 text-[#8B7E74]" />
-                <div className="min-w-0">
-                  <p className="text-xs text-[#8B7E74]/70">Planning task</p>
-                  <p className="text-sm font-medium text-foreground truncate">{taskFromParam}</p>
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center justify-between rounded-xl border border-[#8B7E74]/30 bg-[#8B7E74]/10 px-4 py-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Clock className="h-4 w-4 shrink-0 text-[#8B7E74]" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-[#8B7E74]/70">Planning task</p>
+                    <p className="text-sm font-medium text-foreground truncate">{taskFromParam}</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => setTaskFromParam(null)}
+                  className="shrink-0 ml-2 text-muted-foreground/40 hover:text-muted-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
               <button
-                onClick={() => setTaskFromParam(null)}
-                className="shrink-0 ml-2 text-muted-foreground/40 hover:text-muted-foreground"
+                onClick={() => router.back()}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                <X className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4" />
+                Back to tasks
               </button>
             </div>
           )}
