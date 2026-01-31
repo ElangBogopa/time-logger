@@ -57,7 +57,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
     return (
       <div className="mt-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          Your Plan
+          Your Tasks
         </h3>
         <div className="rounded-xl bg-card border border-border p-4">
           <div className="flex items-center justify-center py-4">
@@ -75,7 +75,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
   return (
     <div className="mt-4">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-        Your Plan
+        Your Tasks
       </h3>
 
       {/* Streaks card */}

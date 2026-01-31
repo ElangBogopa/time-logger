@@ -232,11 +232,11 @@ export default function GoalPage() {
           {goal.description && <p className="mt-1 text-sm text-muted-foreground">{goal.description}</p>}
         </header>
 
-        {/* Tomorrow's Plan */}
+        {/* Tomorrow's Tasks */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Plan for tomorrow
+              Tasks for tomorrow
             </h2>
             <button
               onClick={toggleCoachCard}
@@ -340,7 +340,7 @@ export default function GoalPage() {
           >
             {isSaving ? (
               <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Saving...</span>
-            ) : saved ? '✓ Plan saved' : hasExistingPlans ? 'Update plan' : 'Set plan for tomorrow'}
+            ) : saved ? '✓ Tasks saved' : hasExistingPlans ? 'Update tasks' : 'Set tasks for tomorrow'}
           </button>
         </section>
 
