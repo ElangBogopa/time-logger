@@ -80,15 +80,15 @@ export default function CommitTimeModal({
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg animate-in slide-in-from-bottom duration-200">
-        <div className="rounded-t-2xl border border-border bg-card px-5 pt-4 pb-8 shadow-xl">
+      <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg animate-in slide-in-from-bottom duration-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="rounded-t-2xl border border-border bg-card px-5 pt-3 pb-20 shadow-xl">
           {/* Drag handle */}
-          <div className="flex justify-center mb-3">
+          <div className="flex justify-center mb-2">
             <div className="h-1 w-8 rounded-full bg-muted-foreground/20" />
           </div>
 
           {/* Header row — title + view calendar link */}
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Commit to a time</h3>
               <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
@@ -104,12 +104,12 @@ export default function CommitTimeModal({
           </div>
 
           {/* Task name */}
-          <div className="mb-4 rounded-lg bg-secondary/50 px-3 py-2">
+          <div className="mb-3 rounded-lg bg-secondary/50 px-3 py-2">
             <p className="text-sm font-medium text-foreground truncate">{taskTitle}</p>
           </div>
 
           {/* Time pickers — compact inline */}
-          <div className="mb-3">
+          <div className="mb-2">
             <div className="flex items-center gap-2">
               <div className="w-[120px]">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Start</label>
@@ -134,7 +134,7 @@ export default function CommitTimeModal({
           </div>
 
           {/* Duration presets */}
-          <div className="flex gap-2 mb-5">
+          <div className="flex gap-2 mb-4">
             {presets.map(p => (
               <button
                 key={p.label}
