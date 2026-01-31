@@ -126,6 +126,17 @@ export function smartPlaceEntries(
   return placed
 }
 
+// Snap minutes to :00 or :30 with bias toward :00
+// Within each hour: 0-19 → :00, 20-39 → :30, 40-59 → next :00
+// Gives :00 a 2:1 capture zone over :30
+export function snapToHalfHour(totalMinutes: number): number {
+  const hour = Math.floor(totalMinutes / 60)
+  const minute = totalMinutes - hour * 60
+  if (minute < 20) return hour * 60        // snap to :00
+  if (minute < 40) return hour * 60 + 30   // snap to :30
+  return (hour + 1) * 60                   // snap to next :00
+}
+
 // Convert Y position (relative to grid) to time
 export function yToTime(clientY: number, scrollContainerRef: React.RefObject<HTMLDivElement>, startHour: number): string {
   if (!scrollContainerRef.current) {
@@ -143,8 +154,8 @@ export function yToTime(clientY: number, scrollContainerRef: React.RefObject<HTM
   const minutesFromGridTop = relativeY / PIXELS_PER_MINUTE
   const totalMinutes = minutesFromGridTop + (startHour * 60)
 
-  // Snap to 15-minute intervals
-  const snappedMinutes = Math.round(totalMinutes / 15) * 15
+  // Snap to :00 or :30 with bias toward :00
+  const snappedMinutes = snapToHalfHour(totalMinutes)
 
   // Clamp to valid range (startHour to endHour - assuming 24 hour max)
   const minMinutes = startHour * 60

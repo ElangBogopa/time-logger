@@ -127,10 +127,10 @@ export function useTimelineMouseCreate({
           finalEnd = startTime
         }
 
-        // Ensure minimum 15-minute duration for drags
+        // Ensure minimum 30-minute duration for drags
         const duration = timeToMinutes(finalEnd) - timeToMinutes(finalStart)
-        if (duration < 15) {
-          finalEnd = minutesToTime(timeToMinutes(finalStart) + 15)
+        if (duration < 30) {
+          finalEnd = minutesToTime(timeToMinutes(finalStart) + 30)
         }
       } else {
         // User just clicked - default to 30-minute duration

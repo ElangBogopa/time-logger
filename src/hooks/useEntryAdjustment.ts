@@ -3,6 +3,7 @@ import { timeToMinutes, minutesToTime } from '@/lib/time-utils'
 import { updateEntry } from '@/lib/api'
 import { PlacedEntry } from './useTimelineData'
 import { PIXELS_PER_MINUTE } from '@/components/timeline/constants'
+import { snapToHalfHour } from '@/components/timeline/utils'
 
 export interface UseEntryAdjustmentParams {
   scrollContainerRef: React.RefObject<HTMLDivElement>
@@ -247,9 +248,9 @@ export function useEntryAdjustment({
       const cursorMins = timeToMinutes(cursorTime)
 
       if (dragType === 'move') {
-        // For move, calculate delta and apply to both start and end
-        const deltaMinutes = Math.round((deltaY / PIXELS_PER_MINUTE) / 15) * 15
-        newStartMins = Math.round((originalStartMins + deltaMinutes) / 15) * 15
+        // For move, snap destination to :00/:30 with bias toward :00
+        const rawNewStart = originalStartMins + (deltaY / PIXELS_PER_MINUTE)
+        newStartMins = snapToHalfHour(rawNewStart)
         newEndMins = newStartMins + duration
         // Clamp to day bounds (0:00 to 24:00)
         if (newStartMins < 0) {
@@ -363,9 +364,9 @@ export function useEntryAdjustment({
       const cursorMins = timeToMinutes(cursorTime)
 
       if (dragType === 'move') {
-        // For move, calculate delta and apply to both start and end
-        const deltaMinutes = Math.round((deltaY / PIXELS_PER_MINUTE) / 15) * 15
-        newStartMins = Math.round((originalStartMins + deltaMinutes) / 15) * 15
+        // For move, snap destination to :00/:30 with bias toward :00
+        const rawNewStart = originalStartMins + (deltaY / PIXELS_PER_MINUTE)
+        newStartMins = snapToHalfHour(rawNewStart)
         newEndMins = newStartMins + duration
         if (newStartMins < 0) {
           newStartMins = 0
