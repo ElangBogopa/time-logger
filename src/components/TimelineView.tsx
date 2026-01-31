@@ -479,14 +479,18 @@ export default function TimelineView({
               />
             ))}
 
-            {/* Committed tasks (from daily plans) */}
-            {committedTasks.map((task) => (
-              <TimelineCommitted
-                key={`committed-${task.id}`}
-                task={task}
-                startHour={updatedStartHour}
-              />
-            ))}
+            {/* Committed tasks (from daily plans) — hide if a pending entry already exists for this task */}
+            {committedTasks
+              .filter((task) => !entries.some(
+                (e) => e.status === 'pending' && e.activity.toLowerCase() === task.title.toLowerCase()
+              ))
+              .map((task) => (
+                <TimelineCommitted
+                  key={`committed-${task.id}`}
+                  task={task}
+                  startHour={updatedStartHour}
+                />
+              ))}
 
             {/* Unlogged time gap indicators — only show for gaps ≥ 1 hour */}
             {updatedTimeGaps.filter((gap) => gap.durationMinutes >= 60).map((gap) => (
