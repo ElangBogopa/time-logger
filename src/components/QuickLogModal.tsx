@@ -279,8 +279,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setLastLoggedActivity('')
       setIsInputFocused(false)
       timesInitialized.current = false // Reset flag when modal opens
-      // Focus the activity input after a brief delay
-      setTimeout(() => inputRef.current?.focus(), 100)
+      // Focus the activity input after a brief delay — but skip if pre-filled
+      // (avoids keyboard popup + text selection when task is already set)
+      if (!initialActivity) {
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
       // Fetch smart suggestions
       fetchSuggestions()
     }
