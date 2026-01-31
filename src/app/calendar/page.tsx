@@ -238,7 +238,7 @@ function CalendarContent() {
             </div>
 
             {/* Date navigation */}
-            <div className="flex items-center justify-between">
+            <div className={`flex items-center ${taskFromParam ? 'justify-center' : 'justify-between'}`}>
               {!taskFromParam && (
                 <button
                   onClick={handlePrevDay}
@@ -249,13 +249,20 @@ function CalendarContent() {
                 </button>
               )}
 
-              <button
-                onClick={() => !taskFromParam && setShowCalendarPicker(!showCalendarPicker)}
-                className={`flex flex-col items-center px-4 py-1 rounded-lg ${taskFromParam ? '' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
-              >
-                <span className="text-lg font-semibold">{dateDisplay.label}</span>
-                <span className="text-sm text-muted-foreground">{dateDisplay.date}</span>
-              </button>
+              {taskFromParam ? (
+                <div className="flex flex-col items-center px-4 py-1">
+                  <span className="text-lg font-semibold">{dateDisplay.label}</span>
+                  <span className="text-sm text-muted-foreground">{dateDisplay.date}</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowCalendarPicker(!showCalendarPicker)}
+                  className="flex flex-col items-center px-4 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  <span className="text-lg font-semibold">{dateDisplay.label}</span>
+                  <span className="text-sm text-muted-foreground">{dateDisplay.date}</span>
+                </button>
+              )}
 
               {!taskFromParam && (
                 <button
