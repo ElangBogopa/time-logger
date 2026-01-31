@@ -358,13 +358,7 @@ export default function GoalPage() {
                     </div>
                   </div>
                   {/* Committed time badge */}
-                  {isCommitted && (
-                    <div className="mt-1 ml-10 flex items-center gap-1">
-                      <span className="text-[10px] text-green-500/70 font-medium">
-                        ✓ Scheduled {plan.committed_start?.slice(0,5)} – {plan.committed_end?.slice(0,5)}
-                      </span>
-                    </div>
-                  )}
+                  {/* Green CalendarCheck icon is sufficient indicator */}
                 </div>
               )
             })}
