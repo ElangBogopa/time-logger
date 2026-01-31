@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check } from 'lucide-react'
+import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
 import { getUserToday } from '@/lib/types'
 
@@ -70,6 +70,20 @@ export default function GoalPage() {
   const [existingPlans, setExistingPlans] = useState<PlanItem[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showCoachCard, setShowCoachCard] = useState(false)
+
+  // Check if user has seen the coach card before
+  useEffect(() => {
+    const seen = localStorage.getItem('better_coach_tasks_vs_cal')
+    if (!seen) setShowCoachCard(true)
+  }, [])
+
+  const dismissCoachCard = () => {
+    setShowCoachCard(false)
+    localStorage.setItem('better_coach_tasks_vs_cal', '1')
+  }
+
+  const toggleCoachCard = () => setShowCoachCard(prev => !prev)
 
   // Stats
   const [todayScore, setTodayScore] = useState<DailyScore | null>(null)
@@ -220,9 +234,60 @@ export default function GoalPage() {
 
         {/* Tomorrow's Plan */}
         <section className="mb-8">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            Plan for tomorrow
-          </h2>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Plan for tomorrow
+            </h2>
+            <button
+              onClick={toggleCoachCard}
+              className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+              aria-label="What goes here?"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Coach Card */}
+          {showCoachCard && (
+            <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <p className="text-sm font-medium text-foreground">Tasks vs Calendar — what goes where?</p>
+                <button
+                  onClick={dismissCoachCard}
+                  className="text-muted-foreground/40 hover:text-muted-foreground shrink-0 ml-2"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex gap-2.5">
+                  <span className="text-lg leading-none mt-0.5">✅</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Tasks</p>
+                    <p className="text-xs text-muted-foreground">Things you want to accomplish — on your terms.</p>
+                    <p className="text-xs text-muted-foreground/60 italic mt-0.5">"Study 2 hours", "Code a feature", "Hit the gym"</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5">
+                  <span className="text-lg leading-none mt-0.5">📅</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Calendar</p>
+                    <p className="text-xs text-muted-foreground">Things with a set time — the world expects you there.</p>
+                    <p className="text-xs text-muted-foreground/60 italic mt-0.5">"Class at 9am", "Meeting at 2pm", "Doctor at 4pm"</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-background/60 px-3 py-2">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Rule of thumb:</span> If someone else is expecting you at a specific time → calendar. If it's your call when to do it → task.
+                </p>
+              </div>
+            </div>
+          )}
+
           <p className="text-sm text-muted-foreground/70 mb-4">
             {tomorrowLabel} — What will you get done?
           </p>
