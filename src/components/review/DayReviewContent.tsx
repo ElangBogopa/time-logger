@@ -22,6 +22,7 @@ import {
   SESSION_MOOD_CONFIG,
   TimeEntry,
   AggregatedCategory,
+  getUserToday,
 } from '@/lib/types'
 
 import {
@@ -194,12 +195,13 @@ export default function DayReviewContent() {
 
   const fetchSummary = useCallback(async () => {
     // Check cache for summary
-    const summaryCache = cacheGet<DaySummary>('day-summary:today')
+    const cacheKey = `day-summary:${getUserToday()}`
+    const summaryCache = cacheGet<DaySummary>(cacheKey)
     if (summaryCache) {
       setSummary(summaryCache)
       setIsLoading(false)
       // Still check for cached commentary
-      const commentaryCache = cacheGet<string>('day-commentary:today')
+      const commentaryCache = cacheGet<string>(`day-commentary:${getUserToday()}`)
       if (commentaryCache) {
         setCommentary(commentaryCache)
         return
@@ -207,10 +209,10 @@ export default function DayReviewContent() {
     }
 
     try {
-      const response = await fetch('/api/day-summary')
+      const response = await fetch(`/api/day-summary?date=${getUserToday()}`)
       if (!response.ok) throw new Error('Failed to fetch')
       const data = await response.json()
-      cacheSet('day-summary:today', data)
+      cacheSet(`day-summary:${getUserToday()}`, data)
       setSummary(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
@@ -221,7 +223,7 @@ export default function DayReviewContent() {
 
   const fetchCommentary = useCallback(async (summaryData: DaySummary) => {
     // Check cache first — avoids redundant OpenAI calls
-    const cached = cacheGet<string>('day-commentary:today')
+    const cached = cacheGet<string>(`day-commentary:${getUserToday()}`)
     if (cached) {
       setCommentary(cached)
       return
@@ -243,7 +245,7 @@ export default function DayReviewContent() {
       })
       if (response.ok) {
         const data = await response.json()
-        cacheSet('day-commentary:today', data.commentary)
+        cacheSet(`day-commentary:${getUserToday()}`, data.commentary)
         setCommentary(data.commentary)
       }
     } catch (err) {
