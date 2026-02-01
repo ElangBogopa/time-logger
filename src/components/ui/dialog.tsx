@@ -54,11 +54,36 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Prevent body scroll lock from causing viewport flash on mobile.
+  // Save scroll position before Radix locks body, restore on close.
+  const scrollPosRef = React.useRef(0)
+
+  React.useEffect(() => {
+    // Save current scroll position when dialog mounts
+    scrollPosRef.current = window.scrollY
+
+    // Fix body position to prevent visual jump from scroll lock
+    const scrollY = scrollPosRef.current
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.width = '100%'
+
+    return () => {
+      // Restore body positioning and scroll position on close
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      window.scrollTo(0, scrollY)
+    }
+  }, [])
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        // Prevent auto-focus from causing scroll jumps on mobile
+        onOpenAutoFocus={(e) => e.preventDefault()}
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
           className
