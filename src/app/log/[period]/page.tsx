@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'rea
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch } from '@/lib/api'
+import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
 import {
   TimePeriod,
   TimeEntry,
@@ -123,9 +124,10 @@ function LogPeriodContent() {
     return selectedDate !== today && selectedDate !== yesterday
   })()
 
-  // State
-  const [entries, setEntries] = useState<TimeEntry[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  // State — initialize from shared cache if available (instant render, no skeleton flash)
+  const cachedEntries = selectedDate ? getCachedEntries(selectedDate) : null
+  const [entries, setEntries] = useState<TimeEntry[]>(cachedEntries ?? [])
+  const [isLoading, setIsLoading] = useState(!cachedEntries)
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
   const [summaryInsight, setSummaryInsight] = useState<string | null>(null)
@@ -161,14 +163,23 @@ function LogPeriodContent() {
 
   const userId = session?.user?.id || session?.user?.email || ''
 
-  // Fetch entries for this date
+  // Fetch entries for this date — uses cache for instant render, then revalidates
   const fetchEntries = useCallback(async () => {
     if (!userId || !selectedDate) return
-    setIsLoading(true)
+
+    // Show cached data instantly if available (no loading skeleton)
+    const cached = getCachedEntries(selectedDate)
+    if (cached) {
+      setEntries(cached)
+      setIsLoading(false)
+    } else {
+      setIsLoading(true)
+    }
 
     try {
       const data = await apiFetchEntries({ date: selectedDate, status: 'confirmed', orderBy: 'start_time', orderAsc: true })
       setEntries(data)
+      setCachedEntries(selectedDate, data)
     } catch (err) {
       console.error('Failed to fetch entries:', err)
     }

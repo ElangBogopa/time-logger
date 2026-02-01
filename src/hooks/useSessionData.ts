@@ -19,12 +19,27 @@ interface UseSessionDataProps {
   currentHour: number | null
 }
 
-// Client-side cache for session data per date
+// Client-side cache for session data per date — shared across pages
 interface SessionCacheEntry {
   entries: TimeEntry[]
   completions: SessionCompletion[]
 }
 const sessionDataCache = new Map<string, SessionCacheEntry>()
+
+/** Read cached entries for a date (instant, no fetch). Returns null if not cached. */
+export function getCachedEntries(date: string): TimeEntry[] | null {
+  return sessionDataCache.get(date)?.entries ?? null
+}
+
+/** Write entries into the shared cache (called by session pages after fetch). */
+export function setCachedEntries(date: string, entries: TimeEntry[]): void {
+  const existing = sessionDataCache.get(date)
+  if (existing) {
+    existing.entries = entries
+  } else {
+    sessionDataCache.set(date, { entries, completions: [] })
+  }
+}
 
 export function useSessionData({ userId, today, currentHour }: UseSessionDataProps): UseSessionDataReturn {
   const cached = sessionDataCache.get(today)
