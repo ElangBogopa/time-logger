@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
-import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, PERIOD_TIME_RANGES } from '@/lib/types'
-import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Zap, Share2 } from 'lucide-react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, PERIOD_TIME_RANGES, getUserToday } from '@/lib/types'
+import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Zap, Share2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { csrfFetch } from '@/lib/api'
+import AnimatedCheckbox from '@/components/AnimatedCheckbox'
 
 interface PreviousPeriodStats {
   totalMinutes: number
@@ -98,6 +100,73 @@ export default function PeriodSummaryPopup({
   const [isLeaving, setIsLeaving] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const shareCardRef = useRef<HTMLDivElement>(null)
+
+  // Task completion state
+  interface TaskItem {
+    id: string
+    title: string
+    completed: boolean
+    sort_order: number
+  }
+  const [tasks, setTasks] = useState<TaskItem[]>([])
+  const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(new Set())
+  const tasksFetchedRef = useRef(false)
+
+  // Fetch today's uncompleted tasks when popup opens
+  const fetchTasks = useCallback(async () => {
+    try {
+      const today = getUserToday()
+      const res = await fetch(`/api/plans?date=${today}`)
+      if (res.ok) {
+        const { plans } = await res.json()
+        // Show all tasks — uncompleted ones are interactive, completed ones are shown as done
+        setTasks(plans || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch tasks:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isOpen && !tasksFetchedRef.current) {
+      tasksFetchedRef.current = true
+      fetchTasks()
+    }
+    if (!isOpen) {
+      tasksFetchedRef.current = false
+    }
+  }, [isOpen, fetchTasks])
+
+  // Toggle task completion from the popup
+  const handleToggleTask = async (taskId: string, currentCompleted: boolean) => {
+    if (currentCompleted) {
+      // Un-completing: instant
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: false } : t))
+      try {
+        await csrfFetch('/api/plans', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, completed: false }),
+        })
+      } catch { /* revert on error */ fetchTasks() }
+    } else {
+      // Completing: animate then update
+      setCompletingTaskIds(prev => new Set(prev).add(taskId))
+      csrfFetch('/api/plans', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, completed: true }),
+      }).catch(() => {})
+      setTimeout(() => {
+        setCompletingTaskIds(prev => {
+          const next = new Set(prev)
+          next.delete(taskId)
+          return next
+        })
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: true } : t))
+      }, 1000)
+    }
+  }
 
   useEffect(() => {
     if (isOpen) {
@@ -508,6 +577,42 @@ export default function PeriodSummaryPopup({
                 </div>
               )}
             </div>
+
+            {/* Task completion prompt */}
+            {tasks.length > 0 && (
+              <div className="mb-5 rounded-xl bg-zinc-800/30 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Check className="h-4 w-4 text-zinc-500" />
+                  <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                    Complete any tasks?
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {tasks.map((task, i) => {
+                    const isCompleting = completingTaskIds.has(task.id)
+                    return (
+                      <div
+                        key={task.id}
+                        className={`flex items-center gap-2.5 transition-all duration-500 ${
+                          isCompleting ? 'opacity-40 scale-95' : ''
+                        } ${task.completed && !isCompleting ? 'opacity-50' : ''}`}
+                      >
+                        <AnimatedCheckbox
+                          completed={isCompleting || task.completed}
+                          onToggle={() => !isCompleting && handleToggleTask(task.id, task.completed)}
+                          size="sm"
+                        />
+                        <span className={`text-sm flex-1 transition-all duration-300 ${
+                          task.completed || isCompleting ? 'text-zinc-500 line-through' : 'text-zinc-300'
+                        }`}>
+                          {task.title}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             {isEvening && onViewDayReview ? (

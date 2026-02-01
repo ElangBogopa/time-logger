@@ -395,8 +395,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         ? realToday
         : (selectedDate || today)
 
-      // Check for duplicate/overlapping entries first
-      const existingEntries = await fetchEntries({ date: entryDate, fields: 'id,start_time,end_time,activity' })
+      // Check for duplicate/overlapping entries first (exclude pending/planned — only confirmed entries block)
+      const allEntries = await fetchEntries({ date: entryDate, fields: 'id,start_time,end_time,activity,status' })
+      const existingEntries = allEntries.filter(e => e.status !== 'pending')
 
       if (existingEntries.length > 0 && startTime && endTime) {
         const newStart = timeToMinutes(startTime)
