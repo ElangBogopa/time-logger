@@ -85,23 +85,15 @@ function LogPeriodContent() {
   const range = PERIOD_TIME_RANGES[safePeriod]
 
   // Date handling - support yesterday's evening and arbitrary dates (YYYY-MM-DD)
-  // Initialize empty for hydration safety, set on client
+  // Initialize eagerly so cache lookup works on first render (no skeleton flash)
   const dateParam = searchParams.get('date')
   const isYesterday = dateParam === 'yesterday'
-  const [selectedDate, setSelectedDate] = useState('')
-
-  // Set selected date on client to avoid hydration mismatch
-  useEffect(() => {
-    if (!selectedDate) {
-      if (isYesterday) {
-        setSelectedDate(getYesterdayDateString())
-      } else if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-        setSelectedDate(dateParam)
-      } else {
-        setSelectedDate(getUserToday())
-      }
-    }
-  }, [selectedDate, isYesterday, dateParam])
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (typeof window === 'undefined') return '' // SSR safety
+    if (isYesterday) return getYesterdayDateString()
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) return dateParam
+    return getUserToday()
+  })
 
   // Navigate home preserving the date context
   const goHome = () => {
