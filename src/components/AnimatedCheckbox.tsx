@@ -23,7 +23,7 @@ export default function AnimatedCheckbox({ completed, onToggle, size = 'md', rea
   useEffect(() => {
     if (completed && !wasCompleted) {
       setJustCompleted(true)
-      const timer = setTimeout(() => setJustCompleted(false), 600)
+      const timer = setTimeout(() => setJustCompleted(false), 1000)
       return () => clearTimeout(timer)
     }
     setWasCompleted(completed)
