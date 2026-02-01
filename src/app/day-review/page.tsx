@@ -27,6 +27,7 @@ import {
   SESSION_MOOD_CONFIG,
   TimeEntry,
   AggregatedCategory,
+  getUserToday,
 } from '@/lib/types'
 
 // Map each TimeCategory → aggregated category (mirrors ENERGY_VIEW)
@@ -667,14 +668,20 @@ function DayReviewContent() {
     }
   }, [dateParam, generateCommentary, saveReview])
 
-  // Check if today and before 9pm — block access
+  // Check if reviewing today or future — block access before 9pm
   const [currentHour, setCurrentHour] = useState<number | null>(null)
+  const [clientToday, setClientToday] = useState<string | null>(null)
   useEffect(() => {
-    setCurrentHour(new Date().getHours())
+    const now = new Date()
+    setCurrentHour(now.getHours())
+    // Use getUserToday for consistent rollover logic
+    setClientToday(getUserToday(now))
   }, [])
 
-  const isTodayReview = !dateParam
-  const isLocked = isTodayReview && currentHour !== null && currentHour < 21
+  // Lock if: reviewing today (or no date) and before 9pm, OR reviewing a future date
+  const isTodayReview = clientToday !== null && (!dateParam || dateParam === clientToday)
+  const isFutureReview = clientToday !== null && dateParam !== null && dateParam > clientToday
+  const isLocked = (isTodayReview && currentHour !== null && currentHour < 21) || isFutureReview
 
   useEffect(() => {
     if (status === 'authenticated' && !isLocked) {
