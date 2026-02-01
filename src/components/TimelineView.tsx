@@ -17,6 +17,7 @@ import TimelineGap from './timeline/TimelineGap'
 import TimelineGhost, { type CalendarEvent } from './timeline/TimelineGhost'
 import TimelineCommitted, { type CommittedTask } from './timeline/TimelineCommitted'
 import { CurrentTimeIndicator, DragPreview, PIXELS_PER_MINUTE } from './timeline'
+import { HOUR_HEIGHT } from './timeline/constants'
 import { yToTime as createYToTime } from './timeline/utils'
 
 export type { CalendarEvent, DragCreateData, PlacedEntry }
@@ -334,6 +335,13 @@ export default function TimelineView({
   }, [updatedPlacedEntries, updatedGhostEvents, updatedStartHour, isToday])
 
   if (isLoading) {
+    // Use the same hour range and sizing as the real timeline
+    const skelStartHour = visibleStartHour ?? 0
+    const skelEndHour = visibleEndHour ?? 24
+    const skelHours = Array.from({ length: Math.min(skelEndHour - skelStartHour + 1, 8) }, (_, i) => skelStartHour + i)
+    const skelHeight = (skelEndHour - skelStartHour) * HOUR_HEIGHT
+    const skelContainerHeight = Math.min(skelHeight, 500)
+
     return (
       <div className="space-y-4">
         {/* Skeleton stats bar */}
@@ -341,25 +349,28 @@ export default function TimelineView({
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-4 w-24" />
         </div>
-        {/* Skeleton timeline */}
+        {/* Skeleton timeline — matches real timeline dimensions */}
         <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-          <div className="h-[500px] overflow-hidden">
-            <div className="relative flex" style={{ height: '600px' }}>
-              {/* Hour labels skeleton - faded text placeholders */}
+          <div style={{ height: skelContainerHeight }} className="overflow-hidden">
+            <div className="relative flex" style={{ height: skelHeight }}>
+              {/* Hour labels skeleton */}
               <div className="w-14 shrink-0 border-r border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
-                {[8, 9, 10, 11, 12, 13, 14].map((hour) => (
-                  <div key={hour} className="flex h-[90px] items-start justify-end pr-2 pt-0">
-                    <div className="text-xs text-muted-foreground/30 font-medium">
-                      {hour}:00
-                    </div>
+                {skelHours.map((hour) => (
+                  <div
+                    key={hour}
+                    className="absolute left-0 right-0 flex items-start justify-end pr-2"
+                    style={{ top: (hour - skelStartHour) * HOUR_HEIGHT - 8 }}
+                  >
+                    <span className="text-xs text-muted-foreground/30 font-medium">
+                      {hour % 12 === 0 ? 12 : hour % 12}{hour < 12 ? 'am' : 'pm'}
+                    </span>
                   </div>
                 ))}
               </div>
               {/* Entry blocks skeleton */}
               <div className="relative flex-1 p-2">
-                <Skeleton className="absolute left-2 right-2 h-[70px] rounded-lg" style={{ top: '20px' }} />
-                <Skeleton className="absolute left-2 right-2 h-[120px] rounded-lg" style={{ top: '180px' }} />
-                <Skeleton className="absolute left-2 right-2 h-[45px] rounded-lg" style={{ top: '350px' }} />
+                <Skeleton className="absolute left-2 right-2 rounded-lg" style={{ top: HOUR_HEIGHT * 0.5, height: HOUR_HEIGHT * 1.5 }} />
+                <Skeleton className="absolute left-2 right-2 rounded-lg" style={{ top: HOUR_HEIGHT * 2.5, height: HOUR_HEIGHT * 2.5 }} />
               </div>
             </div>
           </div>
