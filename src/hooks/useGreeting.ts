@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { TimePeriod, getCurrentPeriod } from '@/lib/types'
 import { getRandomQuote } from '@/lib/quotes'
 
@@ -35,20 +35,12 @@ export function useGreeting(userName?: string, currentHour: number | null = null
   const currentPeriod = currentHour !== null ? getCurrentPeriod(currentHour) : 'morning'
   const greeting = getTimeOfDayGreeting(userName, currentHour)
 
-  // Get quotes for each period (stable per day, generated on client to avoid hydration mismatch)
-  const [quotes, setQuotes] = useState<Record<TimePeriod, string>>({
-    morning: '',
-    afternoon: '',
-    evening: '',
-  })
-
-  useEffect(() => {
-    setQuotes({
-      morning: getRandomQuote('morning'),
-      afternoon: getRandomQuote('afternoon'),
-      evening: getRandomQuote('evening'),
-    })
-  }, [])
+  // Get quotes for each period (stable per day)
+  const [quotes] = useState<Record<TimePeriod, string>>(() => ({
+    morning: typeof window !== 'undefined' ? getRandomQuote('morning') : '',
+    afternoon: typeof window !== 'undefined' ? getRandomQuote('afternoon') : '',
+    evening: typeof window !== 'undefined' ? getRandomQuote('evening') : '',
+  }))
 
   return {
     greeting,

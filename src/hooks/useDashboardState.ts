@@ -20,17 +20,14 @@ interface UseDashboardStateProps {
 export function useDashboardState({ session, status }: UseDashboardStateProps): UseDashboardStateReturn {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [hasCheckedTargets, setHasCheckedTargets] = useState(false)
-  // Hydration-safe: initialize to null, set on client
-  const [currentHour, setCurrentHour] = useState<number | null>(null)
+  // Compute eagerly — avoids extra render cycle on client
+  const [currentHour, setCurrentHour] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null // SSR safety
+    return getUserCurrentHour()
+  })
   
   const router = useRouter()
   const searchParams = useSearchParams()
-
-  // Set current hour on client to avoid hydration mismatch
-  // Uses getUserCurrentHour which returns 24+ for late night (before 3am)
-  useEffect(() => {
-    setCurrentHour(getUserCurrentHour())
-  }, [])
 
   // Handle calendar connection URL params - redirect to connections page
   useEffect(() => {

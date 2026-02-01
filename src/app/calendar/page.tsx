@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchEntries, csrfFetch } from '@/lib/api'
+import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
 import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
@@ -47,20 +48,15 @@ function CalendarContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [entries, setEntries] = useState<TimeEntry[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  // Initialize to empty string for hydration safety, set on client
-  const [selectedDate, setSelectedDate] = useState('')
-
-  // Set selected date on client to avoid hydration mismatch — respect ?date= param
-  useEffect(() => {
-    if (!selectedDate) {
-      const dateParam = searchParams.get('date')
-      const initial = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : getLocalDateString()
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only initialization for hydration safety
-      setSelectedDate(initial)
-    }
-  }, [selectedDate, searchParams])
+  // Initialize date eagerly so cache lookups work on first render (no skeleton flash)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (typeof window === 'undefined') return '' // SSR safety
+    const dateParam = searchParams.get('date')
+    return dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : getLocalDateString()
+  })
+  const cachedEntries = selectedDate ? getCachedEntries(selectedDate) : null
+  const [entries, setEntries] = useState<TimeEntry[]>(cachedEntries ?? [])
+  const [isLoading, setIsLoading] = useState(!cachedEntries)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<{ message: string } | null>(null)
@@ -138,13 +134,23 @@ function CalendarContent() {
 
   const fetchEntriesForDate = useCallback(async () => {
     if (!userId || !selectedDate) return
-    setIsLoading(true)
+
+    // Use cache for instant render, then revalidate
+    const cached = getCachedEntries(selectedDate)
+    if (cached) {
+      setEntries(cached)
+      setIsLoading(false)
+    } else {
+      setIsLoading(true)
+    }
+
     try {
       const [data, plansRes] = await Promise.all([
         fetchEntries({ date: selectedDate }),
         fetch(`/api/plans?date=${selectedDate}`),
       ])
       setEntries(data)
+      setCachedEntries(selectedDate, data)
 
       // Fetch committed tasks for this date
       if (plansRes.ok) {

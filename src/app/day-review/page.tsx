@@ -670,15 +670,15 @@ function DayReviewContent() {
   }, [dateParam, generateCommentary, saveReview])
 
   // Check if reviewing today or future — block access before 9pm
-  const [currentHour, setCurrentHour] = useState<number | null>(null)
-  const [clientToday, setClientToday] = useState<string | null>(null)
-  useEffect(() => {
-    const now = new Date()
-    // Use rollover-adjusted hour (12:52 AM = hour 24, so review stays unlocked)
-    setCurrentHour(getUserCurrentHour(now))
-    // Use getUserToday for consistent rollover logic
-    setClientToday(getUserToday(now))
-  }, [])
+  // Computed eagerly to avoid extra render cycle
+  const [currentHour, setCurrentHour] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null
+    return getUserCurrentHour(new Date())
+  })
+  const [clientToday, setClientToday] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return getUserToday(new Date())
+  })
 
   // Lock if: reviewing today (or no date) and before 9pm, OR reviewing a future date
   const isTodayReview = clientToday !== null && (!dateParam || dateParam === clientToday)
