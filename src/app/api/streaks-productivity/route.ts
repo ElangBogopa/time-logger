@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
@@ -14,14 +14,15 @@ import { getUserToday } from '@/lib/types'
  * Grace rule (per Lally's research): 1 missed day per 7 doesn't break the streak.
  * Simplified for v1: no grace — pure consecutive days. Add grace later.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const today = getUserToday()
+    const dateParam = request.nextUrl.searchParams.get('date')
+    const today = dateParam || getUserToday()
 
     // Fetch the last 90 days of plans to calculate streaks
     const startDate = getDateNDaysAgo(today, 89)

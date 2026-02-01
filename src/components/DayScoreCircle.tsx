@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getUserToday } from '@/lib/types'
 
 interface DaySummaryData {
   score: number
@@ -115,7 +116,7 @@ export default function DayScoreCircle({ className = '' }: { className?: string 
 
     async function fetchScore() {
       try {
-        const res = await fetch('/api/day-summary', { signal: controller.signal })
+        const res = await fetch(`/api/day-summary?date=${getUserToday()}`, { signal: controller.signal })
         if (res.ok) {
           const json = await res.json()
           setData({

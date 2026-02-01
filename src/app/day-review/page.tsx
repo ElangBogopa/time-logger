@@ -624,7 +624,7 @@ function DayReviewContent() {
 
     try {
       // Step 1: Check persistence status
-      const reviewUrl = dateParam ? `/api/day-review?date=${dateParam}` : '/api/day-review'
+      const reviewUrl = `/api/day-review?date=${dateParam || getUserToday()}`
       const reviewRes = await fetch(reviewUrl)
       if (!reviewRes.ok) throw new Error('Failed to fetch review status')
       const reviewData = await reviewRes.json()
@@ -642,7 +642,7 @@ function DayReviewContent() {
 
       // Either 'live' (editable) or 'needs_finalization' (locked but not saved yet)
       // In both cases, fetch fresh summary
-      const summaryUrl = dateParam ? `/api/day-summary?date=${dateParam}` : '/api/day-summary'
+      const summaryUrl = `/api/day-summary?date=${dateParam || getUserToday()}`
       const summaryRes = await fetch(summaryUrl)
       if (!summaryRes.ok) throw new Error('Failed to fetch summary')
       const summaryData: DaySummary = await summaryRes.json()

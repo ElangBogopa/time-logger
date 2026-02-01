@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Target, ChevronRight, Loader2, Flame, CalendarCheck } from 'lucide-react'
+import { getUserToday } from '@/lib/types'
 
 interface Goal {
   id: string
@@ -31,7 +32,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
     try {
       const [goalsRes, streaksRes] = await Promise.all([
         fetch('/api/goals'),
-        fetch('/api/streaks-productivity'),
+        fetch(`/api/streaks-productivity?date=${getUserToday()}`),
       ])
 
       if (goalsRes.ok) {

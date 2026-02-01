@@ -386,7 +386,7 @@ export async function GET(request: NextRequest) {
   const dateParam = request.nextUrl.searchParams.get('date')
   // Always prefer client-provided date — server may be in UTC (Vercel)
   const today = dateParam || getUserToday()
-  const isViewingToday = !dateParam || today === getUserToday()
+  const isViewingToday = !dateParam || dateParam === getUserToday()
   const yesterday = getYesterdayDateString(today)
   const sameDayLastWeek = getSameDayLastWeek(today)
   const weekDates = getWeekDates(today)

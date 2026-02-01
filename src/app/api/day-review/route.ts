@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = session.user.id
-    const today = getUserToday()
-    const dateParam = request.nextUrl.searchParams.get('date') || today
+    const dateParam = request.nextUrl.searchParams.get('date')
+    const today = dateParam || getUserToday()
     const editable = isWithinEditWindow(dateParam, today)
 
     // If within edit window, return live data (don't save yet)

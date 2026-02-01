@@ -130,7 +130,7 @@ export default function GoalPage() {
         fetch(`/api/plans?date=${tomorrow}`),
         fetch(`/api/productivity-score?date=${today}`),
         fetch(`/api/productivity-score?date=${today}&period=7d`),
-        fetch('/api/streaks-productivity'),
+        fetch(`/api/streaks-productivity?date=${today}`),
       ])
 
       if (goalsRes.ok) {

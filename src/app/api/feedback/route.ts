@@ -37,27 +37,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET: fetch all feedback (admin use)
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data, error } = await supabase
-      .from('feedback')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100)
-
-    if (error) {
-      return NextResponse.json({ error: 'Failed to fetch feedback' }, { status: 500 })
-    }
-
-    return NextResponse.json({ feedback: data })
-  } catch (error) {
-    console.error('Feedback GET error:', error)
-    return NextResponse.json({ error: 'Failed to fetch feedback' }, { status: 500 })
-  }
-}
+// GET endpoint removed — was exposing all user feedback without admin check
+// Access feedback directly via Supabase dashboard when needed
