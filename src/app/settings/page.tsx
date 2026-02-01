@@ -11,8 +11,6 @@ import {
   Calendar,
   ChevronRight,
   Target,
-  Moon,
-  Sun,
   LogOut,
   Loader2,
   Star,
@@ -20,8 +18,6 @@ import {
   Link2,
   X,
 } from 'lucide-react'
-import { useTheme } from 'next-themes'
-import { Switch } from '@/components/ui/switch'
 
 // ── Section label ──
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -204,11 +200,8 @@ function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
 export default function MorePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -275,20 +268,6 @@ export default function MorePage() {
             iconColor="text-green-500"
             label="View Calendar"
             onClick={() => router.push('/calendar')}
-          />
-          <RowItem
-            icon={mounted && resolvedTheme === 'dark' ? Moon : Sun}
-            iconBg="bg-indigo-500/10"
-            iconColor="text-indigo-500"
-            label="Dark Mode"
-            trailing={
-              mounted ? (
-                <Switch
-                  checked={resolvedTheme === 'dark'}
-                  onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-                />
-              ) : null
-            }
           />
         </div>
 
