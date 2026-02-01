@@ -116,8 +116,9 @@ export default function TimeRangePicker({
   const [tempEnd, setTempEnd] = useState('')
 
   // Check if end time is valid (after start time, or crossing midnight with reasonable duration)
-  const isEndBeforeStart = tempStart && tempEnd && tempEnd <= tempStart
   const duration = calculateDuration(tempStart, tempEnd)
+  // Allow midnight crossing (e.g. 23:00 → 00:00 = 1h) — only invalid if duration is 0 or too long
+  const isEndBeforeStart = tempStart && tempEnd && duration <= 0
   const isValidRange = tempStart && tempEnd && duration > 0 && duration <= 16 * 60 // Max 16 hours
 
   // Handle start time change - auto-snap end time to start + 30 minutes
