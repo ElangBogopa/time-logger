@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
 import { getUserToday } from '@/lib/types'
 import CommitTimeModal from '@/components/CommitTimeModal'
@@ -121,6 +121,7 @@ export default function GoalPage() {
   const [weeklyScores, setWeeklyScores] = useState<DailyScore[]>([])
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null)
   const [streaks, setStreaks] = useState<StreakData | null>(null)
+  const [showCompleted, setShowCompleted] = useState(false)
 
   const hasExistingPlans = existingPlans.length > 0
 
@@ -450,13 +451,35 @@ export default function GoalPage() {
                     </span>
                   </div>
                 ))}
-                {/* Completed tasks — collapsed summary */}
+                {/* Completed tasks — expandable section */}
                 {todayScore.tasks.filter(t => t.completed).length > 0 && (
                   <div className="mt-2 pt-2 border-t border-border/50">
-                    <p className="text-[11px] text-green-500/70 font-medium flex items-center gap-1.5">
+                    <button
+                      onClick={() => setShowCompleted(!showCompleted)}
+                      className="w-full text-[11px] text-green-500/70 font-medium flex items-center gap-1.5 hover:text-green-500 transition-colors"
+                    >
                       <Check className="h-3 w-3" />
                       {todayScore.tasks.filter(t => t.completed).length} task{todayScore.tasks.filter(t => t.completed).length !== 1 ? 's' : ''} completed
-                    </p>
+                      <ChevronDown className={`h-3 w-3 ml-auto transition-transform duration-200 ${showCompleted ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showCompleted && (
+                      <div className="mt-2 space-y-1.5">
+                        {todayScore.tasks.filter(t => t.completed).map((task, i) => (
+                          <div key={task.id || i} className="flex items-center gap-2 opacity-60 transition-all duration-300">
+                            <AnimatedCheckbox
+                              completed={task.completed}
+                              onToggle={() => toggleTaskComplete(task.id, task.completed)}
+                            />
+                            <span className="text-sm flex-1 text-muted-foreground">
+                              {task.title}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/40">
+                              {task.weight}pts
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
