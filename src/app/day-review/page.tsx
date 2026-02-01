@@ -28,6 +28,7 @@ import {
   TimeEntry,
   AggregatedCategory,
   getUserToday,
+  getUserCurrentHour,
 } from '@/lib/types'
 
 // Map each TimeCategory → aggregated category (mirrors ENERGY_VIEW)
@@ -673,7 +674,8 @@ function DayReviewContent() {
   const [clientToday, setClientToday] = useState<string | null>(null)
   useEffect(() => {
     const now = new Date()
-    setCurrentHour(now.getHours())
+    // Use rollover-adjusted hour (12:52 AM = hour 24, so review stays unlocked)
+    setCurrentHour(getUserCurrentHour(now))
     // Use getUserToday for consistent rollover logic
     setClientToday(getUserToday(now))
   }, [])
@@ -724,7 +726,7 @@ function DayReviewContent() {
               Your daily review unlocks at 9:00 PM once your day is wrapping up.
             </p>
             <p className="text-xs text-muted-foreground/50">
-              {currentHour !== null && `${21 - currentHour} hour${21 - currentHour !== 1 ? 's' : ''} to go`}
+              {currentHour !== null && currentHour < 21 && `${21 - currentHour} hour${21 - currentHour !== 1 ? 's' : ''} to go`}
             </p>
           </div>
         </div>
