@@ -23,7 +23,7 @@ const tabs: TabItem[] = [
     label: 'Review',
     icon: BarChart3,
     path: '/review',
-    matchPaths: ['/review', '/insights', '/weekly-review', '/day-review'],
+    matchPaths: ['/review', '/weekly-review', '/day-review'],
   },
   {
     label: 'More',

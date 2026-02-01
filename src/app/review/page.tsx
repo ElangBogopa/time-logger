@@ -3,12 +3,9 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Lightbulb, Sun, BarChart3 } from 'lucide-react'
+import { Sun, BarChart3 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
-const InsightsContent = dynamic(() => import('@/components/review/InsightsContent'), {
-  loading: () => <TabSkeleton />,
-})
 const DayReviewContent = dynamic(() => import('@/components/review/DayReviewContent'), {
   loading: () => <TabSkeleton />,
 })
@@ -26,10 +23,9 @@ function TabSkeleton() {
   )
 }
 
-type ReviewTab = 'insights' | 'day' | 'weekly'
+type ReviewTab = 'day' | 'weekly'
 
 const tabs: { id: ReviewTab; label: string; icon: React.ElementType }[] = [
-  { id: 'insights', label: 'Insights', icon: Lightbulb },
   { id: 'day', label: 'Today', icon: Sun },
   { id: 'weekly', label: 'Weekly', icon: BarChart3 },
 ]
@@ -39,7 +35,7 @@ function ReviewContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<ReviewTab>(
-    (searchParams.get('tab') as ReviewTab) || 'insights'
+    (searchParams.get('tab') as ReviewTab) || 'day'
   )
 
   useEffect(() => {
@@ -73,7 +69,7 @@ function ReviewContent() {
         <header className="mb-4">
           <h1 className="text-2xl font-bold text-foreground">Review</h1>
           <p className="text-sm text-muted-foreground">
-            Your progress, insights, and reflections
+            Your progress and reflections
           </p>
         </header>
 
@@ -102,7 +98,6 @@ function ReviewContent() {
         </div>
 
         {/* Tab Content — conditionally render (caching handles fast re-mounts) */}
-        {activeTab === 'insights' && <InsightsContent />}
         {activeTab === 'day' && <DayReviewContent />}
         {activeTab === 'weekly' && <WeeklyReviewContent />}
       </div>

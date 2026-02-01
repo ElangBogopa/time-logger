@@ -13,7 +13,10 @@ import {
   Target,
   Sparkles,
   BarChart3,
+  Grid3X3,
+  ArrowRight,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { ENERGY_VIEW, getAggregatedCategory, TimeCategory, AGGREGATED_CATEGORY_COLORS } from '@/lib/types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 
@@ -123,6 +126,7 @@ const RATING_ICONS = { good: '✓', neutral: '~', rough: '✗', no_data: '—' }
 
 export default function WeeklyReviewContent() {
   const { status } = useSession()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
@@ -413,6 +417,21 @@ export default function WeeklyReviewContent() {
           </div>
         </section>
       )}
+
+      {/* Year in Pixels */}
+      <button
+        onClick={() => router.push('/pixels')}
+        className="w-full rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors text-left"
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10">
+          <Grid3X3 className="h-5 w-5 text-emerald-500" />
+        </div>
+        <div className="flex-1">
+          <p className="font-medium text-foreground">Year in Pixels</p>
+          <p className="text-sm text-muted-foreground">See your entire year at a glance</p>
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      </button>
     </div>
   )
 }
