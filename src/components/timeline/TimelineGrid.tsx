@@ -52,8 +52,12 @@ export default function TimelineGrid({
 
       {/* Timeline grid and entries */}
       <div
-        className={`relative flex-1 ${onDragCreate ? 'cursor-crosshair' : ''} ${isDragging || isTouchDragging || isAdjustingEntry ? 'select-none' : ''}`}
-        style={{ touchAction: isTouchDragging || isAdjustingEntry ? 'none' : 'auto' }}
+        className={`relative flex-1 ${onDragCreate ? 'cursor-crosshair select-none' : ''} ${isDragging || isTouchDragging || isAdjustingEntry ? 'select-none' : ''}`}
+        style={{
+          touchAction: isTouchDragging || isAdjustingEntry ? 'none' : onDragCreate ? 'pan-y pinch-zoom' : 'auto',
+          WebkitUserSelect: onDragCreate ? 'none' : undefined,
+          WebkitTouchCallout: onDragCreate ? 'none' : undefined,
+        } as React.CSSProperties}
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
       >

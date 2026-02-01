@@ -61,8 +61,10 @@ export function formatDurationLong(minutes: number): string {
 export function formatTimeDisplay(time: string): string {
   if (!time) return ''
   const [hours, minutes] = time.split(':').map(Number)
-  const period = hours >= 12 ? 'PM' : 'AM'
-  const hour12 = hours % 12 || 12
+  // Handle 24:00 (midnight end of day) same as 00:00
+  const normalizedHours = hours === 24 ? 0 : hours
+  const period = normalizedHours >= 12 ? 'PM' : 'AM'
+  const hour12 = normalizedHours % 12 || 12
   return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
 }
 
