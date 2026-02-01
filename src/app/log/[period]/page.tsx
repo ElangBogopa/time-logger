@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch } from '@/lib/api'
@@ -67,7 +67,7 @@ const PERIOD_COLORS: Record<TimePeriod, { gradient: string; text: string; bg: st
   },
 }
 
-export default function LogPeriodPage() {
+function LogPeriodContent() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -587,5 +587,17 @@ export default function LogPeriodPage() {
 
       {/* Toast removed — no popups on entry add/confirm */}
     </div>
+  )
+}
+
+export default function LogPeriodPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    }>
+      <LogPeriodContent />
+    </Suspense>
   )
 }
