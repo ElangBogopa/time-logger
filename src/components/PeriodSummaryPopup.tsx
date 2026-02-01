@@ -433,8 +433,8 @@ export default function PeriodSummaryPopup({
               : 'translate-y-8 opacity-0 scale-95'
           }`}
         >
-          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${colors.gradient} p-[2px] shadow-2xl`}>
-            <div className="relative rounded-2xl bg-zinc-900 p-6">
+          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${colors.gradient} p-[2px] shadow-2xl max-h-[85vh]`}>
+            <div className="relative rounded-2xl bg-zinc-900 p-6 overflow-y-auto max-h-[calc(85vh-4px)]">
               {/* Confetti particles for celebration */}
               {showConfetti && (
                 <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
