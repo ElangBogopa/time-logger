@@ -90,29 +90,57 @@ export default function GoalPage() {
 
   const toggleCoachCard = () => setShowCoachCard(prev => !prev)
 
-  // Toggle task completion
+  // Toggle task completion with animation delay
   const toggleTaskComplete = async (taskId: string, currentCompleted: boolean) => {
-    // Optimistic update
-    setTodayScore(prev => {
-      if (!prev) return prev
-      const updated = { ...prev, tasks: prev.tasks.map(t => t.id === taskId ? { ...t, completed: !currentCompleted } : t) }
-      updated.completedTasks = updated.tasks.filter(t => t.completed).length
-      const earned = updated.tasks.reduce((sum, t) => sum + (t.completed ? t.weight : 0), 0)
-      const max = updated.tasks.reduce((sum, t) => sum + t.weight, 0)
-      updated.score = max > 0 ? Math.round((earned / max) * 100) : 0
-      return updated
-    })
-    try {
-      await csrfFetch('/api/plans', {
+    if (!currentCompleted) {
+      // COMPLETING: show animation first, then update state after delay
+      setCompletingTaskIds(prev => new Set(prev).add(taskId))
+
+      // Fire API call in background
+      csrfFetch('/api/plans', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, completed: !currentCompleted }),
+        body: JSON.stringify({ id: taskId, completed: true }),
+      }).catch(() => {})
+
+      // Wait for animation to play, then update UI
+      setTimeout(() => {
+        setCompletingTaskIds(prev => {
+          const next = new Set(prev)
+          next.delete(taskId)
+          return next
+        })
+        setTodayScore(prev => {
+          if (!prev) return prev
+          const updated = { ...prev, tasks: prev.tasks.map(t => t.id === taskId ? { ...t, completed: true } : t) }
+          updated.completedTasks = updated.tasks.filter(t => t.completed).length
+          const earned = updated.tasks.reduce((sum, t) => sum + (t.completed ? t.weight : 0), 0)
+          const max = updated.tasks.reduce((sum, t) => sum + t.weight, 0)
+          updated.score = max > 0 ? Math.round((earned / max) * 100) : 0
+          return updated
+        })
+      }, 1200)
+    } else {
+      // UN-COMPLETING: instant update (no animation needed)
+      setTodayScore(prev => {
+        if (!prev) return prev
+        const updated = { ...prev, tasks: prev.tasks.map(t => t.id === taskId ? { ...t, completed: false } : t) }
+        updated.completedTasks = updated.tasks.filter(t => t.completed).length
+        const earned = updated.tasks.reduce((sum, t) => sum + (t.completed ? t.weight : 0), 0)
+        const max = updated.tasks.reduce((sum, t) => sum + t.weight, 0)
+        updated.score = max > 0 ? Math.round((earned / max) * 100) : 0
+        return updated
       })
-      // Refresh to get accurate score/label
-      fetchData()
-    } catch {
-      // Revert on error
-      fetchData()
+      try {
+        await csrfFetch('/api/plans', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, completed: false }),
+        })
+        fetchData()
+      } catch {
+        fetchData()
+      }
     }
   }
 
@@ -122,6 +150,7 @@ export default function GoalPage() {
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null)
   const [streaks, setStreaks] = useState<StreakData | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(new Set())
 
   const hasExistingPlans = existingPlans.length > 0
 
@@ -437,20 +466,30 @@ export default function GoalPage() {
 
               {/* Task breakdown */}
               <div className="space-y-1.5">
-                {todayScore.tasks.filter(t => !t.completed).map((task, i) => (
-                  <div key={task.id || i} className="flex items-center gap-2 transition-all duration-300">
-                    <AnimatedCheckbox
-                      completed={task.completed}
-                      onToggle={() => toggleTaskComplete(task.id, task.completed)}
-                    />
-                    <span className="text-sm flex-1 text-foreground">
-                      {task.title}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/40">
-                      {task.weight}pts
-                    </span>
-                  </div>
-                ))}
+                {todayScore.tasks.filter(t => !t.completed || completingTaskIds.has(t.id)).map((task, i) => {
+                  const isCompleting = completingTaskIds.has(task.id)
+                  return (
+                    <div
+                      key={task.id || i}
+                      className={`flex items-center gap-2 transition-all duration-700 ${
+                        isCompleting ? 'opacity-40 scale-95 translate-x-2' : ''
+                      }`}
+                    >
+                      <AnimatedCheckbox
+                        completed={isCompleting || task.completed}
+                        onToggle={() => !isCompleting && toggleTaskComplete(task.id, task.completed)}
+                      />
+                      <span className={`text-sm flex-1 transition-all duration-500 ${
+                        isCompleting ? 'text-green-500' : 'text-foreground'
+                      }`}>
+                        {task.title}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/40">
+                        {task.weight}pts
+                      </span>
+                    </div>
+                  )
+                })}
                 {/* Completed tasks — expandable section */}
                 {todayScore.tasks.filter(t => t.completed).length > 0 && (
                   <div className="mt-2 pt-2 border-t border-border/50">
