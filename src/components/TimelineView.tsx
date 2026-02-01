@@ -63,6 +63,7 @@ export default function TimelineView({
   
   // Touch discovery hint state
   const [showTouchHint, setShowTouchHint] = useState(false)
+  const [scrollReady, setScrollReady] = useState(false)
   
   // Check if user has seen touch discovery hint
   useEffect(() => {
@@ -326,6 +327,9 @@ export default function TimelineView({
           behavior: 'instant'
         })
       }
+
+      // Reveal timeline after scroll position is set — prevents flash
+      setScrollReady(true)
     })
   }, [updatedPlacedEntries, updatedGhostEvents, updatedStartHour, isToday])
 
@@ -390,7 +394,7 @@ export default function TimelineView({
       <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
         <div
           ref={scrollContainerRef}
-          className="max-h-[500px] overflow-y-auto"
+          className={`max-h-[500px] overflow-y-auto transition-opacity duration-150 ${scrollReady ? 'opacity-100' : 'opacity-0'}`}
         >
           <TimelineGrid
             startHour={updatedStartHour}
