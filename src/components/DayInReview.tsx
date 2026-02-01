@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getUserToday } from '@/lib/types'
 
 interface TargetProgress {
   targetId: string
@@ -104,7 +105,7 @@ export default function DayInReview({ className }: DayInReviewProps) {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const response = await fetch('/api/day-summary')
+      const response = await fetch(`/api/day-summary?date=${getUserToday()}`)
       if (!response.ok) throw new Error('Failed to fetch')
       const data = await response.json()
       setSummary(data)
@@ -145,7 +146,7 @@ export default function DayInReview({ className }: DayInReviewProps) {
 
   return (
     <button
-      onClick={() => router.push('/day-review')}
+      onClick={() => router.push(`/day-review?date=${getUserToday()}`)}
       className={cn(
         'w-full text-left rounded-xl border border-border bg-card p-4',
         'hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition-all',

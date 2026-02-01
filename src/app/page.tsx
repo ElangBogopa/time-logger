@@ -179,7 +179,7 @@ function HomeContent() {
               return (
                 <div className="relative mb-3">
                   <button
-                    onClick={() => unlocked && router.push(isToday ? '/day-review' : `/day-review?date=${selectedDate}`)}
+                    onClick={() => unlocked && router.push(`/day-review?date=${selectedDate}`)}
                     disabled={!unlocked}
                     className={`w-full flex items-center gap-3 rounded-xl px-4 py-3.5 transition-all ${
                       unlocked
