@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Target, ChevronRight, Loader2, Flame, CalendarCheck } from 'lucide-react'
+import { Target, ChevronRight, Loader2, Flame } from 'lucide-react'
 import { getUserToday } from '@/lib/types'
 
 interface Goal {
@@ -69,9 +69,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
     )
   }
 
-  const planningStreak = streaks?.planning.current ?? 0
   const executionStreak = streaks?.execution.current ?? 0
-  const hasAnyStreak = planningStreak > 0 || executionStreak > 0
 
   return (
     <div className="mt-4">
@@ -79,72 +77,38 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
         Your Plan
       </h3>
 
-      {/* Streaks card */}
+      {/* Streak card */}
       <div className="rounded-xl bg-card border border-border p-4 mb-3">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Streaks</h4>
-        <div className="flex items-center gap-4">
-          {/* Planning streak */}
-          <div className="flex-1 flex items-center gap-2.5">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-              planningStreak > 0 ? 'bg-blue-500/15' : 'bg-secondary'
-            }`}>
-              <CalendarCheck className={`h-4 w-4 ${
-                planningStreak > 0 ? 'text-blue-500' : 'text-muted-foreground/50'
-              }`} />
-            </div>
-            <div>
-              <div className="flex items-baseline gap-1">
-                <span className={`text-lg font-bold ${
-                  planningStreak > 0 ? 'text-foreground' : 'text-muted-foreground/40'
-                }`}>
-                  {planningStreak}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  day{planningStreak !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <p className="text-[10px] text-muted-foreground/70">
-                Planning
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+            executionStreak > 0 ? 'bg-orange-500/15' : 'bg-secondary'
+          }`}>
+            <Flame className={`h-5 w-5 ${
+              executionStreak > 0 ? 'text-orange-500' : 'text-muted-foreground/50'
+            }`} />
           </div>
-
-          {/* Divider */}
-          <div className="h-10 w-px bg-border" />
-
-          {/* Execution streak */}
-          <div className="flex-1 flex items-center gap-2.5">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-              executionStreak > 0 ? 'bg-orange-500/15' : 'bg-secondary'
-            }`}>
-              <Flame className={`h-4 w-4 ${
-                executionStreak > 0 ? 'text-orange-500' : 'text-muted-foreground/50'
-              }`} />
+          <div className="flex-1">
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-xl font-bold ${
+                executionStreak > 0 ? 'text-foreground' : 'text-muted-foreground/40'
+              }`}>
+                {executionStreak}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                day{executionStreak !== 1 ? 's' : ''} streak
+              </span>
             </div>
-            <div>
-              <div className="flex items-baseline gap-1">
-                <span className={`text-lg font-bold ${
-                  executionStreak > 0 ? 'text-foreground' : 'text-muted-foreground/40'
-                }`}>
-                  {executionStreak}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  day{executionStreak !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <p className="text-[10px] text-muted-foreground/70">
-                Follow-through
-              </p>
-            </div>
+            <p className="text-[10px] text-muted-foreground/70">
+              {executionStreak === 0
+                ? 'Complete your #1 task to start a streak'
+                : executionStreak < 3
+                  ? 'Keep completing your top task daily'
+                  : executionStreak < 7
+                    ? 'Building momentum 💪'
+                    : 'On fire 🔥'}
+            </p>
           </div>
         </div>
-
-        {/* Streak message */}
-        {hasAnyStreak && (
-          <p className="mt-2.5 text-[11px] text-center text-muted-foreground/60 border-t border-border pt-2.5">
-            {getStreakMessage(planningStreak, executionStreak)}
-          </p>
-        )}
       </div>
 
       {/* Goal pills card */}
@@ -188,21 +152,5 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
   )
 }
 
-/**
- * Identity-framed streak messages (per research: identity > evaluative).
- * Encouraging, never punishing.
- */
-function getStreakMessage(planning: number, execution: number): string {
-  // Both streaks active
-  if (planning >= 7 && execution >= 7) return "🔥 A full week of planning and doing. You're locked in."
-  if (planning >= 3 && execution >= 3) return "Building momentum — plan it, do it, repeat."
-  if (planning >= 7) return "A week of planning. Now keep following through."
-  if (execution >= 7) return "7 days of getting the #1 thing done. That's consistency."
-  if (planning >= 3 && execution >= 1) return "Planning streak growing. Keep doing what you plan."
-  if (execution >= 3) return "Three days of follow-through. That's how habits start."
-  if (planning >= 3) return "Three days planned in a row. Consistency is building."
-  if (planning >= 1 && execution >= 1) return "Planned and delivered. Keep it going."
-  if (planning >= 1) return "Day one of planning. Set up tomorrow to keep it going."
-  if (execution >= 1) return "You did what you said you would. That matters."
-  return ''
-}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
