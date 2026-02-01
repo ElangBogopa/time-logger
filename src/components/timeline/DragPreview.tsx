@@ -47,10 +47,10 @@ export function DragPreview({ startTime, endTime, startHour, isDragging, isTouch
 
   return (
     <div
-      className="absolute left-1 right-1 z-20 overflow-hidden rounded-xl border-2 border-dashed border-zinc-400 bg-zinc-500/20 shadow-lg pointer-events-none dark:border-zinc-500 dark:bg-zinc-600/20"
+      className="absolute left-1 right-1 z-20 overflow-hidden rounded-xl border border-[#6B8CAE]/50 bg-[#6B8CAE]/20 backdrop-blur-sm shadow-sm pointer-events-none transition-all duration-75"
       style={{ top, height: Math.max(height, MIN_BLOCK_HEIGHT) }}
     >
-      <div className="flex h-full flex-col items-center justify-center px-2 py-1 text-zinc-600 dark:text-zinc-300">
+      <div className="flex h-full flex-col items-center justify-center px-2 py-1 text-[#6B8CAE]">
         <span className="text-sm font-medium">
           {formatTimeDisplay(previewStart)} - {formatTimeDisplay(previewEnd)}
         </span>
