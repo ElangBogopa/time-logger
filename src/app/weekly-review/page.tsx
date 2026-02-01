@@ -27,7 +27,7 @@ import {
   Share2,
   Grid3X3,
 } from 'lucide-react'
-import { TimeCategory, CATEGORY_LABELS, ENERGY_VIEW, AggregatedCategory, AGGREGATED_CATEGORY_LABELS } from '@/lib/types'
+import { TimeCategory, CATEGORY_LABELS, ENERGY_VIEW, AggregatedCategory, AGGREGATED_CATEGORY_LABELS, getUserToday } from '@/lib/types'
 import {
   Dialog,
   DialogContent,
@@ -137,6 +137,13 @@ function getWeekStart(date: Date): string {
   return d.toISOString().split('T')[0]
 }
 
+// Get week start based on user's perceived "today" (accounts for 12-3AM rollover)
+function getUserWeekStart(): string {
+  const userToday = getUserToday()
+  const d = new Date(userToday + 'T12:00:00') // Noon to avoid timezone edge cases
+  return getWeekStart(d)
+}
+
 function formatWeekRange(weekStart: string, weekEnd: string): string {
   const start = new Date(weekStart + 'T00:00:00')
   const end = new Date(weekEnd + 'T00:00:00')
@@ -162,7 +169,7 @@ function formatHoursShort(minutes: number): string {
 }
 
 function isCurrentWeek(weekStart: string): boolean {
-  return weekStart === getWeekStart(new Date())
+  return weekStart === getUserWeekStart()
 }
 
 // Info tooltip helper
@@ -199,7 +206,7 @@ export default function WeeklyReviewPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))
+  const [weekStart, setWeekStart] = useState(getUserWeekStart())
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
@@ -277,13 +284,13 @@ export default function WeeklyReviewPage() {
     const d = new Date(weekStart + 'T00:00:00')
     d.setDate(d.getDate() + 7)
     const newWeekStart = d.toISOString().split('T')[0]
-    if (newWeekStart <= getWeekStart(new Date())) {
+    if (newWeekStart <= getUserWeekStart()) {
       setWeekStart(newWeekStart)
     }
   }
 
   const goToCurrentWeek = () => {
-    setWeekStart(getWeekStart(new Date()))
+    setWeekStart(getUserWeekStart())
   }
 
   // Build shareable card props from review data
@@ -586,7 +593,7 @@ export default function WeeklyReviewPage() {
                     {trendData && (() => {
                       // Use last 7 entries (current week) from the trend data
                       const focusTrend = trendData.focus.trend.slice(-7)
-                      const todayDate = new Date().toISOString().split('T')[0]
+                      const todayDate = getUserToday()
                       const barsData: WeeklyBarDataPoint[] = focusTrend.map(d => ({
                         day: d.label,
                         value: d.value,
