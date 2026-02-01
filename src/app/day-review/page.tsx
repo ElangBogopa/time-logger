@@ -809,17 +809,12 @@ function DayReviewContent() {
           <TimelineStrip timeline={summary.timeline} />
         </div>
 
-        {/* Goal Progress — includes productivity plan score + weekly targets */}
-        {(summary.productivityScore?.hasPlans || summary.targetProgress.length > 0) && (
+        {/* Goal Progress — productivity plan only */}
+        {summary.productivityScore?.hasPlans && (
           <section className="mb-6 space-y-3">
             <h2 className="font-semibold text-foreground">Goal Progress</h2>
             <div className="space-y-3">
-              {summary.productivityScore?.hasPlans && (
-                <ProductivityPlanCard score={summary.productivityScore} />
-              )}
-              {summary.targetProgress.map(tp => (
-                <TargetCard key={tp.targetId} target={tp} />
-              ))}
+              <ProductivityPlanCard score={summary.productivityScore} />
             </div>
           </section>
         )}

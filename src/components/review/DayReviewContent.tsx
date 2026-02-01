@@ -13,6 +13,7 @@ import {
   Sparkles,
   Target,
   Zap,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -36,6 +37,11 @@ interface TargetProgress { targetId: string; label: string; emoji: string; curre
 interface CategoryBreakdown { category: TimeCategory; label: string; totalMinutes: number; percentage: number }
 interface AggregatedBreakdown { category: AggregatedCategory; label: string; totalMinutes: number; percentage: number }
 interface TimelineSlot { hour: number; period: 'morning' | 'afternoon' | 'evening'; hasEntry: boolean; category?: TimeCategory; minutes?: number }
+interface ProductivityScore {
+  score: number; totalTasks: number; completedTasks: number; priorityCompleted: boolean
+  tasks: { id: string; title: string; completed: boolean; weight: number; slot: number }[]
+  label: string; hasPlans: boolean
+}
 interface DaySummary {
   date: string; score: number; scoreColor: string
   sessionsLogged: number; totalSessions: number; totalMinutesLogged: number
@@ -43,6 +49,7 @@ interface DaySummary {
   categoryBreakdown: CategoryBreakdown[]; aggregatedBreakdown: AggregatedBreakdown[]
   timeline: TimelineSlot[]; todayMood: MoodCheckin | null
   longestFocusSession: { activity: string; minutes: number } | null
+  productivityScore: ProductivityScore | null
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -328,11 +335,46 @@ export default function DayReviewContent() {
       )}
 
       {summary.wins.length > 0 && <div className="mb-6"><WinsSection wins={summary.wins} /></div>}
+      {/* Timeline — commented out, blank and not useful yet
       <div className="mb-6"><TimelineStrip timeline={summary.timeline} /></div>
-      {summary.targetProgress.length > 0 && (
+      */}
+      {summary.productivityScore?.hasPlans && (
         <section className="mb-6 space-y-3">
-          <h2 className="font-semibold text-foreground">Goal Progress</h2>
-          <div className="space-y-3">{summary.targetProgress.map(tp => <TargetCard key={tp.targetId} target={tp} />)}</div>
+          <h2 className="font-semibold text-foreground text-sm">Goal Progress</h2>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <span className="text-2xl font-bold text-foreground">{summary.productivityScore.score}%</span>
+                <p className="text-xs text-muted-foreground mt-0.5">{summary.productivityScore.label}</p>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {summary.productivityScore.completedTasks}/{summary.productivityScore.totalTasks} tasks
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {summary.productivityScore.tasks.map((task, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                    task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
+                  }`}>
+                    {task.completed && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <span className={`text-sm flex-1 ${task.completed ? 'line-through text-muted-foreground/50' : 'text-foreground'}`}>
+                    {task.title}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/40">{task.weight}pts</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 h-2 rounded-full bg-secondary overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  summary.productivityScore.score >= 80 ? 'bg-green-500' : summary.productivityScore.score >= 50 ? 'bg-amber-500' : 'bg-red-400'
+                }`}
+                style={{ width: `${summary.productivityScore.score}%` }}
+              />
+            </div>
+          </div>
         </section>
       )}
       {/* Energy breakdown — commented out until science-based measurement is ready
