@@ -126,6 +126,22 @@ time_entries (
 2. **Muted palette**: Slate/zinc tones, no bright neons. Category colors are desaturated.
 3. **Minimal UI**: shadcn/ui for consistency, no unnecessary chrome
 4. **Progressive disclosure**: Quick log for speed, modal for details
+5. **No loading flash on navigation**: Every component that fetches data MUST cache its state in `sessionStorage`. On re-mount, load from cache instantly (no spinner), then refresh data silently in the background. Pattern:
+   ```typescript
+   // Load from cache — no spinner if cached
+   const cached = (() => {
+     if (typeof window === 'undefined') return null
+     try { return JSON.parse(sessionStorage.getItem(CACHE_KEY) || '') } catch { return null }
+   })()
+   const [data, setData] = useState(cached?.data || defaultValue)
+   const [isLoading, setIsLoading] = useState(!cached)
+   
+   // After fetch, save to cache
+   sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: newData }))
+   ```
+   This prevents the "spinner flash" when navigating back to previously-visited pages.
+6. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
+7. **Planning vs Execution separation**: The goal/productivity page is for PLANNING only (no interactive checkboxes). Task completion ONLY happens from session pages (post-session popup) where each completion is tagged with the session period (morning/afternoon/evening).
 
 ## Quick Commands
 

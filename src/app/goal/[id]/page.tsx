@@ -58,8 +58,18 @@ export default function GoalPage() {
   const params = useParams()
   const goalId = params.id as string
 
-  const [goal, setGoal] = useState<Goal | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // Session cache for instant re-mount
+  const cacheKey = `goal-page-${goalId}`
+  const cached = (() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = sessionStorage.getItem(cacheKey)
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })()
+
+  const [goal, setGoal] = useState<Goal | null>(cached?.goal || null)
+  const [isLoading, setIsLoading] = useState(!cached)
 
   // Tomorrow's date
   const today = getUserToday()
@@ -70,10 +80,10 @@ export default function GoalPage() {
   })()
 
   // Task inputs
-  const [tasks, setTasks] = useState<string[]>(['', '', ''])
-  const [existingPlans, setExistingPlans] = useState<PlanItem[]>([])
+  const [tasks, setTasks] = useState<string[]>(cached?.tasks || ['', '', ''])
+  const [existingPlans, setExistingPlans] = useState<PlanItem[]>(cached?.existingPlans || [])
   const [isSaving, setIsSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [saved, setSaved] = useState(!!cached?.existingPlans?.length)
   const [showCoachCard, setShowCoachCard] = useState(false)
   const [commitModalIdx, setCommitModalIdx] = useState<number | null>(null)
 
@@ -94,10 +104,10 @@ export default function GoalPage() {
   // Goal page is planning-only — tasks are displayed read-only here
 
   // Stats
-  const [todayScore, setTodayScore] = useState<DailyScore | null>(null)
-  const [weeklyScores, setWeeklyScores] = useState<DailyScore[]>([])
-  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null)
-  const [streaks, setStreaks] = useState<StreakData | null>(null)
+  const [todayScore, setTodayScore] = useState<DailyScore | null>(cached?.todayScore || null)
+  const [weeklyScores, setWeeklyScores] = useState<DailyScore[]>(cached?.weeklyScores || [])
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(cached?.weeklyStats || null)
+  const [streaks, setStreaks] = useState<StreakData | null>(cached?.streaks || null)
   const [showCompleted, setShowCompleted] = useState(false)
 
   const hasExistingPlans = existingPlans.length > 0
@@ -112,44 +122,66 @@ export default function GoalPage() {
         fetch(`/api/streaks-productivity?date=${today}`),
       ])
 
+      let cGoal: Goal | null = null
+      let cPlans: PlanItem[] = []
+      let cTasks: string[] = ['', '', '']
+      let cTodayScore: DailyScore | null = null
+      let cWeeklyScores: DailyScore[] = []
+      let cWeeklyStats: WeeklyStats | null = null
+      let cStreaks: StreakData | null = null
+
       if (goalsRes.ok) {
         const { goals } = await goalsRes.json()
-        setGoal(goals.find((g: Goal) => g.id === goalId) || null)
+        cGoal = goals.find((g: Goal) => g.id === goalId) || null
+        setGoal(cGoal)
       }
 
       if (plansRes.ok) {
         const { plans } = await plansRes.json()
-        setExistingPlans(plans || [])
+        cPlans = plans || []
+        setExistingPlans(cPlans)
         if (plans && plans.length > 0) {
           const filled = plans.map((p: PlanItem) => p.title)
-          // Ensure at least 3 slots
           while (filled.length < 3) filled.push('')
-          setTasks(filled)
+          cTasks = filled
+          setTasks(cTasks)
           setSaved(true)
         }
       }
 
       if (todayScoreRes.ok) {
-        const data = await todayScoreRes.json()
-        setTodayScore(data)
+        cTodayScore = await todayScoreRes.json()
+        setTodayScore(cTodayScore)
       }
 
       if (weeklyRes.ok) {
         const data = await weeklyRes.json()
-        setWeeklyScores(data.daily || [])
-        setWeeklyStats(data.weekly || null)
+        cWeeklyScores = data.daily || []
+        cWeeklyStats = data.weekly || null
+        setWeeklyScores(cWeeklyScores)
+        setWeeklyStats(cWeeklyStats)
       }
 
       if (streaksRes.ok) {
-        const data = await streaksRes.json()
-        setStreaks(data)
+        cStreaks = await streaksRes.json()
+        setStreaks(cStreaks)
       }
+
+      // Save to session cache for instant re-mount
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+          goal: cGoal, tasks: cTasks,
+          existingPlans: cPlans.length > 0 ? cPlans : undefined,
+          todayScore: cTodayScore, weeklyScores: cWeeklyScores,
+          weeklyStats: cWeeklyStats, streaks: cStreaks,
+        }))
+      } catch { /* ignore */ }
     } catch (err) {
       console.error('Failed to fetch goal data:', err)
     } finally {
       setIsLoading(false)
     }
-  }, [goalId, tomorrow, today])
+  }, [goalId, tomorrow, today]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
