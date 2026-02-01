@@ -423,7 +423,7 @@ function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
       {/* Task breakdown */}
       <div className="space-y-1.5">
         {score.tasks.map((task, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm">
+          <div key={i} className={`flex items-center gap-2 text-sm ${task.completed ? 'opacity-50' : ''}`}>
             <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
               task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
             }`}>
@@ -433,7 +433,7 @@ function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
                 </svg>
               )}
             </div>
-            <span className={task.completed ? 'line-through text-muted-foreground/50' : 'text-foreground'}>
+            <span className={task.completed ? 'text-muted-foreground' : 'text-foreground'}>
               {task.title}
             </span>
             <span className="ml-auto text-[10px] text-muted-foreground/40">{task.weight}pts</span>

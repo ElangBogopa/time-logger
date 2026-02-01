@@ -355,13 +355,13 @@ export default function DayReviewContent() {
             </div>
             <div className="space-y-1.5">
               {summary.productivityScore.tasks.map((task, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className={`flex items-center gap-2 ${task.completed ? 'opacity-50' : ''}`}>
                   <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                     task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
                   }`}>
                     {task.completed && <Check className="h-3 w-3 text-white" />}
                   </div>
-                  <span className={`text-sm flex-1 ${task.completed ? 'line-through text-muted-foreground/50' : 'text-foreground'}`}>
+                  <span className={`text-sm flex-1 ${task.completed ? 'text-muted-foreground' : 'text-foreground'}`}>
                     {task.title}
                   </span>
                   <span className="text-[10px] text-muted-foreground/40">{task.weight}pts</span>

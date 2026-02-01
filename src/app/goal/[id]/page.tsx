@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Ch
 import { csrfFetch } from '@/lib/api'
 import { getUserToday } from '@/lib/types'
 import CommitTimeModal from '@/components/CommitTimeModal'
+import AnimatedCheckbox from '@/components/AnimatedCheckbox'
 
 interface Goal {
   id: string
@@ -435,17 +436,13 @@ export default function GoalPage() {
 
               {/* Task breakdown */}
               <div className="space-y-1.5">
-                {todayScore.tasks.map((task, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleTaskComplete(task.id, task.completed)}
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                        task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600 active:border-green-400'
-                      }`}
-                    >
-                      {task.completed && <Check className="h-3 w-3 text-white" />}
-                    </button>
-                    <span className={`text-sm flex-1 ${task.completed ? 'line-through text-muted-foreground/50' : 'text-foreground'}`}>
+                {todayScore.tasks.filter(t => !t.completed).map((task, i) => (
+                  <div key={task.id || i} className="flex items-center gap-2 transition-all duration-300">
+                    <AnimatedCheckbox
+                      completed={task.completed}
+                      onToggle={() => toggleTaskComplete(task.id, task.completed)}
+                    />
+                    <span className="text-sm flex-1 text-foreground">
                       {task.title}
                     </span>
                     <span className="text-[10px] text-muted-foreground/40">
@@ -453,6 +450,15 @@ export default function GoalPage() {
                     </span>
                   </div>
                 ))}
+                {/* Completed tasks — collapsed summary */}
+                {todayScore.tasks.filter(t => t.completed).length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-border/50">
+                    <p className="text-[11px] text-green-500/70 font-medium flex items-center gap-1.5">
+                      <Check className="h-3 w-3" />
+                      {todayScore.tasks.filter(t => t.completed).length} task{todayScore.tasks.filter(t => t.completed).length !== 1 ? 's' : ''} completed
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Progress bar */}

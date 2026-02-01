@@ -59,7 +59,7 @@ export default function TimelineCommitted({ task, startHour }: TimelineCommitted
         {isShort ? (
           <div className="flex items-center gap-1.5">
             {task.completed && <Check className="h-3 w-3 shrink-0" />}
-            <span className={`truncate text-xs font-medium ${task.completed ? 'line-through' : ''}`}>
+            <span className={`truncate text-xs font-medium ${task.completed ? 'opacity-60' : ''}`}>
               {task.title}
             </span>
           </div>
@@ -67,7 +67,7 @@ export default function TimelineCommitted({ task, startHour }: TimelineCommitted
           <>
             <div className="flex items-center gap-1.5">
               {task.completed && <Check className="h-3 w-3 shrink-0" />}
-              <span className={`truncate text-xs font-medium ${task.completed ? 'line-through' : ''}`}>
+              <span className={`truncate text-xs font-medium ${task.completed ? 'opacity-60' : ''}`}>
                 {task.title}
               </span>
             </div>
