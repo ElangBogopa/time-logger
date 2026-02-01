@@ -1063,6 +1063,36 @@ export const LOGGING_DISABLED_MESSAGE = "You can only log activities from the pa
 export const VIEWING_PAST_MESSAGE = "You're viewing past entries. Logging is only available for today and yesterday."
 
 /**
+ * Maximum number of days in the past that users can complete/uncomplete tasks.
+ * Today = 0, yesterday = 1. More strict than time logging (which allows 2 days).
+ */
+export const MAX_DAYS_BACK_FOR_TASK_COMPLETION = 1
+
+/**
+ * Checks if a plan's date is within the completable range (today or yesterday only).
+ * Returns true if the task can be toggled, false if it's locked.
+ */
+export function isTaskCompletable(dateStr: string): boolean {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const targetDate = new Date(dateStr + 'T00:00:00')
+  targetDate.setHours(0, 0, 0, 0)
+
+  const diffTime = today.getTime() - targetDate.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+  // Allow today (0) and yesterday (1) only
+  // Also allow future dates (diffDays < 0) — planning ahead
+  return diffDays <= MAX_DAYS_BACK_FOR_TASK_COMPLETION
+}
+
+/**
+ * Message shown when task completion is locked due to age.
+ */
+export const TASK_COMPLETION_LOCKED_MESSAGE = "Tasks can only be checked off for today and yesterday. That ship has sailed."
+
+/**
  * Checks if a pending entry's end time has passed and is ready to confirm.
  */
 export function isPendingEntryReadyToConfirm(entry: TimeEntry): boolean {

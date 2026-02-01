@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
+import { isTaskCompletable } from '@/lib/types'
 
 // GET /api/plans?date=YYYY-MM-DD - Fetch user's plan items for a date
 export async function GET(request: NextRequest) {
@@ -101,6 +102,23 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'Plan id required' }, { status: 400 })
+    }
+
+    // If toggling completion, enforce date restriction (today + yesterday only)
+    if (typeof completed === 'boolean') {
+      const { data: existingPlan } = await supabase
+        .from('daily_plans')
+        .select('date')
+        .eq('id', id)
+        .eq('user_id', session.user.id)
+        .single()
+
+      if (existingPlan && !isTaskCompletable(existingPlan.date)) {
+        return NextResponse.json(
+          { error: 'Tasks can only be checked off for today and yesterday' },
+          { status: 403 }
+        )
+      }
     }
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }

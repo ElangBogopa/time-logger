@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
-import { getUserToday } from '@/lib/types'
+import { getUserToday, isTaskCompletable } from '@/lib/types'
 import CommitTimeModal from '@/components/CommitTimeModal'
 import AnimatedCheckbox from '@/components/AnimatedCheckbox'
 
@@ -90,8 +90,12 @@ export default function GoalPage() {
 
   const toggleCoachCard = () => setShowCoachCard(prev => !prev)
 
+  // Whether today's tasks can still be toggled (today + yesterday only)
+  const canCompleteTasks = isTaskCompletable(today)
+
   // Toggle task completion with animation delay
   const toggleTaskComplete = async (taskId: string, currentCompleted: boolean) => {
+    if (!canCompleteTasks) return // Locked — too far in the past
     if (!currentCompleted) {
       // COMPLETING: show animation first, then update state after delay
       setCompletingTaskIds(prev => new Set(prev).add(taskId))
@@ -478,6 +482,7 @@ export default function GoalPage() {
                       <AnimatedCheckbox
                         completed={isCompleting || task.completed}
                         onToggle={() => !isCompleting && toggleTaskComplete(task.id, task.completed)}
+                        readOnly={!canCompleteTasks}
                       />
                       <span className={`text-sm flex-1 transition-all duration-500 ${
                         isCompleting ? 'text-green-500' : 'text-foreground'
@@ -508,6 +513,7 @@ export default function GoalPage() {
                             <AnimatedCheckbox
                               completed={task.completed}
                               onToggle={() => toggleTaskComplete(task.id, task.completed)}
+                              readOnly={!canCompleteTasks}
                             />
                             <span className="text-sm flex-1 text-muted-foreground">
                               {task.title}
