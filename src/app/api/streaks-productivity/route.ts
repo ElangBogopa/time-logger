@@ -42,101 +42,99 @@ export async function GET(request: NextRequest) {
     }
 
     // Group plans by date
-    const plansByDate = new Map<string, { hasPlans: boolean; priorityCompleted: boolean; allCompleted: boolean }>()
+    const plansByDate = new Map<string, { hasPlans: boolean; priorityCompleted: boolean; completedCount: number }>()
     for (const plan of (plans || [])) {
       const existing = plansByDate.get(plan.date)
       if (!existing) {
         plansByDate.set(plan.date, {
           hasPlans: true,
           priorityCompleted: plan.sort_order === 0 ? plan.completed : false,
-          allCompleted: plan.completed,
+          completedCount: plan.completed ? 1 : 0,
         })
       } else {
-        // Priority task is sort_order 0
         if (plan.sort_order === 0) {
           existing.priorityCompleted = plan.completed
         }
-        if (!plan.completed) {
-          existing.allCompleted = false
+        if (plan.completed) {
+          existing.completedCount++
         }
       }
     }
 
     // Walk backwards from today to calculate streaks
-    let planningStreak = 0
-    let executionStreak = 0
-    let planningActive = true
-    let executionActive = true
+    // 1. Productive Day streak: completed #1 priority task
+    // 2. Crushing It streak: completed 3+ tasks
+    let productiveStreak = 0
+    let crushingStreak = 0
+    let productiveActive = true
+    let crushingActive = true
 
     for (let i = 0; i < 90; i++) {
       const date = getDateNDaysAgo(today, i)
       const dayData = plansByDate.get(date)
 
-      // Planning streak: did they set a plan?
-      if (planningActive) {
-        if (dayData?.hasPlans) {
-          planningStreak++
-        } else {
-          planningActive = false
-        }
-      }
-
-      // Execution streak: did they complete the priority task?
-      if (executionActive) {
+      // Productive Day: completed the #1 priority task
+      if (productiveActive) {
         if (dayData?.hasPlans && dayData?.priorityCompleted) {
-          executionStreak++
+          productiveStreak++
         } else if (dayData?.hasPlans && !dayData?.priorityCompleted) {
-          // Had a plan but didn't execute — streak broken
-          executionActive = false
+          productiveActive = false
         } else if (!dayData?.hasPlans) {
-          // No plan = skip day (don't break execution streak for unplanned days)
-          // But do break if we haven't seen any planned days yet
-          if (executionStreak === 0 && i > 0) {
-            executionActive = false
-          }
-          // Otherwise skip — unplanned days don't count against execution
+          // No plan = skip (don't penalize unplanned days)
+          if (productiveStreak === 0 && i > 0) productiveActive = false
         }
       }
 
-      if (!planningActive && !executionActive) break
+      // Crushing It: completed 3+ tasks
+      if (crushingActive) {
+        if (dayData?.hasPlans && dayData.completedCount >= 3) {
+          crushingStreak++
+        } else if (dayData?.hasPlans) {
+          crushingActive = false
+        } else if (!dayData?.hasPlans) {
+          if (crushingStreak === 0 && i > 0) crushingActive = false
+        }
+      }
+
+      if (!productiveActive && !crushingActive) break
     }
 
     // Best streaks (all time from 90-day window)
-    let bestPlanningStreak = 0
-    let bestExecutionStreak = 0
-    let currentPlanning = 0
-    let currentExecution = 0
+    let bestProductiveStreak = 0
+    let bestCrushingStreak = 0
+    let curProductive = 0
+    let curCrushing = 0
 
     for (let i = 89; i >= 0; i--) {
       const date = getDateNDaysAgo(today, i)
       const dayData = plansByDate.get(date)
 
-      if (dayData?.hasPlans) {
-        currentPlanning++
-        bestPlanningStreak = Math.max(bestPlanningStreak, currentPlanning)
-      } else {
-        currentPlanning = 0
+      if (dayData?.hasPlans && dayData?.priorityCompleted) {
+        curProductive++
+        bestProductiveStreak = Math.max(bestProductiveStreak, curProductive)
+      } else if (dayData?.hasPlans) {
+        curProductive = 0
       }
 
-      if (dayData?.hasPlans && dayData?.priorityCompleted) {
-        currentExecution++
-        bestExecutionStreak = Math.max(bestExecutionStreak, currentExecution)
+      if (dayData?.hasPlans && dayData.completedCount >= 3) {
+        curCrushing++
+        bestCrushingStreak = Math.max(bestCrushingStreak, curCrushing)
       } else if (dayData?.hasPlans) {
-        currentExecution = 0
+        curCrushing = 0
       }
-      // Unplanned days don't reset execution streak
     }
 
     return NextResponse.json({
+      // Keep "planning" key for backwards compat but repurpose as "crushing it"
       planning: {
-        current: planningStreak,
-        best: bestPlanningStreak,
-        label: planningStreak === 0 ? 'Start planning' : `${planningStreak} day${planningStreak !== 1 ? 's' : ''}`,
+        current: crushingStreak,
+        best: bestCrushingStreak,
+        label: crushingStreak === 0 ? 'Complete 3+ tasks' : `${crushingStreak} day${crushingStreak !== 1 ? 's' : ''}`,
       },
       execution: {
-        current: executionStreak,
-        best: bestExecutionStreak,
-        label: executionStreak === 0 ? 'Complete your #1 task' : `${executionStreak} day${executionStreak !== 1 ? 's' : ''}`,
+        current: productiveStreak,
+        best: bestProductiveStreak,
+        label: productiveStreak === 0 ? 'Complete your #1 task' : `${productiveStreak} day${productiveStreak !== 1 ? 's' : ''}`,
       },
     })
   } catch (error) {

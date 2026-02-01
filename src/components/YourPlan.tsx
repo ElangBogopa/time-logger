@@ -69,7 +69,8 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
     )
   }
 
-  const executionStreak = streaks?.execution.current ?? 0
+  const productiveStreak = streaks?.execution.current ?? 0
+  const crushingStreak = streaks?.planning.current ?? 0
 
   return (
     <div className="mt-4">
@@ -77,36 +78,63 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
         Your Plan
       </h3>
 
-      {/* Streak card */}
+      {/* Streaks card */}
       <div className="rounded-xl bg-card border border-border p-4 mb-3">
-        <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            executionStreak > 0 ? 'bg-orange-500/15' : 'bg-secondary'
-          }`}>
-            <Flame className={`h-5 w-5 ${
-              executionStreak > 0 ? 'text-orange-500' : 'text-muted-foreground/50'
-            }`} />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-xl font-bold ${
-                executionStreak > 0 ? 'text-foreground' : 'text-muted-foreground/40'
-              }`}>
-                {executionStreak}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                day{executionStreak !== 1 ? 's' : ''} streak
-              </span>
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Streaks</h4>
+        <div className="flex items-center gap-4">
+          {/* Productive Day streak — completed #1 task */}
+          <div className="flex-1 flex items-center gap-2.5">
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+              productiveStreak > 0 ? 'bg-green-500/15' : 'bg-secondary'
+            }`}>
+              <Target className={`h-4 w-4 ${
+                productiveStreak > 0 ? 'text-green-500' : 'text-muted-foreground/50'
+              }`} />
             </div>
-            <p className="text-[10px] text-muted-foreground/70">
-              {executionStreak === 0
-                ? 'Complete your #1 task to start a streak'
-                : executionStreak < 3
-                  ? 'Keep completing your top task daily'
-                  : executionStreak < 7
-                    ? 'Building momentum 💪'
-                    : 'On fire 🔥'}
-            </p>
+            <div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-lg font-bold ${
+                  productiveStreak > 0 ? 'text-foreground' : 'text-muted-foreground/40'
+                }`}>
+                  {productiveStreak}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  day{productiveStreak !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70">
+                Productive
+              </p>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-10 w-px bg-border" />
+
+          {/* Crushing It streak — completed 3+ tasks */}
+          <div className="flex-1 flex items-center gap-2.5">
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+              crushingStreak > 0 ? 'bg-orange-500/15' : 'bg-secondary'
+            }`}>
+              <Flame className={`h-4 w-4 ${
+                crushingStreak > 0 ? 'text-orange-500' : 'text-muted-foreground/50'
+              }`} />
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-lg font-bold ${
+                  crushingStreak > 0 ? 'text-foreground' : 'text-muted-foreground/40'
+                }`}>
+                  {crushingStreak}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  day{crushingStreak !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70">
+                Crushing It
+              </p>
+            </div>
           </div>
         </div>
       </div>
