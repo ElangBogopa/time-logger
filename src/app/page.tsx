@@ -4,7 +4,7 @@ import { Suspense, useMemo, useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getUserToday, TimePeriod } from '@/lib/types'
+import { getUserToday, getRealToday, DAY_ROLLOVER_HOUR, TimePeriod } from '@/lib/types'
 import { buildSessionInfos } from '@/lib/session-utils'
 import { useSessionData } from '@/hooks/useSessionData'
 import { useGreeting } from '@/hooks/useGreeting'
@@ -151,6 +151,13 @@ function HomeContent() {
             onDateChange={handleDateChange}
             isToday={isToday}
           />
+
+          {/* Rollover indicator: show during 12-3AM when viewing yesterday */}
+          {isToday && today !== getRealToday() && (
+            <p className="text-center text-[11px] text-muted-foreground/60 mb-1">
+              Entries logged after midnight save to {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </p>
+          )}
 
           {/* 2. Brand wordmark */}
           <p className="text-center text-[13px] font-bold uppercase tracking-[0.3em] text-muted-foreground mb-3">

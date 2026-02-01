@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
-import { MoodLevel, MoodCheckin, TimePeriod, getUserToday } from '@/lib/types'
+import { MoodLevel, MoodCheckin, TimePeriod, getUserToday, getRealToday } from '@/lib/types'
 
 // GET /api/mood - Get mood check-in for a specific date and period
 export async function GET(request: NextRequest) {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or missing period value' }, { status: 400 })
     }
 
-    const checkInDate = date || getUserToday()
+    const checkInDate = date || getRealToday()
 
     // Upsert the mood check-in (one per day per user per period)
     const { data, error } = await supabase

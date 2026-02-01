@@ -969,9 +969,18 @@ export function getLocalDateString(date: Date = new Date()): string {
 export const DAY_ROLLOVER_HOUR = 3
 
 /**
+ * Returns the real calendar date, ignoring rollover.
+ * Use this for DATA WRITES — entries should always be saved to the actual date.
+ */
+export function getRealToday(now: Date = new Date()): string {
+  return getLocalDateString(now)
+}
+
+/**
  * Returns "today" from the user's perspective, accounting for late nights.
  * If it's before 3 AM, returns yesterday's date (the user is still in that day mentally).
  * After 3 AM, returns the actual calendar date.
+ * Use this for VIEW/DISPLAY only — not for saving data.
  */
 export function getUserToday(now: Date = new Date()): string {
   const hour = now.getHours()

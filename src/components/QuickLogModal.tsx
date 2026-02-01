@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
-import { getLocalDateString, getUserToday, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS, TimePeriod, PERIOD_LABELS, getLoggingPeriod } from '@/lib/types'
+import { getLocalDateString, getUserToday, getRealToday, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import { parseTimeFromText, getHighlightedSegments, ParseResult } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
@@ -377,7 +377,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
     try {
       const today = getUserToday()
-      const entryDate = selectedDate || today
+      const realToday = getRealToday()
+      // During rollover (12-3AM), if user is on the "today" view (which shows yesterday),
+      // save entries to the real calendar date, not the rollover date
+      const isOnTodayView = !selectedDate || selectedDate === today
+      const entryDate = isOnTodayView ? realToday : selectedDate
 
       // Check for duplicate/overlapping entries first
       const existingEntries = await fetchEntries({ date: entryDate, fields: 'id,start_time,end_time,activity' })
@@ -498,7 +502,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     
     try {
       // Fetch all entries for this period today
-      const today = selectedDate || getUserToday()
+      const today = selectedDate || getRealToday()
       const periodRange = {
         morning: { start: 0, end: 12 },
         afternoon: { start: 12, end: 18 },

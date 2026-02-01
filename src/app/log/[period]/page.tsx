@@ -10,6 +10,8 @@ import {
   PERIOD_LABELS,
   PERIOD_TIME_RANGES,
   getUserToday,
+  getRealToday,
+  DAY_ROLLOVER_HOUR,
 } from '@/lib/types'
 import {
   getEntriesForPeriod,
@@ -437,6 +439,13 @@ export default function LogPeriodPage() {
               </button>
             )}
           </div>
+
+          {/* Rollover indicator during 12-3AM */}
+          {selectedDate === getUserToday() && getUserToday() !== getRealToday() && (
+            <p className="mt-2 text-[11px] text-muted-foreground/60">
+              Entries logged after midnight save to {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </p>
+          )}
 
           {/* Session stats */}
           {stats.entryCount > 0 && (

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
-import { getUserToday } from '@/lib/types'
+import { getUserToday, getRealToday } from '@/lib/types'
 
 export interface MorningCheckinData {
   sleep_quality: 'poor' | 'okay' | 'good'
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid energy_level' }, { status: 400 })
     }
 
-    const checkinDate = date || getUserToday()
+    const checkinDate = date || getRealToday()
 
     // Try Supabase first
     try {

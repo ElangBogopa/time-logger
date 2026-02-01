@@ -4,7 +4,7 @@ import { csrfFetch } from '@/lib/api'
 
 import { useState, useEffect } from 'react'
 import { Check, Sun, Target } from 'lucide-react'
-import { getUserToday } from '@/lib/types'
+import { getUserToday, getRealToday } from '@/lib/types'
 
 type SleepQuality = 'poor' | 'okay' | 'good'
 type EnergyLevel = 'low' | 'medium' | 'high'
@@ -65,6 +65,7 @@ export default function MorningCheckin({ className = '' }: MorningCheckinProps) 
   const [isMorning, setIsMorning] = useState(false)
 
   const today = getUserToday()
+  const realToday = getRealToday()
 
   // Check if it's morning (before noon) - client-side only
   useEffect(() => {
@@ -125,7 +126,7 @@ export default function MorningCheckin({ className = '' }: MorningCheckinProps) 
       sleep_quality: sleepQuality,
       energy_level: energyLevel,
       priority_text: priorityText.trim() || null,
-      date: today,
+      date: realToday,
     }
 
     try {
