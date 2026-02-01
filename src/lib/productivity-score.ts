@@ -41,6 +41,7 @@ export interface DailyProductivityScore {
   completedTasks: number  // how many were completed
   priorityCompleted: boolean // did they do the #1 task?
   tasks: {
+    id: string
     title: string
     completed: boolean
     weight: number        // 50, 30, or 20
@@ -96,6 +97,7 @@ export function calculateDailyScore(plans: PlanItem[]): DailyProductivityScore {
       completedTasks++
     }
     return {
+      id: plan.id,
       title: plan.title,
       completed: plan.completed,
       weight,

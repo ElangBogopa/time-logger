@@ -33,7 +33,7 @@ interface DailyScore {
   totalTasks: number
   completedTasks: number
   priorityCompleted: boolean
-  tasks: { title: string; completed: boolean; weight: number; slot: number }[]
+  tasks: { id: string; title: string; completed: boolean; weight: number; slot: number }[]
   label: string
   hasPlans: boolean
 }
@@ -88,6 +88,32 @@ export default function GoalPage() {
   }
 
   const toggleCoachCard = () => setShowCoachCard(prev => !prev)
+
+  // Toggle task completion
+  const toggleTaskComplete = async (taskId: string, currentCompleted: boolean) => {
+    // Optimistic update
+    setTodayScore(prev => {
+      if (!prev) return prev
+      const updated = { ...prev, tasks: prev.tasks.map(t => t.id === taskId ? { ...t, completed: !currentCompleted } : t) }
+      updated.completedTasks = updated.tasks.filter(t => t.completed).length
+      const earned = updated.tasks.reduce((sum, t) => sum + (t.completed ? t.weight : 0), 0)
+      const max = updated.tasks.reduce((sum, t) => sum + t.weight, 0)
+      updated.score = max > 0 ? Math.round((earned / max) * 100) : 0
+      return updated
+    })
+    try {
+      await csrfFetch('/api/plans', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, completed: !currentCompleted }),
+      })
+      // Refresh to get accurate score/label
+      fetchData()
+    } catch {
+      // Revert on error
+      fetchData()
+    }
+  }
 
   // Stats
   const [todayScore, setTodayScore] = useState<DailyScore | null>(null)
@@ -411,11 +437,14 @@ export default function GoalPage() {
               <div className="space-y-1.5">
                 {todayScore.tasks.map((task, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                      task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
-                    }`}>
+                    <button
+                      onClick={() => toggleTaskComplete(task.id, task.completed)}
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                        task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600 active:border-green-400'
+                      }`}
+                    >
                       {task.completed && <Check className="h-3 w-3 text-white" />}
-                    </div>
+                    </button>
                     <span className={`text-sm flex-1 ${task.completed ? 'line-through text-muted-foreground/50' : 'text-foreground'}`}>
                       {task.title}
                     </span>
