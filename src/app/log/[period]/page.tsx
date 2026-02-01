@@ -30,6 +30,7 @@ import ActivityList from '@/components/ActivityList'
 import GhostEntryModal from '@/components/GhostEntryModal'
 import QuickLogModal from '@/components/QuickLogModal'
 import { Button } from '@/components/ui/button'
+import SessionTasks from '@/components/SessionTasks'
 import {
   ArrowLeft,
   Sun,
@@ -459,6 +460,11 @@ export default function LogPeriodPage() {
             </div>
           )}
         </header>
+
+        {/* Tasks for this session — only on editable days */}
+        {!isLocked && selectedDate && (
+          <SessionTasks period={period} date={selectedDate} />
+        )}
 
         {/* Session content — Whoop-style cards for locked days, timeline for editable */}
         <section className="mb-6">

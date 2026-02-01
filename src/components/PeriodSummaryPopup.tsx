@@ -150,12 +150,12 @@ export default function PeriodSummaryPopup({
         })
       } catch { /* revert on error */ fetchTasks() }
     } else {
-      // Completing: animate then update
+      // Completing: animate then update — tag with current session period
       setCompletingTaskIds(prev => new Set(prev).add(taskId))
       csrfFetch('/api/plans', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, completed: true }),
+        body: JSON.stringify({ id: taskId, completed: true, completed_session: period }),
       }).catch(() => {})
       setTimeout(() => {
         setCompletingTaskIds(prev => {

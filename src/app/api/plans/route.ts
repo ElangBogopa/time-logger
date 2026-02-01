@@ -98,7 +98,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, completed, title, committed_start, committed_end } = body
+    const { id, completed, title, committed_start, committed_end, completed_session } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Plan id required' }, { status: 400 })
@@ -119,10 +119,31 @@ export async function PATCH(request: NextRequest) {
           { status: 403 }
         )
       }
+
+      // Completing a task requires a session period
+      if (completed === true && !completed_session) {
+        return NextResponse.json(
+          { error: 'completed_session is required when completing a task (morning/afternoon/evening)' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate completed_session value
+    const validSessions = ['morning', 'afternoon', 'evening']
+    if (completed_session && !validSessions.includes(completed_session)) {
+      return NextResponse.json(
+        { error: 'completed_session must be morning, afternoon, or evening' },
+        { status: 400 }
+      )
     }
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-    if (typeof completed === 'boolean') updates.completed = completed
+    if (typeof completed === 'boolean') {
+      updates.completed = completed
+      // Set or clear session tag
+      updates.completed_session = completed ? (completed_session || null) : null
+    }
     if (typeof title === 'string' && title.trim()) updates.title = title.trim()
     // Time commitment (HH:MM format or null to clear)
     if (committed_start !== undefined) updates.committed_start = committed_start
