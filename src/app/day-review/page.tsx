@@ -824,26 +824,23 @@ function DayReviewContent() {
           </section>
         )}
 
-        {/* Aggregated Energy Breakdown (primary view) */}
+        {/* Energy Breakdown, Category Breakdown, and Mood — commented out until science-based measurement is ready
         {summary.aggregatedBreakdown && summary.aggregatedBreakdown.length > 0 && (
           <div className="mb-6">
             <AggregatedBreakdownSection breakdown={summary.aggregatedBreakdown} />
           </div>
         )}
-
-        {/* Detailed Category Breakdown (secondary) */}
         {summary.categoryBreakdown && summary.categoryBreakdown.length > 5 && (
           <div className="mb-6">
             <CategoryBreakdownSection breakdown={summary.categoryBreakdown} />
           </div>
         )}
-
-        {/* Mood */}
         {summary.todayMood && (
           <div className="mb-6">
             <MoodSection mood={summary.todayMood} />
           </div>
         )}
+        */}
 
         {/* Longest Focus */}
         {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (

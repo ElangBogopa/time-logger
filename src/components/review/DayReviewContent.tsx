@@ -335,10 +335,14 @@ export default function DayReviewContent() {
           <div className="space-y-3">{summary.targetProgress.map(tp => <TargetCard key={tp.targetId} target={tp} />)}</div>
         </section>
       )}
+      {/* Energy breakdown — commented out until science-based measurement is ready
       {summary.aggregatedBreakdown && summary.aggregatedBreakdown.length > 0 && (
         <div className="mb-6"><AggregatedBreakdownSection breakdown={summary.aggregatedBreakdown} /></div>
       )}
+      */}
+      {/* Mood — commented out until science-based measurement is ready
       {summary.todayMood && <div className="mb-6"><MoodSection mood={summary.todayMood} /></div>}
+      */}
       {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
         <section className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">

@@ -138,7 +138,7 @@ function InsightCard({ insight }: { insight: CorrelationInsight }) {
             <div className="mt-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className={cn('text-xs font-medium', colors.text)}>
-                  {insight.direction === 'positive' ? '+' : '-'}{insight.strengthPercent}% mood impact
+                  {insight.direction === 'positive' ? '+' : '-'}{insight.strengthPercent}% impact
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {insight.sampleSizeWith + insight.sampleSizeWithout} days analyzed
@@ -210,9 +210,9 @@ function EmptyState({ daysNeeded, totalDaysTracked }: { daysNeeded: number; tota
           Insights are unlocking...
         </h3>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-          Keep logging your mood and activities for{' '}
+          Keep logging your activities for{' '}
           <span className="font-medium text-foreground">{daysNeeded} more day{daysNeeded !== 1 ? 's' : ''}</span>{' '}
-          to unlock personalized insights about what affects your mood.
+          to unlock personalized insights about your time patterns.
         </p>
         {/* Progress indicator */}
         <div className="mt-6 max-w-xs mx-auto">
@@ -346,7 +346,7 @@ export default function CorrelationInsights({
             <Lightbulb className="h-8 w-8 text-zinc-400 mx-auto mb-3" />
             <h3 className="font-medium text-foreground mb-1">No strong patterns yet</h3>
             <p className="text-sm text-muted-foreground">
-              Your mood doesn&apos;t show strong correlations with specific activities yet.
+              No strong patterns detected in your activities yet.
               Keep logging — patterns often emerge over 2-3 weeks.
             </p>
           </CardContent>
@@ -435,7 +435,7 @@ export default function CorrelationInsights({
             </CardTitle>
           </CardHeader>
           <p className="text-sm text-muted-foreground mb-3">
-            How your mood flows through the day
+            How your sessions flow through the day
           </p>
           <div className="space-y-3">
             {data.sessionPatterns.map(pattern => (
@@ -447,7 +447,7 @@ export default function CorrelationInsights({
 
       {/* Data info */}
       <p className="text-xs text-muted-foreground text-center">
-        Based on {data.totalDaysTracked} days of mood and activity data
+        Based on {data.totalDaysTracked} days of activity data
       </p>
     </div>
   )

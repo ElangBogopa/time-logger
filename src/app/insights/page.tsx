@@ -47,7 +47,7 @@ export default function InsightsPage() {
             <div>
               <h1 className="text-2xl font-bold text-foreground">Insights</h1>
               <p className="text-sm text-muted-foreground">
-                How your activities affect your mood
+                Patterns in how you spend your time
               </p>
             </div>
           </div>

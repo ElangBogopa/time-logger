@@ -236,6 +236,7 @@ export default function MorePage() {
             description="Google Calendar integration"
             onClick={() => router.push('/settings/connections')}
           />
+          {/* My Goals — accessed from homepage Your Plan section, not settings
           <RowItem
             icon={Target}
             iconBg="bg-primary/10"
@@ -244,6 +245,7 @@ export default function MorePage() {
             description="Weekly targets and intentions"
             onClick={() => router.push('/intentions')}
           />
+          */}
         </div>
 
         {/* Notifications — commented out until cron infrastructure is ready
