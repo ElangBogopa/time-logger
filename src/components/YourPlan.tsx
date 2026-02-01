@@ -22,11 +22,29 @@ interface YourPlanProps {
   isToday: boolean
 }
 
+const CACHE_KEY = 'your-plan-cache'
+
+function loadCache(): { goals: Goal[]; streaks: StreakData | null } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
+
+function saveCache(goals: Goal[], streaks: StreakData | null) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ goals, streaks }))
+  } catch { /* ignore */ }
+}
+
 export default function YourPlan({ date, isToday }: YourPlanProps) {
   const router = useRouter()
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [streaks, setStreaks] = useState<StreakData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const cached = loadCache()
+  const [goals, setGoals] = useState<Goal[]>(cached?.goals || [])
+  const [streaks, setStreaks] = useState<StreakData | null>(cached?.streaks || null)
+  const [isLoading, setIsLoading] = useState(!cached)
 
   const fetchData = useCallback(async () => {
     try {
@@ -35,20 +53,25 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
         fetch(`/api/streaks-productivity?date=${getUserToday()}`),
       ])
 
+      let newGoals = goals
+      let newStreaks = streaks
       if (goalsRes.ok) {
         const data = await goalsRes.json()
-        setGoals(data.goals || [])
+        newGoals = data.goals || []
+        setGoals(newGoals)
       }
       if (streaksRes.ok) {
         const data = await streaksRes.json()
-        setStreaks(data)
+        newStreaks = data
+        setStreaks(newStreaks)
       }
+      saveCache(newGoals, newStreaks)
     } catch (err) {
       console.error('Failed to fetch plan data:', err)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchData()
