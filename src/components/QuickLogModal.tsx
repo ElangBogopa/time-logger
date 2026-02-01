@@ -346,11 +346,17 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const duration = calculateDuration(startTime, endTime)
 
   // Detect if start time is in the future (for today only)
+  // During rollover (12-3AM), adjust current time to 24+ hours so evening times aren't "future"
   const isFutureStartTime = useMemo(() => {
     if (isFutureDay || isPastDay) return false // Only relevant for today
     if (!startTime) return false
     const now = new Date()
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const hour = now.getHours()
+    const isInRollover = hour < DAY_ROLLOVER_HOUR
+    // During rollover, current time is e.g. 24:45 (12:45 AM), so 23:00 is NOT future
+    const currentMinutes = isInRollover
+      ? (24 + hour) * 60 + now.getMinutes()
+      : hour * 60 + now.getMinutes()
     const startMinutes = timeToMinutes(startTime)
     return startMinutes > currentMinutes
   }, [startTime, isFutureDay, isPastDay])
@@ -378,10 +384,16 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     try {
       const today = getUserToday()
       const realToday = getRealToday()
-      // During rollover (12-3AM), if user is on the "today" view (which shows yesterday),
-      // save entries to the real calendar date, not the rollover date
+      const isInRollover = today !== realToday
       const isOnTodayView = !selectedDate || selectedDate === today
-      const entryDate = isOnTodayView ? realToday : selectedDate
+      // During rollover (12-3AM), the user is viewing yesterday and logging to yesterday's timeline.
+      // Only use real date if the entry's time is in the rollover window (after midnight).
+      // For earlier times (e.g. 11 PM), save to the viewed date (yesterday).
+      const startHour = startTime ? parseInt(startTime.split(':')[0]) : -1
+      const isEntryInRolloverHours = startHour >= 0 && startHour < DAY_ROLLOVER_HOUR
+      const entryDate = isOnTodayView && isInRollover && isEntryInRolloverHours
+        ? realToday
+        : (selectedDate || today)
 
       // Check for duplicate/overlapping entries first
       const existingEntries = await fetchEntries({ date: entryDate, fields: 'id,start_time,end_time,activity' })
@@ -502,7 +514,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     
     try {
       // Fetch all entries for this period today
-      const today = selectedDate || getRealToday()
+      const today = selectedDate || getUserToday()
       const periodRange = {
         morning: { start: 0, end: 12 },
         afternoon: { start: 12, end: 18 },
