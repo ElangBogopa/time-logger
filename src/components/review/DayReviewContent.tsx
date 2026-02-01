@@ -24,6 +24,7 @@ import {
   TimeEntry,
   AggregatedCategory,
   getUserToday,
+  getUserCurrentHour,
 } from '@/lib/types'
 
 import {
@@ -195,7 +196,8 @@ export default function DayReviewContent() {
   const [currentHour, setCurrentHour] = useState<number | null>(null)
 
   useEffect(() => {
-    setCurrentHour(new Date().getHours())
+    // Use rollover-adjusted hour (12:52 AM = hour 24, so review stays unlocked)
+    setCurrentHour(getUserCurrentHour())
   }, [])
 
   const isLocked = currentHour !== null && currentHour < 21
@@ -281,7 +283,7 @@ export default function DayReviewContent() {
         <p className="text-sm text-muted-foreground text-center max-w-xs mb-1">
           Your daily review unlocks at 9:00 PM once your day is wrapping up.
         </p>
-        {currentHour !== null && (
+        {currentHour !== null && currentHour < 21 && (
           <p className="text-xs text-muted-foreground/50">
             {21 - currentHour} hour{21 - currentHour !== 1 ? 's' : ''} to go
           </p>
