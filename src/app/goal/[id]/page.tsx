@@ -412,11 +412,10 @@ export default function GoalPage() {
                 </div>
               </div>
 
-              {/* Task breakdown — read-only (complete tasks from session pages) */}
+              {/* Task list — read-only, no circles */}
               <div className="space-y-1.5">
                 {todayScore.tasks.filter(t => !t.completed).map((task, i) => (
                   <div key={task.id || i} className="flex items-center gap-2">
-                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 dark:border-zinc-600" />
                     <span className="text-sm flex-1 text-foreground">
                       {task.title}
                     </span>
@@ -439,11 +438,8 @@ export default function GoalPage() {
                     {showCompleted && (
                       <div className="mt-2 space-y-1.5">
                         {todayScore.tasks.filter(t => t.completed).map((task, i) => (
-                          <div key={task.id || i} className="flex items-center gap-2 opacity-60">
-                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-green-500 bg-green-500">
-                              <Check className="h-3 w-3 text-white" />
-                            </div>
-                            <span className="text-sm flex-1 text-muted-foreground">
+                          <div key={task.id || i} className="flex items-center gap-2 opacity-50">
+                            <span className="text-sm flex-1 text-muted-foreground line-through">
                               {task.title}
                             </span>
                             <span className="text-[10px] text-muted-foreground/40">
@@ -456,6 +452,13 @@ export default function GoalPage() {
                   </div>
                 )}
               </div>
+
+              {/* Hint — how to complete tasks */}
+              {todayScore.tasks.some(t => !t.completed) && (
+                <p className="mt-3 text-[11px] text-muted-foreground/50 text-center">
+                  Completed a task? Log it after finishing a session.
+                </p>
+              )}
 
               {/* Progress bar */}
               <div className="mt-3 h-2 rounded-full bg-secondary overflow-hidden">
