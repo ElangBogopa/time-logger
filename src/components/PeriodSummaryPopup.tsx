@@ -579,40 +579,104 @@ export default function PeriodSummaryPopup({
             </div>
 
             {/* Task completion prompt */}
-            {tasks.length > 0 && (
-              <div className="mb-5 rounded-xl bg-zinc-800/30 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Check className="h-4 w-4 text-zinc-500" />
-                  <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
-                    Complete any tasks?
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {tasks.map((task, i) => {
-                    const isCompleting = completingTaskIds.has(task.id)
-                    return (
+            {tasks.length > 0 && (() => {
+              const incompleteTasks = tasks.filter(t => !t.completed && !completingTaskIds.has(t.id))
+              const completedCount = tasks.filter(t => t.completed || completingTaskIds.has(t.id)).length
+              const allDone = incompleteTasks.length === 0 && completedCount > 0
+
+              return (
+                <div className="mb-5 rounded-xl bg-zinc-800/30 p-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-zinc-500" />
+                      <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                        Complete any tasks?
+                      </p>
+                    </div>
+                    {completedCount > 0 && (
+                      <span className="text-[11px] text-green-500 font-medium">
+                        {completedCount}/{tasks.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* All done celebration */}
+                  {allDone && (
+                    <div className="flex items-center justify-center gap-2 py-2 mb-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <Sparkles className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium text-green-500">All tasks done!</span>
+                    </div>
+                  )}
+
+                  {/* Task list */}
+                  <div className="space-y-2.5">
+                    {/* Incomplete tasks first */}
+                    {incompleteTasks.map((task, i) => (
                       <div
                         key={task.id}
-                        className={`flex items-center gap-2.5 transition-all duration-500 ${
-                          isCompleting ? 'opacity-40 scale-95' : ''
-                        } ${task.completed && !isCompleting ? 'opacity-50' : ''}`}
+                        className="flex items-center gap-3 rounded-lg px-2 py-1.5 -mx-2 hover:bg-zinc-700/20 transition-colors"
                       >
                         <AnimatedCheckbox
-                          completed={isCompleting || task.completed}
-                          onToggle={() => !isCompleting && handleToggleTask(task.id, task.completed)}
-                          size="sm"
+                          completed={false}
+                          onToggle={() => handleToggleTask(task.id, false)}
                         />
-                        <span className={`text-sm flex-1 transition-all duration-300 ${
-                          task.completed || isCompleting ? 'text-zinc-500 line-through' : 'text-zinc-300'
-                        }`}>
+                        <span className="text-sm flex-1 text-zinc-200">
+                          {task.title}
+                        </span>
+                        {i === 0 && incompleteTasks[0]?.sort_order === 0 && (
+                          <span className="text-[10px] text-amber-400/70 font-medium">#1</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Currently animating */}
+                    {tasks.filter(t => completingTaskIds.has(t.id)).map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center gap-3 rounded-lg px-2 py-1.5 -mx-2 transition-all duration-700 opacity-40 scale-[0.97] translate-x-1"
+                      >
+                        <AnimatedCheckbox
+                          completed={true}
+                          onToggle={() => {}}
+                        />
+                        <span className="text-sm flex-1 text-green-400 transition-all duration-500">
                           {task.title}
                         </span>
                       </div>
-                    )
-                  })}
+                    ))}
+
+                    {/* Completed tasks */}
+                    {tasks.filter(t => t.completed && !completingTaskIds.has(t.id)).map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center gap-3 rounded-lg px-2 py-1.5 -mx-2 opacity-50 hover:opacity-70 transition-all"
+                      >
+                        <AnimatedCheckbox
+                          completed={true}
+                          onToggle={() => handleToggleTask(task.id, true)}
+                        />
+                        <span className="text-sm flex-1 text-zinc-500 line-through">
+                          {task.title}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Progress bar */}
+                  {tasks.length > 1 && (
+                    <div className="mt-3 h-1.5 rounded-full bg-zinc-700/50 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          allDone ? 'bg-green-500' : completedCount > 0 ? 'bg-green-500/70' : 'bg-zinc-600'
+                        }`}
+                        style={{ width: `${(completedCount / tasks.length) * 100}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Actions */}
             {isEvening && onViewDayReview ? (
