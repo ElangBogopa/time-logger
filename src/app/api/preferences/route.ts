@@ -78,6 +78,7 @@ export async function PUT(request: NextRequest) {
     const {
       reminder_enabled,
       reminder_times,
+      timezone,
       intentions_committed_since,
       pending_intention_changes
     } = body
@@ -106,10 +107,20 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Validate timezone if provided
+    if (timezone !== undefined && timezone !== null) {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: timezone })
+      } catch {
+        return NextResponse.json({ error: 'Invalid timezone' }, { status: 400 })
+      }
+    }
+
     // Build update object
     const updateData: Record<string, unknown> = {}
     if (reminder_enabled !== undefined) updateData.reminder_enabled = reminder_enabled
     if (reminder_times !== undefined) updateData.reminder_times = reminder_times
+    if (timezone !== undefined) updateData.timezone = timezone
     if (intentions_committed_since !== undefined) updateData.intentions_committed_since = intentions_committed_since
     if (pending_intention_changes !== undefined) updateData.pending_intention_changes = pending_intention_changes
 

@@ -59,6 +59,7 @@ export interface UserPreferences {
   user_id: string
   reminder_enabled: boolean
   reminder_times: ReminderTime[]
+  timezone: string | null // IANA timezone e.g. "America/Toronto"
   intentions_committed_since: string | null // ISO date of last commitment
   pending_intention_changes: PendingIntentionChange[] | null
   created_at: string

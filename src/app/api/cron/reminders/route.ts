@@ -90,22 +90,12 @@ export async function GET(request: NextRequest) {
     }
 
     const now = new Date()
-    const currentHour = now.getUTCHours()
     const todayStr = now.toISOString().slice(0, 10)
 
-    // Common timezone offsets to check
-    const timezoneOffsets = [-8, -7, -6, -5, -4, -3, 0, 1, 2, 3, 5.5, 8, 9, 10, 12]
-
-    const matchingTimes: string[] = []
-    for (const offset of timezoneOffsets) {
-      const localHour = (currentHour + offset + 24) % 24
-      matchingTimes.push(`${String(Math.floor(localHour)).padStart(2, '0')}:00`)
-    }
-
-    // Get users with reminders enabled
+    // Get users with reminders enabled (include their timezone)
     const { data: preferences, error: prefsError } = await supabase
       .from('user_preferences')
-      .select('user_id, reminder_times')
+      .select('user_id, reminder_times, timezone')
       .eq('reminder_enabled', true)
 
     if (prefsError) {
@@ -117,7 +107,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'No users with reminders enabled' })
     }
 
-    // Find users whose reminder times match
+    // Find users whose reminder times match their LOCAL current hour
     const usersToNotify: string[] = []
 
     for (const pref of preferences) {
@@ -128,8 +118,23 @@ export async function GET(request: NextRequest) {
 
       if (!reminderTimes) continue
 
+      // Get user's local time using their stored timezone (or fallback to UTC)
+      const userTz = (pref as { timezone?: string | null }).timezone || 'UTC'
+      let localHourStr: string
+      try {
+        localHourStr = new Intl.DateTimeFormat('en-US', {
+          hour: '2-digit',
+          hour12: false,
+          timeZone: userTz,
+        }).format(now)
+      } catch {
+        // Invalid timezone stored — fall back to UTC
+        localHourStr = String(now.getUTCHours()).padStart(2, '0')
+      }
+      const userLocalTime = `${localHourStr}:00`
+
       for (const reminder of reminderTimes) {
-        if (reminder.enabled && matchingTimes.includes(reminder.time)) {
+        if (reminder.enabled && reminder.time === userLocalTime) {
           usersToNotify.push(pref.user_id)
           break
         }
@@ -139,7 +144,7 @@ export async function GET(request: NextRequest) {
     if (usersToNotify.length === 0) {
       return NextResponse.json({
         message: 'No matching reminder times',
-        checkedTimes: matchingTimes,
+        checkedUsers: preferences.length,
       })
     }
 
@@ -161,9 +166,11 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Determine base message from time of day
-    const timeOfDay = getTimeOfDay(currentHour)
-    const baseMessage = REMINDER_MESSAGES[timeOfDay]
+    // Build a map of user timezone for personalized messages
+    const userTimezones = new Map<string, string>()
+    for (const pref of preferences) {
+      userTimezones.set(pref.user_id, (pref as { timezone?: string | null }).timezone || 'UTC')
+    }
 
     // Look back 60 days for streak calculation
     const lookbackDate = new Date(now)
@@ -183,6 +190,22 @@ export async function GET(request: NextRequest) {
     }
 
     for (const [userId, userSubs] of subsByUser) {
+      // Get user's local hour for personalized message
+      const userTz = userTimezones.get(userId) || 'UTC'
+      let userLocalHour: number
+      try {
+        userLocalHour = parseInt(new Intl.DateTimeFormat('en-US', {
+          hour: '2-digit',
+          hour12: false,
+          timeZone: userTz,
+        }).format(now), 10)
+      } catch {
+        userLocalHour = now.getUTCHours()
+      }
+
+      const timeOfDay = getTimeOfDay(userLocalHour)
+      const baseMessage = REMINDER_MESSAGES[timeOfDay]
+
       // Fetch user's recent entries for personalization
       const { data: recentEntries } = await supabase
         .from('time_entries')
@@ -244,7 +267,6 @@ export async function GET(request: NextRequest) {
       sent,
       failed,
       total: subscriptions.length,
-      timeOfDay,
     })
   } catch (error) {
     console.error('Cron reminders error:', error)
