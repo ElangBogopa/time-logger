@@ -246,7 +246,7 @@ export default function MorePage() {
           />
         </div>
 
-        {/* Notifications */}
+        {/* Notifications — commented out until cron infrastructure is ready
         <SectionLabel>Notifications</SectionLabel>
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
@@ -258,6 +258,7 @@ export default function MorePage() {
             onClick={() => router.push('/settings/notifications')}
           />
         </div>
+        */}
 
         {/* Preferences */}
         <SectionLabel>Preferences</SectionLabel>
