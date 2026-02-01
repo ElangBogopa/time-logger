@@ -137,7 +137,7 @@ function getScoreLabel(
   if (priorityCompleted && score >= 50) return 'Priority done'
   if (score >= 50) return 'Solid progress'
   if (completedTasks > 0) return 'Partial progress'
-  return 'Tough day'
+  return 'Not started yet'
 }
 
 /**

@@ -314,7 +314,7 @@ export default function GoalPage() {
           )}
 
           <p className="text-sm text-muted-foreground/70 mb-4">
-            {tomorrowLabel} — What will you get done?
+            {tomorrowLabel} — Set your priorities.
           </p>
 
           <div className="space-y-3">
@@ -396,7 +396,20 @@ export default function GoalPage() {
         {/* ═══ STATS SECTION ═══ */}
 
         {/* Today's Score */}
-        {todayScore?.hasPlans && (
+        {todayScore?.hasPlans && (() => {
+          // Time-aware label — don't judge early in the day
+          const currentHour = new Date().getHours()
+          const isEarlyDay = currentHour < 9 // Before 9 AM
+          let displayLabel = todayScore.label
+          if (todayScore.score === 0 && todayScore.completedTasks === 0) {
+            if (isEarlyDay) {
+              displayLabel = 'Day ahead'
+            } else if (currentHour < 12) {
+              displayLabel = 'Just getting started'
+            }
+          }
+
+          return (
           <section className="mb-6">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
               Today
@@ -405,7 +418,7 @@ export default function GoalPage() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <span className="text-3xl font-bold text-foreground">{todayScore.score}%</span>
-                  <p className="text-sm text-muted-foreground mt-0.5">{todayScore.label}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{displayLabel}</p>
                 </div>
                 <div className="text-right text-xs text-muted-foreground">
                   {todayScore.completedTasks}/{todayScore.totalTasks} tasks
@@ -471,7 +484,8 @@ export default function GoalPage() {
               </div>
             </div>
           </section>
-        )}
+          )
+        })()}
 
         {/* This Week */}
         {weeklyStats && weeklyStats.plannedDays > 0 && (
