@@ -601,55 +601,87 @@ export default function GoalPage() {
         )}
 
         {/* Streaks */}
-        {streaks && (
-          <section className="mb-6">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              Streaks
-            </h2>
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1 flex items-center gap-2.5">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                    streaks.planning.current > 0 ? 'bg-blue-500/15' : 'bg-secondary'
-                  }`}>
-                    <CalendarCheck className={`h-4 w-4 ${streaks.planning.current > 0 ? 'text-blue-500' : 'text-muted-foreground/50'}`} />
-                  </div>
-                  <div>
-                    <div className="flex items-baseline gap-1">
-                      <span className={`text-lg font-bold ${streaks.planning.current > 0 ? 'text-foreground' : 'text-muted-foreground/40'}`}>
-                        {streaks.planning.current}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">day{streaks.planning.current !== 1 ? 's' : ''}</span>
+        {streaks && (() => {
+          const STREAK_THRESHOLD = 3
+          const planningUnlocked = streaks.planning.current >= STREAK_THRESHOLD
+          const executionUnlocked = streaks.execution.current >= STREAK_THRESHOLD
+          const planningRemaining = Math.max(0, STREAK_THRESHOLD - streaks.planning.current)
+          const executionRemaining = Math.max(0, STREAK_THRESHOLD - streaks.execution.current)
+
+          return (
+            <section className="mb-6">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                Streaks
+              </h2>
+              <div className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-center gap-4">
+                  {/* Planning streak */}
+                  <div className="flex-1 flex items-center gap-2.5">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      planningUnlocked ? 'bg-blue-500/15' : 'bg-secondary'
+                    }`}>
+                      <CalendarCheck className={`h-4 w-4 ${planningUnlocked ? 'text-blue-500' : 'text-muted-foreground/50'}`} />
                     </div>
-                    <p className="text-[10px] text-muted-foreground/70">Planning</p>
+                    <div>
+                      {planningUnlocked ? (
+                        <>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-lg font-bold text-foreground">
+                              {streaks.planning.current}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">days</span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/70">Planning</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs font-medium text-muted-foreground/60">Planning</p>
+                          <p className="text-[10px] text-muted-foreground/40">
+                            {planningRemaining} more day{planningRemaining !== 1 ? 's' : ''} to unlock
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="h-10 w-px bg-border" />
+                  {/* Execution streak */}
+                  <div className="flex-1 flex items-center gap-2.5">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      executionUnlocked ? 'bg-orange-500/15' : 'bg-secondary'
+                    }`}>
+                      <Flame className={`h-4 w-4 ${executionUnlocked ? 'text-orange-500' : 'text-muted-foreground/50'}`} />
+                    </div>
+                    <div>
+                      {executionUnlocked ? (
+                        <>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-lg font-bold text-foreground">
+                              {streaks.execution.current}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">days</span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/70">Follow-through</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs font-medium text-muted-foreground/60">Follow-through</p>
+                          <p className="text-[10px] text-muted-foreground/40">
+                            {executionRemaining} more day{executionRemaining !== 1 ? 's' : ''} to unlock
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="h-10 w-px bg-border" />
-                <div className="flex-1 flex items-center gap-2.5">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                    streaks.execution.current > 0 ? 'bg-orange-500/15' : 'bg-secondary'
-                  }`}>
-                    <Flame className={`h-4 w-4 ${streaks.execution.current > 0 ? 'text-orange-500' : 'text-muted-foreground/50'}`} />
-                  </div>
-                  <div>
-                    <div className="flex items-baseline gap-1">
-                      <span className={`text-lg font-bold ${streaks.execution.current > 0 ? 'text-foreground' : 'text-muted-foreground/40'}`}>
-                        {streaks.execution.current}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">day{streaks.execution.current !== 1 ? 's' : ''}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/70">Follow-through</p>
-                  </div>
-                </div>
+                {(planningUnlocked || executionUnlocked) && (streaks.planning.best > 0 || streaks.execution.best > 0) && (
+                  <p className="mt-2.5 text-[11px] text-center text-muted-foreground/50 border-t border-border pt-2.5">
+                    Best: {streaks.planning.best} day{streaks.planning.best !== 1 ? 's' : ''} planning · {streaks.execution.best} day{streaks.execution.best !== 1 ? 's' : ''} follow-through
+                  </p>
+                )}
               </div>
-              {(streaks.planning.best > 0 || streaks.execution.best > 0) && (
-                <p className="mt-2.5 text-[11px] text-center text-muted-foreground/50 border-t border-border pt-2.5">
-                  Best: {streaks.planning.best} day{streaks.planning.best !== 1 ? 's' : ''} planning · {streaks.execution.best} day{streaks.execution.best !== 1 ? 's' : ''} follow-through
-                </p>
-              )}
-            </div>
-          </section>
-        )}
+            </section>
+          )
+        })()}
       </div>
 
       {/* Commit Time Modal */}
