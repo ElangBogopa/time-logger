@@ -223,7 +223,7 @@ function ConnectionsContent() {
                 <div className="space-y-3">
                   {isGoogleOAuthUser && calendarStatus.source === 'google_oauth' ? (
                     <p className="text-sm text-muted-foreground">
-                      Calendar is connected through your Google sign-in. To disconnect, sign out and use email/password login.
+                      Calendar is connected through your Google sign-in.
                     </p>
                   ) : (
                     <Button

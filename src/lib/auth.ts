@@ -1,18 +1,7 @@
 import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
-import EmailProvider from 'next-auth/providers/email'
-import { Resend } from 'resend'
 import { supabase } from './supabase-server'
 import { SupabaseAdapter } from './auth-adapter'
-
-// Lazy initialization of Resend client
-let resendClient: Resend | null = null
-function getResend(): Resend {
-  if (!resendClient) {
-    resendClient = new Resend(process.env.RESEND_API_KEY)
-  }
-  return resendClient
-}
 
 /**
  * Refresh the Google access token using the refresh token
@@ -63,82 +52,6 @@ async function refreshAccessToken(token: {
 export const authOptions: NextAuthOptions = {
   adapter: SupabaseAdapter(),
   providers: [
-    EmailProvider({
-      from: process.env.EMAIL_FROM || 'Better <noreply@timelogger.app>',
-      maxAge: 10 * 60, // 10 minutes
-      async sendVerificationRequest({ identifier: email, url }) {
-        console.log('[Auth] sendVerificationRequest called')
-        console.log('[Auth] Email:', email)
-        console.log('[Auth] URL:', url)
-
-        const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 40px 20px;">
-  <div style="max-width: 400px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
-    <h1 style="font-size: 24px; font-weight: 600; color: #111827; margin: 0 0 16px 0; text-align: center;">
-      Sign in to Better
-    </h1>
-    <p style="font-size: 15px; color: #6b7280; margin: 0 0 32px 0; text-align: center; line-height: 1.5;">
-      Click the button below to sign in. This link will expire in 10 minutes.
-    </p>
-    <a href="${url}" style="display: block; background-color: #111827; color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; padding: 14px 24px; border-radius: 8px; text-align: center;">
-      Sign In
-    </a>
-    <p style="font-size: 13px; color: #9ca3af; margin: 32px 0 0 0; text-align: center; line-height: 1.5;">
-      If you didn't request this email, you can safely ignore it.
-    </p>
-  </div>
-</body>
-</html>`
-
-        const textContent = `Sign in to Better
-
-Click the link below to sign in. This link will expire in 10 minutes.
-
-${url}
-
-If you didn't request this email, you can safely ignore it.`
-
-        console.log('[Auth] HTML length:', htmlContent.length)
-        console.log('[Auth] Text length:', textContent.length)
-
-        try {
-          const emailPayload = {
-            from: process.env.EMAIL_FROM || 'Better <noreply@timelogger.app>',
-            to: email,
-            subject: 'Sign in to Better',
-            html: htmlContent,
-            text: textContent,
-          }
-
-          console.log('[Auth] Sending email with payload:', {
-            from: emailPayload.from,
-            to: emailPayload.to,
-            subject: emailPayload.subject,
-            htmlLength: emailPayload.html.length,
-            textLength: emailPayload.text.length,
-          })
-
-          const result = await getResend().emails.send(emailPayload)
-
-          console.log('[Auth] Resend result:', result)
-
-          if (result.error) {
-            console.error('[Auth] Resend error:', result.error)
-            throw new Error('Failed to send verification email')
-          }
-
-          console.log('[Auth] Magic link sent successfully to:', email)
-        } catch (error) {
-          console.error('[Auth] Failed to send magic link:', error)
-          throw new Error('Failed to send verification email')
-        }
-      },
-    }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -160,28 +73,6 @@ If you didn't request this email, you can safely ignore it.`
         hasProfile: !!profile,
       })
 
-      // Handle email provider sign-in (magic link)
-      if (account?.provider === 'email') {
-        console.log('[Auth] Email provider sign-in for:', user?.email)
-
-        // Check if this email has a Google account linked
-        if (user?.email) {
-          const { data: existingUser } = await supabase
-            .from('users')
-            .select('id, google_id, auth_provider')
-            .eq('email', user.email.toLowerCase())
-            .single()
-
-          if (existingUser?.google_id) {
-            console.log('[Auth] User has Google account linked, redirecting to Google sign-in')
-            // Redirect to login with message to use Google
-            return '/login?error=google_account'
-          }
-        }
-
-        return true
-      }
-
       // Handle Google sign-in: create or link user record
       if (account?.provider === 'google' && profile?.email) {
         const email = profile.email.toLowerCase()
@@ -202,7 +93,7 @@ If you didn't request this email, you can safely ignore it.`
               .from('users')
               .update({
                 google_id: googleId,
-                auth_provider: existingUser.password_hash ? 'both' : 'google',
+                auth_provider: 'google',
                 preferred_name: existingUser.preferred_name || googleName,
               })
               .eq('id', existingUser.id)
@@ -270,18 +161,6 @@ If you didn't request this email, you can safely ignore it.`
           id: dbUser?.id || profile?.sub,
           preferredName: dbUser?.preferred_name || profile?.name,
           authProvider: 'google',
-          error: undefined,
-        }
-      }
-
-      // Initial sign in with magic link (email provider)
-      if (account?.provider === 'email' && user) {
-        console.log('[Auth] Magic link sign-in, user.id:', user.id, 'email:', user.email)
-        return {
-          ...token,
-          id: user.id,
-          preferredName: (user as { name?: string }).name,
-          authProvider: 'email',
           error: undefined,
         }
       }

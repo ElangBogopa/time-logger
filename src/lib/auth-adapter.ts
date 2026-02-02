@@ -2,12 +2,12 @@ import { Adapter, AdapterUser, AdapterAccount, AdapterSession, VerificationToken
 import { supabase } from './supabase-server'
 
 /**
- * Custom partial adapter for NextAuth that handles verification tokens
- * using Supabase. Only implements methods needed for magic link authentication.
+ * Custom partial adapter for NextAuth that handles Google authentication
+ * using Supabase. Only implements methods needed for Google OAuth.
  */
 export function SupabaseAdapter(): Adapter {
   return {
-    // Create a new user (called when magic link is used by a new email)
+    // Create a new user (called when Google account is used by a new email)
     async createUser(user: Omit<AdapterUser, 'id'>) {
       console.log('[Adapter] createUser called with:', user.email)
       const { data, error } = await supabase
@@ -15,7 +15,7 @@ export function SupabaseAdapter(): Adapter {
         .insert({
           email: user.email?.toLowerCase(),
           preferred_name: user.name,
-          auth_provider: 'email',
+          auth_provider: 'google',
         })
         .select('id, email, preferred_name, created_at')
         .single()
@@ -80,7 +80,7 @@ export function SupabaseAdapter(): Adapter {
       }
     },
 
-    // Get user by account (not used for magic links, but required by adapter)
+    // Get user by account (required by adapter)
     async getUserByAccount({ providerAccountId, provider }) {
       if (provider === 'google') {
         const { data } = await supabase
@@ -158,13 +158,12 @@ export function SupabaseAdapter(): Adapter {
       await supabase.from('users').delete().eq('id', userId)
     },
 
-    // Link account (not used for magic links)
+    // Link account (required by adapter)
     async linkAccount(account: AdapterAccount) {
-      // For magic links, we don't need to link accounts
       return account
     },
 
-    // Unlink account (not used for magic links)
+    // Unlink account (required by adapter)
     async unlinkAccount(_params: { providerAccountId: string; provider: string }) {
       // Not implemented
     },
@@ -189,77 +188,18 @@ export function SupabaseAdapter(): Adapter {
       // Not implemented
     },
 
-    // Create verification token for magic link
+    // Create verification token (no-op for Google-only auth)
     async createVerificationToken({ identifier, expires, token }: VerificationToken) {
       console.log('[Adapter] createVerificationToken called for:', identifier)
-      console.log('[Adapter] Token expires:', expires.toISOString())
-
-      const { data, error } = await supabase
-        .from('verification_tokens')
-        .insert({
-          identifier: identifier.toLowerCase(),
-          token,
-          expires: expires.toISOString(),
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error('[Adapter] Failed to create verification token:', error)
-        throw new Error('Failed to create verification token')
-      }
-
-      console.log('[Adapter] Verification token created successfully')
-      return {
-        identifier: data.identifier,
-        token: data.token,
-        expires: new Date(data.expires),
-      }
+      // Return the input as-is since we're not using verification tokens
+      return { identifier, expires, token }
     },
 
-    // Use (consume) verification token
+    // Use (consume) verification token (no-op for Google-only auth)
     async useVerificationToken({ identifier, token }: { identifier: string; token: string }) {
       console.log('[Adapter] useVerificationToken called for:', identifier)
-      // First, get the token
-      const { data, error } = await supabase
-        .from('verification_tokens')
-        .select('*')
-        .eq('identifier', identifier.toLowerCase())
-        .eq('token', token)
-        .single()
-
-      if (error || !data) {
-        console.error('[Adapter] Verification token not found:', error)
-        return null
-      }
-
-      console.log('[Adapter] Token found, expires:', data.expires)
-
-      // Check if expired
-      if (new Date(data.expires) < new Date()) {
-        console.error('[Adapter] Token has expired')
-        // Still delete it
-        await supabase
-          .from('verification_tokens')
-          .delete()
-          .eq('identifier', identifier.toLowerCase())
-          .eq('token', token)
-        return null
-      }
-
-      // Delete the token (single use)
-      await supabase
-        .from('verification_tokens')
-        .delete()
-        .eq('identifier', identifier.toLowerCase())
-        .eq('token', token)
-
-      console.log('[Adapter] Token verified and consumed successfully')
-      return {
-        identifier: data.identifier,
-        token: data.token,
-        expires: new Date(data.expires),
-      }
+      // Return null since we're not using verification tokens
+      return null
     },
   }
 }
