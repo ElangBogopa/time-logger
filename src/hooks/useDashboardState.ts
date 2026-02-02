@@ -57,17 +57,11 @@ export function useDashboardState({ session, status }: UseDashboardStateProps): 
   }, [status, router])
 
   // Check if user needs onboarding (no productivity target or goals set)
-  // TODO: TEMP — force onboarding for testing, revert after
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.id || hasCheckedTargets) {
       return
     }
 
-    // TEMP: Force show onboarding for testing
-    setShowOnboarding(true)
-    setHasCheckedTargets(true)
-
-    /* ORIGINAL — uncomment to restore:
     const controller = new AbortController()
 
     async function checkOnboardingNeeded() {
@@ -101,7 +95,6 @@ export function useDashboardState({ session, status }: UseDashboardStateProps): 
 
     checkOnboardingNeeded()
     return () => controller.abort()
-    */
   }, [status, session?.user?.id, hasCheckedTargets])
 
   return {
