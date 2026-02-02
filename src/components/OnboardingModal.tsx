@@ -92,18 +92,26 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     setError(null)
 
     try {
-      // Create the goal
-      const goalResponse = await csrfFetch('/api/goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: 'Increase Productivity',
-          description: 'Track your daily priorities and build consistent follow-through',
-        }),
-      })
-      if (!goalResponse.ok) {
-        const data = await goalResponse.json()
-        throw new Error(data.error || 'Failed to create goal')
+      // Check if goal already exists before creating (prevents duplicates on re-onboarding)
+      const existingGoals = await csrfFetch('/api/goals')
+      const goalsData = existingGoals.ok ? await existingGoals.json() : { goals: [] }
+      const hasProductivityGoal = goalsData.goals?.some(
+        (g: { title: string; active: boolean }) => g.title === 'Increase Productivity' && g.active
+      )
+
+      if (!hasProductivityGoal) {
+        const goalResponse = await csrfFetch('/api/goals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: 'Increase Productivity',
+            description: 'Track your daily priorities and build consistent follow-through',
+          }),
+        })
+        if (!goalResponse.ok) {
+          const data = await goalResponse.json()
+          throw new Error(data.error || 'Failed to create goal')
+        }
       }
 
       // Save productivity target to preferences

@@ -45,6 +45,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
+    // Prevent duplicate goals with the same title
+    const { data: duplicate } = await supabase
+      .from('user_goals')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('title', title.trim())
+      .eq('active', true)
+      .limit(1)
+
+    if (duplicate && duplicate.length > 0) {
+      return NextResponse.json(
+        { error: 'A goal with this title already exists' },
+        { status: 409 }
+      )
+    }
+
     // Get current max sort_order
     const { data: existing } = await supabase
       .from('user_goals')
