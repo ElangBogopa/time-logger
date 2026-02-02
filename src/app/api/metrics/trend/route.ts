@@ -5,21 +5,21 @@ import { supabase } from '@/lib/supabase-server'
 import { getUserToday } from '@/lib/types'
 import {
   EntryRow,
-  FOCUS_WEIGHTS,
   FOCUS_TARGET,
+  BODY_TARGET,
+  SOCIAL_TARGET,
   FOCUS_THRESHOLDS,
-  BALANCE_THRESHOLDS,
-  RHYTHM_THRESHOLDS,
-  ESSENTIALS,
+  BODY_THRESHOLDS,
+  SOCIAL_THRESHOLDS,
   getStatusColor,
   getDateNDaysAgo,
   getDayLabel,
   calcFocus,
-  calcBalance,
-  calcRhythm,
+  calcBody,
+  calcSocial,
   calcFocusDetails,
-  calcBalanceDetails,
-  calcEssentialsDetail,
+  calcBodyDetails,
+  calcSocialDetails,
   getStatusLabel,
   getNudge,
 } from '@/lib/metrics-calc'
@@ -31,17 +31,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Parse period — default 7d
     const searchParams = request.nextUrl.searchParams
     const periodParam = searchParams.get('period') || '7d'
     const days = periodParam === '30d' ? 30 : periodParam === '14d' ? 14 : 7
 
     const dateParam = searchParams.get('date')
     const today = dateParam || getUserToday()
-    // For rhythm, we need 7 days lookback for each day, so fetch extra
-    const fetchFrom = getDateNDaysAgo(today, days + 6)
+    const fetchFrom = getDateNDaysAgo(today, days - 1)
 
-    // Fetch all confirmed entries for the range
     const { data: allEntries, error } = await supabase
       .from('time_entries')
       .select('category, duration_minutes, date')
@@ -57,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const entries = (allEntries || []) as EntryRow[]
 
-    // Build date range for the requested period
+    // Build date range
     const trendDates: string[] = []
     for (let i = days - 1; i >= 0; i--) {
       trendDates.push(getDateNDaysAgo(today, i))
@@ -67,100 +64,74 @@ export async function GET(request: NextRequest) {
     const trend: Array<{
       date: string
       label: string
+      body: number
       focus: number
-      balance: number
-      rhythm: number
+      social: number
+      bodyColor: string
       focusColor: string
-      balanceColor: string
-      rhythmColor: string
+      socialColor: string
     }> = []
 
     for (const date of trendDates) {
       const dayEntries = entries.filter(e => e.date === date)
-
+      const bodyVal = calcBody(dayEntries)
       const focusVal = calcFocus(dayEntries)
-      const balanceVal = calcBalance(dayEntries)
-
-      // Rhythm needs 7-day rolling window ending on this date
-      const rhythmWindowDates: string[] = []
-      for (let r = 6; r >= 0; r--) {
-        rhythmWindowDates.push(getDateNDaysAgo(date, r))
-      }
-      const rhythmVal = calcRhythm(entries, rhythmWindowDates)
+      const socialVal = calcSocial(dayEntries)
 
       trend.push({
         date,
-        label: days <= 7 ? getDayLabel(date) : date.slice(8), // 'Mon' or '28'
+        label: days <= 7 ? getDayLabel(date) : date.slice(8),
+        body: bodyVal,
         focus: focusVal,
-        balance: balanceVal,
-        rhythm: rhythmVal,
+        social: socialVal,
+        bodyColor: getStatusColor(bodyVal, BODY_THRESHOLDS),
         focusColor: getStatusColor(focusVal, FOCUS_THRESHOLDS),
-        balanceColor: getStatusColor(balanceVal, BALANCE_THRESHOLDS),
-        rhythmColor: getStatusColor(rhythmVal, RHYTHM_THRESHOLDS),
+        socialColor: getStatusColor(socialVal, SOCIAL_THRESHOLDS),
       })
     }
 
-    // Today's data (last element in trend)
     const todayData = trend[trend.length - 1]
     const todayEntries = entries.filter(e => e.date === today)
 
-    // ── Focus details ──
+    // Details
+    const bodyDetails = calcBodyDetails(todayEntries)
     const focusDetails = calcFocusDetails(todayEntries)
+    const socialDetails = calcSocialDetails(todayEntries)
 
-    // ── Balance details ──
-    const balanceDetails = calcBalanceDetails(todayEntries)
-
-    // ── Rhythm details ──
-    const essentialsDetail = calcEssentialsDetail(todayEntries)
-
-    // ── Personal bests ──
+    // Personal bests
+    const bodyBest = trend.reduce((best, d) => d.body > (best?.value ?? 0) ? { value: d.body, date: d.date } : best, null as { value: number; date: string } | null)
     const focusBest = trend.reduce((best, d) => d.focus > (best?.value ?? 0) ? { value: d.focus, date: d.date } : best, null as { value: number; date: string } | null)
-    const balanceBest = trend.reduce((best, d) => d.balance > (best?.value ?? 0) ? { value: d.balance, date: d.date } : best, null as { value: number; date: string } | null)
-    const rhythmBest = trend.reduce((best, d) => d.rhythm > (best?.value ?? 0) ? { value: d.rhythm, date: d.date } : best, null as { value: number; date: string } | null)
+    const socialBest = trend.reduce((best, d) => d.social > (best?.value ?? 0) ? { value: d.social, date: d.date } : best, null as { value: number; date: string } | null)
 
-    // ── vs Last Week (7-day comparison) ──
-    function calcWeekAvg(metric: 'focus' | 'balance' | 'rhythm', startIdx: number, count: number): number {
-      const slice = trend.slice(startIdx, startIdx + count)
-      if (slice.length === 0) return 0
-      return Math.round(slice.reduce((s, d) => s + d[metric], 0) / slice.length)
-    }
-
-    let vsLastWeek: { focus: number | null; balance: number | null; rhythm: number | null }
+    // vs Last Week
+    let vsLastWeek: { body: number | null; focus: number | null; social: number | null }
 
     if (days >= 14) {
-      // We have 2+ weeks — compare last 7 vs previous 7
-      const thisWeekAvgFocus = calcWeekAvg('focus', days - 7, 7)
-      const lastWeekAvgFocus = calcWeekAvg('focus', days - 14, 7)
-      const thisWeekAvgBalance = calcWeekAvg('balance', days - 7, 7)
-      const lastWeekAvgBalance = calcWeekAvg('balance', days - 14, 7)
-      const thisWeekAvgRhythm = calcWeekAvg('rhythm', days - 7, 7)
-      const lastWeekAvgRhythm = calcWeekAvg('rhythm', days - 14, 7)
+      const calcAvg = (metric: 'body' | 'focus' | 'social', startIdx: number, count: number) => {
+        const slice = trend.slice(startIdx, startIdx + count)
+        if (slice.length === 0) return 0
+        return Math.round(slice.reduce((s, d) => s + d[metric], 0) / slice.length)
+      }
       vsLastWeek = {
-        focus: thisWeekAvgFocus - lastWeekAvgFocus,
-        balance: thisWeekAvgBalance - lastWeekAvgBalance,
-        rhythm: thisWeekAvgRhythm - lastWeekAvgRhythm,
+        body: calcAvg('body', days - 7, 7) - calcAvg('body', days - 14, 7),
+        focus: calcAvg('focus', days - 7, 7) - calcAvg('focus', days - 14, 7),
+        social: calcAvg('social', days - 7, 7) - calcAvg('social', days - 14, 7),
       }
     } else {
-      // Only 7 days — fetch last week's data separately for comparison
       const lastWeekEnd = getDateNDaysAgo(today, 7)
       const lastWeekStart = getDateNDaysAgo(today, 13)
-      // W3 fix: For rhythm comparison, we need entries from 20 days ago
-      // (last week's rhythm rolling window goes back 7 days before lastWeekStart)
-      const rhythmLookbackStart = getDateNDaysAgo(today, 20)
 
-      // W2 fix: Handle Supabase error on vsLastWeek query
       const { data: lastWeekEntries, error: lwError } = await supabase
         .from('time_entries')
         .select('category, duration_minutes, date')
         .eq('user_id', session.user.id)
         .eq('status', 'confirmed')
-        .gte('date', rhythmLookbackStart)
+        .gte('date', lastWeekStart)
         .lte('date', lastWeekEnd)
 
       if (lwError) {
-        // W2 fix: On error, set all deltas to null instead of fake zeros
         console.error('vsLastWeek query failed:', lwError)
-        vsLastWeek = { focus: null, balance: null, rhythm: null }
+        vsLastWeek = { body: null, focus: null, social: null }
       } else {
         const lwEntries = (lastWeekEntries || []) as EntryRow[]
         const lwDates: string[] = []
@@ -168,58 +139,67 @@ export async function GET(request: NextRequest) {
           lwDates.push(getDateNDaysAgo(lastWeekEnd, i))
         }
 
-        // Calculate last week averages
-        let lwFocusSum = 0, lwBalanceSum = 0
-        let lwCount = 0
+        let lwBodySum = 0, lwFocusSum = 0, lwSocialSum = 0, lwCount = 0
         for (const date of lwDates) {
           const dayEntries = lwEntries.filter(e => e.date === date)
+          lwBodySum += calcBody(dayEntries)
           lwFocusSum += calcFocus(dayEntries)
-          lwBalanceSum += calcBalance(dayEntries)
+          lwSocialSum += calcSocial(dayEntries)
           lwCount++
         }
 
-        // W3 fix: Use calcRhythm() with 7-day rolling window for last week,
-        // same as how this week's rhythm is calculated in the trend array
-        const lwRhythmAvg = calcRhythm(lwEntries, lwDates)
-
+        const lwBodyAvg = lwCount > 0 ? Math.round(lwBodySum / lwCount) : 0
         const lwFocusAvg = lwCount > 0 ? Math.round(lwFocusSum / lwCount) : 0
-        const lwBalanceAvg = lwCount > 0 ? Math.round(lwBalanceSum / lwCount) : 0
+        const lwSocialAvg = lwCount > 0 ? Math.round(lwSocialSum / lwCount) : 0
 
+        const thisWeekBodyAvg = Math.round(trend.reduce((s, d) => s + d.body, 0) / trend.length)
         const thisWeekFocusAvg = Math.round(trend.reduce((s, d) => s + d.focus, 0) / trend.length)
-        const thisWeekBalanceAvg = Math.round(trend.reduce((s, d) => s + d.balance, 0) / trend.length)
-        const thisWeekRhythmAvg = Math.round(trend.reduce((s, d) => s + d.rhythm, 0) / trend.length)
+        const thisWeekSocialAvg = Math.round(trend.reduce((s, d) => s + d.social, 0) / trend.length)
 
         vsLastWeek = {
+          body: thisWeekBodyAvg - lwBodyAvg,
           focus: thisWeekFocusAvg - lwFocusAvg,
-          balance: thisWeekBalanceAvg - lwBalanceAvg,
-          rhythm: thisWeekRhythmAvg - lwRhythmAvg,
+          social: thisWeekSocialAvg - lwSocialAvg,
         }
       }
     }
 
-    // ── Labels & Nudge ──
+    // Labels & Nudge
+    const bodyLabel = getStatusLabel('body', todayData.body)
     const focusLabel = getStatusLabel('focus', todayData.focus)
-    const balanceLabel = getStatusLabel('balance', todayData.balance)
-    const rhythmLabel = getStatusLabel('rhythm', todayData.rhythm)
+    const socialLabel = getStatusLabel('social', todayData.social)
 
     const nudge = getNudge(
+      todayData.body, todayData.bodyColor,
       todayData.focus, todayData.focusColor,
-      todayData.balance, todayData.balanceColor,
-      todayData.rhythm, todayData.rhythmColor,
+      todayData.social, todayData.socialColor,
     )
 
     // Averages
+    const bodyAvg = Math.round(trend.reduce((s, d) => s + d.body, 0) / trend.length)
     const focusAvg = Math.round(trend.reduce((s, d) => s + d.focus, 0) / trend.length)
-    const balanceAvg = Math.round(trend.reduce((s, d) => s + d.balance, 0) / trend.length)
-    const rhythmAvg = Math.round(trend.reduce((s, d) => s + d.rhythm, 0) / trend.length)
+    const socialAvg = Math.round(trend.reduce((s, d) => s + d.social, 0) / trend.length)
 
-    // Helper to build vsLastWeek response (handles null for W2)
     function buildVsLastWeek(change: number | null) {
       if (change === null) return null
       return { change, direction: change > 0 ? 'up' : change < 0 ? 'down' : 'same' }
     }
 
     return NextResponse.json({
+      body: {
+        current: todayData.body,
+        color: todayData.bodyColor,
+        label: bodyLabel,
+        average: bodyAvg,
+        trend: trend.map(d => ({ date: d.date, label: d.label, value: d.body, color: d.bodyColor })),
+        personalBest: bodyBest,
+        vsLastWeek: buildVsLastWeek(vsLastWeek.body),
+        details: {
+          totalMinutes: bodyDetails.totalMinutes,
+          target: BODY_TARGET,
+          breakdown: bodyDetails.breakdown,
+        },
+      },
       focus: {
         current: todayData.focus,
         color: todayData.focusColor,
@@ -234,33 +214,18 @@ export async function GET(request: NextRequest) {
           breakdown: focusDetails.breakdown,
         },
       },
-      balance: {
-        current: todayData.balance,
-        color: todayData.balanceColor,
-        label: balanceLabel,
-        average: balanceAvg,
-        trend: trend.map(d => ({ date: d.date, label: d.label, value: d.balance, color: d.balanceColor })),
-        personalBest: balanceBest,
-        vsLastWeek: buildVsLastWeek(vsLastWeek.balance),
+      social: {
+        current: todayData.social,
+        color: todayData.socialColor,
+        label: socialLabel,
+        average: socialAvg,
+        trend: trend.map(d => ({ date: d.date, label: d.label, value: d.social, color: d.socialColor })),
+        personalBest: socialBest,
+        vsLastWeek: buildVsLastWeek(vsLastWeek.social),
         details: {
-          body: balanceDetails.body,
-          mind: balanceDetails.mind,
-          connection: balanceDetails.connection,
-          bodyMinutes: balanceDetails.bodyMinutes,
-          mindMinutes: balanceDetails.mindMinutes,
-          connectionMinutes: balanceDetails.connectionMinutes,
-        },
-      },
-      rhythm: {
-        current: todayData.rhythm,
-        color: todayData.rhythmColor,
-        label: rhythmLabel,
-        average: rhythmAvg,
-        trend: trend.map(d => ({ date: d.date, label: d.label, value: d.rhythm, color: d.rhythmColor })),
-        personalBest: rhythmBest,
-        vsLastWeek: buildVsLastWeek(vsLastWeek.rhythm),
-        details: {
-          essentials: essentialsDetail,
+          totalMinutes: socialDetails.totalMinutes,
+          target: SOCIAL_TARGET,
+          breakdown: socialDetails.breakdown,
         },
       },
       nudge,

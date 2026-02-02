@@ -21,29 +21,21 @@ export const FOCUS_WEIGHTS: Record<string, number> = {
   shallow_work: 0.3,
 }
 
-// ── Balance category groups ──
-export const BODY_CATS = ['exercise', 'movement', 'meals']
-export const MIND_CATS = ['rest', 'self_care']
-export const CONNECTION_CATS = ['social', 'calls']
+// ── Body category groups ──
+export const BODY_CATS = ['exercise', 'movement', 'meals', 'rest', 'self_care', 'sleep']
+
+// ── Social category groups ──
+export const SOCIAL_CATS = ['social', 'calls']
 
 // ── Default targets ──
 export const FOCUS_TARGET = 240 // 4 hours weighted
-export const BODY_TARGET = 90   // 90 min
-export const MIND_TARGET = 30   // 30 min
-export const CONNECTION_TARGET = 30 // 30 min
-
-// ── Rhythm essentials ──
-export const ESSENTIALS: EssentialDef[] = [
-  { name: 'Deep Work', categories: ['deep_work', 'learning', 'creating'], threshold: 60 },
-  { name: 'Movement', categories: ['exercise', 'movement'], threshold: 30 },
-  { name: 'Recharge', categories: ['rest', 'self_care', 'meals'], threshold: 20 },
-  { name: 'Connect', categories: ['social', 'calls'], threshold: 15 },
-]
+export const BODY_TARGET = 120  // 2 hours (exercise + meals + rest + self-care)
+export const SOCIAL_TARGET = 60 // 1 hour
 
 // ── Color / Label / Nudge thresholds ──
 export const FOCUS_THRESHOLDS = { green: 80, yellow: 50 }
-export const BALANCE_THRESHOLDS = { green: 70, yellow: 40 }
-export const RHYTHM_THRESHOLDS = { green: 75, yellow: 45 }
+export const BODY_THRESHOLDS = { green: 70, yellow: 40 }
+export const SOCIAL_THRESHOLDS = { green: 70, yellow: 35 }
 
 // ── Pure helpers ──
 
@@ -92,113 +84,85 @@ export function calcFocusDetails(dayEntries: EntryRow[]): { weightedMinutes: num
   return { weightedMinutes: Math.round(weightedMinutes), breakdown }
 }
 
-/** Calculate Balance value for a set of entries on a single day */
-export function calcBalance(dayEntries: EntryRow[]): number {
-  const sumMinutes = (cats: string[]) =>
-    dayEntries.filter(e => cats.includes(e.category)).reduce((s, e) => s + e.duration_minutes, 0)
+/** Calculate Body value for a set of entries on a single day */
+export function calcBody(dayEntries: EntryRow[]): number {
+  const bodyMinutes = dayEntries
+    .filter(e => BODY_CATS.includes(e.category))
+    .reduce((s, e) => s + e.duration_minutes, 0)
 
-  const bodyScore = Math.round(Math.min(100, (sumMinutes(BODY_CATS) / BODY_TARGET) * 100))
-  const mindScore = Math.round(Math.min(100, (sumMinutes(MIND_CATS) / MIND_TARGET) * 100))
-  const connectionScore = Math.round(Math.min(100, (sumMinutes(CONNECTION_CATS) / CONNECTION_TARGET) * 100))
-
-  return Math.round((bodyScore + mindScore + connectionScore) / 3)
+  return Math.round(Math.min(100, (bodyMinutes / BODY_TARGET) * 100))
 }
 
-/** Get Balance details breakdown for a set of entries */
-export function calcBalanceDetails(dayEntries: EntryRow[]): {
-  body: number; mind: number; connection: number
-  bodyMinutes: number; mindMinutes: number; connectionMinutes: number
+/** Get Body details breakdown for a set of entries */
+export function calcBodyDetails(dayEntries: EntryRow[]): {
+  totalMinutes: number
+  breakdown: Record<string, number>
 } {
-  const sumMinutes = (cats: string[]) =>
-    dayEntries.filter(e => cats.includes(e.category)).reduce((s, e) => s + e.duration_minutes, 0)
-
-  const bodyMinutes = sumMinutes(BODY_CATS)
-  const mindMinutes = sumMinutes(MIND_CATS)
-  const connectionMinutes = sumMinutes(CONNECTION_CATS)
-
-  return {
-    body: Math.round(Math.min(100, (bodyMinutes / BODY_TARGET) * 100)),
-    mind: Math.round(Math.min(100, (mindMinutes / MIND_TARGET) * 100)),
-    connection: Math.round(Math.min(100, (connectionMinutes / CONNECTION_TARGET) * 100)),
-    bodyMinutes,
-    mindMinutes,
-    connectionMinutes,
-  }
-}
-
-/** Calculate Rhythm value — 7-day rolling average of daily essentials completion */
-export function calcRhythm(entries: EntryRow[], dates: string[]): number {
-  const dailyScores: number[] = []
-
-  for (const date of dates) {
-    const dayEntries = entries.filter(e => e.date === date)
-    let essentialsHit = 0
-    for (const essential of ESSENTIALS) {
-      const mins = dayEntries
-        .filter(e => essential.categories.includes(e.category))
-        .reduce((s, e) => s + e.duration_minutes, 0)
-      if (mins >= essential.threshold) essentialsHit++
+  let totalMinutes = 0
+  const breakdown: Record<string, number> = {}
+  for (const entry of dayEntries) {
+    if (BODY_CATS.includes(entry.category)) {
+      totalMinutes += entry.duration_minutes
+      breakdown[entry.category] = (breakdown[entry.category] || 0) + entry.duration_minutes
     }
-    dailyScores.push(Math.round((essentialsHit / ESSENTIALS.length) * 100))
   }
-
-  if (dailyScores.length === 0) return 0
-  return Math.round(dailyScores.reduce((s, d) => s + d, 0) / dailyScores.length)
+  return { totalMinutes, breakdown }
 }
 
-/** Calculate daily rhythm score (single-day essentials percentage) */
-export function calcDailyRhythm(dayEntries: EntryRow[]): number {
-  let essentialsHit = 0
-  for (const essential of ESSENTIALS) {
-    const mins = dayEntries
-      .filter(e => essential.categories.includes(e.category))
-      .reduce((s, e) => s + e.duration_minutes, 0)
-    if (mins >= essential.threshold) essentialsHit++
-  }
-  return Math.round((essentialsHit / ESSENTIALS.length) * 100)
+/** Calculate Social value for a set of entries on a single day */
+export function calcSocial(dayEntries: EntryRow[]): number {
+  const socialMinutes = dayEntries
+    .filter(e => SOCIAL_CATS.includes(e.category))
+    .reduce((s, e) => s + e.duration_minutes, 0)
+
+  return Math.round(Math.min(100, (socialMinutes / SOCIAL_TARGET) * 100))
 }
 
-/** Get essentials detail for a set of day entries */
-export function calcEssentialsDetail(dayEntries: EntryRow[]): Array<{
-  name: string; minutes: number; threshold: number; hit: boolean
-}> {
-  return ESSENTIALS.map(essential => {
-    const mins = dayEntries
-      .filter(e => essential.categories.includes(e.category))
-      .reduce((s, e) => s + e.duration_minutes, 0)
-    return { name: essential.name, minutes: mins, threshold: essential.threshold, hit: mins >= essential.threshold }
-  })
+/** Get Social details breakdown for a set of entries */
+export function calcSocialDetails(dayEntries: EntryRow[]): {
+  totalMinutes: number
+  breakdown: Record<string, number>
+} {
+  let totalMinutes = 0
+  const breakdown: Record<string, number> = {}
+  for (const entry of dayEntries) {
+    if (SOCIAL_CATS.includes(entry.category)) {
+      totalMinutes += entry.duration_minutes
+      breakdown[entry.category] = (breakdown[entry.category] || 0) + entry.duration_minutes
+    }
+  }
+  return { totalMinutes, breakdown }
 }
 
 /** Get the status label for a metric */
-export function getStatusLabel(metric: 'focus' | 'balance' | 'rhythm', value: number): string {
+export function getStatusLabel(metric: 'body' | 'focus' | 'social', value: number): string {
+  if (metric === 'body') return value >= 70 ? 'Fueled up' : value >= 40 ? 'Running low' : 'Running on empty'
   if (metric === 'focus') return value >= 80 ? 'Locked in' : value >= 50 ? 'Building' : 'Scattered'
-  if (metric === 'balance') return value >= 70 ? 'Recharged' : value >= 40 ? 'Running low' : 'Running on fumes'
-  return value >= 75 ? 'Dialed in' : value >= 45 ? 'Getting there' : 'Off track'
+  return value >= 70 ? 'Connected' : value >= 35 ? 'Reaching out' : 'Isolated'
 }
 
 /** Generate a nudge based on current metric values */
 export function getNudge(
+  bodyValue: number, bodyColor: string,
   focusValue: number, focusColor: string,
-  balanceValue: number, balanceColor: string,
-  rhythmValue: number, rhythmColor: string,
+  socialValue: number, socialColor: string,
 ): string {
   const metrics = [
+    { name: 'Body', value: bodyValue, color: bodyColor },
     { name: 'Focus', value: focusValue, color: focusColor },
-    { name: 'Balance', value: balanceValue, color: balanceColor },
-    { name: 'Rhythm', value: rhythmValue, color: rhythmColor },
+    { name: 'Social', value: socialValue, color: socialColor },
   ]
   const lowest = metrics.reduce((a, b) => a.value < b.value ? a : b)
 
   if (lowest.color === 'red') {
+    if (lowest.name === 'Body') return 'Move your body or grab a proper meal — you need it.'
     if (lowest.name === 'Focus') return 'Start a deep work block to get Focus moving.'
-    if (lowest.name === 'Balance') return 'Take a break — your body and mind need it.'
-    return 'Log your essentials to build Rhythm back up.'
+    return 'Reach out to someone — even a quick call counts.'
   }
   if (lowest.color === 'yellow') {
+    if (lowest.name === 'Body') return 'A walk or a real break would boost Body.'
     if (lowest.name === 'Focus') return 'One more focus session pushes you to green.'
-    if (lowest.name === 'Balance') return 'A quick walk or call would boost Balance.'
-    return 'Keep showing up — Rhythm builds day by day.'
+    return 'Make time for people today — Social is slipping.'
   }
   return 'All metrics looking strong. Keep it up! 🔥'
 }

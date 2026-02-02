@@ -618,14 +618,14 @@ export default function WeeklyReviewPage() {
                     })()}
                   </div>
 
-                  {/* Metric Sparklines — Focus / Balance / Rhythm trends */}
+                  {/* Metric Sparklines — Body / Focus / Social trends */}
                   {trendData && (
                     <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-800">
                       <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                         Metric Trends
                       </h2>
                       <div className="grid grid-cols-3 gap-4">
-                        {(['focus', 'balance', 'rhythm'] as const).map(metric => {
+                        {(['body', 'focus', 'social'] as const).map(metric => {
                           const md = trendData[metric]
                           // Use last 7 data points for sparkline
                           const last7 = md.trend.slice(-7)

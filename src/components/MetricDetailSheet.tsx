@@ -19,24 +19,16 @@ interface FocusDetails {
   breakdown: Record<string, number>
 }
 
-interface BalanceDetails {
-  body: number
-  mind: number
-  connection: number
-  bodyMinutes: number
-  mindMinutes: number
-  connectionMinutes: number
+interface BodyDetails {
+  totalMinutes: number
+  target: number
+  breakdown: Record<string, number>
 }
 
-interface RhythmEssential {
-  name: string
-  minutes: number
-  threshold: number
-  hit: boolean
-}
-
-interface RhythmDetails {
-  essentials: RhythmEssential[]
+interface SocialDetails {
+  totalMinutes: number
+  target: number
+  breakdown: Record<string, number>
 }
 
 interface MetricDetailSheetProps {
@@ -56,12 +48,22 @@ const FOCUS_CATEGORY_INFO: Record<string, { label: string; weight: number; targe
   shallow_work: { label: 'Shallow Work', weight: 0.3, target: 30 },
 }
 
-// ── Balance sub-score targets ──
+// ── Body category labels ──
 
-const BALANCE_TARGETS = {
-  body: 90,
-  mind: 30,
-  connection: 30,
+const BODY_CATEGORY_INFO: Record<string, { label: string }> = {
+  exercise: { label: 'Exercise' },
+  movement: { label: 'Movement' },
+  meals: { label: 'Meals' },
+  rest: { label: 'Rest' },
+  self_care: { label: 'Self-Care' },
+  sleep: { label: 'Sleep' },
+}
+
+// ── Social category labels ──
+
+const SOCIAL_CATEGORY_INFO: Record<string, { label: string }> = {
+  social: { label: 'Social Time' },
+  calls: { label: 'Calls' },
 }
 
 // ── Helpers ──
@@ -79,9 +81,9 @@ function formatDate(dateStr: string): string {
 }
 
 const METRIC_LABELS: Record<MetricKey, string> = {
+  body: 'Body',
   focus: 'Focus',
-  balance: 'Balance',
-  rhythm: 'Rhythm',
+  social: 'Social',
 }
 
 // ── Sub-components ──
@@ -135,37 +137,47 @@ function FocusBreakdown({ details, metricColor }: { details: FocusDetails; metri
   )
 }
 
-function BalanceBreakdown({ details, metricColor }: { details: BalanceDetails; metricColor: string }) {
-  const subScores = [
-    { label: 'Body', value: details.body, minutes: details.bodyMinutes, target: BALANCE_TARGETS.body },
-    { label: 'Mind', value: details.mind, minutes: details.mindMinutes, target: BALANCE_TARGETS.mind },
-    { label: 'Connection', value: details.connection, minutes: details.connectionMinutes, target: BALANCE_TARGETS.connection },
-  ]
+function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricColor: string }) {
+  const breakdown = Object.entries(details.breakdown).map(([category, minutes]) => {
+    const info = BODY_CATEGORY_INFO[category] || { label: category }
+    return { label: info.label, minutes }
+  })
+  breakdown.sort((a, b) => b.minutes - a.minutes)
+
+  if (breakdown.length === 0) {
+    return (
+      <div className="px-4 mb-6">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Today&apos;s Body
+        </h3>
+        <p className="text-sm text-muted-foreground">No body care logged yet. Move, eat, or rest to fill this up.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="px-4 mb-6">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-        Today&apos;s Balance
+        Today&apos;s Body — {formatMinutes(details.totalMinutes)} / {formatMinutes(details.target)}
       </h3>
-      <div className="grid grid-cols-3 gap-3">
-        {subScores.map(sub => (
-          <div key={sub.label} className="bg-secondary/50 rounded-lg p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{sub.label}</p>
-            <p className="text-2xl font-bold tabular-nums mt-1" style={{ color: metricColor }}>
-              {sub.value}
-            </p>
-            <div className="w-full h-1 bg-secondary rounded-full overflow-hidden mt-2">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min(100, sub.value)}%`,
-                  backgroundColor: `${metricColor}cc`,
-                }}
-              />
+      <div className="space-y-2">
+        {breakdown.map(item => (
+          <div key={item.label} className="flex items-center gap-3">
+            <div className="flex-1">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-foreground">{item.label}</span>
+                <span className="text-muted-foreground tabular-nums">{formatMinutes(item.minutes)}</span>
+              </div>
+              <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, (item.minutes / details.target) * 100)}%`,
+                    backgroundColor: `${metricColor}cc`,
+                  }}
+                />
+              </div>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              {formatMinutes(sub.minutes)} / {formatMinutes(sub.target)}
-            </p>
           </div>
         ))}
       </div>
@@ -173,74 +185,49 @@ function BalanceBreakdown({ details, metricColor }: { details: BalanceDetails; m
   )
 }
 
-function RhythmBreakdown({ details, trend }: { details: RhythmDetails; trend: TrendDataPoint[] }) {
-  // Build 7-day consistency data from trend
-  const last7 = trend.slice(-7)
-  const consistencyDots = last7.map(d => ({
-    date: d.label,
-    allHit: d.value >= 75,
-    someHit: d.value >= 25,
-    value: d.value,
-  }))
+function SocialBreakdown({ details, metricColor }: { details: SocialDetails; metricColor: string }) {
+  const breakdown = Object.entries(details.breakdown).map(([category, minutes]) => {
+    const info = SOCIAL_CATEGORY_INFO[category] || { label: category }
+    return { label: info.label, minutes }
+  })
+  breakdown.sort((a, b) => b.minutes - a.minutes)
+
+  if (breakdown.length === 0) {
+    return (
+      <div className="px-4 mb-6">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Today&apos;s Social
+        </h3>
+        <p className="text-sm text-muted-foreground">No social time logged yet. Connect with someone today.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="px-4 mb-6">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-        Today&apos;s Essentials
+        Today&apos;s Social — {formatMinutes(details.totalMinutes)} / {formatMinutes(details.target)}
       </h3>
-      <div className="grid grid-cols-2 gap-2">
-        {details.essentials.map(e => (
-          <div
-            key={e.name}
-            className={`flex items-center gap-2 rounded-lg px-3 py-2.5 ${
-              e.hit
-                ? 'bg-green-500/10 border border-green-500/20'
-                : 'bg-secondary/50 border border-transparent'
-            }`}
-          >
-            {e.hit ? (
-              <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" aria-hidden="true" />
-            ) : (
-              <Circle className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
-            )}
-            <div className="flex-1 min-w-0">
-              <span className={`text-sm ${e.hit ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {e.name}
-              </span>
-              <p className="text-[10px] text-muted-foreground">
-                {formatMinutes(e.minutes)} / {formatMinutes(e.threshold)}
-              </p>
+      <div className="space-y-2">
+        {breakdown.map(item => (
+          <div key={item.label} className="flex items-center gap-3">
+            <div className="flex-1">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-foreground">{item.label}</span>
+                <span className="text-muted-foreground tabular-nums">{formatMinutes(item.minutes)}</span>
+              </div>
+              <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, (item.minutes / details.target) * 100)}%`,
+                    backgroundColor: `${metricColor}cc`,
+                  }}
+                />
+              </div>
             </div>
-            <span className="sr-only">{e.hit ? 'Completed' : 'Not completed'}</span>
           </div>
         ))}
-      </div>
-
-      {/* 7-day consistency dots */}
-      <div className="mt-4">
-        <p className="text-[10px] text-muted-foreground mb-2">Last 7 days</p>
-        <div className="flex gap-1">
-          {consistencyDots.map((day, i) => (
-            <div
-              key={i}
-              className={`h-6 flex-1 rounded-sm flex items-center justify-center text-[9px] font-bold ${
-                day.allHit
-                  ? 'bg-green-500/80 text-white'
-                  : day.someHit
-                    ? 'bg-amber-500/60 text-white'
-                    : 'bg-secondary text-muted-foreground'
-              }`}
-              title={`${day.date}: ${day.value}`}
-              aria-label={`${day.date}: score ${day.value}`}
-            >
-              {day.allHit ? '✓' : day.someHit ? '·' : ''}
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between mt-1">
-          <span className="text-[10px] text-muted-foreground">7 days ago</span>
-          <span className="text-[10px] text-muted-foreground">Today</span>
-        </div>
       </div>
     </div>
   )
@@ -432,16 +419,16 @@ export default function MetricDetailSheet({
                   metricColor={metricColor}
                 />
               )}
-              {metric === 'balance' && (
-                <BalanceBreakdown
-                  details={metricData.details as unknown as BalanceDetails}
+              {metric === 'body' && (
+                <BodyBreakdown
+                  details={metricData.details as unknown as BodyDetails}
                   metricColor={metricColor}
                 />
               )}
-              {metric === 'rhythm' && (
-                <RhythmBreakdown
-                  details={metricData.details as unknown as RhythmDetails}
-                  trend={metricData.trend}
+              {metric === 'social' && (
+                <SocialBreakdown
+                  details={metricData.details as unknown as SocialDetails}
+                  metricColor={metricColor}
                 />
               )}
             </div>

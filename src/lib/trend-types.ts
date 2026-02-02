@@ -30,9 +30,9 @@ export interface MetricTrendData {
 }
 
 export interface TrendAPIResponse {
+  body: MetricTrendData
   focus: MetricTrendData
-  balance: MetricTrendData
-  rhythm: MetricTrendData
+  social: MetricTrendData
   nudge: string
   period: string
 }

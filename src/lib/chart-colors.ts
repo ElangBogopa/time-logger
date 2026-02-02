@@ -5,6 +5,13 @@
 
 /** Metric identity colors — used for chart lines, fills, rings */
 export const METRIC_COLORS = {
+  body: {
+    hex: '#22c55e',
+    textHex: '#4ade80', // green-400 — for text on dark backgrounds
+    rgb: '34, 197, 94',
+    tailwind: 'green-500',
+    textTailwind: 'green-400',
+  },
   focus: {
     hex: '#3b82f6',
     textHex: '#60a5fa', // blue-400 — 5.5:1 on zinc-800 ✅
@@ -12,19 +19,12 @@ export const METRIC_COLORS = {
     tailwind: 'blue-500',
     textTailwind: 'blue-400',
   },
-  balance: {
+  social: {
     hex: '#f59e0b',
     textHex: '#f59e0b', // amber-500 — already passes ✅
     rgb: '249, 159, 11',
     tailwind: 'amber-500',
     textTailwind: 'amber-500',
-  },
-  rhythm: {
-    hex: '#22c55e',
-    textHex: '#4ade80', // green-400 — for text on dark backgrounds
-    rgb: '34, 197, 94',
-    tailwind: 'green-500',
-    textTailwind: 'green-400',
   },
 } as const
 
@@ -80,5 +80,5 @@ export function getStatusLabel(value: number): string {
   return 'Getting started'
 }
 
-export type MetricKey = 'focus' | 'balance' | 'rhythm'
+export type MetricKey = 'body' | 'focus' | 'social'
 export type StatusColor = 'green' | 'yellow' | 'red'

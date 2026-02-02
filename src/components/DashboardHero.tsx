@@ -9,20 +9,20 @@ export type { TrendAPIResponse }
 
 /* ── Per-metric color identity ── */
 const METRIC_IDENTITY = {
+  body: {
+    active: '#22c55e',
+    track: '#22c55e20',
+    trackDim: '#22c55e10',
+  },
   focus: {
     active: '#3b82f6',
     track: '#3b82f620',
     trackDim: '#3b82f610',
   },
-  balance: {
+  social: {
     active: '#f59e0b',
     track: '#f59e0b20',
     trackDim: '#f59e0b10',
-  },
-  rhythm: {
-    active: '#22c55e',
-    track: '#22c55e20',
-    trackDim: '#22c55e10',
   },
 }
 
@@ -185,9 +185,9 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
     size: number
     strokeWidth: number
   }> = [
-    { key: 'focus', label: 'Focus', size: 96, strokeWidth: 7 },
-    { key: 'balance', label: 'Balance', size: 104, strokeWidth: 8 },
-    { key: 'rhythm', label: 'Rhythm', size: 96, strokeWidth: 7 },
+    { key: 'body', label: 'Body', size: 96, strokeWidth: 7 },
+    { key: 'focus', label: 'Focus', size: 104, strokeWidth: 8 },
+    { key: 'social', label: 'Social', size: 96, strokeWidth: 7 },
   ]
 
   return (
