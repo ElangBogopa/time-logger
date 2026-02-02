@@ -16,6 +16,7 @@ import {
   Star,
   MessageSquare,
   Link2,
+  Lightbulb,
   X,
 } from 'lucide-react'
 
@@ -277,6 +278,14 @@ export default function MorePage() {
         {/* About */}
         <SectionLabel>About</SectionLabel>
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
+          <RowItem
+            icon={Lightbulb}
+            iconBg="bg-blue-500/10"
+            iconColor="text-blue-500"
+            label="Your Ideal Day"
+            description="Science-backed daily planning guide"
+            onClick={() => router.push('/guide')}
+          />
           <RowItem
             icon={BookOpen}
             iconBg="bg-amber-500/10"
