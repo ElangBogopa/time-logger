@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 import {
   TimeEntry,
   TimeCategory,
   CATEGORY_LABELS,
-  WeeklyTarget,
-  WeeklyTargetType,
-  WEEKLY_TARGET_CONFIGS,
 } from '@/lib/types'
 import { getTimeOfDay, formatDurationLong } from '@/lib/time-utils'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
@@ -41,135 +35,9 @@ function detectMixedActivity(activity: string): boolean {
   return mixedIndicators.some(indicator => lowerActivity.includes(indicator))
 }
 
-// Get the start of the week (Monday) for a given date string (YYYY-MM-DD)
-function getWeekStart(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const date = new Date(year, month - 1, day)
-  const dayOfWeek = date.getDay()
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Adjust for Monday start
-  date.setDate(date.getDate() + diff)
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-// Simple in-memory cache for weekly category totals (avoids N+1 queries)
-// Cache invalidates after 10 minutes or when a new week starts
-interface WeeklyCacheEntry {
-  totals: Map<TimeCategory, number>
-  weekStart: string
-  timestamp: number
-}
-const weeklyTotalsCache = new Map<string, WeeklyCacheEntry>()
-const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
-
-async function getCachedWeeklyTotals(
-  userId: string,
-  entryDate: string
-): Promise<Map<TimeCategory, number>> {
-  const weekStart = getWeekStart(entryDate)
-  const cacheKey = `${userId}:${weekStart}`
-  const cached = weeklyTotalsCache.get(cacheKey)
-
-  // Return cached if valid
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.totals
-  }
-
-  // Fetch fresh data
-  const { data: weekEntries } = await supabase
-    .from('time_entries')
-    .select('category, duration_minutes')
-    .eq('user_id', userId)
-    .eq('status', 'confirmed')
-    .gte('date', weekStart)
-
-  const totals = new Map<TimeCategory, number>()
-  if (weekEntries) {
-    weekEntries.forEach((entry) => {
-      if (entry.category) {
-        const current = totals.get(entry.category as TimeCategory) || 0
-        totals.set(entry.category as TimeCategory, current + entry.duration_minutes)
-      }
-    })
-  }
-
-  // Store in cache
-  weeklyTotalsCache.set(cacheKey, {
-    totals,
-    weekStart,
-    timestamp: Date.now(),
-  })
-
-  // Clean old entries (different week starts)
-  for (const [key, value] of weeklyTotalsCache.entries()) {
-    if (value.weekStart !== weekStart) {
-      weeklyTotalsCache.delete(key)
-    }
-  }
-
-  return totals
-}
-
-// Calculate weekly progress for target-related categories
-// Uses cached weekly totals to avoid N+1 queries
-async function getWeeklyTargetProgress(
-  userId: string,
-  targets: WeeklyTarget[],
-  entryDate: string
-): Promise<Map<string, { minutes: number; target: number; targetLabel: string }>> {
-  const progress = new Map<string, { minutes: number; target: number; targetLabel: string }>()
-
-  if (targets.length === 0) return progress
-
-  // Use cached weekly totals instead of fetching each time
-  const categoryTotals = await getCachedWeeklyTotals(userId, entryDate)
-
-  // Map targets to their progress
-  targets.forEach((target) => {
-    const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-    if (!config) return
-
-    let totalMinutes = 0
-    config.categories.forEach((cat) => {
-      totalMinutes += categoryTotals.get(cat) || 0
-    })
-
-    progress.set(target.target_type, {
-      minutes: totalMinutes,
-      target: target.weekly_target_minutes,
-      targetLabel: config.label,
-    })
-  })
-
-  return progress
-}
-
-// Check if entry category relates to any target
-function getRelatedTarget(
-  category: TimeCategory | null,
-  targets: WeeklyTarget[]
-): WeeklyTarget | null {
-  if (!category) return null
-
-  for (const target of targets) {
-    const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-    if (!config) continue
-
-    if (config.categories.includes(category)) {
-      return target
-    }
-  }
-
-  return null
-}
-
 function buildContext(
   entry: TimeEntry,
   dayEntries: TimeEntry[],
-  targets: WeeklyTarget[],
-  weeklyProgress: Map<string, { minutes: number; target: number; targetLabel: string }>
 ): string {
   const timeOfDay = getTimeOfDay(entry.start_time)
   const duration = formatDurationLong(entry.duration_minutes)
@@ -225,123 +93,7 @@ ${entry.category ? `- This is ${categoryLabel} session #${positionInCategory} of
   context += `- Today's breakdown: ${categoryBreakdown}
 `
 
-  // Add targets context
-  if (targets.length > 0) {
-    context += `
-USER'S WEEKLY TARGETS (what they're tracking):
-`
-    targets.forEach((target, idx) => {
-      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-      if (!config) return
-      const progress = weeklyProgress.get(target.target_type)
-
-      let progressStr = ''
-      if (progress) {
-        const hours = Math.round(progress.minutes / 60 * 10) / 10
-        const targetHours = progress.target / 60
-        const percentage = Math.round((progress.minutes / progress.target) * 100)
-        progressStr = ` — ${hours}h logged this week (${percentage}% of ${targetHours}h target)`
-      }
-
-      const directionLabel = target.direction === 'at_least' ? 'at least' : 'at most'
-      context += `${idx + 1}. ${config.label} (${directionLabel})${progressStr}
-`
-    })
-
-    // Check if this entry relates to a target
-    const relatedTarget = getRelatedTarget(entry.category, targets)
-    if (relatedTarget) {
-      const config = WEEKLY_TARGET_CONFIGS[relatedTarget.target_type as WeeklyTargetType]
-      const progress = weeklyProgress.get(relatedTarget.target_type)
-      if (progress && config) {
-        const isLimitTarget = relatedTarget.direction === 'at_most'
-        if (isLimitTarget) {
-          context += `
-THIS ENTRY RELATES TO USER'S TARGET: "${config.label}"
-- They want LESS of this (limit target)
-- This week so far: ${Math.round(progress.minutes / 60 * 10) / 10}h
-- Weekly limit: ${progress.target / 60}h
-`
-        } else {
-          context += `
-THIS ENTRY RELATES TO USER'S TARGET: "${config.label}"
-- They want MORE of this
-- This week so far: ${Math.round(progress.minutes / 60 * 10) / 10}h
-- Weekly target: ${progress.target / 60}h (${Math.round((progress.minutes / progress.target) * 100)}% complete)
-`
-        }
-      }
-    }
-  }
-
   return context
-}
-
-function buildTargetInstructions(
-  entry: TimeEntry,
-  targets: WeeklyTarget[],
-  weeklyProgress: Map<string, { minutes: number; target: number; targetLabel: string }>
-): string {
-  if (targets.length === 0) return ''
-
-  const relatedTarget = getRelatedTarget(entry.category, targets)
-  if (!relatedTarget) return ''
-
-  const progress = weeklyProgress.get(relatedTarget.target_type)
-  if (!progress) return ''
-
-  const isLimitTarget = relatedTarget.direction === 'at_most'
-  const hoursLogged = Math.round(progress.minutes / 60 * 10) / 10
-  const targetHours = progress.target / 60
-  const percentage = Math.round((progress.minutes / progress.target) * 100)
-
-  let instructions = `
-TARGET-AWARE COMMENTARY:
-This entry relates to the user's target: "${progress.targetLabel}"
-`
-
-  if (isLimitTarget) {
-    instructions += `
-- The user has a LIMIT target — they want to keep this under ${targetHours}h/week
-- Be supportive, not judgmental
-- Acknowledge their self-awareness in logging it
-- If they've exceeded the limit: gently note it
-- Don't pile on guilt; they're already tracking it which shows intent to change
-- You might reference their limit: "You wanted to keep ${progress.targetLabel.toLowerCase()} under ${targetHours}h..."
-`
-  } else {
-    // Growth target (at_least)
-    if (percentage >= 100) {
-      instructions += `
-- They've HIT their weekly target (${hoursLogged}h of ${targetHours}h goal)!
-- Celebrate this achievement
-- Example: "That's ${hoursLogged} hours of ${progress.targetLabel.toLowerCase()} this week—you hit your target!"
-`
-    } else if (percentage >= 75) {
-      instructions += `
-- They're CLOSE to their weekly target (${percentage}% there)
-- Encourage them: "${Math.round((targetHours - hoursLogged) * 10) / 10} more hours to hit your ${targetHours}h target"
-- Build momentum
-`
-    } else if (percentage >= 50) {
-      instructions += `
-- They're HALFWAY to their weekly target
-- Acknowledge progress: "${hoursLogged}h down, ${Math.round((targetHours - hoursLogged) * 10) / 10}h to go"
-`
-    } else {
-      instructions += `
-- They're building toward their target (${percentage}% so far)
-- Encourage without pressure
-- Every session counts toward the goal
-`
-    }
-  }
-
-  instructions += `
-IMPORTANT: Only reference their target if it feels natural and meaningful. Don't force it into every comment.
-`
-
-  return instructions
 }
 
 export async function POST(request: NextRequest) {
@@ -364,36 +116,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Entry is required' }, { status: 400 })
     }
 
-    // Get session to fetch user's targets
-    const session = await getServerSession(authOptions)
-    let targets: WeeklyTarget[] = []
-    let weeklyProgress = new Map<string, { minutes: number; target: number; targetLabel: string }>()
-
-    if (session?.user?.id) {
-      // Fetch user's active weekly targets
-      const { data: userTargets } = await supabase
-        .from('weekly_targets')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .eq('active', true)
-        .order('sort_order', { ascending: true })
-
-      if (userTargets) {
-        targets = userTargets as WeeklyTarget[]
-        weeklyProgress = await getWeeklyTargetProgress(session.user.id, targets, entry.date)
-      }
-    }
-
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       timeout: 30000, // 30 second timeout
     })
 
     const tone = getCategoryTone(entry.category)
-    const context = buildContext(entry, dayEntries || [], targets, weeklyProgress)
+    const context = buildContext(entry, dayEntries || [])
     const durationCategory = getDurationCategory(entry.duration_minutes)
     const isMixedActivity = detectMixedActivity(entry.activity)
-    const targetInstructions = buildTargetInstructions(entry, targets, weeklyProgress)
 
     let toneInstructions = ''
     const categoryForTone = entry.category || 'other'
@@ -477,7 +208,6 @@ Examples of good commentary:
 - "2 hours of learning—building momentum."
 
 ${toneInstructions}
-${targetInstructions}
 
 STRICT RULES:
 - ONE short sentence only (under 15 words)

@@ -5,11 +5,7 @@ import { supabase } from '@/lib/supabase-server'
 import { calculateDailyScore, DailyProductivityScore, PlanItem } from '@/lib/productivity-score'
 import {
   TimeEntry,
-  WeeklyTarget,
-  WeeklyTargetType,
-  WEEKLY_TARGET_CONFIGS,
   SessionCompletion,
-  calculateTargetProgress,
   getLocalDateString,
   getUserToday,
   getUserCurrentHour,
@@ -21,22 +17,6 @@ import {
   AGGREGATED_CATEGORY_LABELS,
   aggregateByView,
 } from '@/lib/types'
-
-interface TargetProgress {
-  targetId: string
-  targetType: string
-  label: string
-  todayMinutes: number
-  yesterdayMinutes: number
-  sameDayLastWeekMinutes: number
-  dailyTarget: number
-  weeklyTarget: number
-  weekMinutes: number
-  progress: number
-  direction: 'at_least' | 'at_most'
-  trend: 'up' | 'down' | 'same'
-  vsLastWeekTrend: 'up' | 'down' | 'same'
-}
 
 interface Win {
   id: string
@@ -70,7 +50,6 @@ interface AggregatedBreakdown {
   label: string
   minutes: number
   percentage: number
-  isTargetLinked: boolean // true if user has a target tracking this category
 }
 
 interface DaySummary {
@@ -82,9 +61,6 @@ interface DaySummary {
   totalMinutesLogged: number
   hasEveningPassed: boolean
   date: string
-
-  // Target progress
-  targetProgress: TargetProgress[]
 
   // Wins
   wins: Win[]
@@ -109,51 +85,11 @@ interface DaySummary {
   productivityScore: DailyProductivityScore | null
 }
 
-function getYesterdayDateString(userToday: string): string {
-  const todayDate = new Date(userToday + 'T12:00:00')
-  todayDate.setDate(todayDate.getDate() - 1)
-  return getLocalDateString(todayDate)
-}
-
-function getSameDayLastWeek(userToday: string): string {
-  const todayDate = new Date(userToday + 'T12:00:00')
-  todayDate.setDate(todayDate.getDate() - 7)
-  return getLocalDateString(todayDate)
-}
-
-function getWeekDates(userToday: string): string[] {
-  const todayDate = new Date(userToday + 'T12:00:00')
-  const dayOfWeek = todayDate.getDay()
-  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-
-  const dates: string[] = []
-  for (let i = 0; i <= (dayOfWeek === 0 ? 6 : dayOfWeek - 1); i++) {
-    const date = new Date(todayDate)
-    date.setDate(date.getDate() - daysToSubtract + i)
-    dates.push(getLocalDateString(date))
-  }
-  if (!dates.includes(userToday)) {
-    dates.push(userToday)
-  }
-  return dates
-}
-
 function calculateDayScore(
-  targetProgress: TargetProgress[],
   sessionsLogged: number,
   totalSessions: number
 ): number {
-  if (targetProgress.length === 0) {
-    return Math.round((sessionsLogged / Math.max(totalSessions, 1)) * 100)
-  }
-
-  const targetWeight = 0.7
-  const sessionWeight = 0.3
-  const avgTargetProgress =
-    targetProgress.reduce((sum, p) => sum + p.progress, 0) / targetProgress.length
-  const sessionScore = (sessionsLogged / Math.max(totalSessions, 1)) * 100
-
-  return Math.round(avgTargetProgress * targetWeight + sessionScore * sessionWeight)
+  return Math.round((sessionsLogged / Math.max(totalSessions, 1)) * 100)
 }
 
 function getScoreColor(score: number): 'green' | 'orange' | 'red' {
@@ -164,47 +100,10 @@ function getScoreColor(score: number): 'green' | 'orange' | 'red' {
 
 function generateWins(
   entries: TimeEntry[],
-  targetProgress: TargetProgress[],
   longestFocus: { activity: string; minutes: number } | null,
   categoryBreakdown: CategoryBreakdown[]
 ): Win[] {
   const wins: Win[] = []
-
-  // Check for goals met
-  for (const tp of targetProgress) {
-    if (tp.direction === 'at_least' && tp.progress >= 100) {
-      wins.push({
-        id: `goal-${tp.targetId}`,
-        text: `Hit your ${tp.label.toLowerCase()} goal`,
-        type: 'goal_met',
-        value: tp.todayMinutes,
-      })
-    } else if (tp.direction === 'at_most' && tp.progress >= 100) {
-      wins.push({
-        id: `goal-${tp.targetId}`,
-        text: `Stayed under your ${tp.label.toLowerCase()} limit`,
-        type: 'goal_met',
-        value: tp.todayMinutes,
-      })
-    }
-  }
-
-  // Check for improvements vs yesterday
-  for (const tp of targetProgress) {
-    if (tp.trend === 'up' && tp.progress < 100) {
-      const diff = tp.direction === 'at_least'
-        ? tp.todayMinutes - tp.yesterdayMinutes
-        : tp.yesterdayMinutes - tp.todayMinutes
-      if (diff > 15) { // At least 15 min improvement
-        wins.push({
-          id: `improve-${tp.targetId}`,
-          text: `${Math.round(diff)} min ${tp.direction === 'at_least' ? 'more' : 'less'} ${tp.label.toLowerCase()} than yesterday`,
-          type: 'improvement',
-          value: diff,
-        })
-      }
-    }
-  }
 
   // Longest focus session
   if (longestFocus && longestFocus.minutes >= 60) {
@@ -214,19 +113,6 @@ function generateWins(
       type: 'focus',
       value: longestFocus.minutes,
     })
-  }
-
-  // No entertainment (if tracking leisure limit)
-  const entertainmentEntry = categoryBreakdown.find(c => c.category === 'entertainment')
-  if (!entertainmentEntry || entertainmentEntry.minutes === 0) {
-    const hasLeisureTarget = targetProgress.some(t => t.targetType === 'leisure')
-    if (hasLeisureTarget) {
-      wins.push({
-        id: 'no-distraction',
-        text: 'Zero leisure/entertainment logged today',
-        type: 'balance',
-      })
-    }
   }
 
   // Good balance of categories
@@ -317,7 +203,6 @@ function buildCategoryBreakdown(entries: TimeEntry[]): CategoryBreakdown[] {
 
 function buildAggregatedBreakdown(
   entries: TimeEntry[],
-  targets: WeeklyTarget[]
 ): AggregatedBreakdown[] {
   // Build category minutes map
   const categoryMinutes = new Map<TimeCategory, number>()
@@ -334,21 +219,6 @@ function buildAggregatedBreakdown(
   // Aggregate using the energy view
   const aggregated = aggregateByView(categoryMinutes, ENERGY_VIEW)
 
-  // Determine which aggregated categories are linked to user targets
-  const targetLinkedCategories = new Set<AggregatedCategory>()
-  for (const target of targets) {
-    const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-    if (!config) continue
-    for (const cat of config.categories) {
-      // Find which aggregated category this belongs to
-      for (const [aggCat, group] of Object.entries(ENERGY_VIEW)) {
-        if (group.categories.includes(cat)) {
-          targetLinkedCategories.add(aggCat as AggregatedCategory)
-        }
-      }
-    }
-  }
-
   // Build breakdown with all 6 categories (even if 0 minutes)
   const breakdown: AggregatedBreakdown[] = []
   const aggCategories: AggregatedCategory[] = ['focus', 'ops', 'body', 'recovery', 'connection', 'escape']
@@ -360,18 +230,11 @@ function buildAggregatedBreakdown(
       label: AGGREGATED_CATEGORY_LABELS[aggCat],
       minutes,
       percentage: totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0,
-      isTargetLinked: targetLinkedCategories.has(aggCat),
     })
   }
 
-  // Sort by minutes descending, but keep target-linked ones prominent
-  breakdown.sort((a, b) => {
-    // Target-linked with time first
-    if (a.isTargetLinked && a.minutes > 0 && !(b.isTargetLinked && b.minutes > 0)) return -1
-    if (b.isTargetLinked && b.minutes > 0 && !(a.isTargetLinked && a.minutes > 0)) return 1
-    // Then by minutes
-    return b.minutes - a.minutes
-  })
+  // Sort by minutes descending
+  breakdown.sort((a, b) => b.minutes - a.minutes)
 
   return breakdown
 }
@@ -387,9 +250,6 @@ export async function GET(request: NextRequest) {
   // Always prefer client-provided date — server may be in UTC (Vercel)
   const today = dateParam || getUserToday()
   const isViewingToday = !dateParam || dateParam === getUserToday()
-  const yesterday = getYesterdayDateString(today)
-  const sameDayLastWeek = getSameDayLastWeek(today)
-  const weekDates = getWeekDates(today)
   const currentHour = getUserCurrentHour()
 
   // For past dates, all sessions have passed
@@ -401,10 +261,6 @@ export async function GET(request: NextRequest) {
   try {
     const [
       todayEntriesResult,
-      yesterdayEntriesResult,
-      lastWeekEntriesResult,
-      weekEntriesResult,
-      targetsResult,
       completionsResult,
       moodResult,
       plansResult,
@@ -416,34 +272,6 @@ export async function GET(request: NextRequest) {
         .eq('date', today)
         .eq('status', 'confirmed')
         .order('start_time'),
-
-      supabase
-        .from('time_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('date', yesterday)
-        .eq('status', 'confirmed'),
-
-      supabase
-        .from('time_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('date', sameDayLastWeek)
-        .eq('status', 'confirmed'),
-
-      supabase
-        .from('time_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .in('date', weekDates)
-        .eq('status', 'confirmed'),
-
-      supabase
-        .from('weekly_targets')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('active', true)
-        .order('sort_order'),
 
       supabase
         .from('session_completions')
@@ -468,10 +296,6 @@ export async function GET(request: NextRequest) {
     ])
 
     const todayEntries = (todayEntriesResult.data || []) as TimeEntry[]
-    const yesterdayEntries = (yesterdayEntriesResult.data || []) as TimeEntry[]
-    const lastWeekEntries = (lastWeekEntriesResult.data || []) as TimeEntry[]
-    const weekEntries = (weekEntriesResult.data || []) as TimeEntry[]
-    const targets = (targetsResult.data || []) as WeeklyTarget[]
     const completions = (completionsResult.data || []) as SessionCompletion[]
     const todayMood = (moodResult.data?.[0] as MoodCheckin) || null
     const todayPlans = (plansResult.data || []) as PlanItem[]
@@ -482,90 +306,15 @@ export async function GET(request: NextRequest) {
     const totalMinutesLogged = todayEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
     const sessionsLogged = completions.filter(c => !c.skipped).length
 
-    // Calculate target progress with same day last week comparison
-    const targetProgress: TargetProgress[] = targets.map(target => {
-      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-      if (!config) {
-        return {
-          targetId: target.id,
-          targetType: target.target_type,
-          label: target.target_type,
-          todayMinutes: 0,
-          yesterdayMinutes: 0,
-          sameDayLastWeekMinutes: 0,
-          dailyTarget: 0,
-          weeklyTarget: target.weekly_target_minutes,
-          weekMinutes: 0,
-          progress: 0,
-          direction: target.direction as 'at_least' | 'at_most',
-          trend: 'same' as const,
-          vsLastWeekTrend: 'same' as const,
-        }
-      }
-
-      const categories = config.categories
-      const weeklyTarget = target.weekly_target_minutes
-      const dailyTarget = Math.round(weeklyTarget / 7)
-
-      const todayMinutes = todayEntries
-        .filter(e => e.category && categories.includes(e.category))
-        .reduce((sum, e) => sum + e.duration_minutes, 0)
-
-      const yesterdayMinutes = yesterdayEntries
-        .filter(e => e.category && categories.includes(e.category))
-        .reduce((sum, e) => sum + e.duration_minutes, 0)
-
-      const sameDayLastWeekMinutes = lastWeekEntries
-        .filter(e => e.category && categories.includes(e.category))
-        .reduce((sum, e) => sum + e.duration_minutes, 0)
-
-      const weekMinutes = weekEntries
-        .filter(e => e.category && categories.includes(e.category))
-        .reduce((sum, e) => sum + e.duration_minutes, 0)
-
-      const progress = calculateTargetProgress(todayMinutes, dailyTarget, target.direction as 'at_least' | 'at_most')
-
-      let trend: 'up' | 'down' | 'same'
-      if (target.direction === 'at_least') {
-        trend = todayMinutes > yesterdayMinutes ? 'up' : todayMinutes < yesterdayMinutes ? 'down' : 'same'
-      } else {
-        // at_most: less is better
-        trend = todayMinutes < yesterdayMinutes ? 'up' : todayMinutes > yesterdayMinutes ? 'down' : 'same'
-      }
-
-      let vsLastWeekTrend: 'up' | 'down' | 'same'
-      if (target.direction === 'at_least') {
-        vsLastWeekTrend = todayMinutes > sameDayLastWeekMinutes ? 'up' : todayMinutes < sameDayLastWeekMinutes ? 'down' : 'same'
-      } else {
-        vsLastWeekTrend = todayMinutes < sameDayLastWeekMinutes ? 'up' : todayMinutes > sameDayLastWeekMinutes ? 'down' : 'same'
-      }
-
-      return {
-        targetId: target.id,
-        targetType: target.target_type,
-        label: config.label,
-        todayMinutes,
-        yesterdayMinutes,
-        sameDayLastWeekMinutes,
-        dailyTarget,
-        weeklyTarget,
-        weekMinutes,
-        progress,
-        direction: target.direction as 'at_least' | 'at_most',
-        trend,
-        vsLastWeekTrend,
-      }
-    })
-
-    const score = calculateDayScore(targetProgress, sessionsLogged, sessionsPassed)
+    const score = calculateDayScore(sessionsLogged, sessionsPassed)
     const scoreColor = getScoreColor(score)
 
     // Build additional data
     const timeline = buildTimeline(todayEntries)
     const longestFocusSession = findLongestFocusSession(todayEntries)
     const categoryBreakdown = buildCategoryBreakdown(todayEntries)
-    const aggregatedBreakdown = buildAggregatedBreakdown(todayEntries, targets)
-    const wins = generateWins(todayEntries, targetProgress, longestFocusSession, categoryBreakdown)
+    const aggregatedBreakdown = buildAggregatedBreakdown(todayEntries)
+    const wins = generateWins(todayEntries, longestFocusSession, categoryBreakdown)
 
     const summary: DaySummary = {
       score,
@@ -575,7 +324,6 @@ export async function GET(request: NextRequest) {
       totalMinutesLogged,
       hasEveningPassed,
       date: today,
-      targetProgress,
       wins,
       timeline,
       longestFocusSession,

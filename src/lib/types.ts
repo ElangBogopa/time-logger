@@ -45,7 +45,7 @@ export interface ReminderTime {
 // Pending target change (for delayed updates)
 export interface PendingIntentionChange {
   action: 'add' | 'remove' | 'update'
-  target_type?: WeeklyTargetType
+  target_type?: string
   target_id?: string
   weekly_target_minutes?: number | null
   sort_order?: number
@@ -62,6 +62,7 @@ export interface UserPreferences {
   timezone: string | null // IANA timezone e.g. "America/Toronto"
   intentions_committed_since: string | null // ISO date of last commitment
   pending_intention_changes: PendingIntentionChange[] | null
+  productivity_target: number | null // Productivity target percentage (50-100, default 80)
   created_at: string
   updated_at: string
 }
@@ -274,211 +275,6 @@ export function getLoggingPeriod(hour: number = new Date().getHours()): TimePeri
   if (hour <= 18) return 'afternoon'
   // After 6pm = logging evening
   return 'evening'
-}
-
-// ============================================================================
-// WEEKLY TARGETS SYSTEM
-// ============================================================================
-
-export type WeeklyTargetType =
-  | 'deep_focus'
-  | 'exercise'
-  | 'social_time'
-  | 'recovery'
-  | 'leisure'
-  | 'meetings'
-
-export type TargetDirection = 'at_least' | 'at_most'
-
-export interface WeeklyTarget {
-  id: string
-  user_id: string
-  target_type: WeeklyTargetType
-  direction: TargetDirection
-  weekly_target_minutes: number
-  sort_order: number
-  active: boolean
-  created_at: string
-}
-
-export interface WeeklyTargetConfig {
-  label: string
-  description: string
-  direction: TargetDirection
-  defaultMinutes: number
-  minMinutes: number
-  maxMinutes: number
-  unit: 'hours' | 'minutes'
-  categories: TimeCategory[]
-  color: string       // Tailwind color name (e.g. 'blue', 'green')
-  ringColor: string   // SVG stroke color hex
-  icon: string        // Emoji icon
-  researchNote: string
-}
-
-export const WEEKLY_TARGET_CONFIGS: Record<WeeklyTargetType, WeeklyTargetConfig> = {
-  deep_focus: {
-    label: 'Deep Focus',
-    description: 'Focused work, learning, and creative output',
-    direction: 'at_least',
-    defaultMinutes: 15 * 60, // 15 hrs/wk
-    minMinutes: 5 * 60,
-    maxMinutes: 25 * 60,
-    unit: 'hours',
-    categories: ['deep_work', 'learning', 'creating'],
-    color: 'blue',
-    ringColor: '#3b82f6',
-    icon: '🧠',
-    researchNote: 'Cal Newport: Experts sustain ~4 hrs/day of deep work. 15-20 hrs/week is a strong target.',
-  },
-  exercise: {
-    label: 'Exercise',
-    description: 'Intentional physical activity and movement',
-    direction: 'at_least',
-    defaultMinutes: 150, // 2.5 hrs/wk (WHO minimum)
-    minMinutes: 60,
-    maxMinutes: 450,
-    unit: 'minutes',
-    categories: ['exercise', 'movement'],
-    color: 'green',
-    ringColor: '#22c55e',
-    icon: '💪',
-    researchNote: 'WHO: 150-300 min/week moderate activity. Only 31% of adults meet this minimum.',
-  },
-  social_time: {
-    label: 'Social Time',
-    description: 'Quality time with friends, family, and community',
-    direction: 'at_least',
-    defaultMinutes: 10 * 60, // 10 hrs/wk
-    minMinutes: 3 * 60,
-    maxMinutes: 21 * 60,
-    unit: 'hours',
-    categories: ['social', 'calls'],
-    color: 'pink',
-    ringColor: '#ec4899',
-    icon: '💬',
-    researchNote: 'Research: 9-12 hrs/week minimum to avoid loneliness. Social connection increases survival odds by 50%.',
-  },
-  recovery: {
-    label: 'Recovery',
-    description: 'Rest, self-care, and sleep for recharging',
-    direction: 'at_least',
-    defaultMinutes: 7 * 60, // 7 hrs/wk
-    minMinutes: 3 * 60,
-    maxMinutes: 14 * 60,
-    unit: 'hours',
-    categories: ['rest', 'self_care', 'sleep'],
-    color: 'amber',
-    ringColor: '#f59e0b',
-    icon: '🔋',
-    researchNote: '75% of employees report burnout. Intentional recovery prevents it. Short breaks improve mood and focus.',
-  },
-  leisure: {
-    label: 'Leisure',
-    description: 'Entertainment and passive screen time',
-    direction: 'at_most',
-    defaultMinutes: 10 * 60, // 10 hrs/wk
-    minMinutes: 0,
-    maxMinutes: 21 * 60,
-    unit: 'hours',
-    categories: ['entertainment'],
-    color: 'zinc',
-    ringColor: '#71717a',
-    icon: '📺',
-    researchNote: 'Research links >2 hrs/day recreational screen time to increased anxiety. Average attention span is 47 seconds.',
-  },
-  meetings: {
-    label: 'Meetings',
-    description: 'Synchronous work meetings and calls',
-    direction: 'at_most',
-    defaultMinutes: 10 * 60, // 10 hrs/wk
-    minMinutes: 0,
-    maxMinutes: 20 * 60,
-    unit: 'hours',
-    categories: ['meetings'],
-    color: 'indigo',
-    ringColor: '#6366f1',
-    icon: '📅',
-    researchNote: 'Microsoft research: Workers spend 57% of time in meetings/email. Reducing meetings increases deep focus.',
-  },
-}
-
-// All target types ordered for display
-export const WEEKLY_TARGET_TYPES: WeeklyTargetType[] = [
-  'deep_focus', 'exercise', 'social_time', 'recovery', 'leisure', 'meetings',
-]
-
-// Maximum number of targets a user can select
-export const MAX_WEEKLY_TARGETS = 5
-
-/**
- * Calculate progress for a weekly target.
- * For at_least: 0-100% filling toward goal.
- * For at_most: 100% when under limit, decreasing as you exceed it.
- */
-export function calculateTargetProgress(
-  actualMinutes: number,
-  targetMinutes: number,
-  direction: TargetDirection
-): number {
-  if (targetMinutes === 0) return direction === 'at_most' ? 100 : 0
-
-  if (direction === 'at_least') {
-    return Math.min(100, Math.round((actualMinutes / targetMinutes) * 100))
-  } else {
-    // at_most: under limit = 100%, over = decreasing
-    if (actualMinutes <= targetMinutes) {
-      return 100
-    }
-    const overageRatio = actualMinutes / targetMinutes
-    return Math.max(0, Math.round(100 - (overageRatio - 1) * 100))
-  }
-}
-
-/**
- * Get feedback for target progress display
- */
-export function getTargetFeedback(
-  actualMinutes: number,
-  targetMinutes: number,
-  direction: TargetDirection
-): { message: string; tone: 'success' | 'warning' | 'neutral' | 'danger' } {
-  const progress = calculateTargetProgress(actualMinutes, targetMinutes, direction)
-
-  if (direction === 'at_least') {
-    if (progress >= 100) return { message: 'Target reached!', tone: 'success' }
-    if (progress >= 75) return { message: 'Almost there', tone: 'neutral' }
-    if (progress >= 50) return { message: 'Halfway', tone: 'neutral' }
-    if (progress >= 25) return { message: 'Getting started', tone: 'warning' }
-    return { message: 'Needs attention', tone: 'danger' }
-  } else {
-    if (actualMinutes === 0) return { message: 'Perfect!', tone: 'success' }
-    if (actualMinutes <= targetMinutes * 0.5) return { message: 'Great restraint', tone: 'success' }
-    if (actualMinutes <= targetMinutes) return { message: 'Within limit', tone: 'neutral' }
-    if (actualMinutes <= targetMinutes * 1.5) return { message: 'Slightly over', tone: 'warning' }
-    return { message: 'Over limit', tone: 'danger' }
-  }
-}
-
-/**
- * Format target value for display (e.g. "15 hrs" or "150 min")
- */
-export function formatTargetValue(minutes: number, unit: 'hours' | 'minutes'): string {
-  if (unit === 'minutes' || minutes < 60) {
-    return `${minutes} min`
-  }
-  const hours = minutes / 60
-  if (hours === Math.floor(hours)) {
-    return `${hours} hr${hours !== 1 ? 's' : ''}`
-  }
-  return `${hours.toFixed(1)} hrs`
-}
-
-// Map weekly target types to streak types for continuity
-export const TARGET_TO_STREAK_MAP: Partial<Record<WeeklyTargetType, StreakType>> = {
-  deep_focus: 'deep_work',
-  exercise: 'exercise',
-  social_time: 'relationships',
 }
 
 export interface TimeEntry {

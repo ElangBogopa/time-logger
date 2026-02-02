@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { fetchEntries, fetchWeeklyTargets, fetchStreaks, upsertStreak } from '@/lib/api'
+import { fetchEntries, fetchStreaks, upsertStreak } from '@/lib/api'
 import {
   TimeEntry,
   getLocalDateString,
@@ -12,9 +12,6 @@ import {
   calculateDailyTarget,
   formatMinutesForStreak,
   UserStreak,
-  WeeklyTarget,
-  WeeklyTargetType,
-  TARGET_TO_STREAK_MAP,
   StreakConfig,
 } from '@/lib/types'
 import { Flame, ChevronRight, Sparkles } from 'lucide-react'
@@ -35,34 +32,12 @@ function getDateDaysAgo(daysAgo: number): string {
   return getLocalDateString(date)
 }
 
-// Map weekly targets to streak types with their weekly target values
-interface StreakTypeWithTarget {
-  type: StreakType
-  weeklyTargetMinutes: number | null
-}
-
-function getStreakTypesFromTargets(targets: WeeklyTarget[]): StreakTypeWithTarget[] {
-  const streakMap = new Map<StreakType, StreakTypeWithTarget>()
-
-  targets.forEach(target => {
-    const streakType = TARGET_TO_STREAK_MAP[target.target_type as WeeklyTargetType]
-    if (streakType) {
-      streakMap.set(streakType, {
-        type: streakType,
-        weeklyTargetMinutes: target.weekly_target_minutes,
-      })
-    }
-  })
-
-  // Add defaults if no targets map to streaks
-  if (streakMap.size === 0) {
-    streakMap.set('deep_work', { type: 'deep_work', weeklyTargetMinutes: null })
-    streakMap.set('exercise', { type: 'exercise', weeklyTargetMinutes: null })
-    streakMap.set('focus', { type: 'focus', weeklyTargetMinutes: null })
-  }
-
-  return Array.from(streakMap.values())
-}
+// Default streak types to track
+const DEFAULT_STREAK_TYPES: { type: StreakType; weeklyTargetMinutes: number | null }[] = [
+  { type: 'deep_work', weeklyTargetMinutes: null },
+  { type: 'exercise', weeklyTargetMinutes: null },
+  { type: 'focus', weeklyTargetMinutes: null },
+]
 
 interface StatsCardProps {
   userId: string
@@ -110,11 +85,10 @@ export default function StatsCard({ userId }: StatsCardProps) {
       const sixtyDaysAgo = getDateDaysAgo(60)
       const today = getLocalDateString()
 
-      const [entries, targets, existingStreaks] = await Promise.all([
+      const [entries, existingStreaks] = await Promise.all([
         fetchEntries({ status: 'confirmed', dateFrom: sixtyDaysAgo, dateTo: today }),
-        fetchWeeklyTargets(),
         fetchStreaks(),
-      ]) as [TimeEntry[], WeeklyTarget[], UserStreak[]]
+      ]) as [TimeEntry[], UserStreak[]]
 
       // Build personal bests map
       const pbMap = new Map<StreakType, number>()
@@ -129,8 +103,8 @@ export default function StatsCard({ userId }: StatsCardProps) {
         entriesByDate.set(entry.date, [...existing, entry])
       })
 
-      // Get streak types based on weekly targets
-      const streakTypesWithTargets = getStreakTypesFromTargets(targets)
+      // Use default streak types
+      const streakTypesWithTargets = DEFAULT_STREAK_TYPES
 
       // Calculate all streaks with intention-based thresholds
       const calculatedStreaks: StreakDisplay[] = streakTypesWithTargets

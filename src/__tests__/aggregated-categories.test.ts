@@ -7,8 +7,6 @@ import {
   getAggregatedCategory,
   aggregateByView,
   CATEGORY_LABELS,
-  WEEKLY_TARGET_CONFIGS,
-  WeeklyTargetType,
 } from '@/lib/types'
 
 describe('ENERGY_VIEW configuration', () => {
@@ -305,51 +303,6 @@ describe('aggregateByView', () => {
     expect(result.get('recovery')).toBe(30)
     expect(result.get('connection')).toBe(60)
     expect(result.get('escape')).toBe(120)
-  })
-})
-
-describe('WEEKLY_TARGET_CONFIGS integration with aggregated categories', () => {
-  it('deep_focus target maps to focus category', () => {
-    const categories = WEEKLY_TARGET_CONFIGS.deep_focus.categories
-    categories.forEach(cat => {
-      expect(getAggregatedCategory(cat)).toBe('focus')
-    })
-  })
-
-  it('leisure target maps to escape category', () => {
-    const categories = WEEKLY_TARGET_CONFIGS.leisure.categories
-    categories.forEach(cat => {
-      expect(getAggregatedCategory(cat)).toBe('escape')
-    })
-  })
-
-  it('exercise target maps to body category', () => {
-    const categories = WEEKLY_TARGET_CONFIGS.exercise.categories
-    categories.forEach(cat => {
-      expect(getAggregatedCategory(cat)).toBe('body')
-    })
-  })
-
-  it('social_time target maps to connection category', () => {
-    const categories = WEEKLY_TARGET_CONFIGS.social_time.categories
-    categories.forEach(cat => {
-      expect(getAggregatedCategory(cat)).toBe('connection')
-    })
-  })
-
-  it('recovery target maps to recovery or body categories', () => {
-    const categories = WEEKLY_TARGET_CONFIGS.recovery.categories
-    const validAggCategories = ['recovery', 'body']
-    categories.forEach(cat => {
-      expect(validAggCategories).toContain(getAggregatedCategory(cat))
-    })
-  })
-
-  it('meetings target maps to ops category', () => {
-    const categories = WEEKLY_TARGET_CONFIGS.meetings.categories
-    categories.forEach(cat => {
-      expect(getAggregatedCategory(cat)).toBe('ops')
-    })
   })
 })
 

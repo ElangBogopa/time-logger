@@ -4,7 +4,7 @@
  * All requests go through Next.js API routes which use the service role key.
  */
 
-import { TimeEntry, TimeCategory, WeeklyTarget, WeeklyTargetType } from './types'
+import { TimeEntry, TimeCategory } from './types'
 import { CorrelationsResponse } from './correlation-types'
 
 export function getCsrfToken(): string {
@@ -208,42 +208,6 @@ export async function upsertStreak(params: UpsertStreakParams): Promise<UserStre
     body: JSON.stringify(params),
   })
   return data
-}
-
-// ============================================================
-// WEEKLY TARGETS
-// ============================================================
-
-export async function fetchWeeklyTargets(): Promise<WeeklyTarget[]> {
-  const { targets } = await fetchJSON<{ targets: WeeklyTarget[] }>('/api/targets')
-  return targets
-}
-
-export async function createWeeklyTargets(
-  targets: Array<{ target_type: WeeklyTargetType; weekly_target_minutes: number }>
-): Promise<WeeklyTarget[]> {
-  const { targets: created } = await fetchJSON<{ targets: WeeklyTarget[] }>('/api/targets', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targets }),
-  })
-  return created
-}
-
-export async function updateWeeklyTarget(
-  id: string,
-  updates: { weekly_target_minutes?: number; sort_order?: number; active?: boolean }
-): Promise<WeeklyTarget> {
-  const { target } = await fetchJSON<{ target: WeeklyTarget }>(`/api/targets/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  })
-  return target
-}
-
-export async function deleteWeeklyTarget(id: string): Promise<void> {
-  await fetchJSON(`/api/targets/${id}`, { method: 'DELETE' })
 }
 
 // ============================================================

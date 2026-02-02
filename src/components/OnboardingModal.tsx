@@ -2,14 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import {
-  WeeklyTargetType,
-  WEEKLY_TARGET_CONFIGS,
-  WEEKLY_TARGET_TYPES,
-  MAX_WEEKLY_TARGETS,
-  formatTargetValue,
-} from '@/lib/types'
-import { createWeeklyTargets, csrfFetch } from '@/lib/api'
+import { csrfFetch } from '@/lib/api'
 import {
   Dialog,
   DialogContent,
@@ -21,12 +14,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
-import { ArrowRight, ArrowLeft, Loader2, Sparkles, Check, User } from 'lucide-react'
-
-interface SelectedTarget {
-  type: WeeklyTargetType
-  minutes: number
-}
+import { ArrowRight, ArrowLeft, Loader2, User, TrendingUp, Info } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface OnboardingModalProps {
   isOpen: boolean
@@ -37,7 +31,8 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
   const { data: session } = useSession()
   const [step, setStep] = useState(0)
   const [preferredName, setPreferredName] = useState('')
-  const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>([])
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [productivityTarget, setProductivityTarget] = useState(80)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,26 +42,6 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
       setPreferredName(name)
     }
   }, [session])
-
-  const toggleTarget = (type: WeeklyTargetType) => {
-    setSelectedTargets(prev => {
-      const exists = prev.find(t => t.type === type)
-      if (exists) {
-        return prev.filter(t => t.type !== type)
-      }
-      if (prev.length >= MAX_WEEKLY_TARGETS) {
-        return prev
-      }
-      const config = WEEKLY_TARGET_CONFIGS[type]
-      return [...prev, { type, minutes: config.defaultMinutes }]
-    })
-  }
-
-  const updateMinutes = (type: WeeklyTargetType, minutes: number) => {
-    setSelectedTargets(prev =>
-      prev.map(t => (t.type === type ? { ...t, minutes } : t))
-    )
-  }
 
   const handleNext = async () => {
     setError(null)
@@ -97,8 +72,8 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     }
 
     if (step === 1) {
-      if (selectedTargets.length === 0) {
-        setError('Please select at least one target')
+      if (!selectedPlan) {
+        setError('Please select a plan')
         return
       }
       setStep(2)
@@ -117,12 +92,31 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     setError(null)
 
     try {
-      await createWeeklyTargets(
-        selectedTargets.map(t => ({
-          target_type: t.type,
-          weekly_target_minutes: t.minutes,
-        }))
-      )
+      // Create the goal
+      const goalResponse = await csrfFetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Increase Productivity',
+          description: 'Track your daily priorities and build consistent follow-through',
+        }),
+      })
+      if (!goalResponse.ok) {
+        const data = await goalResponse.json()
+        throw new Error(data.error || 'Failed to create goal')
+      }
+
+      // Save productivity target to preferences
+      const prefsResponse = await csrfFetch('/api/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productivity_target: productivityTarget }),
+      })
+      if (!prefsResponse.ok) {
+        const data = await prefsResponse.json()
+        throw new Error(data.error || 'Failed to save preferences')
+      }
+
       onComplete()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -132,295 +126,262 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent
-        className="max-h-[90vh] overflow-y-auto sm:max-w-xl"
-        showCloseButton={false}
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        <VisuallyHidden>
-          <DialogTitle>Set up your account</DialogTitle>
-          <DialogDescription>
-            Welcome to Better! Complete the setup process by entering your name and choosing weekly targets to track your productivity goals.
-          </DialogDescription>
-        </VisuallyHidden>
+    <TooltipProvider>
+      <Dialog open={isOpen} onOpenChange={() => {}}>
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto sm:max-w-xl"
+          showCloseButton={false}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <VisuallyHidden>
+            <DialogTitle>Set up your account</DialogTitle>
+            <DialogDescription>
+              Welcome to Better! Complete the setup process by entering your name and setting your productivity goal.
+            </DialogDescription>
+          </VisuallyHidden>
 
-        {/* Progress indicator */}
-        <div className="mb-6 flex items-center justify-center gap-2">
-          {[0, 1, 2].map(s => (
-            <div
-              key={s}
-              className={`h-2 w-16 rounded-full transition-colors ${
-                s <= step ? 'bg-primary' : 'bg-zinc-200 dark:bg-zinc-700'
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Step 0: Name */}
-        {step === 0 && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <User className="h-8 w-8 text-primary" />
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                Welcome to Better!
-              </h2>
-              <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-                What should we call you?
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="preferredName">Your first name</Label>
-              <Input
-                id="preferredName"
-                type="text"
-                value={preferredName}
-                onChange={e => setPreferredName(e.target.value)}
-                placeholder="e.g., Alex"
-                autoFocus
-                className="text-lg"
+          {/* Progress indicator */}
+          <div className="mb-6 flex items-center justify-center gap-2">
+            {[0, 1, 2].map(s => (
+              <div
+                key={s}
+                className={`h-2 w-16 rounded-full transition-colors ${
+                  s <= step ? 'bg-primary' : 'bg-zinc-200 dark:bg-zinc-700'
+                }`}
               />
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                We&apos;ll use this in your personalized greetings and weekly reviews.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Step 1: Select targets */}
-        {step === 1 && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                Set your weekly targets
-              </h2>
-              <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-                Pick up to {MAX_WEEKLY_TARGETS} targets to track. Each is backed by research.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {WEEKLY_TARGET_TYPES.map(type => {
-                const config = WEEKLY_TARGET_CONFIGS[type]
-                const isSelected = selectedTargets.some(t => t.type === type)
-                const isDisabled = !isSelected && selectedTargets.length >= MAX_WEEKLY_TARGETS
-
-                return (
-                  <button
-                    key={type}
-                    onClick={() => toggleTarget(type)}
-                    disabled={isDisabled}
-                    className={`relative rounded-xl border-2 p-4 text-left transition-all ${
-                      isSelected
-                        ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                        : isDisabled
-                          ? 'border-zinc-100 dark:border-zinc-800 opacity-40 cursor-not-allowed'
-                          : 'border-border hover:border-zinc-300 dark:hover:border-zinc-600'
-                    }`}
-                  >
-                    {/* Selection check */}
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="h-3 w-3 text-white" />
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xl">{config.icon}</span>
-                      <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-                        {config.label}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                      {config.description}
-                    </p>
-
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                        config.direction === 'at_least'
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-                      }`}>
-                        {config.direction === 'at_least' ? 'At least' : 'At most'}
-                      </span>
-                      <span className="text-xs text-zinc-400">
-                        Default: {formatTargetValue(config.defaultMinutes, config.unit)}/wk
-                      </span>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-
-            {selectedTargets.length >= MAX_WEEKLY_TARGETS && (
-              <p className="text-center text-sm text-zinc-500">
-                Maximum {MAX_WEEKLY_TARGETS} targets selected
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Step 2: Set values + confirm */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                <Sparkles className="h-8 w-8 text-green-600 dark:text-green-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                Tune your targets, {preferredName}
-              </h2>
-              <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-                Adjust the weekly amount for each target. Defaults are research-backed.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              {selectedTargets.map(target => {
-                const config = WEEKLY_TARGET_CONFIGS[target.type]
-                const isHours = config.unit === 'hours'
-                const sliderMin = isHours ? Math.floor(config.minMinutes / 60) : config.minMinutes
-                const sliderMax = isHours ? Math.floor(config.maxMinutes / 60) : config.maxMinutes
-                const sliderValue = isHours ? Math.round(target.minutes / 60) : target.minutes
-                const sliderStep = isHours ? 1 : 15
-
-                return (
-                  <div
-                    key={target.type}
-                    className="rounded-xl border border-border p-4"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{config.icon}</span>
-                        <span className="font-semibold text-sm">{config.label}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          config.direction === 'at_least'
-                            ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                            : 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-                        }`}>
-                          {config.direction === 'at_least' ? 'At least' : 'At most'}
-                        </span>
-                      </div>
-                      <span className="text-lg font-bold text-primary">
-                        {formatTargetValue(target.minutes, config.unit)}/wk
-                      </span>
-                    </div>
-
-                    <Slider
-                      value={[sliderValue]}
-                      onValueChange={([val]) => {
-                        const mins = isHours ? val * 60 : val
-                        updateMinutes(target.type, mins)
-                      }}
-                      min={sliderMin}
-                      max={sliderMax}
-                      step={sliderStep}
-                      className="mb-2"
-                    />
-
-                    <div className="flex justify-between text-[10px] text-zinc-400">
-                      <span>{formatTargetValue(config.minMinutes, config.unit)}</span>
-                      <span>{formatTargetValue(config.maxMinutes, config.unit)}</span>
-                    </div>
-
-                    <p className="mt-2 text-[10px] text-zinc-400 italic">
-                      {config.researchNote}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Error message */}
-        {error && (
-          <p className="mt-4 text-center text-sm text-red-500">{error}</p>
-        )}
-
-        {/* Navigation */}
-        <div className="mt-6 space-y-3">
-          <div className="flex gap-3">
-            {step > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleBack}
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-            )}
-
-            {step < 2 ? (
-              <Button
-                type="button"
-                onClick={handleNext}
-                disabled={
-                  isSubmitting ||
-                  (step === 0 && !preferredName.trim()) ||
-                  (step === 1 && selectedTargets.length === 0)
-                }
-                className="flex-1"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1 bg-green-600 hover:bg-green-700"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    Start logging
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            )}
+            ))}
           </div>
 
-          {/* Skip option - only on step 0 */}
+          {/* Step 0: Name */}
           {step === 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                // Set a flag to remind later
-                localStorage.setItem('onboarding-skipped', 'true')
-                onComplete()
-              }}
-              className="w-full text-center text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
-              disabled={isSubmitting}
-            >
-              Skip for now
-            </button>
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <User className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                  Welcome to Better!
+                </h2>
+                <p className="mt-2 text-zinc-500 dark:text-zinc-400">
+                  What should we call you?
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="preferredName">Your first name</Label>
+                <Input
+                  id="preferredName"
+                  type="text"
+                  value={preferredName}
+                  onChange={e => setPreferredName(e.target.value)}
+                  placeholder="e.g., Alex"
+                  autoFocus
+                  className="text-lg"
+                />
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  We&apos;ll use this in your personalized greetings and weekly reviews.
+                </p>
+              </div>
+            </div>
           )}
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          {/* Step 1: Pick a Plan */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                  Choose your plan
+                </h2>
+                <p className="mt-2 text-zinc-500 dark:text-zinc-400">
+                  What do you want to focus on?
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                <button
+                  onClick={() => setSelectedPlan('increase_productivity')}
+                  className={`relative rounded-xl border-2 p-5 text-left transition-all ${
+                    selectedPlan === 'increase_productivity'
+                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                      : 'border-border hover:border-zinc-300 dark:hover:border-zinc-600'
+                  }`}
+                >
+                  {selectedPlan === 'increase_productivity' && (
+                    <div className="absolute top-3 right-3 h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                      <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+                      <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <span className="font-semibold text-lg text-zinc-900 dark:text-zinc-100">
+                      Increase Productivity
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 ml-[52px]">
+                    Track your daily priorities and build consistent follow-through
+                  </p>
+                </button>
+              </div>
+
+              <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+                More plans coming soon
+              </p>
+            </div>
+          )}
+
+          {/* Step 2: Set Productivity Target */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                  Set your target{preferredName ? `, ${preferredName}` : ''}
+                </h2>
+                <div className="mt-2 flex items-center justify-center gap-1">
+                  <p className="text-zinc-500 dark:text-zinc-400">
+                    Your daily productivity goal
+                  </p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[280px]">
+                      <p className="text-sm">
+                        We measure productivity by how well you follow through on your daily plan.
+                        Each day, you set 1-3 priority tasks — your score is based on completing them,
+                        weighted by priority. Your #1 task is worth the most.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border p-6">
+                {/* Target display */}
+                <div className="text-center mb-6">
+                  <span className="text-6xl font-bold text-primary">
+                    {productivityTarget}%
+                  </span>
+                </div>
+
+                {/* Slider */}
+                <Slider
+                  value={[productivityTarget]}
+                  onValueChange={([val]) => setProductivityTarget(val)}
+                  min={50}
+                  max={100}
+                  step={5}
+                  className="mb-3"
+                />
+
+                <div className="flex justify-between text-xs text-zinc-400">
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+
+                {/* Recommendation */}
+                <div className="mt-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3">
+                  <p className="text-sm text-green-700 dark:text-green-400">
+                    <span className="font-medium">Recommended: 80%</span>
+                    {' — '}
+                    Studies show 80% task completion correlates with sustainable high performance without burnout.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <p className="mt-4 text-center text-sm text-red-500">{error}</p>
+          )}
+
+          {/* Navigation */}
+          <div className="mt-6 space-y-3">
+            <div className="flex gap-3">
+              {step > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+              )}
+
+              {step < 2 ? (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={
+                    isSubmitting ||
+                    (step === 0 && !preferredName.trim()) ||
+                    (step === 1 && !selectedPlan)
+                  }
+                  className="flex-1"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      Start logging
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            {/* Skip option - only on step 0 */}
+            {step === 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem('onboarding-skipped', 'true')
+                  onComplete()
+                }}
+                className="w-full text-center text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                disabled={isSubmitting}
+              >
+                Skip for now
+              </button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
   )
 }

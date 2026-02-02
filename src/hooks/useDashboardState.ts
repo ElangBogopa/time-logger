@@ -56,28 +56,42 @@ export function useDashboardState({ session, status }: UseDashboardStateProps): 
     }
   }, [status, router])
 
-  // Check if user needs onboarding (no weekly targets set)
+  // Check if user needs onboarding (no productivity target or goals set)
+  // TODO: TEMP — force onboarding for testing, revert after
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.id || hasCheckedTargets) {
       return
     }
 
+    // TEMP: Force show onboarding for testing
+    setShowOnboarding(true)
+    setHasCheckedTargets(true)
+
+    /* ORIGINAL — uncomment to restore:
     const controller = new AbortController()
 
-    async function checkTargets() {
+    async function checkOnboardingNeeded() {
       try {
-        const response = await fetch('/api/targets', {
-          signal: controller.signal,
-        })
-        if (response.ok) {
-          const data = await response.json()
-          if (!data.targets || data.targets.length === 0) {
+        // Check preferences for productivity_target and goals in parallel
+        const [prefsResponse, goalsResponse] = await Promise.all([
+          fetch('/api/preferences', { signal: controller.signal }),
+          fetch('/api/goals', { signal: controller.signal }),
+        ])
+
+        if (prefsResponse.ok && goalsResponse.ok) {
+          const prefsData = await prefsResponse.json()
+          const goalsData = await goalsResponse.json()
+
+          const hasProductivityTarget = prefsData.preferences?.productivity_target != null
+          const hasGoals = goalsData.goals && goalsData.goals.length > 0
+
+          if (!hasProductivityTarget && !hasGoals) {
             setShowOnboarding(true)
           }
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') return
-        console.error('Failed to check targets:', error)
+        console.error('Failed to check onboarding status:', error)
       } finally {
         if (!controller.signal.aborted) {
           setHasCheckedTargets(true)
@@ -85,8 +99,9 @@ export function useDashboardState({ session, status }: UseDashboardStateProps): 
       }
     }
 
-    checkTargets()
+    checkOnboardingNeeded()
     return () => controller.abort()
+    */
   }, [status, session?.user?.id, hasCheckedTargets])
 
   return {

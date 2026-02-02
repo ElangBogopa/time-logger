@@ -26,28 +26,6 @@ export async function GET() {
 
     // Return existing preferences or defaults
     if (preferences) {
-      // Auto-initialize committedSince for existing users with targets
-      if (!preferences.intentions_committed_since) {
-        const { data: targets } = await supabase
-          .from('weekly_targets')
-          .select('created_at')
-          .eq('user_id', session.user.id)
-          .eq('active', true)
-          .order('created_at', { ascending: true })
-          .limit(1)
-
-        if (targets && targets.length > 0) {
-          // Set committedSince to their first target's creation date
-          const firstTargetDate = targets[0].created_at.split('T')[0]
-          await supabase
-            .from('user_preferences')
-            .update({ intentions_committed_since: firstTargetDate })
-            .eq('user_id', session.user.id)
-
-          preferences.intentions_committed_since = firstTargetDate
-        }
-      }
-
       return NextResponse.json({ preferences })
     }
 
@@ -80,7 +58,8 @@ export async function PUT(request: NextRequest) {
       reminder_times,
       timezone,
       intentions_committed_since,
-      pending_intention_changes
+      pending_intention_changes,
+      productivity_target,
     } = body
 
     // Validate reminder_times structure if provided
@@ -116,6 +95,13 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Validate productivity_target if provided
+    if (productivity_target !== undefined && productivity_target !== null) {
+      if (typeof productivity_target !== 'number' || productivity_target < 50 || productivity_target > 100) {
+        return NextResponse.json({ error: 'productivity_target must be a number between 50 and 100' }, { status: 400 })
+      }
+    }
+
     // Build update object
     const updateData: Record<string, unknown> = {}
     if (reminder_enabled !== undefined) updateData.reminder_enabled = reminder_enabled
@@ -123,6 +109,7 @@ export async function PUT(request: NextRequest) {
     if (timezone !== undefined) updateData.timezone = timezone
     if (intentions_committed_since !== undefined) updateData.intentions_committed_since = intentions_committed_since
     if (pending_intention_changes !== undefined) updateData.pending_intention_changes = pending_intention_changes
+    if (productivity_target !== undefined) updateData.productivity_target = productivity_target
 
     // Upsert preferences
     const { data: preferences, error } = await supabase

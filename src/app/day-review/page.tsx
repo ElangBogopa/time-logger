@@ -10,8 +10,6 @@ import {
   ArrowLeft,
   Trophy,
   TrendingUp,
-  TrendingDown,
-  Minus,
   Clock,
   Sparkles,
   Target,
@@ -91,22 +89,6 @@ const AGGREGATED_TEXT_COLORS: Record<AggregatedCategory, string> = {
   escape: 'text-[#7A7D82]',
 }
 
-interface TargetProgress {
-  targetId: string
-  targetType: string
-  label: string
-  todayMinutes: number
-  yesterdayMinutes: number
-  sameDayLastWeekMinutes: number
-  dailyTarget: number
-  weeklyTarget: number
-  weekMinutes: number
-  progress: number
-  direction: 'at_least' | 'at_most'
-  trend: 'up' | 'down' | 'same'
-  vsLastWeekTrend: 'up' | 'down' | 'same'
-}
-
 interface Win {
   id: string
   text: string
@@ -139,7 +121,6 @@ interface AggregatedBreakdown {
   label: string
   minutes: number
   percentage: number
-  isTargetLinked: boolean
 }
 
 interface ProductivityTaskInfo {
@@ -170,7 +151,6 @@ interface DaySummary {
   totalMinutesLogged: number
   hasEveningPassed: boolean
   date: string
-  targetProgress: TargetProgress[]
   wins: Win[]
   timeline: TimelineBlock[]
   longestFocusSession: { activity: string; minutes: number } | null
@@ -336,64 +316,6 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
   )
 }
 
-// Trend Icon Component (extracted to avoid creating components during render)
-function TrendIcon({ trend, direction }: { trend: 'up' | 'down' | 'same'; direction: 'at_least' | 'at_most' }) {
-  const isGood = direction === 'at_least' ? trend === 'up' : trend === 'down'
-
-  if (trend === 'same') return <Minus className="h-3 w-3 text-zinc-400" />
-  if (trend === 'up') return <TrendingUp className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
-  return <TrendingDown className={cn('h-3 w-3', isGood ? 'text-green-500' : 'text-red-500')} />
-}
-
-// Target Progress Card
-function TargetCard({ target }: { target: TargetProgress }) {
-  const getBarColor = () => {
-    if (target.progress >= 80) return 'bg-green-500'
-    if (target.progress >= 50) return 'bg-amber-500'
-    return 'bg-red-500'
-  }
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="font-medium text-foreground">{target.label}</h3>
-          <p className="text-2xl font-bold text-foreground mt-1">
-            {formatMinutes(target.todayMinutes)}
-            <span className="text-sm font-normal text-muted-foreground ml-1">
-              / {formatMinutes(target.dailyTarget)}
-            </span>
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <span>vs yesterday</span>
-            <TrendIcon trend={target.trend} direction={target.direction} />
-          </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-            <span>vs last week</span>
-            <TrendIcon trend={target.vsLastWeekTrend} direction={target.direction} />
-          </div>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-        <div
-          className={cn('h-full rounded-full transition-all duration-500', getBarColor())}
-          style={{ width: `${Math.min(target.progress, 100)}%` }}
-        />
-      </div>
-
-      {/* Comparison stats */}
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>Yesterday: {formatMinutes(target.yesterdayMinutes)}</span>
-        <span>Last {new Date().toLocaleDateString('en-US', { weekday: 'short' })}: {formatMinutes(target.sameDayLastWeekMinutes)}</span>
-      </div>
-    </div>
-  )
-}
-
 // Productivity Plan Card — shows plan completion in Goal Progress
 function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
   const barColor = score.score >= 80 ? 'bg-green-500' : score.score >= 50 ? 'bg-amber-500' : 'bg-red-400'
@@ -446,8 +368,8 @@ function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
 
 // Aggregated Category Breakdown (6 energy categories)
 function AggregatedBreakdownSection({ breakdown }: { breakdown: AggregatedBreakdown[] }) {
-  // Filter to only show categories with time (or target-linked)
-  const visibleCategories = breakdown.filter(cat => cat.minutes > 0 || cat.isTargetLinked)
+  // Filter to only show categories with time
+  const visibleCategories = breakdown.filter(cat => cat.minutes > 0)
 
   if (visibleCategories.length === 0) return null
 
@@ -462,21 +384,12 @@ function AggregatedBreakdownSection({ breakdown }: { breakdown: AggregatedBreakd
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className={cn('w-3 h-3 rounded-full', AGGREGATED_COLORS[cat.category])} />
-                <span className={cn(
-                  'text-sm font-medium',
-                  cat.isTargetLinked ? 'text-foreground' : 'text-muted-foreground'
-                )}>
+                <span className="text-sm font-medium text-muted-foreground">
                   {cat.label}
                 </span>
-                {cat.isTargetLinked && (
-                  <Target className="h-3 w-3 text-blue-500" />
-                )}
               </div>
               <div className="flex items-center gap-2">
-                <span className={cn(
-                  'text-sm font-medium',
-                  cat.isTargetLinked ? 'text-foreground' : 'text-muted-foreground'
-                )}>
+                <span className="text-sm font-medium text-muted-foreground">
                   {formatMinutes(cat.minutes)}
                 </span>
                 {cat.minutes > 0 && (
@@ -564,7 +477,6 @@ function DayReviewContent() {
           score: summaryData.score,
           totalMinutesLogged: summaryData.totalMinutesLogged,
           wins: summaryData.wins,
-          targetProgress: summaryData.targetProgress,
           mood: summaryData.todayMood?.mood || null,
           longestFocusSession: summaryData.longestFocusSession,
         }),
@@ -596,7 +508,6 @@ function DayReviewContent() {
           totalMinutesLogged: summaryData.totalMinutesLogged,
           commentary: commentaryText,
           wins: summaryData.wins,
-          targetProgress: summaryData.targetProgress,
           categoryBreakdown: summaryData.categoryBreakdown,
           aggregatedBreakdown: summaryData.aggregatedBreakdown,
           timeline: summaryData.timeline,

@@ -211,38 +211,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // --- Notification type 3: Goal progress ---
-      const { data: targets } = await supabase
-        .from('weekly_targets')
-        .select('category, target_minutes')
-        .eq('user_id', userId)
-
-      if (targets?.length) {
-        // Get this week's entries
-        const weekEntries = recentEntries.filter(e => e.date >= weekStartStr)
-
-        for (const target of targets) {
-          const logged = weekEntries
-            .filter(e => e.category === target.category)
-            .reduce((sum, e) => sum + (e.duration_minutes || 0), 0)
-
-          const pct = Math.round((logged / target.target_minutes) * 100)
-
-          if (pct >= 70 && pct < 100) {
-            const result = await sendToUser(subs, {
-              title: 'Almost there! 💪',
-              body: `You're ${pct}% to your ${target.category.replace('_', ' ')} goal this week. Keep pushing!`,
-              tag: 'goal-progress',
-            })
-            totalSent += result.sent
-            totalFailed += result.failed
-            notifications.push(`goal:${userId}:${target.category}`)
-            break // One goal notification per user
-          }
-        }
-      }
-
-      // --- Notification type 4: Weekly milestone (Sunday) ---
+      // --- Notification type 3: Weekly milestone (Sunday) ---
       if (dayOfWeek === 0) {
         const weekDates = new Set(
           recentEntries

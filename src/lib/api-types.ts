@@ -3,7 +3,7 @@
  * Provides type safety for client-server communication
  */
 
-import { TimeCategory, TimeEntry, WeeklyTarget } from './types'
+import { TimeCategory, TimeEntry } from './types'
 
 // ============================================================================
 // Categorize API
@@ -117,12 +117,6 @@ export interface WeeklyReviewResponse {
   totalMinutes: number
   categoryBreakdown: Record<TimeCategory, number>
   dailyTotals: Record<string, number>
-  targets: Array<{
-    target: WeeklyTarget
-    actualMinutes: number
-    targetMinutes: number | null
-    percentComplete: number | null
-  }>
 }
 
 // ============================================================================

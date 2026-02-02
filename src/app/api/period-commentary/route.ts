@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 import {
   TimeEntry,
@@ -9,9 +6,6 @@ import {
   CATEGORY_LABELS,
   TimePeriod,
   PERIOD_LABELS,
-  WeeklyTarget,
-  WeeklyTargetType,
-  WEEKLY_TARGET_CONFIGS,
 } from '@/lib/types'
 import { formatDurationLong } from '@/lib/time-utils'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
@@ -25,7 +19,6 @@ interface PeriodCommentaryRequest {
 function buildPeriodContext(
   period: TimePeriod,
   entries: TimeEntry[],
-  targets: WeeklyTarget[]
 ): string {
   const periodLabel = PERIOD_LABELS[period]
   const totalMinutes = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
@@ -58,31 +51,6 @@ BREAKDOWN BY CATEGORY:
   Activities: ${data.activities.join(', ')}
 `
   })
-
-  // Add targets context
-  if (targets.length > 0) {
-    context += `
-USER'S WEEKLY TARGETS:
-`
-    targets.forEach((target, idx) => {
-      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-      if (!config) return
-
-      // Check if this period had any related activities
-      const relatedMinutes = sortedCategories
-        .filter(([cat]) => config.categories.includes(cat as TimeCategory))
-        .reduce((sum, [, data]) => sum + data.minutes, 0)
-
-      const directionLabel = target.direction === 'at_least' ? 'at least' : 'at most'
-      if (relatedMinutes > 0) {
-        context += `${idx + 1}. ${config.label} (${directionLabel}) - ${formatDurationLong(relatedMinutes)} this ${periodLabel.toLowerCase()}
-`
-      } else {
-        context += `${idx + 1}. ${config.label} (${directionLabel}) - no related activities this ${periodLabel.toLowerCase()}
-`
-      }
-    })
-  }
 
   // Notable patterns
   const deepWorkMinutes = categoryBreakdown['deep_work']?.minutes || 0
@@ -132,29 +100,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Period and entries are required' }, { status: 400 })
     }
 
-    // Get session to fetch user's targets
-    const session = await getServerSession(authOptions)
-    let targets: WeeklyTarget[] = []
-
-    if (session?.user?.id) {
-      const { data: userTargets } = await supabase
-        .from('weekly_targets')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .eq('active', true)
-        .order('sort_order', { ascending: true })
-
-      if (userTargets) {
-        targets = userTargets as WeeklyTarget[]
-      }
-    }
-
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       timeout: 30000,
     })
 
-    const context = buildPeriodContext(period, entries, targets)
+    const context = buildPeriodContext(period, entries)
     const periodLabel = PERIOD_LABELS[period]
 
     // Determine overall tone

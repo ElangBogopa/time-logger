@@ -7,11 +7,6 @@ import {
   TimeEntry,
   TimeCategory,
   CATEGORY_LABELS,
-  WeeklyTarget,
-  WeeklyTargetType,
-  WEEKLY_TARGET_CONFIGS,
-  calculateTargetProgress,
-  getTargetFeedback,
 } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
@@ -22,50 +17,12 @@ interface WeeklyReviewRequest {
   timezone?: string // IANA timezone (e.g., 'America/New_York')
 }
 
-interface TargetProgress {
-  target: WeeklyTarget
-  label: string
-  currentMinutes: number
-  targetMinutes: number
-  percentage: number | null
-  trend: 'up' | 'down' | 'same' | null
-  previousMinutes: number | null
-  isLimitTarget: boolean // For at_most targets
-  changeMinutes: number | null // Difference from last week
-  improvementPercentage: number | null // For limit targets
-  // Research-based feedback
-  feedbackMessage: string | null
-  feedbackTone: 'success' | 'warning' | 'neutral' | 'danger' | null
-  researchNote: string | null
-  optimalRangeMin: number | null
-  optimalRangeMax: number | null
-}
-
 interface CategoryBreakdown {
   category: TimeCategory
   label: string
   minutes: number
   percentage: number
   entryCount: number
-}
-
-type DayRating = 'good' | 'neutral' | 'rough' | 'no_data'
-
-interface TargetDayScore {
-  date: string
-  day: string // 'Mon', 'Tue', etc.
-  rating: DayRating
-  targetMinutes: number
-  hadDistraction: boolean // For leisure limit targets
-}
-
-interface TargetScorecard {
-  targetId: string
-  targetLabel: string
-  isLimitTarget: boolean
-  days: TargetDayScore[]
-  goodDays: number
-  roughDays: number
 }
 
 interface WeekHighlight {
@@ -91,8 +48,6 @@ interface WeeklyReviewData {
   previousWeekEntryCount: number
   hasEnoughData: boolean // Current week has >= 7 entries
   hasPreviousWeekData: boolean // Previous week has >= 7 entries
-  targetProgress: TargetProgress[]
-  targetScorecards: TargetScorecard[]
   categoryBreakdown: CategoryBreakdown[]
   bestDays: string[]
   bestHours: string[]
@@ -158,12 +113,6 @@ function formatHour(hour: number): string {
 function getDayName(dateStr: string): string {
   const date = new Date(dateStr + 'T00:00:00')
   return date.toLocaleDateString('en-US', { weekday: 'long' })
-}
-
-// Get short day name
-function getShortDayName(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  return date.toLocaleDateString('en-US', { weekday: 'short' })
 }
 
 export async function POST(request: NextRequest) {
@@ -243,17 +192,8 @@ export async function POST(request: NextRequest) {
       .gte('date', previousWeekStart)
       .lte('date', previousWeekEnd)
 
-    // Fetch user's weekly targets
-    const { data: userTargets } = await supabase
-      .from('weekly_targets')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .eq('active', true)
-      .order('sort_order', { ascending: true })
-
     const entries = (currentWeekEntries || []) as TimeEntry[]
     const prevEntries = (previousWeekEntries || []) as TimeEntry[]
-    const targets = (userTargets || []) as WeeklyTarget[]
 
     const entryCount = entries.length
     const previousWeekEntryCount = prevEntries.length
@@ -314,151 +254,8 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Calculate target progress
-    const targetProgress: TargetProgress[] = targets.map((target) => {
-      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-      const isLimitTarget = target.direction === 'at_most'
-      let currentMinutes = 0
-      let previousMinutes = 0
-
-      if (config) {
-        config.categories.forEach((cat) => {
-          currentMinutes += categoryMap.get(cat)?.minutes || 0
-          previousMinutes += prevCategoryMap.get(cat) || 0
-        })
-      }
-
-      const targetMinutes = target.weekly_target_minutes
-
-      // Calculate progress percentage
-      let percentage: number | null = null
-      let improvementPercentage: number | null = null
-
-      if (isLimitTarget && hasPreviousWeekData && previousMinutes > 0) {
-        // Improvement = how much we reduced (positive = good)
-        improvementPercentage = Math.round(((previousMinutes - currentMinutes) / previousMinutes) * 100)
-        percentage = improvementPercentage
-      } else if (!isLimitTarget && targetMinutes) {
-        percentage = calculateTargetProgress(currentMinutes, targetMinutes, target.direction as 'at_least' | 'at_most')
-      }
-
-      // Get research-based feedback
-      const feedback = config
-        ? getTargetFeedback(currentMinutes, targetMinutes, target.direction as 'at_least' | 'at_most')
-        : null
-
-      // Trend calculation
-      let trend: 'up' | 'down' | 'same' | null = null
-      let changeMinutes: number | null = null
-
-      if (hasPreviousWeekData && previousMinutes > 0) {
-        changeMinutes = currentMinutes - previousMinutes
-        const threshold = previousMinutes * 0.1
-
-        if (Math.abs(changeMinutes) < threshold) {
-          trend = 'same'
-        } else if (changeMinutes > 0) {
-          trend = 'up'
-        } else {
-          trend = 'down'
-        }
-      }
-
-      return {
-        target,
-        label: config ? config.label : target.target_type,
-        currentMinutes,
-        targetMinutes,
-        percentage,
-        trend,
-        previousMinutes: hasPreviousWeekData ? previousMinutes : null,
-        isLimitTarget,
-        changeMinutes: hasPreviousWeekData ? changeMinutes : null,
-        improvementPercentage,
-        // Add research-based feedback
-        feedbackMessage: feedback?.message || null,
-        feedbackTone: feedback?.tone || null,
-        researchNote: config?.researchNote || null,
-        optimalRangeMin: config?.minMinutes || null,
-        optimalRangeMax: config?.maxMinutes || null,
-      }
-    })
-
-    // Calculate evaluatedDays early (needed for scorecard daily targets)
+    // Calculate evaluatedDays
     const evaluatedDays = entriesByDay.size
-
-    // Build target scorecards
-    const targetScorecards: TargetScorecard[] = targets.map((target) => {
-      const config = WEEKLY_TARGET_CONFIGS[target.target_type as WeeklyTargetType]
-      const isLimitTarget = target.direction === 'at_most'
-      const targetMinutes = target.weekly_target_minutes
-      const dailyTarget = targetMinutes / (evaluatedDays || 7)
-
-      const days: TargetDayScore[] = []
-      let goodDays = 0
-      let roughDays = 0
-
-      Array.from(entriesByDay.entries()).forEach(([date, dayEntries]) => {
-        let dayTargetMinutes = 0
-        let hadDistraction = false
-
-        dayEntries.forEach((entry) => {
-          if (config && entry.category && config.categories.includes(entry.category)) {
-            dayTargetMinutes += entry.duration_minutes
-            if (isLimitTarget) {
-              hadDistraction = true
-            }
-          }
-        })
-
-        let rating: DayRating = 'no_data'
-
-        if (dayEntries.length === 0) {
-          rating = 'no_data'
-        } else if (isLimitTarget) {
-          // For limit targets: no related activity = good, <30min = neutral, >30min = rough
-          if (!hadDistraction || dayTargetMinutes === 0) {
-            rating = 'good'
-            goodDays++
-          } else if (dayTargetMinutes <= 30) {
-            rating = 'neutral'
-          } else {
-            rating = 'rough'
-            roughDays++
-          }
-        } else {
-          // For growth targets: compare against daily target
-          if (dayTargetMinutes >= dailyTarget) {
-            rating = 'good'
-            goodDays++
-          } else if (dayTargetMinutes >= dailyTarget * 0.5) {
-            rating = 'neutral'
-          } else if (dayTargetMinutes > 0) {
-            rating = 'neutral'
-          } else {
-            rating = 'rough'
-            roughDays++
-          }
-        }
-
-        days.push({
-          date,
-          day: getShortDayName(date),
-          rating,
-          targetMinutes: dayTargetMinutes,
-          hadDistraction,
-        })
-      })
-
-      return {
-        targetId: target.id,
-        targetLabel: config ? config.label : target.target_type,
-        isLimitTarget,
-        days,
-        goodDays,
-        roughDays,
-      }
-    })
 
     // Find best days (most productive)
     const dayMinutes = new Map<string, number>()
@@ -527,47 +324,19 @@ export async function POST(request: NextRequest) {
     // evaluatedDays already calculated above (before scorecards)
 
     // Calculate Week Score (0-100)
-    // Components:
-    // - Active days: 0-N days → 0-35 points (scaled to evaluated days)
-    // - Target progress: average % across targets → 0-45 points
-    // - Consistency: ratio of good days to total active days → 0-20 points
+    // Based on active days and activity volume
     let weekScore = 0
 
-    // Active days component (35 points max, scaled to evaluated days)
-    const activeDaysScore = evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 35) : 0
+    // Active days component (50 points max, scaled to evaluated days)
+    const activeDaysScore = evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 50) : 0
     weekScore += activeDaysScore
 
-    // Target progress component (45 points max)
-    if (targetProgress.length > 0) {
-      const avgTargetProgress = targetProgress.reduce((sum, tp) => {
-        if (tp.isLimitTarget) {
-          // For limit targets, less is better. Score based on staying under limit
-          if (tp.targetMinutes && tp.targetMinutes > 0) {
-            const ratio = tp.currentMinutes / tp.targetMinutes
-            return sum + Math.max(0, Math.min(100, (1 - ratio + 0.5) * 100)) // Under limit = 100%+, at limit = 50%
-          }
-          return sum + (tp.improvementPercentage !== null ? Math.max(0, 50 + tp.improvementPercentage / 2) : 50)
-        }
-        return sum + (tp.percentage || 0)
-      }, 0) / targetProgress.length
-      const targetScore = Math.round((Math.min(avgTargetProgress, 100) / 100) * 45)
-      weekScore += targetScore
-    } else {
-      // No targets set, give partial credit based on activity
-      weekScore += evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 20) : 0
-    }
-
-    // Consistency component (20 points max)
-    if (targetScorecards.length > 0) {
-      const totalGoodDays = targetScorecards.reduce((sum, sc) => sum + sc.goodDays, 0)
-      const totalPossibleGoodDays = targetScorecards.length * activeDays
-      if (totalPossibleGoodDays > 0) {
-        const consistencyRatio = totalGoodDays / totalPossibleGoodDays
-        weekScore += Math.round(consistencyRatio * 20)
-      }
-    } else {
-      // No scorecards, give partial credit
-      weekScore += evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 10) : 0
+    // Activity volume component (50 points max, based on entries per active day)
+    if (activeDays > 0) {
+      const avgEntriesPerDay = entryCount / activeDays
+      // Scale: 3 entries/day = full marks
+      const volumeScore = Math.round(Math.min(avgEntriesPerDay / 3, 1) * 50)
+      weekScore += volumeScore
     }
 
     // Cap at 100
@@ -594,47 +363,6 @@ export async function POST(request: NextRequest) {
         subtext: activeDays === 7 ? 'Perfect week!' : 'Nearly perfect',
       })
     }
-
-    // Highlight: Targets hit
-    const targetsHit = targetProgress.filter(tp => {
-      if (tp.isLimitTarget) {
-        return tp.targetMinutes && tp.currentMinutes <= tp.targetMinutes
-      }
-      return tp.percentage !== null && tp.percentage >= 100
-    })
-    if (targetsHit.length > 0) {
-      highlights.push({
-        type: 'target_hit',
-        icon: '✓',
-        text: `Hit ${targetsHit.length} of ${targetProgress.length} targets`,
-        subtext: targetsHit.map(t => t.label).join(', '),
-      })
-    }
-
-    // Highlight: Week-over-week improvements
-    targetProgress.forEach(tp => {
-      if (tp.changeMinutes !== null && tp.previousMinutes !== null && tp.previousMinutes > 0) {
-        const changePercent = Math.round((tp.changeMinutes / tp.previousMinutes) * 100)
-
-        if (tp.isLimitTarget && changePercent < -20) {
-          // Significant reduction in something we want less of
-          highlights.push({
-            type: 'improvement',
-            icon: '⬇️',
-            text: `${Math.abs(changePercent)}% less ${tp.label.toLowerCase()}`,
-            subtext: 'vs last week',
-          })
-        } else if (!tp.isLimitTarget && changePercent > 20) {
-          // Significant increase in something we want more of
-          highlights.push({
-            type: 'improvement',
-            icon: '⬆️',
-            text: `${changePercent}% more ${tp.label.toLowerCase()}`,
-            subtext: 'vs last week',
-          })
-        }
-      }
-    })
 
     // Highlight: Best day
     if (bestDays.length > 0) {
@@ -672,28 +400,6 @@ Weekly Review Data:
 Category breakdown:
 ${categoryBreakdown.map((c) => `- ${c.label}: ${Math.round((c.minutes / 60) * 10) / 10}h (${c.percentage}%)`).join('\n')}
 
-User targets:
-${targetProgress
-  .map((tp) => {
-    const hours = Math.round((tp.currentMinutes / 60) * 10) / 10
-    const targetHours = tp.targetMinutes ? Math.round((tp.targetMinutes / 60) * 10) / 10 : null
-
-    if (tp.isLimitTarget) {
-      const prevHours = tp.previousMinutes ? Math.round((tp.previousMinutes / 60) * 10) / 10 : null
-      const changeStr = tp.changeMinutes !== null
-        ? (tp.changeMinutes < 0 ? `↓${Math.abs(Math.round(tp.changeMinutes / 60 * 10) / 10)}h` : `↑${Math.round(tp.changeMinutes / 60 * 10) / 10}h`)
-        : 'no comparison'
-      return `- ${tp.label}: ${hours}h this week (${changeStr} vs last week) - LIMIT TARGET`
-    }
-
-    const progressStr = targetHours ? ` (${tp.percentage}% of ${targetHours}h target)` : ''
-    const trendStr = tp.trend ? ` [${tp.trend} vs last week]` : ''
-    return `- ${tp.label}: ${hours}h${progressStr}${trendStr}`
-  })
-  .join('\n')}
-
-Target scorecards (good/rough days):
-${targetScorecards.map((sc) => `- ${sc.targetLabel}: ${sc.goodDays} good days, ${sc.roughDays} rough days`).join('\n')}
 `
 
         const completion = await openai.chat.completions.create({
@@ -744,8 +450,6 @@ For limit targets like "leisure" or "meetings", celebrate decreases and gently n
       previousWeekEntryCount,
       hasEnoughData,
       hasPreviousWeekData,
-      targetProgress,
-      targetScorecards,
       categoryBreakdown,
       bestDays,
       bestHours,
