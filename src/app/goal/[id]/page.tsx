@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown, CheckSquare } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
 import { getUserToday } from '@/lib/types'
 import CommitTimeModal from '@/components/CommitTimeModal'
+import GoogleTasksPicker from '@/components/GoogleTasksPicker'
 // AnimatedCheckbox removed — task completion only from session pages
 
 interface Goal {
@@ -86,6 +87,7 @@ export default function GoalPage() {
   const [saved, setSaved] = useState(!!cached?.existingPlans?.length)
   const [showCoachCard, setShowCoachCard] = useState(false)
   const [commitModalIdx, setCommitModalIdx] = useState<number | null>(null)
+  const [showGoogleTasksPicker, setShowGoogleTasksPicker] = useState(false)
 
   // Check if user has seen the coach card before
   useEffect(() => {
@@ -234,6 +236,31 @@ export default function GoalPage() {
     } else {
       handleTaskChange(index, '')
     }
+  }
+
+  const handleImportGoogleTasks = (importedTasks: string[]) => {
+    if (importedTasks.length === 0) return
+    
+    // Fill empty slots first, then add new ones
+    const updatedTasks = [...tasks]
+    let importIndex = 0
+    
+    // Fill existing empty slots
+    for (let i = 0; i < updatedTasks.length && importIndex < importedTasks.length; i++) {
+      if (!updatedTasks[i].trim()) {
+        updatedTasks[i] = importedTasks[importIndex]
+        importIndex++
+      }
+    }
+    
+    // Add remaining tasks as new slots
+    while (importIndex < importedTasks.length) {
+      updatedTasks.push(importedTasks[importIndex])
+      importIndex++
+    }
+    
+    setTasks(updatedTasks)
+    if (saved) setSaved(false)
   }
 
   const handleCommitTime = async (index: number, start: string, end: string) => {
@@ -399,6 +426,15 @@ export default function GoalPage() {
                 </div>
               )
             })}
+
+            {/* Import from Google Tasks button */}
+            <button
+              onClick={() => setShowGoogleTasksPicker(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground/50 hover:text-muted-foreground hover:border-muted-foreground/30 transition-all"
+            >
+              <CheckSquare className="h-4 w-4" />
+              Import from Google Tasks
+            </button>
 
             {/* Add task button */}
             <button
@@ -660,6 +696,14 @@ export default function GoalPage() {
           )
         })()}
       </div>
+
+      {/* Google Tasks Picker */}
+      <GoogleTasksPicker
+        isOpen={showGoogleTasksPicker}
+        onClose={() => setShowGoogleTasksPicker(false)}
+        onImport={handleImportGoogleTasks}
+        existingTaskCount={tasks.filter(t => t.trim()).length}
+      />
 
       {/* Commit Time Modal */}
       {commitModalIdx !== null && existingPlans[commitModalIdx] && (
