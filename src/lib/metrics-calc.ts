@@ -27,10 +27,11 @@ export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care']
 
 // ── Body category weights (weighted + diminishing returns via sqrt scaling) ──
 // 'movement' is merged into 'exercise' for scoring — old DB entries still work
+// Multiple paths to 100%: beast gym session alone, or balanced mix
 export const BODY_WEIGHTS: Record<string, { weight: number; target: number; cap: number }> = {
-  exercise:  { weight: 0.45, target: 60, cap: 50 },  // 1hr target, max 50% contribution (includes movement)
-  self_care: { weight: 0.30, target: 30, cap: 35 },  // 30min target, max 35% contribution
-  rest:      { weight: 0.25, target: 20, cap: 30 },   // 20min target, max 30% contribution
+  exercise:  { weight: 0.80, target: 60, cap: 100 },  // 60min=80%, 90min=98%, no cap — gym CAN hit 100%
+  self_care: { weight: 0.25, target: 30, cap: 25 },   // 30min=25%, supplements exercise
+  rest:      { weight: 0.15, target: 20, cap: 15 },    // 20min=15%, supplements exercise
 }
 
 // ── Social category groups ──
