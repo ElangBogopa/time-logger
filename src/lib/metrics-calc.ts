@@ -22,14 +22,15 @@ export const FOCUS_WEIGHTS: Record<string, number> = {
 }
 
 // ── Body category groups (no meals/sleep — only intentional physical well-being) ──
+// 'movement' included for backward compat with old entries — treated as exercise in scoring
 export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care']
 
 // ── Body category weights (weighted + diminishing returns via sqrt scaling) ──
+// 'movement' is merged into 'exercise' for scoring — old DB entries still work
 export const BODY_WEIGHTS: Record<string, { weight: number; target: number; cap: number }> = {
-  exercise:  { weight: 0.35, target: 60, cap: 40 },  // 1hr target, max 40% contribution
-  movement:  { weight: 0.30, target: 45, cap: 35 },  // 45min target, max 35% contribution
-  self_care: { weight: 0.20, target: 30, cap: 25 },  // 30min target, max 25% contribution
-  rest:      { weight: 0.15, target: 20, cap: 20 },   // 20min target, max 20% contribution
+  exercise:  { weight: 0.45, target: 60, cap: 50 },  // 1hr target, max 50% contribution (includes movement)
+  self_care: { weight: 0.30, target: 30, cap: 35 },  // 30min target, max 35% contribution
+  rest:      { weight: 0.25, target: 20, cap: 30 },   // 20min target, max 30% contribution
 }
 
 // ── Social category groups ──
@@ -104,11 +105,12 @@ export function calcFocusDetails(dayEntries: EntryRow[]): { weightedMinutes: num
  * - Getting to 100% requires exceeding targets across ALL categories
  */
 export function calcBody(dayEntries: EntryRow[]): number {
-  // Sum minutes per body category
+  // Sum minutes per body category — merge 'movement' into 'exercise'
   const minutesByCategory: Record<string, number> = {}
   for (const entry of dayEntries) {
     if (BODY_CATS.includes(entry.category)) {
-      minutesByCategory[entry.category] = (minutesByCategory[entry.category] || 0) + entry.duration_minutes
+      const cat = entry.category === 'movement' ? 'exercise' : entry.category
+      minutesByCategory[cat] = (minutesByCategory[cat] || 0) + entry.duration_minutes
     }
   }
 
@@ -142,7 +144,9 @@ export function calcBodyDetails(dayEntries: EntryRow[]): {
   for (const entry of dayEntries) {
     if (BODY_CATS.includes(entry.category)) {
       totalMinutes += entry.duration_minutes
-      breakdown[entry.category] = (breakdown[entry.category] || 0) + entry.duration_minutes
+      // Merge movement into exercise for display
+      const cat = entry.category === 'movement' ? 'exercise' : entry.category
+      breakdown[cat] = (breakdown[cat] || 0) + entry.duration_minutes
     }
   }
 

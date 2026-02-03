@@ -92,8 +92,7 @@ MAINTENANCE (life logistics):
 - commute: Travel to/from obligations - commute to work, travel to appointments
 
 BODY (physical):
-- exercise: Intentional workouts - gym, running, sports, yoga, cycling, strength training, HIIT
-- movement: Light/incidental activity - walking, stretching, standing, light yoga, playing with kids
+- exercise: ANY physical activity - gym, running, sports, yoga, cycling, strength training, HIIT, walking, stretching, standing, light yoga, playing with kids
 - meals: Eating (not cooking) - breakfast, lunch, dinner, snacks, coffee breaks
 - sleep: Sleep tracking - night sleep, naps
 
