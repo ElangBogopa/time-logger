@@ -21,15 +21,23 @@ export const FOCUS_WEIGHTS: Record<string, number> = {
   shallow_work: 0.3,
 }
 
-// ── Body category groups ──
-export const BODY_CATS = ['exercise', 'movement', 'meals', 'rest', 'self_care', 'sleep']
+// ── Body category groups (no meals/sleep — only intentional physical well-being) ──
+export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care']
+
+// ── Body category weights (weighted + diminishing returns via sqrt scaling) ──
+export const BODY_WEIGHTS: Record<string, { weight: number; target: number; cap: number }> = {
+  exercise:  { weight: 0.35, target: 60, cap: 40 },  // 1hr target, max 40% contribution
+  movement:  { weight: 0.30, target: 45, cap: 35 },  // 45min target, max 35% contribution
+  self_care: { weight: 0.20, target: 30, cap: 25 },  // 30min target, max 25% contribution
+  rest:      { weight: 0.15, target: 20, cap: 20 },   // 20min target, max 20% contribution
+}
 
 // ── Social category groups ──
 export const SOCIAL_CATS = ['social', 'calls']
 
 // ── Default targets ──
 export const FOCUS_TARGET = 240 // 4 hours weighted
-export const BODY_TARGET = 120  // 2 hours (exercise + meals + rest + self-care)
+export const BODY_TARGET = 90   // ~1.5 hours combined (weighted, with diminishing returns)
 export const SOCIAL_TARGET = 60 // 1 hour
 
 // ── Color / Label / Nudge thresholds ──
@@ -84,19 +92,50 @@ export function calcFocusDetails(dayEntries: EntryRow[]): { weightedMinutes: num
   return { weightedMinutes: Math.round(weightedMinutes), breakdown }
 }
 
-/** Calculate Body value for a set of entries on a single day */
+/**
+ * Calculate Body value using weighted categories with diminishing returns (sqrt scaling).
+ * Each category has a weight, individual target, and a cap on max contribution.
+ * 
+ * Scoring examples (approximate):
+ * - 30min exercise alone → ~28%
+ * - 60min exercise alone → ~35% (capped at 40%)
+ * - 30min exercise + 30min movement → ~48%
+ * - 60min exercise + 45min movement + 20min self_care + 15min rest → ~85%
+ * - Getting to 100% requires exceeding targets across ALL categories
+ */
 export function calcBody(dayEntries: EntryRow[]): number {
-  const bodyMinutes = dayEntries
-    .filter(e => BODY_CATS.includes(e.category))
-    .reduce((s, e) => s + e.duration_minutes, 0)
+  // Sum minutes per body category
+  const minutesByCategory: Record<string, number> = {}
+  for (const entry of dayEntries) {
+    if (BODY_CATS.includes(entry.category)) {
+      minutesByCategory[entry.category] = (minutesByCategory[entry.category] || 0) + entry.duration_minutes
+    }
+  }
 
-  return Math.round(Math.min(100, (bodyMinutes / BODY_TARGET) * 100))
+  let totalScore = 0
+  for (const [cat, config] of Object.entries(BODY_WEIGHTS)) {
+    const minutes = minutesByCategory[cat] || 0
+    if (minutes === 0) continue
+
+    // sqrt scaling: diminishing returns as you log more
+    // ratio of 1.0 = hit target, sqrt(1.0) = 1.0 → full weight
+    // ratio of 4.0 = 4x target, sqrt(4.0) = 2.0 → only 2x, not 4x
+    const ratio = minutes / config.target
+    const scaled = Math.sqrt(ratio)
+
+    // Category contribution = scaled * weight * 100, capped
+    const contribution = Math.min(config.cap, scaled * config.weight * 100)
+    totalScore += contribution
+  }
+
+  return Math.round(Math.min(100, totalScore))
 }
 
 /** Get Body details breakdown for a set of entries */
 export function calcBodyDetails(dayEntries: EntryRow[]): {
   totalMinutes: number
   breakdown: Record<string, number>
+  categoryScores: Record<string, number>
 } {
   let totalMinutes = 0
   const breakdown: Record<string, number> = {}
@@ -106,7 +145,17 @@ export function calcBodyDetails(dayEntries: EntryRow[]): {
       breakdown[entry.category] = (breakdown[entry.category] || 0) + entry.duration_minutes
     }
   }
-  return { totalMinutes, breakdown }
+
+  // Also compute per-category scores for transparency
+  const categoryScores: Record<string, number> = {}
+  for (const [cat, config] of Object.entries(BODY_WEIGHTS)) {
+    const minutes = breakdown[cat] || 0
+    const ratio = minutes / config.target
+    const scaled = Math.sqrt(ratio)
+    categoryScores[cat] = Math.round(Math.min(config.cap, scaled * config.weight * 100))
+  }
+
+  return { totalMinutes, breakdown, categoryScores }
 }
 
 /** Calculate Social value for a set of entries on a single day */
@@ -155,7 +204,7 @@ export function getNudge(
   const lowest = metrics.reduce((a, b) => a.value < b.value ? a : b)
 
   if (lowest.color === 'red') {
-    if (lowest.name === 'Body') return 'Move your body or grab a proper meal — you need it.'
+    if (lowest.name === 'Body') return 'Move your body — even a short walk counts.'
     if (lowest.name === 'Focus') return 'Start a deep work block to get Focus moving.'
     return 'Reach out to someone — even a quick call counts.'
   }
