@@ -124,9 +124,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Rate limit
+    // Rate limit by user ID (authenticated) with IP fallback
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
-    const rateLimitKey = `weekly-review:${ip}`
+    const rateLimitKey = `weekly-review:${session.user.id || ip}`
     const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMITS.ai)
 
     if (!rateLimitResult.success) {

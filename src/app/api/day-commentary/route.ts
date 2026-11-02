@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
+import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -27,6 +28,18 @@ export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Rate limit by user ID (authenticated) with IP fallback
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+  const rateLimitKey = `day-commentary:${session.user.id || ip}`
+  const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMITS.ai)
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429, headers: getRateLimitHeaders(rateLimitResult) }
+    )
   }
 
   try {
