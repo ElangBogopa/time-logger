@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { getLocalDateString } from '@/lib/types'
+import { readSession, writeSession, clearSession } from '@/lib/session-store'
 
 export interface CalendarEvent {
   id: string
@@ -56,6 +57,20 @@ const MAX_CACHE_EVENTS = 500
 // Maximum days to keep in cache from today
 const MAX_CACHE_DAYS = 30
 
+// Both caches lived only in component state, so every full page load refetched
+// the Google range and the connection status — on the dashboard, the review
+// page and the session pages alike. They are now seeded from sessionStorage.
+const EVENTS_STORAGE_KEY = 'calendar-events-cache-v1'
+const STATUS_STORAGE_KEY = 'calendar-status-cache-v1'
+
+// Status gets a shorter life than the events: connecting a calendar happens in
+// Settings, which does not go through this context, so a stale "not connected"
+// should correct itself quickly.
+const STATUS_CACHE_MS = 5 * 60 * 1000
+
+// Outer bound on how long an entry may sit in storage at all.
+const STORAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000
+
 function getDateRange(centerDate: string, daysBefore: number, daysAfter: number): { start: string; end: string } {
   const center = new Date(centerDate + 'T00:00:00')
 
@@ -73,10 +88,20 @@ function getDateRange(centerDate: string, daysBefore: number, daysAfter: number)
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession()
-  const [cache, setCache] = useState<CalendarCache | null>(null)
+  // Seeded from sessionStorage, so a reload reuses the range it already has
+  // instead of calling Google again. Freshness comes from the cache's own
+  // lastFetched, not the envelope: the effect below rewrites the entry on
+  // every mount, which would otherwise keep renewing its life forever.
+  const [cache, setCache] = useState<CalendarCache | null>(() => {
+    const stored = readSession<CalendarCache>(EVENTS_STORAGE_KEY, STORAGE_MAX_AGE_MS)
+    if (!stored || Date.now() - stored.lastFetched >= CACHE_DURATION_MS) return null
+    return stored
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(null)
+  const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(() =>
+    readSession<CalendarStatus>(STATUS_STORAGE_KEY, STATUS_CACHE_MS)
+  )
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
   const [googleTokenExpired, setGoogleTokenExpired] = useState(false)
 
@@ -94,11 +119,13 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         console.log('[CalendarContext] Status response:', data)
-        setCalendarStatus({
+        const next: CalendarStatus = {
           connected: data.connected,
           source: data.source,
           googleEmail: data.googleEmail,
-        })
+        }
+        setCalendarStatus(next)
+        writeSession(STATUS_STORAGE_KEY, next)
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
@@ -291,11 +318,18 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [calendarStatus?.connected, cache, refreshCalendar])
 
+  // Persist whatever the cache becomes — refreshCalendar replaces it,
+  // fetchEventsForDate merges into it, and both should survive a reload.
+  useEffect(() => {
+    if (cache) writeSession(EVENTS_STORAGE_KEY, cache)
+  }, [cache])
+
   // Clear cache on logout
   useEffect(() => {
     if (status === 'unauthenticated') {
       setCache(null)
       setCalendarStatus(null)
+      clearSession(EVENTS_STORAGE_KEY, STATUS_STORAGE_KEY)
     }
   }, [status])
 
