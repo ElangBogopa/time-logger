@@ -303,8 +303,22 @@ describe('POST', () => {
     await POST(post({ ...DAY, message: 'I dont like your tone' }))
 
     const system = (lastRequest as unknown as ChatArgs).messages[0].content
-    expect(system).toContain('push back on your tone')
-    expect(system).toContain('Do not defend a previous answer')
+    expect(system).toContain('WHEN THEY PUSH BACK, CONCEDE FIRST')
+    expect(system).toContain('open with the concession or correction')
+    // the exact openers the eval caught it using
+    expect(system).toContain('I understand where you\'re coming from')
+  })
+
+  it('tells the model to answer when advice is actually asked for', async () => {
+    // The eval caught it refusing ("I can't tell you what to do differently")
+    // and then hedging advice anyway.
+    await POST(post({ ...DAY, message: 'what should I do tomorrow?' }))
+
+    const system = (lastRequest as unknown as ChatArgs).messages[0].content
+    expect(system).toContain('WHEN THEY ASK WHAT TO DO, ANSWER')
+    expect(system).toContain('never a refusal followed by a hedge')
+    // examples get copied verbatim unless they obviously cannot apply
+    expect(system).toContain("FROM SOMEONE ELSE'S WEEK")
   })
 
   it('keeps the cheek while ruling out condescension', async () => {

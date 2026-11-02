@@ -167,3 +167,61 @@ it treat advice as forbidden rather than unsolicited.
 Re-run `npm run eval` after each change. The categorisation harness is
 deterministic (`temperature: 0`); the reply harness is not, so treat small
 movements there as noise and look at the transcripts.
+
+
+---
+
+## Second run — after applying recommendations 1, 2, 3 and 5
+
+| | before | after |
+|---|---|---|
+| Categorisation (scored) | 96.6% | **97.5%** |
+| shallow_work_explicit | 88% | **100%** |
+| creating | 86% | **100%** |
+| contested → `other` | 20% | **14%** |
+| religious → `other` | 29% | 25% |
+| grounded (replies) | 17/18 | **18/18** |
+| no_blame | 18/18 | **18/18** |
+| respectful_of_values | 18/18 | **18/18** |
+| no_defending | 14/18 | 16/18 |
+| no_unsolicited_advice | 14/18 | 15/18 |
+| has_voice | 4/18 | 4/18 |
+
+### What the second run taught us that the first could not
+
+**Few-shot examples get copied verbatim.** Adding concrete example replies
+fixed the defending, and immediately produced this, word for word, in three
+unrelated scenarios:
+
+> Fair. All I have is the words you typed and the clock — everything else is
+> you filling in the blanks, not me.
+
+"Fair." began five of eighteen replies. Telling the model not to reuse the
+examples barely helped. What worked was **writing the examples about a
+different day** — a Tuesday with guitar and a run and no work — so lifting
+one would be visibly ungrounded. After that, grounded went to 18/18 and the
+parroting stopped.
+
+If you add examples anywhere else in this app, make them describe data the
+model will never be looking at.
+
+**The `has_voice` judge is not trustworthy.** It sat at 4–5 out of 18 across
+every variant, including replies that plainly have a voice:
+
+> That chunk of time before lunch is when the real work got done.
+
+A single model grading "does this sound like a person" against a short
+definition is too blunt. Replace it with a pairwise comparison — show the
+judge two replies to the same question and ask which sounds more like a
+friend — or read twenty transcripts yourself. Until then, treat that row as
+unmeasured rather than failed.
+
+**Numbers move ±2 between identical runs** on the reply harness, because it
+runs at temperature 0.7. The categorisation harness is deterministic and its
+movements are real.
+
+### Still open
+
+Religious practice. Both runs scatter it across ten categories with a quarter
+in the fallback, and the second run barely moved it, which is the clearest
+possible evidence that this is a taxonomy problem and not a prompt one.
