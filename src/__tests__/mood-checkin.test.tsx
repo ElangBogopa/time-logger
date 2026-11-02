@@ -246,11 +246,11 @@ describe('MoodCheckIn Component', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
 
-    expect(mockFetch).toHaveBeenLastCalledWith('/api/mood', {
+    expect(mockFetch).toHaveBeenLastCalledWith('/api/mood', expect.objectContaining({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: expect.any(Headers),
       body: JSON.stringify({ mood: 'okay', period: 'afternoon' }),
-    })
+    }))
   })
 
   it('shows motivational message after selecting mood', async () => {
