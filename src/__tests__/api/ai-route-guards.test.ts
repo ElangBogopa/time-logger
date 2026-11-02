@@ -73,6 +73,11 @@ const ROUTES: { name: string; load: () => Promise<AiRoute>; body: unknown }[] = 
     body: { period: 'morning', date: '2026-11-01', entries: [{ activity: 'writing code', category: 'deep_work', duration_minutes: 60 }] },
   },
   {
+    name: '/api/commentary/thread',
+    load: () => import('@/app/api/commentary/thread/route'),
+    body: { subject_type: 'day', subject_key: '2026-11-02', message: 'Why do you say that?' },
+  },
+  {
     name: '/api/weekly-review',
     load: () => import('@/app/api/weekly-review/route'),
     body: { weekStart: '2026-11-02' },
