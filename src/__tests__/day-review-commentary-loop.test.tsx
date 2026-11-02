@@ -52,6 +52,7 @@ const summary = {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  window.localStorage.clear()
   ;(useSession as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => summary })) as unknown as typeof fetch
 })
@@ -125,4 +126,46 @@ it('renders the commentary and stops requesting on success', async () => {
 
   expect(screen.getByText('Strong focus today.')).toBeInTheDocument()
   expect(csrfFetch).toHaveBeenCalledTimes(1)
+})
+
+describe('reusing commentary between visits', () => {
+  const ok = (commentary: string) => async () => {
+    await delay(30)
+    return { ok: true, json: async () => ({ commentary }) }
+  }
+
+  it('does not regenerate when nothing about the day changed', async () => {
+    // The old cache was a module-level Map keyed on the date alone, so every
+    // full page load regenerated the commentary even on an unchanged day.
+    ;(csrfFetch as jest.Mock).mockImplementation(ok('A steady day.'))
+
+    const first = render(<DayReviewContent />)
+    await waitFor(() => expect(screen.getByText('A steady day.')).toBeInTheDocument())
+    first.unmount()
+
+    render(<DayReviewContent />)
+    await waitFor(() => expect(screen.getByText('A steady day.')).toBeInTheDocument())
+    await delay(120)
+
+    expect(csrfFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('regenerates once after the day data changes', async () => {
+    ;(csrfFetch as jest.Mock).mockImplementation(ok('A steady day.'))
+
+    const first = render(<DayReviewContent />)
+    await waitFor(() => expect(screen.getByText('A steady day.')).toBeInTheDocument())
+    first.unmount()
+
+    // same date, but another entry has been logged since
+    const later = { ...summary, totalMinutesLogged: summary.totalMinutesLogged + 45, score: 71 }
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => later })) as unknown as typeof fetch
+    ;(csrfFetch as jest.Mock).mockImplementation(ok('Even better after that session.'))
+
+    render(<DayReviewContent />)
+    await waitFor(() => expect(screen.getByText('Even better after that session.')).toBeInTheDocument())
+    await delay(120)
+
+    expect(csrfFetch).toHaveBeenCalledTimes(2)
+  })
 })

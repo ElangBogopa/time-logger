@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
+import { commentaryFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
 import { Trophy, Clock, Sparkles, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TimeCategory, MoodCheckin, MOOD_EMOJIS, SESSION_MOOD_CONFIG, AggregatedCategory, getUserToday, getUserCurrentHour } from '@/lib/types'
@@ -202,10 +203,13 @@ export default function DayReviewContent() {
     if (summaryCache) {
       setSummary(summaryCache)
       setIsLoading(false)
-      // Still check for cached commentary
-      const commentaryCache = cacheGet<string>(`day-commentary:${getUserToday()}`)
-      if (commentaryCache) {
-        setCommentary(commentaryCache)
+      // Reuse the stored commentary when the day's data has not changed
+      const cached = readCachedCommentary(
+        summaryCache.date,
+        commentaryFingerprint({ ...summaryCache, mood: summaryCache.todayMood?.mood ?? null })
+      )
+      if (cached) {
+        setCommentary(cached)
         return
       }
     }
@@ -224,8 +228,14 @@ export default function DayReviewContent() {
   }, [])
 
   const fetchCommentary = useCallback(async (summaryData: DaySummary) => {
-    // Check cache first — avoids redundant OpenAI calls
-    const cached = cacheGet<string>(`day-commentary:${getUserToday()}`)
+    // Keyed on the day's data, not just the date, and held in localStorage — so
+    // reopening the app reuses the same line, and logging something new earns a
+    // fresh one.
+    const fingerprint = commentaryFingerprint({
+      ...summaryData,
+      mood: summaryData.todayMood?.mood ?? null,
+    })
+    const cached = readCachedCommentary(summaryData.date, fingerprint)
     if (cached) {
       setCommentary(cached)
       return
@@ -246,7 +256,7 @@ export default function DayReviewContent() {
       })
       if (response.ok) {
         const data = await response.json()
-        cacheSet(`day-commentary:${getUserToday()}`, data.commentary)
+        writeCachedCommentary(summaryData.date, fingerprint, data.commentary)
         setCommentary(data.commentary)
       }
     } catch (err) {
@@ -269,8 +279,10 @@ export default function DayReviewContent() {
   // 26 requests a second to /api/day-commentary.
   useEffect(() => {
     if (!summary || commentary) return
-    if (commentaryRequestedFor.current === summary.date) return
-    commentaryRequestedFor.current = summary.date
+    // Keyed on the data, so a changed day asks again exactly once.
+    const key = `${summary.date}:${commentaryFingerprint({ ...summary, mood: summary.todayMood?.mood ?? null })}`
+    if (commentaryRequestedFor.current === key) return
+    commentaryRequestedFor.current = key
     fetchCommentary(summary)
   }, [summary, commentary, fetchCommentary])
 
