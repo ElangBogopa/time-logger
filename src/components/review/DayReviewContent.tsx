@@ -8,7 +8,10 @@ import { Trophy, Clock, Sparkles, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TimeCategory, MoodCheckin, MOOD_EMOJIS, SESSION_MOOD_CONFIG, AggregatedCategory, getUserToday, getUserCurrentHour } from '@/lib/types'
 import { getAggregatedCategory, AGGREGATED_CATEGORY_COLORS } from '@/lib/types'
-interface Win { icon: string; label: string }
+// Matches the Win that /api/day-summary returns. This previously declared
+// { icon, label }, which the API has never sent, so every win rendered as two
+// empty spans under the heading.
+interface Win { id: string; text: string; type: 'goal_met' | 'streak' | 'focus' | 'improvement' | 'balance'; value?: number }
 interface TargetProgress { targetId: string; label: string; emoji: string; currentMinutes: number; targetMinutes: number; percentComplete: number; todayMinutes?: number; dailyTarget?: number; progress?: number }
 interface CategoryBreakdown { category: TimeCategory; label: string; totalMinutes: number; percentage: number }
 interface AggregatedBreakdown { category: AggregatedCategory; label: string; totalMinutes: number; percentage: number }
@@ -21,7 +24,7 @@ interface ProductivityScore {
 interface DaySummary {
   date: string; score: number; scoreColor: string
   sessionsLogged: number; totalSessions: number; totalMinutesLogged: number
-  wins: Win[]; targetProgress: TargetProgress[]
+  wins: Win[]
   categoryBreakdown: CategoryBreakdown[]; aggregatedBreakdown: AggregatedBreakdown[]
   timeline: TimelineSlot[]; todayMood: MoodCheckin | null
   longestFocusSession: { activity: string; minutes: number } | null
@@ -64,6 +67,14 @@ function ScoreCircle({ score, color, size = 'large' }: { score: number; color: s
   )
 }
 
+const WIN_EMOJI: Record<Win['type'], string> = {
+  goal_met: '🎯',
+  streak: '⚡',
+  focus: '⏱️',
+  improvement: '📈',
+  balance: '✨',
+}
+
 function WinsSection({ wins }: { wins: Win[] }) {
   return (
     <section className="rounded-xl border border-border bg-card p-4">
@@ -72,8 +83,11 @@ function WinsSection({ wins }: { wins: Win[] }) {
         <h2 className="font-semibold text-foreground text-sm">Today&apos;s Wins</h2>
       </div>
       <div className="space-y-2">
-        {wins.map((w, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm"><span>{w.icon}</span><span className="text-foreground">{w.label}</span></div>
+        {wins.map((w) => (
+          <div key={w.id} className="flex items-center gap-2 text-sm">
+            <span>{WIN_EMOJI[w.type] ?? '•'}</span>
+            <span className="text-foreground">{w.text}</span>
+          </div>
         ))}
       </div>
     </section>
@@ -226,7 +240,6 @@ export default function DayReviewContent() {
           score: summaryData.score,
           totalMinutesLogged: summaryData.totalMinutesLogged,
           wins: summaryData.wins,
-          targetProgress: summaryData.targetProgress,
           mood: summaryData.todayMood?.mood || null,
           longestFocusSession: summaryData.longestFocusSession,
         }),

@@ -11,8 +11,10 @@ const openai = new OpenAI({
 interface DayData {
   score: number
   totalMinutesLogged: number
-  wins: { text: string }[]
-  targetProgress: {
+  // Optional: /api/day-summary stopped returning targetProgress when the
+  // weekly targets system was removed, so the client omits it entirely.
+  wins?: { text: string }[]
+  targetProgress?: {
     label: string
     todayMinutes: number
     dailyTarget: number
@@ -46,12 +48,15 @@ export async function POST(request: NextRequest) {
     const dayData: DayData = await request.json()
 
     // Build context for AI
-    const winsText = dayData.wins.length > 0
-      ? `Wins today: ${dayData.wins.map(w => w.text).join(', ')}.`
+    const wins = dayData.wins ?? []
+    const targetProgress = dayData.targetProgress ?? []
+
+    const winsText = wins.length > 0
+      ? `Wins today: ${wins.map(w => w.text).join(', ')}.`
       : 'No specific wins detected.'
 
-    const targetsText = dayData.targetProgress.length > 0
-      ? dayData.targetProgress.map(t => {
+    const targetsText = targetProgress.length > 0
+      ? targetProgress.map(t => {
           const status = t.progress >= 100 ? 'met' : t.progress >= 50 ? 'partially met' : 'not met'
           const directionWord = t.direction === 'at_least' ? 'toward' : 'staying under'
           return `${t.label}: ${t.todayMinutes} min ${directionWord} ${t.dailyTarget} min target (${status}, ${t.trend} vs yesterday)`

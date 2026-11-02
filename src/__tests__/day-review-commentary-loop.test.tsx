@@ -40,8 +40,8 @@ const summary = {
   sessionsLogged: 2,
   totalSessions: 3,
   totalMinutesLogged: 300,
-  wins: [{ icon: '🏆', label: 'Three hours of deep work' }],
-  targetProgress: [],
+  // the shape /api/day-summary really returns
+  wins: [{ id: 'longest-focus', text: '150 min focus session on "Coding"', type: 'focus' }],
   categoryBreakdown: [],
   aggregatedBreakdown: [],
   timeline: [],
@@ -98,6 +98,20 @@ it('requests commentary once when the request throws', async () => {
   await settle()
 
   expect(csrfFetch).toHaveBeenCalledTimes(1)
+})
+
+it('renders each win from the summary', async () => {
+  // The local Win type claimed { icon, label }, which the API never sends, so
+  // the section rendered its heading over empty rows.
+  ;(csrfFetch as jest.Mock).mockImplementation(async () => {
+    await delay(30)
+    return { ok: true, json: async () => ({ commentary: 'Good day.' }) }
+  })
+
+  render(<DayReviewContent />)
+  await waitFor(() => expect(screen.getByText("Today's Wins")).toBeInTheDocument())
+
+  expect(screen.getByText('150 min focus session on "Coding"')).toBeInTheDocument()
 })
 
 it('renders the commentary and stops requesting on success', async () => {
