@@ -10,6 +10,7 @@ import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import type { MetricKey, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
+import { METRIC_LABELS as SHARED_METRIC_LABELS } from '@/lib/metrics-calc'
 
 // ── Detail types (cast from the generic Record at usage site) ──
 
@@ -80,11 +81,8 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const METRIC_LABELS: Record<MetricKey, string> = {
-  body: 'Body',
-  focus: 'Focus',
-  social: 'Social',
-}
+// Labels live in metrics-calc so the hero and this sheet cannot drift apart.
+const METRIC_LABELS: Record<MetricKey, string> = SHARED_METRIC_LABELS
 
 // ── Sub-components ──
 

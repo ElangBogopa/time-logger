@@ -34,8 +34,25 @@ export const BODY_WEIGHTS: Record<string, { weight: number; target: number; cap:
   rest:      { weight: 0.15, target: 20, cap: 15 },    // 20min=15%, supplements exercise
 }
 
-// ── Social category groups ──
-export const SOCIAL_CATS = ['social', 'calls']
+// ── Heart category groups ──
+// Faith sits here rather than under Body: prayer is not physical upkeep, and
+// the third metric is about what sustains you, not only who you saw. It is
+// additive — an hour with friends still maxes the metric on its own, so no
+// one is penalised for having no faith.
+export const SOCIAL_CATS = ['social', 'calls', 'faith']
+
+/**
+ * What the three hero metrics are called.
+ *
+ * The keys are 'body' | 'focus' | 'social' throughout the API, the stored
+ * trend data and the client caches; only the display names changed, so old
+ * payloads keep working. Body / Mind / Heart.
+ */
+export const METRIC_LABELS = {
+  body: 'Body',
+  focus: 'Mind',
+  social: 'Heart',
+} as const
 
 // ── Default targets ──
 export const FOCUS_TARGET = 240 // 4 hours weighted
@@ -202,21 +219,21 @@ export function getNudge(
   socialValue: number, socialColor: string,
 ): string {
   const metrics = [
-    { name: 'Body', value: bodyValue, color: bodyColor },
-    { name: 'Focus', value: focusValue, color: focusColor },
-    { name: 'Social', value: socialValue, color: socialColor },
+    { name: METRIC_LABELS.body, value: bodyValue, color: bodyColor },
+    { name: METRIC_LABELS.focus, value: focusValue, color: focusColor },
+    { name: METRIC_LABELS.social, value: socialValue, color: socialColor },
   ]
   const lowest = metrics.reduce((a, b) => a.value < b.value ? a : b)
 
   if (lowest.color === 'red') {
-    if (lowest.name === 'Body') return 'Move your body — even a short walk counts.'
-    if (lowest.name === 'Focus') return 'Start a deep work block to get Focus moving.'
+    if (lowest.name === METRIC_LABELS.body) return 'Move your body — even a short walk counts.'
+    if (lowest.name === METRIC_LABELS.focus) return 'Start a deep work block to get Mind moving.'
     return 'Reach out to someone — even a quick call counts.'
   }
   if (lowest.color === 'yellow') {
-    if (lowest.name === 'Body') return 'A walk or a real break would boost Body.'
-    if (lowest.name === 'Focus') return 'One more focus session pushes you to green.'
-    return 'Make time for people today — Social is slipping.'
+    if (lowest.name === METRIC_LABELS.body) return 'A walk or a real break would boost Body.'
+    if (lowest.name === METRIC_LABELS.focus) return 'One more focus session pushes you to green.'
+    return 'Make time for people today — Heart is slipping.'
   }
   return 'All metrics looking strong. Keep it up! 🔥'
 }

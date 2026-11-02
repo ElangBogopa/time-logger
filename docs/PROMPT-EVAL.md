@@ -251,8 +251,11 @@ prompt engineering is the wrong tool.
 
 - **`faith` is its own aggregated bucket**, not folded into `recovery`.
   Filing prayer under recovery would assert it is a form of downtime.
-- **It feeds none of the three hero metrics** (Body, Focus, Social). A day of
-  prayer therefore scores zero on all three, which may itself read as a
-  judgement. Adding it to a metric is a values decision, so it is left to you.
+- **It now feeds the third hero metric.** The triad was renamed Body / Mind /
+  Heart and faith joined `social` and `calls` under Heart — the third metric
+  measures what sustains you, not only who you saw. It is additive: an hour
+  with friends still maxes it, so nobody is penalised for having no faith.
+  Filing it under Body was considered and rejected, because prayer is not
+  physical upkeep.
 - `ALTER TYPE … ADD VALUE` cannot be undone in Postgres. The enum value is
   permanent even if the category is removed from the app.

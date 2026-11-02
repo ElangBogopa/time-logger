@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
 import type { TrendAPIResponse } from '@/lib/trend-types'
+import { METRIC_LABELS } from '@/lib/metrics-calc'
 
 export type { TrendAPIResponse }
 
@@ -185,9 +186,9 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
     size: number
     strokeWidth: number
   }> = [
-    { key: 'body', label: 'Body', size: 96, strokeWidth: 7 },
-    { key: 'focus', label: 'Focus', size: 104, strokeWidth: 8 },
-    { key: 'social', label: 'Social', size: 96, strokeWidth: 7 },
+    { key: 'body', label: METRIC_LABELS.body, size: 96, strokeWidth: 7 },
+    { key: 'focus', label: METRIC_LABELS.focus, size: 104, strokeWidth: 8 },
+    { key: 'social', label: METRIC_LABELS.social, size: 96, strokeWidth: 7 },
   ]
 
   return (
