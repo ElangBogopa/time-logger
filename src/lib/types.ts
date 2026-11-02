@@ -361,7 +361,11 @@ export const ENERGY_VIEW: CategoryView = {
   ops: {
     label: 'Ops',
     color: 'slate',
-    categories: ['shallow_work', 'meetings', 'admin', 'errands', 'chores', 'commute'],
+    // 'other' lives here, not in escape. It is the fallback for activities the
+    // categoriser could not place, and scoring an unknown as leisure counts
+    // real work against the person — a bare "Work" was landing in escape
+    // alongside television.
+    categories: ['shallow_work', 'meetings', 'admin', 'errands', 'chores', 'commute', 'other'],
   },
   body: {
     label: 'Body',
@@ -381,7 +385,7 @@ export const ENERGY_VIEW: CategoryView = {
   escape: {
     label: 'Escape',
     color: 'zinc',
-    categories: ['entertainment', 'other'],
+    categories: ['entertainment'],
   },
 }
 

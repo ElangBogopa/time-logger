@@ -66,10 +66,16 @@ describe('ENERGY_VIEW configuration', () => {
     expect(ENERGY_VIEW.connection.label).toBe('Connection')
   })
 
-  it('maps escape to entertainment, other', () => {
+  it('maps escape to entertainment only', () => {
     expect(ENERGY_VIEW.escape.categories).toContain('entertainment')
-    expect(ENERGY_VIEW.escape.categories).toContain('other')
     expect(ENERGY_VIEW.escape.label).toBe('Escape')
+  })
+
+  it('keeps the fallback category out of escape', () => {
+    // An activity the categoriser could not place must not be scored as
+    // leisure: a bare "Work" was counting against the day as escape time.
+    expect(ENERGY_VIEW.escape.categories).not.toContain('other')
+    expect(ENERGY_VIEW.ops.categories).toContain('other')
   })
 
   it('covers all 19 granular categories exactly once', () => {
@@ -197,8 +203,8 @@ describe('getAggregatedCategory', () => {
     expect(getAggregatedCategory('entertainment')).toBe('escape')
   })
 
-  it('returns escape for other', () => {
-    expect(getAggregatedCategory('other')).toBe('escape')
+  it('returns ops for other, not escape', () => {
+    expect(getAggregatedCategory('other')).toBe('ops')
   })
 })
 

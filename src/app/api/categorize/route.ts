@@ -127,6 +127,18 @@ IMPORTANT RULES:
    - Intentional relaxation, reading, unwinding → rest
    - TV, games, scrolling, browsing → entertainment
 
+5. GENERIC WORK IS STILL WORK: an activity that says only that someone worked,
+   with no detail about what, is shallow_work — never other:
+   - "Work" → shallow_work
+   - "Working" / "Worked" / "At work" → shallow_work
+   - "Office" / "Day job" / "Work session" → shallow_work
+   Pick deep_work when the activity names something cognitively demanding
+   (coding, writing, analysis, design), and shallow_work when it does not say.
+
+6. USE 'other' ONLY AS A LAST RESORT: it means the activity fits no category at
+   all. If it plausibly belongs somewhere, put it there. Anything describing
+   work, study, exercise, food, rest or people has a home above.
+
 Respond with ONLY the category name, nothing else.`,
         },
         {
