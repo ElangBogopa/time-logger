@@ -216,6 +216,8 @@ Examples of good commentary:
 - "2 hours of learning—building momentum."
 
 ${toneInstructions}
+${durationInstructions}
+${mixedActivityInstructions}
 
 STRICT RULES:
 - ONE short sentence only (under 15 words)

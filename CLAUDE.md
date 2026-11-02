@@ -33,20 +33,40 @@ CONFIRMED (status: 'confirmed')
 Calendar events shown as dashed blue blocks. Not stored in DB until user confirms. Click to convert to real entry.
 
 ### Categories (Supabase enum must match exactly)
+19 categories, grouped. The source of truth is `TimeCategory` in `lib/types.ts`.
+
 ```typescript
 type TimeCategory =
-  | 'deep_work'    // Coding, writing, focused creative work
-  | 'learning'     // Courses, studying, lectures (incl. university codes like "STA414H1")
-  | 'meetings'     // Calls, syncs, 1:1s
-  | 'admin'        // Email, scheduling, chores
-  | 'exercise'     // Workouts, sports, walks
-  | 'rest'         // Breaks, naps, relaxation
-  | 'meals'        // Eating, cooking
-  | 'self_care'    // Hygiene, meditation, health
-  | 'relationships'// Social time, family, friends
-  | 'distraction'  // Social media, aimless browsing
-  | 'other'        // Fallback
+  // PRODUCTIVE
+  | 'deep_work'       // Focused cognitively demanding work
+  | 'shallow_work'    // Quick tasks, admin within work context
+  | 'meetings'        // Synchronous work communication
+  | 'learning'        // Courses, studying, reading
+  | 'creating'        // Creative hobbies, side projects
+  // MAINTENANCE
+  | 'admin'           // Personal admin (email, finances, planning)
+  | 'errands'         // Outside home (shopping, appointments)
+  | 'chores'          // Inside home (cleaning, cooking, repairs)
+  | 'commute'         // Travel to/from obligations
+  // BODY
+  | 'exercise'        // Intentional workout
+  | 'movement'        // Light activity (walks, stretching)
+  | 'meals'           // Eating, food prep
+  | 'sleep'           // Sleep tracking
+  // MIND
+  | 'rest'            // Intentional downtime, naps
+  | 'self_care'       // Hygiene, meditation, health
+  // CONNECTION
+  | 'social'          // Friends, family, community
+  | 'calls'           // Personal calls/video chats
+  // LEISURE
+  | 'entertainment'   // TV, games, movies, browsing
+  // FALLBACK
+  | 'other'           // Anything that doesn't fit
 ```
+
+For display, these roll up into six `AggregatedCategory` buckets —
+`focus | ops | body | recovery | connection | escape` (see `ENERGY_VIEW`).
 
 ## Common Pitfalls
 
@@ -86,16 +106,20 @@ src/
 │   ├── TimelineView.tsx      # 24hr timeline with drag-to-create
 │   ├── QuickLogModal.tsx     # Fast entry creation modal
 │   ├── TimeEntryModal.tsx    # Edit/view entry details
-│   ├── TimeEntriesList.tsx   # List view of entries
 │   ├── CalendarPicker.tsx    # Date navigation
+│   ├── timeline/             # Timeline internals (grid, entry, ghost, gap)
+│   ├── charts/               # Recharts wrappers + shared chart config
+│   ├── review/               # Day/weekly review tab content
 │   └── ui/                   # shadcn components
 ├── contexts/
 │   └── CalendarContext.tsx   # Calendar event caching
+├── hooks/                    # Data fetching + timeline interaction hooks
 ├── lib/
-│   ├── types.ts              # TimeEntry, TimeCategory, helpers
+│   ├── types.ts              # TimeEntry, TimeCategory, date + domain helpers
 │   ├── time-utils.ts         # Time formatting, calculations
-│   ├── supabase.ts           # Supabase client
+│   ├── supabase-server.ts    # Supabase client (server-side; the only one)
 │   ├── auth.ts               # NextAuth options
+│   ├── api.ts                # Client-side fetch wrappers (csrfFetch)
 │   └── rate-limit.ts         # API rate limiting
 └── supabase/
     └── migrations/           # DB schema changes
@@ -149,16 +173,38 @@ time_entries (
 npm run dev      # Start dev server
 npm run build    # Production build (catches type errors)
 npm run lint     # ESLint
+npm test         # Jest suite
+npm run test:tz  # Date helpers across 7 timezones (UTC+14 … UTC-11)
 ```
+
+Dates: never round-trip a local date through `toISOString()`. Use
+`getLocalDateString`, `shiftDateString` and `getWeekStartForDate` from
+`lib/types.ts` — a UTC round-trip shifts the day east of UTC, and in the
+evening west of it. `npm run test:tz` guards this.
 
 ## Environment Variables
 
+See `.env.example` for the full list with notes. Summary:
+
 ```
-NEXTAUTH_SECRET=
-NEXTAUTH_URL=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=        NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+# NextAuth + Google OAuth (calendar + tasks scopes)
+NEXTAUTH_SECRET=                 NEXTAUTH_URL=
+GOOGLE_CLIENT_ID=                GOOGLE_CLIENT_SECRET=
+# AI
 OPENAI_API_KEY=
+# Email (Resend)
+EMAIL_FROM=                      RESEND_API_KEY=
+# Web push (VAPID)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=    VAPID_PRIVATE_KEY=    VAPID_EMAIL=
+# Cron
+CRON_SECRET=
+# Sentry
+NEXT_PUBLIC_SENTRY_DSN=          SENTRY_ORG=    SENTRY_PROJECT=    SENTRY_AUTH_TOKEN=
 ```
+
+Only `NEXT_PUBLIC_*` values reach the browser; `OPENAI_API_KEY` and the other
+secrets are server-only. Every route that calls OpenAI checks the session
+first and rate-limits by user ID.
