@@ -9,7 +9,7 @@
 -- 20260201_add_productivity_target.sql already sorts after 033_, so a new
 -- 034_ file would run before it on a fresh database.
 
-CREATE TABLE commentary_replies (
+CREATE TABLE IF NOT EXISTS commentary_replies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT NOT NULL,
 
@@ -39,14 +39,16 @@ CREATE TABLE commentary_replies (
   UNIQUE (user_id, subject_type, subject_key, seq)
 );
 
-CREATE INDEX idx_commentary_replies_thread
+CREATE INDEX IF NOT EXISTS idx_commentary_replies_thread
   ON commentary_replies(user_id, subject_type, subject_key, seq);
 
-CREATE INDEX idx_commentary_replies_user_created
+CREATE INDEX IF NOT EXISTS idx_commentary_replies_user_created
   ON commentary_replies(user_id, created_at DESC);
 
 -- RLS: deny-all (service role key bypasses)
 ALTER TABLE commentary_replies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Deny direct access - use server" ON commentary_replies;
 
 CREATE POLICY "Deny direct access - use server" ON commentary_replies
   FOR ALL USING (false);
