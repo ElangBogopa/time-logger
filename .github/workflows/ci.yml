@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    # Placeholder values only. The build imports modules that construct
+    # clients at load time (lib/supabase-server.ts throws without a URL), so
+    # these exist to let the build run — not to reach any real service. No
+    # step here talks to Supabase, OpenAI or Google.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+      NEXTAUTH_SECRET: ci-placeholder
+      NEXTAUTH_URL: http://localhost:3000
+      GOOGLE_CLIENT_ID: ci-placeholder
+      GOOGLE_CLIENT_SECRET: ci-placeholder
+      OPENAI_API_KEY: ci-placeholder
+      # The VAPID keypair is generated at runtime below: web-push validates it
+      # at module load, so a placeholder fails the build. Deliberately NOT set
+      # here — a job-level env would shadow what that step writes to
+      # $GITHUB_ENV.
+      VAPID_EMAIL: mailto:ci@example.com
+      CRON_SECRET: ci-placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # web-push decodes and validates the keypair when the push routes are
+      # imported, so the build fails on /api/cron/reminders with
+      # "Vapid public key should be 65 bytes long when decoded" unless these
+      # are well-formed. Generated per run so no fake-looking secret is
+      # committed; it is never used to send a notification.
+      - name: Generate throwaway VAPID keypair for the build
+        run: |
+          node -e "const k=require('web-push').generateVAPIDKeys();console.log('NEXT_PUBLIC_VAPID_PUBLIC_KEY='+k.publicKey);console.log('VAPID_PRIVATE_KEY='+k.privateKey)" >> "$GITHUB_ENV"
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+      - name: Date helpers across timezones
+        run: npm run test:tz
+
+      - name: Build
+        run: npm run build
+
+      # Not blocking yet: the repo currently has 64 pre-existing lint errors,
+      # mostly React 19 compiler rules (set-state-in-effect, purity). Findings
+      # still show in the log. Drop continue-on-error once that backlog is
+      # cleared, so lint regressions start failing the build.
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
