@@ -10,12 +10,16 @@ import {
   shiftDateString,
 } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
+import { stableHash } from '@/lib/ai-text-cache'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the Sunday
   timezone?: string // IANA timezone (e.g., 'America/New_York')
+  // Fingerprint of the coach summary the caller already has. When it matches
+  // this week's prompt inputs the summary is not regenerated.
+  knownCoachFingerprint?: string
 }
 
 interface CategoryBreakdown {
@@ -54,6 +58,11 @@ interface WeeklyReviewData {
   bestHours: string[]
   insights: string[]
   coachSummary: string | null
+  // Fingerprint of the inputs behind coachSummary, so the client can tell us
+  // next time whether the one it holds is still current.
+  coachFingerprint: string | null
+  // True when the caller's fingerprint matched and no summary was generated.
+  coachSummaryUnchanged: boolean
 }
 
 // Get today's date in a specific timezone (YYYY-MM-DD)
@@ -136,7 +145,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { weekStart: requestedWeekStart, timezone }: WeeklyReviewRequest = await request.json()
+    const { weekStart: requestedWeekStart, timezone, knownCoachFingerprint }: WeeklyReviewRequest =
+      await request.json()
 
     // Require timezone from client - no defaults
     if (!timezone) {
@@ -382,14 +392,19 @@ export async function POST(request: NextRequest) {
     // Limit to top 4 highlights
     const topHighlights = highlights.slice(0, 4)
 
-    // Generate AI coach summary only if enough data
+    // Generate AI coach summary only if enough data.
+    //
+    // The context below is the whole prompt input, so hashing it answers the
+    // only question that matters: would the model be asked the same thing
+    // again? If the caller already holds the answer to this exact question it
+    // says so with knownCoachFingerprint, and we skip the call — this used to
+    // regenerate on every single view of the weekly tab.
     let coachSummary: string | null = null
+    let coachFingerprint: string | null = null
+    let coachSummaryUnchanged = false
 
     if (hasEnoughData && entries.length > 0) {
-      try {
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-        const context = `
+      const context = `
 Weekly Review Data:
 - Total logged: ${Math.round((totalMinutes / 60) * 10) / 10} hours (${entryCount} entries)
 - Previous week: ${hasPreviousWeekData && previousWeekMinutes ? Math.round((previousWeekMinutes / 60) * 10) / 10 + ' hours' : 'Not enough data'}
@@ -401,12 +416,18 @@ ${categoryBreakdown.map((c) => `- ${c.label}: ${Math.round((c.minutes / 60) * 10
 
 `
 
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a supportive personal time coach. Write a brief weekly reflection (3-4 sentences max).
+      coachFingerprint = stableHash(context)
+      coachSummaryUnchanged = knownCoachFingerprint === coachFingerprint
+
+      if (!coachSummaryUnchanged) {
+        try {
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: `You are a supportive personal time coach. Write a brief weekly reflection (3-4 sentences max).
 
 Structure your response in 3 parts:
 1. What went well (acknowledge wins, even small ones)
@@ -417,19 +438,20 @@ Be warm but direct. Use "you" language. Reference specific data from their week.
 Don't use bullet points - write in flowing prose.
 Keep it concise - no more than 4 sentences total.
 For limit targets like "leisure" or "meetings", celebrate decreases and gently note increases.`,
-            },
-            {
-              role: 'user',
-              content: context,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 200,
-        })
+              },
+              {
+                role: 'user',
+                content: context,
+              },
+            ],
+            temperature: 0.7,
+            max_tokens: 200,
+          })
 
-        coachSummary = completion.choices[0]?.message?.content?.trim() || null
-      } catch (error) {
-        console.error('Failed to generate coach summary:', error)
+          coachSummary = completion.choices[0]?.message?.content?.trim() || null
+        } catch (error) {
+          console.error('Failed to generate coach summary:', error)
+        }
       }
     }
 
@@ -454,6 +476,8 @@ For limit targets like "leisure" or "meetings", celebrate decreases and gently n
       bestHours,
       insights,
       coachSummary,
+      coachFingerprint,
+      coachSummaryUnchanged,
     }
 
     return NextResponse.json(reviewData)

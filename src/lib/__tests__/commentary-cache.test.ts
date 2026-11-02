@@ -96,7 +96,7 @@ describe('storage', () => {
   })
 
   it('ignores corrupt stored JSON', () => {
-    window.localStorage.setItem('day-commentary-cache-v1', 'not json')
+    window.localStorage.setItem('ai-text-cache-v1', 'not json')
     expect(readCachedCommentary(base.date, 'fp')).toBeNull()
   })
 })

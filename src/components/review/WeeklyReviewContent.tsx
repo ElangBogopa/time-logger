@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sp
 import { useRouter } from 'next/navigation'
 import { getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
+import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
 
 // ─── Types matching API route response ────────────────
 
@@ -78,6 +79,8 @@ interface WeeklyReviewData {
   coachSummary: string | null
 }
 
+const CACHE_NAMESPACE = 'week'
+
 // ─── Helpers ────────────────
 
 function getWeekStart(d: Date) {
@@ -129,10 +132,14 @@ export default function WeeklyReviewContent() {
     setIsLoading(true)
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      // Tell the server which coach summary we already hold. If the week's
+      // numbers still hash to the same thing it skips the model entirely —
+      // this used to generate a fresh summary on every view of this tab.
+      const knownCoachFingerprint = storedFingerprint(CACHE_NAMESPACE, weekStart) ?? undefined
       const response = await csrfFetch('/api/weekly-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ weekStart, timezone }),
+        body: JSON.stringify({ weekStart, timezone, knownCoachFingerprint }),
       })
       if (!response.ok) {
         const errBody = await response.text().catch(() => '')
@@ -140,6 +147,14 @@ export default function WeeklyReviewContent() {
         throw new Error(`Failed to fetch review (${response.status})`)
       }
       const data = await response.json()
+
+      if (data.coachSummary && data.coachFingerprint) {
+        writeCachedText(CACHE_NAMESPACE, weekStart, data.coachFingerprint, data.coachSummary)
+      } else if (data.coachSummaryUnchanged && data.coachFingerprint) {
+        // The server skipped generation because our fingerprint matched.
+        data.coachSummary = readCachedText(CACHE_NAMESPACE, weekStart, data.coachFingerprint)
+      }
+
       cacheSet(cacheKey, data)
       setReviewData(data)
     } catch (err) {
