@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
@@ -169,6 +169,10 @@ export default function DayReviewContent() {
   const [commentary, setCommentary] = useState<string | null>(null)
   const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
   const [currentHour, setCurrentHour] = useState<number | null>(null)
+  // Which date we have already asked for commentary for. A ref, not state, so
+  // setting it cannot itself trigger a render — and so one attempt is recorded
+  // before the request starts, closing the re-entry the effect below used to have.
+  const commentaryRequestedFor = useRef<string | null>(null)
 
   useEffect(() => {
     // Use rollover-adjusted hour (12:52 AM = hour 24, so review stays unlocked)
@@ -243,9 +247,19 @@ export default function DayReviewContent() {
     if (status === 'authenticated' && !isLocked) fetchSummary()
   }, [status, fetchSummary, isLocked])
 
+  // Ask for commentary at most once per day's summary. This used to be gated on
+  // `!isLoadingCommentary`, which the fetch itself sets — so any request that
+  // finished without commentary (a 429, a thrown error, or the route returning
+  // an empty string) flipped the guard back open and the effect fired again,
+  // forever. The section only renders while (commentary || isLoadingCommentary),
+  // so it mounted and unmounted on every pass: a constant flicker, and roughly
+  // 26 requests a second to /api/day-commentary.
   useEffect(() => {
-    if (summary && !commentary && !isLoadingCommentary) fetchCommentary(summary)
-  }, [summary, commentary, isLoadingCommentary, fetchCommentary])
+    if (!summary || commentary) return
+    if (commentaryRequestedFor.current === summary.date) return
+    commentaryRequestedFor.current = summary.date
+    fetchCommentary(summary)
+  }, [summary, commentary, fetchCommentary])
 
   // Locked before 9pm
   if (isLocked) {
