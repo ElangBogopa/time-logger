@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
-import { DEFAULT_REMINDER_TIMES, UserPreferences, PendingIntentionChange } from '@/lib/types'
-
+import { DEFAULT_REMINDER_TIMES, UserPreferences } from '@/lib/types'
 // GET /api/preferences - Get user preferences
 export async function GET() {
   try {

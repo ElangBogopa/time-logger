@@ -27,8 +27,6 @@ const STILLNESS_CHECK_DELAY = 100 // ms - must be still this long before hold ti
 const TOUCH_HOLD_DELAY = 400 // ms - after stillness confirmed, hold this long to create entry
 
 export function useTimelineTouchCreate({
-  scrollContainerRef,
-  startHour,
   onDragCreate,
   yToTime,
 }: UseTimelineTouchCreateParams): UseTimelineTouchCreateReturn {

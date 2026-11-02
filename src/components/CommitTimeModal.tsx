@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Clock, Calendar, ExternalLink } from 'lucide-react'
+import { Calendar, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface CommitTimeModalProps {

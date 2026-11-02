@@ -1,20 +1,4 @@
-import {
-  getLocalDateString,
-  isEntryInFuture,
-  isDateLoggable,
-  isPendingEntryReadyToConfirm,
-  MAX_DAYS_BACK_FOR_LOGGING,
-  TimeEntry,
-  dayMeetsStreakRequirement,
-  getNextMilestone,
-  getRecentMilestone,
-  calculateWeeklyConsistency,
-  calculateStreakWithGrace,
-  getWeekStartDate,
-  STREAK_CONFIGS,
-  StreakConfig,
-} from '@/lib/types'
-
+import { getLocalDateString, isEntryInFuture, isDateLoggable, isPendingEntryReadyToConfirm, MAX_DAYS_BACK_FOR_LOGGING, TimeEntry, dayMeetsStreakRequirement, getNextMilestone, getRecentMilestone, calculateWeeklyConsistency, calculateStreakWithGrace, getWeekStartDate, STREAK_CONFIGS } from '@/lib/types'
 describe('getLocalDateString', () => {
   it('formats date correctly', () => {
     const date = new Date('2024-03-15T10:30:00')

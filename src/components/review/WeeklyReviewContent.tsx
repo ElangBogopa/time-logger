@@ -3,21 +3,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
-import {
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Target,
-  Sparkles,
-  BarChart3,
-  Grid3X3,
-  ArrowRight,
-} from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ENERGY_VIEW, getAggregatedCategory, TimeCategory, AGGREGATED_CATEGORY_COLORS, getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
+import { getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 
 // ─── Types matching API route response ────────────────

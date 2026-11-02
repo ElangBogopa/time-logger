@@ -9,14 +9,7 @@
  * - Highlighting/segmentation for UI
  */
 
-import {
-  detectTimePatterns,
-  hasTimePattern,
-  parseTimeFromText,
-  getHighlightedSegments,
-  ParsedTime,
-} from '@/lib/time-parser'
-
+import { detectTimePatterns, hasTimePattern, parseTimeFromText, getHighlightedSegments } from '@/lib/time-parser'
 describe('Time Parser - Pattern Detection', () => {
   describe('Duration Patterns', () => {
     describe('Hours', () => {

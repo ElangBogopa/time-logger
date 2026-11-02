@@ -3,22 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import { getUserToday } from '@/lib/types'
-import {
-  EntryRow,
-  FOCUS_WEIGHTS,
-  BODY_CATS,
-  SOCIAL_CATS,
-  FOCUS_TARGET,
-  BODY_TARGET,
-  SOCIAL_TARGET,
-  FOCUS_THRESHOLDS,
-  BODY_THRESHOLDS,
-  SOCIAL_THRESHOLDS,
-  getStatusColor,
-  getDateNDaysAgo,
-  getNudge,
-} from '@/lib/metrics-calc'
-
+import { EntryRow, FOCUS_WEIGHTS, BODY_CATS, SOCIAL_CATS, FOCUS_TARGET, BODY_TARGET, SOCIAL_TARGET, FOCUS_THRESHOLDS, BODY_THRESHOLDS, SOCIAL_THRESHOLDS, getStatusColor, getNudge } from '@/lib/metrics-calc'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

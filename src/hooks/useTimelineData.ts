@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { TimeEntry, isPendingEntryReadyToConfirm } from '@/lib/types'
-import { timeToMinutes, minutesToTime, formatDuration } from '@/lib/time-utils'
+import { TimeEntry } from '@/lib/types'
+import { timeToMinutes, minutesToTime } from '@/lib/time-utils'
 import { CalendarEvent } from '@/components/TimelineView'
 import { PlacedEntry } from '@/components/timeline/TimelineEntry'
 

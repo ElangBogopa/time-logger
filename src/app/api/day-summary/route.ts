@@ -3,21 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import { calculateDailyScore, DailyProductivityScore, PlanItem } from '@/lib/productivity-score'
-import {
-  TimeEntry,
-  SessionCompletion,
-  getLocalDateString,
-  getUserToday,
-  getUserCurrentHour,
-  TimeCategory,
-  CATEGORY_LABELS,
-  MoodCheckin,
-  AggregatedCategory,
-  ENERGY_VIEW,
-  AGGREGATED_CATEGORY_LABELS,
-  aggregateByView,
-} from '@/lib/types'
-
+import { TimeEntry, SessionCompletion, getUserToday, getUserCurrentHour, TimeCategory, CATEGORY_LABELS, MoodCheckin, AggregatedCategory, ENERGY_VIEW, AGGREGATED_CATEGORY_LABELS, aggregateByView } from '@/lib/types'
 interface Win {
   id: string
   text: string

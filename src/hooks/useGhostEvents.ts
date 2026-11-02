@@ -50,10 +50,7 @@ const GHOST_TAP_THRESHOLD = 150 // ms - release before this = tap to confirm
 const DRAG_THRESHOLD = 20 // pixels - minimum drag distance to count as intentional drag
 
 export function useGhostEvents({
-  scrollContainerRef,
-  startHour,
   onGhostEntryClick,
-  onDragCreate,
   yToTime,
   setIsDragging,
   setDragPreviewStart,

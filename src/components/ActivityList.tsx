@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  TimeEntry,
-  TimeCategory,
-  CATEGORY_LABELS,
-  getAggregatedCategory,
-  AggregatedCategory,
-} from '@/lib/types'
+import { TimeEntry, CATEGORY_LABELS, getAggregatedCategory, AggregatedCategory } from '@/lib/types'
 import {
   Brain,
   Briefcase,

@@ -35,8 +35,6 @@ const SCROLL_CANCEL_THRESHOLD = 5 // pixels - ANY movement this much means user 
 const DRAG_THRESHOLD = 20 // pixels - minimum drag distance to count as intentional drag
 
 export function useEntryAdjustment({
-  scrollContainerRef,
-  startHour,
   onEntryDeleted,
   onShowToast,
   yToTime,

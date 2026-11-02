@@ -1,10 +1,10 @@
 'use client'
 
-import { Suspense, useMemo, useState, useCallback, useEffect } from 'react'
+import { Suspense, useMemo, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getUserToday, getRealToday, DAY_ROLLOVER_HOUR, TimePeriod } from '@/lib/types'
+import { getUserToday, getRealToday, TimePeriod } from '@/lib/types'
 import { buildSessionInfos } from '@/lib/session-utils'
 import { useSessionData } from '@/hooks/useSessionData'
 import { useGreeting } from '@/hooks/useGreeting'

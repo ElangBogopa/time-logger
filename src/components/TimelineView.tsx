@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { TimeEntry, TimeCategory } from '@/lib/types'
+import { TimeEntry } from '@/lib/types'
 import { formatDuration, timeToMinutes } from '@/lib/time-utils'
 import TimeEntryModal from './TimeEntryModal'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -10,7 +10,6 @@ import { useTimelineData, type PlacedEntry } from '@/hooks/useTimelineData'
 import { useTimelineMouseCreate, type DragCreateData } from '@/hooks/useTimelineMouseCreate'
 import { useTimelineTouchCreate } from '@/hooks/useTimelineTouchCreate'
 import { useEntryAdjustment } from '@/hooks/useEntryAdjustment'
-import { useGhostEvents } from '@/hooks/useGhostEvents'
 import TimelineGrid from './timeline/TimelineGrid'
 import TimelineEntry from './timeline/TimelineEntry'
 import TimelineGap from './timeline/TimelineGap'
@@ -82,19 +81,7 @@ export default function TimelineView({
 
   // Timeline data hook first (we need startHour for other hooks)
   const {
-    totalMinutes,
-    ghostEvents,
-    overlappingGhostIds,
-    overlappingEntryIds,
-    timedEntries,
-    untimedEntries,
     startHour,
-    endHour,
-    placedEntries,
-    timeGaps,
-    hours,
-    timelineHeight,
-    isEmpty,
   } = useTimelineData({
     entries,
     calendarEvents,

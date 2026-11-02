@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
-import { getLocalDateString, getUserToday, getRealToday, TimeEntry, isEntryInFuture, PENDING_COMMENTARY, TimeCategory, CATEGORY_LABELS, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR } from '@/lib/types'
+import { getUserToday, getRealToday, TimeEntry, PENDING_COMMENTARY, TimeCategory, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
-import { parseTimeFromText, getHighlightedSegments, ParseResult } from '@/lib/time-parser'
+import { parseTimeFromText, ParseResult } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
 import {

@@ -5,16 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch } from '@/lib/api'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
-import {
-  TimePeriod,
-  TimeEntry,
-  PERIOD_LABELS,
-  PERIOD_TIME_RANGES,
-  getUserToday,
-  getRealToday,
-  shiftDateString,
-  DAY_ROLLOVER_HOUR,
-} from '@/lib/types'
+import { TimePeriod, TimeEntry, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, shiftDateString } from '@/lib/types'
 import {
   getEntriesForPeriod,
   getSessionStats,

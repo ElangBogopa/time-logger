@@ -7,8 +7,8 @@ import { StatusDelta } from '@/components/charts/StatusDelta'
 import { METRIC_COLORS, getStatusLabel, getStatusTailwind } from '@/lib/chart-colors'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
-import { ChevronLeft, CheckCircle2, Circle, Sparkles } from 'lucide-react'
-import type { MetricKey, TrendDataPoint, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
+import { ChevronLeft, Sparkles } from 'lucide-react'
+import type { MetricKey, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 
 // ── Detail types (cast from the generic Record at usage site) ──

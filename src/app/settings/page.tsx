@@ -5,21 +5,7 @@ import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import {
-  Bell,
-  BookOpen,
-  Calendar,
-  ChevronRight,
-  Target,
-  LogOut,
-  Loader2,
-  Star,
-  MessageSquare,
-  Link2,
-  Lightbulb,
-  X,
-} from 'lucide-react'
-
+import { BookOpen, Calendar, ChevronRight, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, X } from 'lucide-react'
 // ── Section label ──
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (

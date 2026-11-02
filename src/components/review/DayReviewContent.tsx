@@ -4,35 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
-import {
-  Trophy,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Clock,
-  Sparkles,
-  Target,
-  Zap,
-  Check,
-} from 'lucide-react'
+import { Trophy, Clock, Sparkles, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  TimeCategory,
-  MoodCheckin,
-  MOOD_EMOJIS,
-  SESSION_MOOD_CONFIG,
-  TimeEntry,
-  AggregatedCategory,
-  getUserToday,
-  getUserCurrentHour,
-} from '@/lib/types'
-
-import {
-  getAggregatedCategory,
-  AGGREGATED_CATEGORY_LABELS,
-  AGGREGATED_CATEGORY_COLORS,
-} from '@/lib/types'
-
+import { TimeCategory, MoodCheckin, MOOD_EMOJIS, SESSION_MOOD_CONFIG, AggregatedCategory, getUserToday, getUserCurrentHour } from '@/lib/types'
+import { getAggregatedCategory, AGGREGATED_CATEGORY_COLORS } from '@/lib/types'
 interface Win { icon: string; label: string }
 interface TargetProgress { targetId: string; label: string; emoji: string; currentMinutes: number; targetMinutes: number; percentComplete: number; todayMinutes?: number; dailyTarget?: number; progress?: number }
 interface CategoryBreakdown { category: TimeCategory; label: string; totalMinutes: number; percentage: number }

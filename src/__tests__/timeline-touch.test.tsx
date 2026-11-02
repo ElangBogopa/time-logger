@@ -15,17 +15,6 @@ import TimelineView, { DragCreateData } from '@/components/TimelineView'
 // Mock scrollTo for jsdom
 Element.prototype.scrollTo = jest.fn()
 
-// Mock the supabase client
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(() => ({
-      update: jest.fn(() => ({
-        eq: jest.fn(() => Promise.resolve({ error: null }))
-      }))
-    }))
-  }
-}))
-
 describe('TimelineView Touch Interactions', () => {
   // Constants from the component (should match TimelineView.tsx)
   const SCROLL_CANCEL_THRESHOLD = 5 // pixels (updated from 3 for better fat finger tolerance)

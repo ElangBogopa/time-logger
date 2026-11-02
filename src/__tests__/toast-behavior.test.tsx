@@ -14,36 +14,6 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react'
 Element.prototype.scrollTo = jest.fn()
 
 // Mock supabase
-const mockSupabaseUpdate = jest.fn()
-const mockSupabaseInsert = jest.fn()
-const mockSupabaseSelect = jest.fn()
-const mockSupabaseDelete = jest.fn()
-
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(() => ({
-      update: jest.fn(() => ({
-        eq: mockSupabaseUpdate,
-      })),
-      insert: jest.fn(() => ({
-        select: jest.fn(() => ({
-          single: mockSupabaseInsert,
-        })),
-      })),
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          eq: jest.fn(() => ({
-            order: mockSupabaseSelect,
-          })),
-        })),
-      })),
-      delete: jest.fn(() => ({
-        eq: mockSupabaseDelete,
-      })),
-    })),
-  },
-}))
-
 // Mock fetch for API calls
 global.fetch = jest.fn()
 
@@ -56,12 +26,6 @@ describe('Toast Notification Behavior', () => {
     jest.useFakeTimers()
 
     // Default successful responses
-    mockSupabaseUpdate.mockResolvedValue({ error: null })
-    mockSupabaseInsert.mockResolvedValue({
-      data: { id: 'new-entry-1' },
-      error: null
-    })
-    mockSupabaseSelect.mockResolvedValue({ data: [], error: null })
     ;(global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ category: 'deep_work', commentary: 'Test commentary' }),
@@ -104,7 +68,6 @@ describe('Toast Notification Behavior', () => {
       )
 
       // Simulate successful entry time update
-      mockSupabaseUpdate.mockResolvedValueOnce({ error: null })
 
       // The updateEntryTimes function is internal, but we can verify
       // that onEntryDeleted is called (to refresh) without onShowToast
@@ -125,7 +88,6 @@ describe('Toast Notification Behavior', () => {
       const onEntryDeleted = jest.fn()
 
       // Mock a failure
-      mockSupabaseUpdate.mockRejectedValueOnce(new Error('Database error'))
 
       render(
         <TimelineView
@@ -223,9 +185,7 @@ describe('Toast Notification Behavior', () => {
           json: async () => ({ commentary: 'Great work on this!' }),
         })
 
-      mockSupabaseUpdate.mockResolvedValue({ error: null })
-      mockSupabaseSelect.mockResolvedValue({ data: [], error: null })
-
+    
       const { getByText } = render(
         <TimeEntryModal
           entry={mockPendingEntry}

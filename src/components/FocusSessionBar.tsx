@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Target, Square } from 'lucide-react'
-
+import { Target } from 'lucide-react'
 interface FocusSessionData {
   isActive: boolean
   startTime: number

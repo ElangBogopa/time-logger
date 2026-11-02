@@ -51,8 +51,6 @@ export default function GhostEntryModal({
   event,
   onClose,
   onConfirm,
-  onShowToast,
-  userId,
   selectedDate,
 }: GhostEntryModalProps) {
   const [activity, setActivity] = useState('')

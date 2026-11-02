@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { fetchEntries as apiFetchEntries, fetchSessionCompletions } from '@/lib/api'
 import { TimeEntry, SessionCompletion, PERIOD_TIME_RANGES } from '@/lib/types'
 import { canLogYesterdayEvening, getYesterdayDateString } from '@/lib/session-utils'
