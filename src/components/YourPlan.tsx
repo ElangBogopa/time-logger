@@ -4,13 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Target, ChevronRight, Loader2, Flame } from 'lucide-react'
 import { getUserToday } from '@/lib/types'
-
-interface Goal {
-  id: string
-  title: string
-  description: string | null
-  active: boolean
-}
+import { fetchGoals, type Goal } from '@/lib/goals'
 
 interface StreakData {
   planning: { current: number; best: number; label: string }
@@ -48,16 +42,15 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [goalsRes, streaksRes] = await Promise.all([
-        fetch('/api/goals'),
+      const [fetchedGoals, streaksRes] = await Promise.all([
+        fetchGoals().catch(() => null),
         fetch(`/api/streaks-productivity?date=${getUserToday()}`),
       ])
 
       let newGoals = goals
       let newStreaks = streaks
-      if (goalsRes.ok) {
-        const data = await goalsRes.json()
-        newGoals = data.goals || []
+      if (fetchedGoals) {
+        newGoals = fetchedGoals
         setGoals(newGoals)
       }
       if (streaksRes.ok) {

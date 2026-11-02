@@ -134,8 +134,10 @@ export async function POST(request: NextRequest) {
       toneGuidance = 'Mixed period. Highlight the positives while being realistic about the balance.'
     }
 
-    // Generate main commentary
-    const commentaryCompletion = await openai.chat.completions.create({
+    // All three take the same context and differ only in their system prompt,
+    // so they ran back to back for no reason — three round trips of latency
+    // while the summary popup spins. They are started together below.
+    const commentaryPromise = openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -171,10 +173,7 @@ EXAMPLES OF GOOD PERIOD SUMMARIES:
       max_tokens: 150,
     })
 
-    const commentary = commentaryCompletion.choices[0]?.message?.content?.trim() || ''
-
-    // Generate data-driven insight
-    const insightCompletion = await openai.chat.completions.create({
+    const insightPromise = openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -204,10 +203,7 @@ RULES:
       max_tokens: 50,
     })
 
-    const insight = insightCompletion.choices[0]?.message?.content?.trim() || null
-
-    // Generate forward-looking prediction
-    const predictionCompletion = await openai.chat.completions.create({
+    const predictionPromise = openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -238,7 +234,24 @@ RULES:
       max_tokens: 50,
     })
 
-    const prediction = predictionCompletion.choices[0]?.message?.content?.trim() || null
+    const [commentaryResult, insightResult, predictionResult] = await Promise.allSettled([
+      commentaryPromise,
+      insightPromise,
+      predictionPromise,
+    ])
+
+    // allSettled, not all: the insight and the prediction are extras the client
+    // already treats as optional, so losing one should not cost the summary.
+    if (commentaryResult.status === 'rejected') throw commentaryResult.reason
+
+    const text = (result: PromiseSettledResult<OpenAI.Chat.Completions.ChatCompletion>) =>
+      result.status === 'fulfilled'
+        ? result.value.choices[0]?.message?.content?.trim() || null
+        : null
+
+    const commentary = text(commentaryResult) || ''
+    const insight = text(insightResult)
+    const prediction = text(predictionResult)
 
     return NextResponse.json({ commentary, insight, prediction })
   } catch (error) {

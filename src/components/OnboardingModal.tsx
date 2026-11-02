@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { invalidateGoals } from '@/lib/goals'
 
 interface OnboardingModalProps {
   isOpen: boolean
@@ -112,6 +113,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
           const data = await goalResponse.json()
           throw new Error(data.error || 'Failed to create goal')
         }
+        invalidateGoals()
       }
 
       // Save productivity target to preferences

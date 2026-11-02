@@ -73,11 +73,6 @@ const ROUTES: { name: string; load: () => Promise<AiRoute>; body: unknown }[] = 
     body: { period: 'morning', date: '2026-11-01', entries: [{ activity: 'writing code', category: 'deep_work', duration_minutes: 60 }] },
   },
   {
-    name: '/api/parse-activity',
-    load: () => import('@/app/api/parse-activity/route'),
-    body: { input: 'ran 5k this morning' },
-  },
-  {
     name: '/api/weekly-review',
     load: () => import('@/app/api/weekly-review/route'),
     body: { weekStart: '2026-11-02' },

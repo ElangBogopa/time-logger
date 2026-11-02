@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Session } from 'next-auth'
 import { getUserCurrentHour } from '@/lib/types'
+import { fetchGoals } from '@/lib/goals'
 
 interface UseDashboardStateReturn {
   showOnboarding: boolean
@@ -66,18 +67,19 @@ export function useDashboardState({ session, status }: UseDashboardStateProps): 
 
     async function checkOnboardingNeeded() {
       try {
-        // Check preferences for productivity_target and goals in parallel
-        const [prefsResponse, goalsResponse] = await Promise.all([
+        // Check preferences for productivity_target and goals in parallel.
+        // Goals go through the shared reader, so this shares one request with
+        // YourPlan instead of making a second identical one.
+        const [prefsResponse, goals] = await Promise.all([
           fetch('/api/preferences', { signal: controller.signal }),
-          fetch('/api/goals', { signal: controller.signal }),
+          fetchGoals(),
         ])
 
-        if (prefsResponse.ok && goalsResponse.ok) {
+        if (prefsResponse.ok) {
           const prefsData = await prefsResponse.json()
-          const goalsData = await goalsResponse.json()
 
           const hasProductivityTarget = prefsData.preferences?.productivity_target != null
-          const hasGoals = goalsData.goals && goalsData.goals.length > 0
+          const hasGoals = goals.length > 0
 
           if (!hasProductivityTarget && !hasGoals) {
             setShowOnboarding(true)

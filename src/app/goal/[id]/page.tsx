@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown, CheckSquare, Trash2 } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
 import { getUserToday } from '@/lib/types'
+import { invalidateGoals } from '@/lib/goals'
 import CommitTimeModal from '@/components/CommitTimeModal'
 import GoogleTasksPicker from '@/components/GoogleTasksPicker'
 // AnimatedCheckbox removed — task completion only from session pages
@@ -296,7 +297,11 @@ export default function GoalPage() {
     try {
       const res = await csrfFetch(`/api/goals?id=${goalId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete goal')
+      invalidateGoals()
       sessionStorage.removeItem(cacheKey)
+      // YourPlan renders from this cache on the dashboard we are about to
+      // return to; without clearing it the deleted goal flashes back.
+      sessionStorage.removeItem('your-plan-cache')
       router.push('/')
     } catch {
       setDeleteError('Could not delete this goal. Please try again.')

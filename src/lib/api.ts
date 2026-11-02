@@ -5,7 +5,6 @@
  */
 
 import { TimeEntry, TimeCategory } from './types'
-import { CorrelationsResponse } from './correlation-types'
 
 export function getCsrfToken(): string {
   const match = document.cookie.match(/csrf-token=([^;]+)/)
@@ -174,46 +173,6 @@ export async function upsertSessionCompletion(
 }
 
 // ============================================================
-// STREAKS
-// ============================================================
-
-interface UserStreak {
-  id: string
-  user_id: string
-  streak_type: string
-  personal_best_days: number
-  personal_best_achieved_at: string | null
-  current_streak_days: number
-  current_streak_start_date: string | null
-  last_calculated_at: string
-}
-
-export async function fetchStreaks(): Promise<UserStreak[]> {
-  const { data } = await fetchJSON<{ data: UserStreak[] }>('/api/streaks')
-  return data
-}
-
-interface UpsertStreakParams {
-  streak_type: string
-  personal_best_days?: number
-  personal_best_achieved_at?: string | null
-  current_streak_days?: number
-  current_streak_start_date?: string | null
-}
-
-export async function upsertStreak(params: UpsertStreakParams): Promise<UserStreak> {
-  const { data } = await fetchJSON<{ data: UserStreak }>('/api/streaks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  })
-  return data
-}
-
-// ============================================================
 // CORRELATIONS / INSIGHTS
 // ============================================================
 
-export async function fetchCorrelations(): Promise<CorrelationsResponse> {
-  return fetchJSON<CorrelationsResponse>('/api/correlations')
-}
