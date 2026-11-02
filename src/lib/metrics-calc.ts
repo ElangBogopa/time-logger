@@ -13,11 +13,16 @@ export interface EssentialDef {
   threshold: number
 }
 
-// ── Category weights for Focus ──
+// ── Category weights for Mind ──
+// Anything without a weight scores nothing, which left meetings worth zero:
+// six hours of client calls scored 0 while six hours of email scored 45%.
+// That ranks a working day backwards. Meetings are real cognitive work, but
+// someone else sets the agenda, so they sit below your own deep work.
 export const FOCUS_WEIGHTS: Record<string, number> = {
   deep_work: 1.0,
   learning: 0.9,
   creating: 0.8,
+  meetings: 0.5,
   shallow_work: 0.3,
 }
 

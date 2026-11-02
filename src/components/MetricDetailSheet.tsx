@@ -10,7 +10,7 @@ import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import type { MetricKey, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
-import { METRIC_LABELS as SHARED_METRIC_LABELS } from '@/lib/metrics-calc'
+import { METRIC_LABELS as SHARED_METRIC_LABELS, FOCUS_WEIGHTS } from '@/lib/metrics-calc'
 
 // ── Detail types (cast from the generic Record at usage site) ──
 
@@ -40,13 +40,17 @@ interface MetricDetailSheetProps {
   initialData?: TrendAPIResponse | null
 }
 
-// ── Focus category labels & weights ──
+// ── Mind category labels & targets ──
+// Weights are read from FOCUS_WEIGHTS rather than repeated here: this map had
+// its own copy, so a category added to the metric would have been scored and
+// then left out of the breakdown that explains it.
 
 const FOCUS_CATEGORY_INFO: Record<string, { label: string; weight: number; target: number }> = {
-  deep_work: { label: 'Deep Work', weight: 1.0, target: 120 },
-  learning: { label: 'Learning', weight: 0.9, target: 60 },
-  creating: { label: 'Creating', weight: 0.8, target: 60 },
-  shallow_work: { label: 'Shallow Work', weight: 0.3, target: 30 },
+  deep_work: { label: 'Deep Work', weight: FOCUS_WEIGHTS.deep_work, target: 120 },
+  learning: { label: 'Learning', weight: FOCUS_WEIGHTS.learning, target: 60 },
+  creating: { label: 'Creating', weight: FOCUS_WEIGHTS.creating, target: 60 },
+  meetings: { label: 'Meetings', weight: FOCUS_WEIGHTS.meetings, target: 60 },
+  shallow_work: { label: 'Shallow Work', weight: FOCUS_WEIGHTS.shallow_work, target: 30 },
 }
 
 // ── Body category labels ──
