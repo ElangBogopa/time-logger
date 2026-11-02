@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown, CheckSquare } from 'lucide-react'
+import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown, CheckSquare, Trash2 } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
 import { getUserToday } from '@/lib/types'
 import CommitTimeModal from '@/components/CommitTimeModal'
@@ -58,6 +58,9 @@ export default function GoalPage() {
   const router = useRouter()
   const params = useParams()
   const goalId = params.id as string
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Session cache for instant re-mount
   const cacheKey = `goal-page-${goalId}`
@@ -285,6 +288,21 @@ export default function GoalPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  const handleDeleteGoal = async () => {
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await csrfFetch(`/api/goals?id=${goalId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete goal')
+      sessionStorage.removeItem(cacheKey)
+      router.push('/')
+    } catch {
+      setDeleteError('Could not delete this goal. Please try again.')
+      setIsDeleting(false)
+      setConfirmingDelete(false)
+    }
   }
 
   if (!goal) {
@@ -695,6 +713,45 @@ export default function GoalPage() {
             </section>
           )
         })()}
+
+        {/* Delete goal — two-step, no browser confirm dialog */}
+        <section className="mt-10 border-t border-border pt-6">
+          {deleteError && (
+            <p className="mb-3 text-sm text-destructive" role="alert">{deleteError}</p>
+          )}
+          {confirmingDelete ? (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+              <p className="text-sm font-medium text-foreground">Delete &ldquo;{goal.title}&rdquo;?</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                It is removed from your plan. Tasks you already logged against it are kept.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={handleDeleteGoal}
+                  disabled={isDeleting}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-destructive px-4 text-sm font-medium text-white disabled:opacity-60"
+                >
+                  {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  {isDeleting ? 'Deleting…' : 'Delete goal'}
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={isDeleting}
+                  className="min-h-11 rounded-lg border border-border px-4 text-sm text-muted-foreground hover:text-foreground disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="h-4 w-4" /> Delete this goal
+            </button>
+          )}
+        </section>
       </div>
 
       {/* Google Tasks Picker */}

@@ -30,6 +30,50 @@ export async function GET() {
   }
 }
 
+// DELETE /api/goals?id=<uuid> - Retire a goal
+//
+// Soft delete. GET already filters on active, so flipping the flag removes the
+// goal from the app while leaving daily_plans.goal_id intact — a hard delete
+// would fire the ON DELETE SET NULL in 028 and detach the task history. It
+// also frees the title: the duplicate check in POST only looks at active rows.
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const id = new URL(request.url).searchParams.get('id')
+    if (!id) {
+      return NextResponse.json({ error: 'Goal id is required' }, { status: 400 })
+    }
+
+    // Scoped by user_id, so one account cannot retire another's goal, and an
+    // id belonging to someone else is reported as not found rather than denied.
+    const { data, error } = await supabase
+      .from('user_goals')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', session.user.id)
+      .eq('active', true)
+      .select('id')
+
+    if (error) {
+      console.error('Error deleting goal:', error)
+      return NextResponse.json({ error: 'Failed to delete goal' }, { status: 500 })
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, id })
+  } catch (error) {
+    console.error('Goal delete error:', error)
+    return NextResponse.json({ error: 'Failed to delete goal' }, { status: 500 })
+  }
+}
+
 // POST /api/goals - Create a new goal
 export async function POST(request: NextRequest) {
   try {
