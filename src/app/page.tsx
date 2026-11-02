@@ -264,7 +264,7 @@ function HomeContent() {
 
                   // Subtitle text
                   const subtitle = (isDone || hasEntries)
-                    ? `${info.entryCount} entries · ${Math.round(info.totalMinutes)}m logged`
+                    ? `${info.entryCount} ${info.entryCount === 1 ? 'entry' : 'entries'}`
                     : isToday
                       ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
                       : 'Not logged'
