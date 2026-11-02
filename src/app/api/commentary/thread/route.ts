@@ -4,14 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
-import {
-  TimeEntry,
-  TimeCategory,
-  TimePeriod,
-  CATEGORY_LABELS,
-  shiftDateString,
-} from '@/lib/types'
+import { TimeEntry, TimePeriod, shiftDateString } from '@/lib/types'
 import { getEntriesForPeriod } from '@/lib/session-utils'
+import { buildThreadSystemPrompt, describeEntries } from '@/lib/prompts'
 import { formatDurationLong } from '@/lib/time-utils'
 
 /**
@@ -69,16 +64,6 @@ async function loadThread(userId: string, type: SubjectType, key: string): Promi
   return (data as ReplyRow[]) || []
 }
 
-function describeEntries(entries: TimeEntry[]): string {
-  if (entries.length === 0) return 'No activities logged.'
-  return entries
-    .map((e) => {
-      const label = e.category ? CATEGORY_LABELS[e.category as TimeCategory] : 'Uncategorised'
-      const when = e.start_time ? `${e.start_time.slice(0, 5)} ` : ''
-      return `- ${when}${e.activity} (${label}, ${formatDurationLong(e.duration_minutes)})`
-    })
-    .join('\n')
-}
 
 /**
  * The data the commentary was about, re-derived server-side. The client sends
@@ -218,36 +203,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are answering a follow-up question about the person's own time tracking.
-
-THEIR DATA:
-${subjectContext}
-
-${subjectCommentary ? `WHAT YOU SAID ABOUT IT:\n${subjectCommentary}` : ''}
-
-HOW CATEGORIES WORK — you need this to answer "why was this counted as X":
-- The category in parentheses after each activity was assigned automatically by a
-  classifier reading the activity text, not chosen by the person.
-- So the honest answer to "why wasn't that deep work" is about what the text
-  said, not about how hard they were working. Say that plainly.
-
-ASSUME THE WORK WAS WORK:
-- Someone who logged a working day was working. Never suggest they were
-  slacking, distracted or "not fully engaged" — you have no evidence of that,
-  and a short activity name is not evidence.
-- Light-sounding categories are not an accusation. Do not tell them a day
-  "could use improvement" because of how something was categorised.
-
-RULES:
-- Answer the question that was asked. Nothing else.
-- No closing advice, no "next time try…", unless they asked what to do.
-- Ground every claim in the data above; if it does not say, say you cannot tell.
-- Never name a category, activity or number that is not in the data above.
-- If they push back on your tone or your facts, re-read the data and correct
-  yourself. Do not defend a previous answer.
-- Keep the commentary's voice — warm, a bit dry, like a friend who knows them.
-  Cheeky is fine. Preachy is not, and condescending never is.
-- 1-3 sentences. No emojis, no bullet points, no preamble.`,
+          content: buildThreadSystemPrompt({ subjectContext, subjectCommentary }),
         },
         ...thread.slice(-MAX_CONTEXT_MESSAGES).map((m) => ({
           role: m.role,

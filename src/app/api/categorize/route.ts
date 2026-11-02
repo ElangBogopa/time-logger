@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { CATEGORIES, TimeCategory } from '@/lib/types'
+import { buildCategorizeSystemPrompt } from '@/lib/prompts'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
 // In-memory cache for activity → category mappings
@@ -74,75 +75,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are a time tracking assistant. Categorize the given activity into exactly one of these categories: ${CATEGORIES.join(', ')}.
-
-Category definitions:
-
-PRODUCTIVE (value-creating work):
-- deep_work: Focused, cognitively demanding work - coding, writing, analysis, design, creative projects, programming, vibe coding
-- shallow_work: Work tasks that are necessary but not cognitively demanding - work email, Slack, status updates, quick code reviews
-- meetings: Scheduled WORK calls, video conferences, in-person meetings, 1:1s, standups
-- learning: Educational activities - university lectures, classes, labs, tutorials, seminars, courses, studying, research, reading educational content. University course codes (e.g., "STA414H1", "CSC108") are ALWAYS learning.
-- creating: Creative hobbies and side projects - art, music, writing for fun, personal projects, crafts
-
-MAINTENANCE (life logistics):
-- admin: PERSONAL administrative tasks - personal email, bills, finances, scheduling personal appointments, planning
-- errands: Tasks outside home - grocery shopping, doctor appointments, bank visits, picking up packages, car maintenance
-- chores: Household tasks - cleaning, laundry, cooking/meal prep, dishes, home repairs, organizing
-- commute: Travel to/from obligations - commute to work, travel to appointments
-
-BODY (physical):
-- exercise: ANY physical activity - gym, running, sports, yoga, cycling, strength training, HIIT, walking, stretching, standing, light yoga, playing with kids
-- meals: Eating (not cooking) - breakfast, lunch, dinner, snacks, coffee breaks
-- sleep: Sleep tracking - night sleep, naps
-
-MIND (mental recovery):
-- rest: Intentional downtime - relaxing, reading for pleasure, listening to music, sitting in nature
-- self_care: Personal maintenance - showering, skincare, hygiene, meditation, journaling, therapy
-
-CONNECTION (social):
-- social: In-person time with others - hanging out with friends, family time, dates, parties
-- calls: Personal phone/video calls - FaceTime with family, catching up with friends
-
-LEISURE:
-- entertainment: Passive/active leisure - TV, movies, video games, social media, YouTube, browsing, podcasts
-
-IMPORTANT RULES:
-1. MIXED ACTIVITIES - FAVOR PRODUCTIVE: When an activity combines productive work with distractions, ALWAYS categorize by the PRODUCTIVE part:
-   - "Vibe coding + tiktok" → deep_work
-   - "Studying while checking Instagram" → learning
-   - "Working on project + youtube in background" → deep_work
-
-2. DISTINGUISH WORK vs PERSONAL:
-   - Work meetings/calls → meetings
-   - Personal calls with friends/family → calls
-   - Work email/Slack → shallow_work
-   - Personal email/bills → admin
-
-3. COOKING vs EATING:
-   - Cooking, meal prep → chores
-   - Eating, having lunch → meals
-
-4. REST vs ENTERTAINMENT:
-   - Intentional relaxation, reading, unwinding → rest
-   - TV, games, scrolling, browsing → entertainment
-
-5. ASSUME A WORKING DAY IS REAL WORK: an activity that says only that someone
-   worked is deep_work. Someone logging "Work" for their job was doing their
-   job, not answering email for eight hours:
-   - "Work" → deep_work
-   - "Working" / "Worked" / "At work" → deep_work
-   - "Office" / "Day job" / "Work session" → deep_work
-   Use shallow_work ONLY when the activity itself says the task was light:
-   email, Slack, status updates, expenses, filing, quick reviews. Never infer
-   shallow_work from a lack of detail — a missing description is not evidence
-   that the work was trivial.
-
-6. USE 'other' ONLY AS A LAST RESORT: it means the activity fits no category at
-   all. If it plausibly belongs somewhere, put it there. Anything describing
-   work, study, exercise, food, rest or people has a home above.
-
-Respond with ONLY the category name, nothing else.`,
+          content: buildCategorizeSystemPrompt(),
         },
         {
           role: 'user',
