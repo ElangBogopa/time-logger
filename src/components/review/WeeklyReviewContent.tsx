@@ -17,7 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ENERGY_VIEW, getAggregatedCategory, TimeCategory, AGGREGATED_CATEGORY_COLORS } from '@/lib/types'
+import { ENERGY_VIEW, getAggregatedCategory, TimeCategory, AGGREGATED_CATEGORY_COLORS, getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 
 // ─── Types matching API route response ────────────────
@@ -93,11 +93,7 @@ interface WeeklyReviewData {
 // ─── Helpers ────────────────
 
 function getWeekStart(d: Date) {
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(d)
-  monday.setDate(diff)
-  return monday.toISOString().split('T')[0]
+  return getWeekStartForDate(getLocalDateString(d), 1)
 }
 
 function formatWeekRange(start: string, end: string) {
@@ -170,15 +166,11 @@ export default function WeeklyReviewContent() {
   }, [status, fetchReview])
 
   const goToPreviousWeek = () => {
-    const d = new Date(weekStart + 'T00:00:00')
-    d.setDate(d.getDate() - 7)
-    setWeekStart(d.toISOString().split('T')[0])
+    setWeekStart(shiftDateString(weekStart, -7))
   }
 
   const goToNextWeek = () => {
-    const d = new Date(weekStart + 'T00:00:00')
-    d.setDate(d.getDate() + 7)
-    const newWeekStart = d.toISOString().split('T')[0]
+    const newWeekStart = shiftDateString(weekStart, 7)
     if (newWeekStart <= getWeekStart(new Date())) setWeekStart(newWeekStart)
   }
 

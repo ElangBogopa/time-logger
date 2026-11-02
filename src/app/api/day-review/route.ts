@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
-import { getUserToday } from '@/lib/types'
+import { getUserToday, shiftDateString } from '@/lib/types'
 
 /**
  * Day Review Persistence API
@@ -15,15 +15,8 @@ import { getUserToday } from '@/lib/types'
  *   - If saved but not finalized → re-generate, update & finalize
  */
 
-function getDateDaysAgo(baseDate: string, days: number): string {
-  const [y, m, d] = baseDate.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  date.setDate(date.getDate() - days)
-  return date.toISOString().split('T')[0]
-}
-
 function isWithinEditWindow(dateStr: string, today: string): boolean {
-  const yesterday = getDateDaysAgo(today, 1)
+  const yesterday = shiftDateString(today, -1)
   return dateStr === today || dateStr === yesterday
 }
 

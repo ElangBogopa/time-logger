@@ -759,6 +759,33 @@ export function getLocalDateString(date: Date = new Date()): string {
 }
 
 /**
+ * Shifts a YYYY-MM-DD date string by a number of days.
+ * Stays in local time end to end. Never round-trip a local date through
+ * toISOString() — that shifts the result a day for users east of UTC, and
+ * in the evening for users west of it.
+ */
+export function shiftDateString(dateStr: string, deltaDays: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + deltaDays)
+  return getLocalDateString(date)
+}
+
+/**
+ * Gets the date that starts the week containing a given YYYY-MM-DD date.
+ * weekStartsOn: 1 for Monday (default), 0 for Sunday.
+ */
+export function getWeekStartForDate(dateStr: string, weekStartsOn: 0 | 1 = 1): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  const dayOfWeek = date.getDay() // 0 = Sunday
+  const daysToSubtract =
+    weekStartsOn === 1 ? (dayOfWeek === 0 ? 6 : dayOfWeek - 1) : dayOfWeek
+  date.setDate(date.getDate() - daysToSubtract)
+  return getLocalDateString(date)
+}
+
+/**
  * The hour at which the "day" rolls over for the user.
  * Before this hour, we consider it still "yesterday" from the user's perspective.
  * This accounts for late-night users who haven't slept yet.

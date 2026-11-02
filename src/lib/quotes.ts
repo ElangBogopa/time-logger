@@ -1,4 +1,4 @@
-import { TimePeriod } from './types'
+import { TimePeriod, getLocalDateString } from './types'
 
 /**
  * Curated quotes for each session period
@@ -50,7 +50,7 @@ export const SESSION_QUOTES: Record<TimePeriod, string[]> = {
 export function getRandomQuote(period: TimePeriod): string {
   const quotes = SESSION_QUOTES[period]
   // Use date as seed for consistent quote per day
-  const today = new Date().toISOString().split('T')[0]
+  const today = getLocalDateString()
   const seed = hashString(today + period)
   const index = seed % quotes.length
   return quotes[index]

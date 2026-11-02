@@ -12,6 +12,7 @@ import {
   PERIOD_TIME_RANGES,
   getUserToday,
   getRealToday,
+  shiftDateString,
   DAY_ROLLOVER_HOUR,
 } from '@/lib/types'
 import {
@@ -109,10 +110,7 @@ function LogPeriodContent() {
   const isLocked = (() => {
     if (!selectedDate) return false
     const today = getUserToday()
-    const [y, m, d] = today.split('-').map(Number)
-    const yesterdayDate = new Date(y, m - 1, d)
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
-    const yesterday = yesterdayDate.toISOString().split('T')[0]
+    const yesterday = shiftDateString(today, -1)
     return selectedDate !== today && selectedDate !== yesterday
   })()
 

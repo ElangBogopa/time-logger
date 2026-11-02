@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { TimePeriod } from '@/lib/types'
+import { TimePeriod, shiftDateString } from '@/lib/types'
 
 interface GreetingHeaderProps {
   greeting: { text: string; emoji: string }
@@ -19,13 +19,6 @@ function formatDateNav(dateStr: string, isToday: boolean): string {
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
   const label = `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`
   return isToday ? `TODAY — ${label}` : label
-}
-
-function shiftDate(dateStr: string, delta: number): string {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  date.setDate(date.getDate() + delta)
-  return date.toISOString().split('T')[0]
 }
 
 export default function GreetingHeader({
@@ -48,7 +41,7 @@ export default function GreetingHeader({
       {/* Date navigation bar */}
       <div className="flex items-center justify-center gap-3">
         <button
-          onClick={() => onDateChange(shiftDate(selectedDate, -1))}
+          onClick={() => onDateChange(shiftDateString(selectedDate, -1))}
           className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           aria-label="Previous day"
         >
@@ -58,7 +51,7 @@ export default function GreetingHeader({
           {formatDateNav(selectedDate, isToday)}
         </span>
         <button
-          onClick={() => !isToday && onDateChange(shiftDate(selectedDate, 1))}
+          onClick={() => !isToday && onDateChange(shiftDateString(selectedDate, 1))}
           className={`p-1 rounded-full transition-colors ${
             isToday
               ? 'text-muted-foreground/30 cursor-default'

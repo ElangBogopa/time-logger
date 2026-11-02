@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase-server'
 import {
   TimeEntry,
   SessionCompletion,
+  getLocalDateString,
 } from '@/lib/types'
 
 interface DayPixel {
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
     const endDate = new Date(year, 11, 31)
 
     for (let d = new Date(startDate); d <= endDate && d <= today; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0]
+      const dateStr = getLocalDateString(d)
       const dayEntries = entriesByDate.get(dateStr) || []
       const entryCount = dayEntries.length
       const totalMinutes = dayEntries.reduce((sum, e) => sum + e.duration_minutes, 0)

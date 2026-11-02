@@ -7,6 +7,7 @@ import {
   TimeEntry,
   TimeCategory,
   CATEGORY_LABELS,
+  shiftDateString,
 } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
@@ -241,9 +242,7 @@ export async function POST(request: NextRequest) {
     // Only include days up to effectiveEndDate (excludes today for current week)
     const entriesByDay = new Map<string, TimeEntry[]>()
     for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart + 'T00:00:00')
-      d.setDate(d.getDate() + i)
-      const dateStr = d.toISOString().split('T')[0]
+      const dateStr = shiftDateString(weekStart, i)
       if (dateStr > effectiveEndDate) break
       entriesByDay.set(dateStr, [])
     }

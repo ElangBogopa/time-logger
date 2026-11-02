@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
-import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, PERIOD_TIME_RANGES, getUserToday } from '@/lib/types'
+import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, PERIOD_TIME_RANGES, getUserToday, getRealToday } from '@/lib/types'
 import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Zap, Share2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { csrfFetch } from '@/lib/api'
@@ -219,7 +219,7 @@ export default function PeriodSummaryPopup({
               }
             }}
             period={period}
-            date={new Date().toISOString().split('T')[0]}
+            date={getRealToday()}
             sessionScore={sessionScore}
             totalMinutes={totalMinutes}
             topCategories={topCategories}

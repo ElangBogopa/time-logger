@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
-import { getUserToday } from '@/lib/types'
+import { getUserToday, shiftDateString } from '@/lib/types'
 
 /**
  * One-time backfill: generates and saves day reviews for all locked dates
@@ -10,13 +10,6 @@ import { getUserToday } from '@/lib/types'
  * 
  * Call: POST /api/day-review/backfill
  */
-
-function getDateDaysAgo(baseDate: string, days: number): string {
-  const [y, m, d] = baseDate.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  date.setDate(date.getDate() - days)
-  return date.toISOString().split('T')[0]
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     const userId = session.user.id
     const today = getUserToday()
-    const yesterday = getDateDaysAgo(today, 1)
+    const yesterday = shiftDateString(today, -1)
 
     // Step 1: Get all unique dates with entries (locked dates only = before yesterday)
     const { data: dateRows, error: dateError } = await supabase

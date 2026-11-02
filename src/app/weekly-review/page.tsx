@@ -27,7 +27,7 @@ import {
   Share2,
   Grid3X3,
 } from 'lucide-react'
-import { TimeCategory, CATEGORY_LABELS, ENERGY_VIEW, AggregatedCategory, AGGREGATED_CATEGORY_LABELS, getUserToday } from '@/lib/types'
+import { TimeCategory, CATEGORY_LABELS, ENERGY_VIEW, AggregatedCategory, AGGREGATED_CATEGORY_LABELS, getUserToday, getWeekStartForDate, shiftDateString } from '@/lib/types'
 import {
   Dialog,
   DialogContent,
@@ -129,19 +129,9 @@ interface WeeklyReviewData {
   coachSummary: string | null
 }
 
-// Get Sunday (start) of a given week
-function getWeekStart(date: Date): string {
-  const d = new Date(date)
-  const day = d.getDay() // 0 = Sunday, 1 = Monday, etc.
-  d.setDate(d.getDate() - day) // Go back to Sunday
-  return d.toISOString().split('T')[0]
-}
-
 // Get week start based on user's perceived "today" (accounts for 12-3AM rollover)
 function getUserWeekStart(): string {
-  const userToday = getUserToday()
-  const d = new Date(userToday + 'T12:00:00') // Noon to avoid timezone edge cases
-  return getWeekStart(d)
+  return getWeekStartForDate(getUserToday(), 0)
 }
 
 function formatWeekRange(weekStart: string, weekEnd: string): string {
@@ -275,15 +265,11 @@ export default function WeeklyReviewPage() {
   }, [status, weekStart])
 
   const goToPreviousWeek = () => {
-    const d = new Date(weekStart + 'T00:00:00')
-    d.setDate(d.getDate() - 7)
-    setWeekStart(d.toISOString().split('T')[0])
+    setWeekStart(shiftDateString(weekStart, -7))
   }
 
   const goToNextWeek = () => {
-    const d = new Date(weekStart + 'T00:00:00')
-    d.setDate(d.getDate() + 7)
-    const newWeekStart = d.toISOString().split('T')[0]
+    const newWeekStart = shiftDateString(weekStart, 7)
     if (newWeekStart <= getUserWeekStart()) {
       setWeekStart(newWeekStart)
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
-import { TimeCategory, TimeEntry } from '@/lib/types'
+import { TimeCategory, TimeEntry, shiftDateString } from '@/lib/types'
 
 export interface ActivitySuggestion {
   activity: string
@@ -161,10 +161,7 @@ export async function POST(request: NextRequest) {
 
     // === RECENT ACTIVITY SUGGESTIONS ===
     // Suggest continuation of recent activities from today/yesterday
-    const recentDates = [date]
-    const yesterday = new Date(date + 'T00:00:00')
-    yesterday.setDate(yesterday.getDate() - 1)
-    recentDates.push(yesterday.toISOString().split('T')[0])
+    const recentDates = [date, shiftDateString(date, -1)]
 
     const recentEntries = entries
       .filter(e => recentDates.includes(e.date) && e.start_time)

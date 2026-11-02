@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:tz": "for tz in UTC America/Toronto America/Los_Angeles Europe/Berlin Asia/Tokyo Pacific/Kiritimati Pacific/Midway; do echo \"\\n── TZ=$tz ──\"; TZ=$tz jest src/lib/__tests__/date-shift.test.ts || exit 1; done"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
