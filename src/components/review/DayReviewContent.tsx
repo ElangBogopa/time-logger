@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
+import CommentaryThread from '@/components/CommentaryThread'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { commentaryFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
 import { Trophy, Clock, Sparkles, Check } from 'lucide-react'
@@ -342,7 +343,10 @@ export default function DayReviewContent() {
                     <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-3/4" />
                   </div>
                 ) : (
-                  <p className="text-sm text-foreground leading-relaxed">{commentary}</p>
+                  <>
+                    <p className="text-sm text-foreground leading-relaxed">{commentary}</p>
+                    <CommentaryThread subjectType="day" subjectKey={summary.date} commentary={commentary} />
+                  </>
                 )}
               </div>
             </div>

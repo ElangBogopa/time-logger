@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, PERIOD_TIME_RANGES, getUserToday, getRealToday } from '@/lib/types'
+import CommentaryThread from '@/components/CommentaryThread'
 import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Zap, Share2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { csrfFetch } from '@/lib/api'
@@ -17,6 +18,8 @@ interface PeriodSummaryPopupProps {
   isOpen: boolean
   onClose: () => void
   period: TimePeriod
+  /** The session's date, YYYY-MM-DD — half of the follow-up thread's key. */
+  date: string
   entries: TimeEntry[]
   commentary: string | null
   insight: string | null
@@ -87,6 +90,7 @@ export default function PeriodSummaryPopup({
   isOpen,
   onClose,
   period,
+  date,
   entries,
   commentary,
   insight,
@@ -555,9 +559,17 @@ export default function PeriodSummaryPopup({
                     <div className="h-4 bg-zinc-700 rounded animate-pulse w-3/4" />
                   </div>
                 ) : (
-                  <p className="text-sm text-zinc-300 leading-relaxed italic">
-                    &ldquo;{commentary || `Great ${periodLabel.toLowerCase()}! You stayed on track.`}&rdquo;
-                  </p>
+                  <div className="flex-1">
+                    <p className="text-sm text-zinc-300 leading-relaxed italic">
+                      &ldquo;{commentary || `Great ${periodLabel.toLowerCase()}! You stayed on track.`}&rdquo;
+                    </p>
+                    <CommentaryThread
+                      subjectType="session"
+                      subjectKey={`${date}:${period}`}
+                      commentary={commentary}
+                      tone="dark"
+                    />
+                  </div>
                 )}
               </div>
 

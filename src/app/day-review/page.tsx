@@ -1,6 +1,7 @@
 'use client'
 
 import { csrfFetch } from '@/lib/api'
+import CommentaryThread from '@/components/CommentaryThread'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 
 import { Suspense, useEffect, useState, useCallback } from 'react'
@@ -702,7 +703,14 @@ function DayReviewContent() {
                       <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-3/4" />
                     </div>
                   ) : (
-                    <p className="text-sm text-foreground leading-relaxed">{commentary}</p>
+                    <>
+                      <p className="text-sm text-foreground leading-relaxed">{commentary}</p>
+                      <CommentaryThread
+                        subjectType="day"
+                        subjectKey={summary.date}
+                        commentary={commentary}
+                      />
+                    </>
                   )}
                 </div>
               </div>

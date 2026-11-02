@@ -528,6 +528,7 @@ function LogPeriodContent() {
         isOpen={showSummary}
         onClose={handleSummaryClose}
         period={period}
+        date={selectedDate}
         entries={periodEntries}
         commentary={summaryCommentary}
         insight={summaryInsight}
