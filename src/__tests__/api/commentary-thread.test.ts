@@ -278,6 +278,43 @@ describe('POST', () => {
     expect(system).not.toContain('99999')
   })
 
+  it('tells the model how categories are assigned, and not to blame the person', async () => {
+    // The first real thread answered "why wasn't that deep work" by guessing
+    // at the person — "multitasking or not fully engaged" — because nothing
+    // told it the category came from a classifier reading the activity text.
+    await POST(post({ ...DAY, message: 'why?', subject_commentary: 'Strong focus today.' }))
+
+    const system = (lastRequest as unknown as ChatArgs).messages[0].content
+    expect(system).toContain('assigned automatically by a')
+    expect(system).toContain('ASSUME THE WORK WAS WORK')
+    expect(system).toContain('slacking')
+  })
+
+  it('tells the model to answer the question and skip the advice', async () => {
+    // Every reply in the first real thread ended with homework.
+    await POST(post({ ...DAY, message: 'why?' }))
+
+    const system = (lastRequest as unknown as ChatArgs).messages[0].content
+    expect(system).toContain('No closing advice')
+    expect(system).toContain('Answer the question that was asked')
+  })
+
+  it('tells the model to correct itself rather than defend an answer', async () => {
+    await POST(post({ ...DAY, message: 'I dont like your tone' }))
+
+    const system = (lastRequest as unknown as ChatArgs).messages[0].content
+    expect(system).toContain('push back on your tone')
+    expect(system).toContain('Do not defend a previous answer')
+  })
+
+  it('keeps the cheek while ruling out condescension', async () => {
+    await POST(post({ ...DAY, message: 'why?' }))
+
+    const system = (lastRequest as unknown as ChatArgs).messages[0].content
+    expect(system).toContain('Cheeky is fine')
+    expect(system).toContain('condescending never is')
+  })
+
   it.each([
     ['an empty message', { ...DAY, message: '   ' }],
     ['a missing message', { ...DAY }],

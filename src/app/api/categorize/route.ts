@@ -127,13 +127,16 @@ IMPORTANT RULES:
    - Intentional relaxation, reading, unwinding → rest
    - TV, games, scrolling, browsing → entertainment
 
-5. GENERIC WORK IS STILL WORK: an activity that says only that someone worked,
-   with no detail about what, is shallow_work — never other:
-   - "Work" → shallow_work
-   - "Working" / "Worked" / "At work" → shallow_work
-   - "Office" / "Day job" / "Work session" → shallow_work
-   Pick deep_work when the activity names something cognitively demanding
-   (coding, writing, analysis, design), and shallow_work when it does not say.
+5. ASSUME A WORKING DAY IS REAL WORK: an activity that says only that someone
+   worked is deep_work. Someone logging "Work" for their job was doing their
+   job, not answering email for eight hours:
+   - "Work" → deep_work
+   - "Working" / "Worked" / "At work" → deep_work
+   - "Office" / "Day job" / "Work session" → deep_work
+   Use shallow_work ONLY when the activity itself says the task was light:
+   email, Slack, status updates, expenses, filing, quick reviews. Never infer
+   shallow_work from a lack of detail — a missing description is not evidence
+   that the work was trivial.
 
 6. USE 'other' ONLY AS A LAST RESORT: it means the activity fits no category at
    all. If it plausibly belongs somewhere, put it there. Anything describing

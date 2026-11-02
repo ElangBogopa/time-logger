@@ -121,8 +121,11 @@ export async function POST(request: NextRequest) {
     const entertainmentMinutes = entries
       .filter(e => e.category === 'entertainment')
       .reduce((sum, e) => sum + e.duration_minutes, 0)
+    // shallow_work belongs here: answering email and filing expenses is still
+    // work, and leaving it out made the model call a full working day
+    // unproductive and then suggest the person try harder.
     const productiveMinutes = entries
-      .filter(e => ['deep_work', 'learning', 'exercise', 'creating'].includes(e.category || ''))
+      .filter(e => ['deep_work', 'shallow_work', 'learning', 'exercise', 'creating'].includes(e.category || ''))
       .reduce((sum, e) => sum + e.duration_minutes, 0)
 
     let toneGuidance = ''

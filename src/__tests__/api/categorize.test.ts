@@ -70,11 +70,20 @@ beforeEach(() => {
 
 type Res = { status: number; body: { category?: string; error?: string } }
 
-it('tells the model that generic work is shallow_work, not other', async () => {
+it('tells the model to treat a bare working day as real work', async () => {
   await POST(request('some unique activity for the prompt check'))
 
-  expect(lastPrompt).toContain('GENERIC WORK IS STILL WORK')
-  expect(lastPrompt).toMatch(/"Work" → shallow_work/)
+  expect(lastPrompt).toContain('ASSUME A WORKING DAY IS REAL WORK')
+  expect(lastPrompt).toMatch(/"Work" → deep_work/)
+})
+
+it('tells the model not to infer shallow work from missing detail', async () => {
+  await POST(request('a third unique activity for the prompt check'))
+
+  // "shallow" was reading as "barely working": it scores 0.3 against deep
+  // work's 1.0 and the session commentary did not count it as productive.
+  expect(lastPrompt).toContain('Never infer')
+  expect(lastPrompt).toMatch(/a missing description is not evidence/)
 })
 
 it('tells the model to use other only as a last resort', async () => {
