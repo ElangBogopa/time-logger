@@ -50,6 +50,7 @@ const CATEGORY_TO_AGGREGATED: Record<TimeCategory, AggregatedCategory> = {
   social: 'connection',
   calls: 'connection',
   entertainment: 'escape',
+  faith: 'faith',
   other: 'escape',
 }
 
@@ -60,6 +61,7 @@ const AGGREGATED_HEX: Record<AggregatedCategory, string> = {
   body: '#7D9B8A',       // Sage green
   recovery: '#B5A07A',   // Dusty amber
   connection: '#A0848E', // Muted rose
+  faith: '#8A7CA8',
   escape: '#7A7D82',     // Cool gray
 }
 
@@ -78,6 +80,7 @@ const AGGREGATED_COLORS: Record<AggregatedCategory, string> = {
   body: 'bg-[#7D9B8A]',
   recovery: 'bg-[#B5A07A]',
   connection: 'bg-[#A0848E]',
+  faith: 'bg-[#8A7CA8]',
   escape: 'bg-[#7A7D82]',
 }
 
@@ -87,6 +90,7 @@ const AGGREGATED_TEXT_COLORS: Record<AggregatedCategory, string> = {
   body: 'text-[#7D9B8A]',
   recovery: 'text-[#B5A07A]',
   connection: 'text-[#A0848E]',
+  faith: 'text-[#8A7CA8]',
   escape: 'text-[#7A7D82]',
 }
 

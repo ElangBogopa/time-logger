@@ -66,6 +66,12 @@ describe('ENERGY_VIEW configuration', () => {
     expect(ENERGY_VIEW.connection.label).toBe('Connection')
   })
 
+  it('gives faith its own bucket rather than filing it under recovery', () => {
+    expect(ENERGY_VIEW.faith.categories).toEqual(['faith'])
+    expect(ENERGY_VIEW.recovery.categories).not.toContain('faith')
+    expect(getAggregatedCategory('faith')).toBe('faith')
+  })
+
   it('maps escape to entertainment only', () => {
     expect(ENERGY_VIEW.escape.categories).toContain('entertainment')
     expect(ENERGY_VIEW.escape.label).toBe('Escape')
@@ -78,7 +84,7 @@ describe('ENERGY_VIEW configuration', () => {
     expect(ENERGY_VIEW.ops.categories).toContain('other')
   })
 
-  it('covers all 19 granular categories exactly once', () => {
+  it('covers every granular category exactly once', () => {
     const allCategories = Object.keys(CATEGORY_LABELS) as TimeCategory[]
     const mappedCategories: TimeCategory[] = []
 
@@ -338,12 +344,16 @@ describe('TimeCategory type coverage', () => {
     'calls',
     // Leisure
     'entertainment',
+    // Faith
+    'faith',
     // Fallback
     'other',
   ]
 
-  it('has 19 total categories', () => {
-    expect(allCategories.length).toBe(19)
+  it('has 20 total categories', () => {
+    expect(allCategories.length).toBe(20)
+    // the hand-written list above must stay in step with the type
+    expect(new Set(allCategories)).toEqual(new Set(Object.keys(CATEGORY_LABELS)))
   })
 
   it('all categories have labels', () => {
@@ -355,7 +365,8 @@ describe('TimeCategory type coverage', () => {
   it('all categories map to an aggregated category', () => {
     allCategories.forEach(cat => {
       const aggCat = getAggregatedCategory(cat)
-      expect(['focus', 'ops', 'body', 'recovery', 'connection', 'escape']).toContain(aggCat)
+      // derived, so adding a bucket does not need this list editing too
+      expect(Object.keys(ENERGY_VIEW)).toContain(aggCat)
     })
   })
 })

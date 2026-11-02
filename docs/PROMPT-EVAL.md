@@ -225,3 +225,34 @@ movements are real.
 Religious practice. Both runs scatter it across ten categories with a quarter
 in the fallback, and the second run barely moved it, which is the clearest
 possible evidence that this is a taxonomy problem and not a prompt one.
+
+
+---
+
+## Third run — after adding the `faith` category
+
+| group | before | after |
+|---|---|---|
+| religious practice (core) | 29% in `other`, spread over 10 buckets | **100% `faith` (90/90)** |
+| religious practice (adjacent) | — | 86% (Retreat day → other; apologetics podcast → entertainment) |
+| contested → `other` | 14% | 18% |
+| overall scored | 97.5% of 650 | **97.1% of 790** |
+
+The headline number barely moves because 140 previously unscorable entries
+became scorable — and the hardest ones at that. The group that mattered went
+from unusable to exact.
+
+This is the clearest result in the whole exercise: two rounds of prompt
+wording moved religious practice by four percentage points, and giving it a
+category moved it by seventy-one. When the taxonomy has no home for something,
+prompt engineering is the wrong tool.
+
+### Choices made, that are yours to revisit
+
+- **`faith` is its own aggregated bucket**, not folded into `recovery`.
+  Filing prayer under recovery would assert it is a form of downtime.
+- **It feeds none of the three hero metrics** (Body, Focus, Social). A day of
+  prayer therefore scores zero on all three, which may itself read as a
+  judgement. Adding it to a metric is a values decision, so it is left to you.
+- `ALTER TYPE … ADD VALUE` cannot be undone in Postgres. The enum value is
+  permanent even if the category is removed from the app.

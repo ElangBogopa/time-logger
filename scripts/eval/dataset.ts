@@ -64,14 +64,17 @@ const SPECS: Spec[] = [
   ['entertainment', ['entertainment'], ['Netflix', 'Gaming', 'Scrolling TikTok', 'YouTube', 'Watching football', 'Browsing Reddit']],
 
   // ─── religious and spiritual practice: the app has no category for it ───
-  ['religious_practice', null, [
+  ['religious_core', ['faith'], [
     'Morning prayer', 'Salah', 'Fajr prayer', 'Reading the Quran', 'Quran study circle',
-    'Bible study', 'Church service', 'Sunday mass', 'Youth group at church', 'Worship team practice',
-    'Synagogue', 'Torah study', 'Shabbat dinner', 'Temple visit', 'Puja',
-    'Meditation (Buddhist practice)', 'Rosary', 'Confession', 'Fasting', 'Devotional reading',
-    'Volunteering at the mosque', 'Choir practice', 'Tithing and church finances', 'Sermon prep',
-    'Islamic history lecture', 'Christian apologetics podcast', 'Prayer meeting', 'Retreat day',
-  ], 'There is no religious category. Whatever it picks, some users will find it wrong — the point is to see what it picks and how consistent it is.'],
+    'Bible study', 'Church service', 'Sunday mass', 'Worship team practice',
+    'Synagogue', 'Torah study', 'Temple visit', 'Puja',
+    'Rosary', 'Confession', 'Devotional reading', 'Sermon prep', 'Prayer meeting',
+  ], 'Core religious practice. Before the faith category these scattered across ten buckets with 29% in the fallback.'],
+  ['religious_adjacent', ['faith', 'social', 'learning', 'meals', 'creating'], [
+    'Youth group at church', 'Shabbat dinner', 'Fasting', 'Volunteering at the mosque',
+    'Choir practice', 'Tithing and church finances', 'Islamic history lecture',
+    'Christian apologetics podcast', 'Retreat day', 'Meditation (Buddhist practice)',
+  ], 'Faith-shaped but genuinely shared with another category; any of these is defensible, other is not.'],
 
   // ─── activities whose value is genuinely contested ───
   ['contested_value', null, [

@@ -9,6 +9,7 @@ import {
   Users,
   Tv,
   HelpCircle,
+  Sparkles,
 } from 'lucide-react'
 
 /**
@@ -24,6 +25,7 @@ const AGG_HEX: Record<AggregatedCategory, string> = {
   recovery: '#f59e0b', // amber-500
   connection: '#ec4899', // pink-500
   escape: '#71717a',  // zinc-500
+  faith: '#8b5cf6',   // violet-500
 }
 
 // Aggregated category → icon
@@ -34,6 +36,7 @@ const AGG_ICONS: Record<AggregatedCategory, React.ElementType> = {
   recovery: Heart,
   connection: Users,
   escape: Tv,
+  faith: Sparkles,
 }
 
 function formatDuration(minutes: number): string {

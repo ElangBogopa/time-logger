@@ -94,7 +94,18 @@ IMPORTANT RULES:
    creating even when it involves moving about — "Photography walk" is
    creating, not exercise. Use exercise only when the exercise is the point.
 
-8. USE 'other' ONLY AS A LAST RESORT: it means the activity fits no category at
+8. FAITH IS ITS OWN CATEGORY: religious and spiritual practice is faith, not
+   other, and not learning or social because of its shape:
+   - Prayer, salah, fajr, rosary, devotions → faith
+   - Reading or studying scripture — Quran, Bible, Torah → faith
+   - Services, mass, jumu'ah, synagogue, temple, puja → faith
+   - Worship or choir practice, sermon prep, religious volunteering → faith
+   - Fasting kept for religious reasons → faith
+   Secular meditation or mindfulness is self_care. A meal that happens to be
+   with people from your congregation is social or meals; a Shabbat or iftar
+   meal observed as practice is faith.
+
+9. USE 'other' ONLY AS A LAST RESORT: it means the activity fits no category at
    all. If it plausibly belongs somewhere, put it there. Anything describing
    work, study, exercise, food, rest or people has a home above.
 

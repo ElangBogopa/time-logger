@@ -51,6 +51,8 @@ const CATEGORY_COLORS: Record<TimeCategory, string> = {
   calls: 'bg-[#f472b6]/20 text-[#f9a8d4]',
   // Leisure
   entertainment: 'bg-[#71717a]/20 text-[#a1a1aa]',
+  // Faith
+  faith: 'bg-[#8b5cf6]/20 text-[#c4b5fd]',
   // Fallback
   other: 'bg-[#52525b]/20 text-[#71717a]',
 }

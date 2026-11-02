@@ -1,4 +1,4 @@
-import { TimeCategory } from '@/lib/types'
+import { TimeCategory, AggregatedCategory } from '@/lib/types'
 
 // Timeline layout constants
 // 0.75 px/min = 45px/hour → ~13 hours visible on a 600px screen (matches Google/Apple Calendar density)
@@ -16,17 +16,18 @@ export const ENTRY_EDGE_ZONE = 0.2 // 20% of entry height for resize zones
 export const ENTRY_HOLD_DELAY = 200 // ms - hold before moving entry (touch only)
 
 // Aggregated color palette — 6 muted colors mapped to energy categories
-export const AGGREGATED_COLORS: Record<string, { border: string; bgLight: string; bgDark: string }> = {
+export const AGGREGATED_COLORS: Record<AggregatedCategory, { border: string; bgLight: string; bgDark: string }> = {
   focus:      { border: 'border-[#6B8CAE]', bgLight: 'bg-[#6B8CAE]/15', bgDark: 'dark:bg-[#6B8CAE]/15' },      // Slate blue
   ops:        { border: 'border-[#8B8680]', bgLight: 'bg-[#8B8680]/15', bgDark: 'dark:bg-[#8B8680]/15' },        // Warm gray
   body:       { border: 'border-[#7D9B8A]', bgLight: 'bg-[#7D9B8A]/15', bgDark: 'dark:bg-[#7D9B8A]/15' },       // Sage green
   recovery:   { border: 'border-[#B5A07A]', bgLight: 'bg-[#B5A07A]/15', bgDark: 'dark:bg-[#B5A07A]/15' },   // Dusty amber
   connection: { border: 'border-[#A0848E]', bgLight: 'bg-[#A0848E]/15', bgDark: 'dark:bg-[#A0848E]/15' }, // Muted rose
   escape:     { border: 'border-[#7A7D82]', bgLight: 'bg-[#7A7D82]/15', bgDark: 'dark:bg-[#7A7D82]/15' },     // Cool gray
+  faith:      { border: 'border-[#8A7CA8]', bgLight: 'bg-[#8A7CA8]/15', bgDark: 'dark:bg-[#8A7CA8]/15' },      // Muted violet
 }
 
 // Map each TimeCategory → aggregated category (mirrors ENERGY_VIEW from types.ts)
-export const CATEGORY_TO_AGGREGATED: Record<TimeCategory, string> = {
+export const CATEGORY_TO_AGGREGATED: Record<TimeCategory, AggregatedCategory> = {
   deep_work: 'focus',
   learning: 'focus',
   creating: 'focus',
@@ -45,6 +46,7 @@ export const CATEGORY_TO_AGGREGATED: Record<TimeCategory, string> = {
   social: 'connection',
   calls: 'connection',
   entertainment: 'escape',
+  faith: 'faith',
   other: 'escape',
 }
 

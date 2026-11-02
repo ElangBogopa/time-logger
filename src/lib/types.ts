@@ -29,6 +29,9 @@ export type TimeCategory =
   // LEISURE
   | 'entertainment'   // TV, games, movies, browsing
 
+  // FAITH
+  | 'faith'           // Prayer, worship, scripture study, religious community
+
   // FALLBACK
   | 'other'           // Anything that doesn't fit
 
@@ -323,6 +326,8 @@ export const CATEGORY_LABELS: Record<TimeCategory, string> = {
   calls: 'Calls',
   // Leisure
   entertainment: 'Entertainment',
+  // Faith
+  faith: 'Faith',
   // Fallback
   other: 'Other',
 }
@@ -339,6 +344,7 @@ export type AggregatedCategory =
   | 'recovery'
   | 'connection'
   | 'escape'
+  | 'faith'
 
 export interface CategoryViewGroup {
   label: string
@@ -387,6 +393,13 @@ export const ENERGY_VIEW: CategoryView = {
     color: 'zinc',
     categories: ['entertainment'],
   },
+  // Its own bucket on purpose. Folding faith into recovery would say prayer
+  // is a form of downtime, which is not ours to decide.
+  faith: {
+    label: 'Faith',
+    color: 'violet',
+    categories: ['faith'],
+  },
 }
 
 /**
@@ -430,6 +443,7 @@ export const AGGREGATED_CATEGORY_LABELS: Record<AggregatedCategory, string> = {
   recovery: 'Recovery',
   connection: 'Connection',
   escape: 'Escape',
+  faith: 'Faith',
 }
 
 export const AGGREGATED_CATEGORY_COLORS: Record<AggregatedCategory, string> = {
@@ -439,6 +453,7 @@ export const AGGREGATED_CATEGORY_COLORS: Record<AggregatedCategory, string> = {
   recovery: 'bg-amber-500',
   connection: 'bg-pink-500',
   escape: 'bg-zinc-500',
+  faith: 'bg-violet-500',
 }
 
 /**
@@ -738,6 +753,22 @@ export const CATEGORY_DEFINITIONS: Record<TimeCategory, {
   },
 
   // FALLBACK
+  // FAITH
+  faith: {
+    definition: 'Religious and spiritual practice, alone or with a community.',
+    includes: [
+      'Prayer and salah',
+      'Scripture study (Quran, Bible, Torah)',
+      'Services, mass, jumu\'ah',
+      'Worship and choir practice',
+      'Fasting observed for faith',
+      'Religious community and volunteering',
+    ],
+    excludes: [
+      'Secular meditation (self_care)',
+      'A social meal that happens to be with people from your congregation (social)',
+    ],
+  },
   other: {
     definition: 'Activities that don\'t fit other categories. Consider if another category might apply.',
     includes: [
