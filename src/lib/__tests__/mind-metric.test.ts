@@ -45,11 +45,13 @@ describe('what Mind counts', () => {
 
   it('gives a full day of light work a real but modest score', () => {
     // The thing that made an eight-hour admin day read as nothing.
-    expect(calcFocus([entry('shallow_work', hours(8))])).toBe(60)
+    const score = calcFocus([entry('shallow_work', hours(8))])
+    expect(score).toBeGreaterThan(50)
+    expect(score).toBeLessThan(FOCUS_THRESHOLDS.green)
   })
 
-  it('reaches 100 on four hours of deep work', () => {
-    expect(calcFocus([entry('deep_work', FOCUS_TARGET)])).toBe(100)
+  it('scores 80 on four hours of deep work — the target, not a perfect day', () => {
+    expect(calcFocus([entry('deep_work', FOCUS_TARGET)])).toBe(80)
   })
 
   it('ignores categories that belong to other metrics', () => {

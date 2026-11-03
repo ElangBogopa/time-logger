@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import { getUserToday } from '@/lib/types'
-import { EntryRow, FOCUS_WEIGHTS, BODY_CATS, SOCIAL_CATS, FOCUS_TARGET, BODY_TARGET, SOCIAL_TARGET, FOCUS_THRESHOLDS, BODY_THRESHOLDS, SOCIAL_THRESHOLDS, getStatusColor, getNudge } from '@/lib/metrics-calc'
+import { EntryRow, FOCUS_WEIGHTS, BODY_CATS, SOCIAL_CATS, FOCUS_TARGET, BODY_TARGET, SOCIAL_TARGET, FOCUS_THRESHOLDS, BODY_THRESHOLDS, SOCIAL_THRESHOLDS, getStatusColor, getNudge, calcBody, calcFocus, calcSocial } from '@/lib/metrics-calc'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -38,9 +38,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const bodyValue = Math.round(Math.min(100, (bodyMinutes / BODY_TARGET) * 100))
+    const bodyValue = calcBody(todayEntries)
     const bodyColor = getStatusColor(bodyValue, BODY_THRESHOLDS)
-    const bodyLabel = bodyValue >= 70 ? 'Fueled up' : bodyValue >= 40 ? 'Running low' : 'Running on empty'
+    const bodyLabel = bodyValue >= BODY_THRESHOLDS.green ? 'Fueled up' : bodyValue >= BODY_THRESHOLDS.yellow ? 'Running low' : 'Running on empty'
 
     // ═══════════════════════════════════════
     // ⚡ FOCUS — weighted deep work output
@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const focusValue = Math.round(Math.min(100, (weightedMinutes / FOCUS_TARGET) * 100))
+    const focusValue = calcFocus(todayEntries)
     const focusColor = getStatusColor(focusValue, FOCUS_THRESHOLDS)
-    const focusLabel = focusValue >= 80 ? 'Locked in' : focusValue >= 50 ? 'Building' : 'Scattered'
+    const focusLabel = focusValue >= FOCUS_THRESHOLDS.green ? 'Locked in' : focusValue >= FOCUS_THRESHOLDS.yellow ? 'Building' : 'Scattered'
 
     // ═══════════════════════════════════════
     // 👥 SOCIAL — connection time
@@ -74,9 +74,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const socialValue = Math.round(Math.min(100, (socialMinutes / SOCIAL_TARGET) * 100))
+    const socialValue = calcSocial(todayEntries)
     const socialColor = getStatusColor(socialValue, SOCIAL_THRESHOLDS)
-    const socialLabel = socialValue >= 70 ? 'Connected' : socialValue >= 35 ? 'Reaching out' : 'Isolated'
+    const socialLabel = socialValue >= SOCIAL_THRESHOLDS.green ? 'Connected' : socialValue >= SOCIAL_THRESHOLDS.yellow ? 'Reaching out' : 'Isolated'
 
     // ═══════════════════════════════════════
     // 💡 NUDGE — actionable insight

@@ -10,6 +10,9 @@
 
 import { calcSocial, SOCIAL_CATS, SOCIAL_TARGET, METRIC_LABELS, EntryRow } from '../metrics-calc'
 
+// Hitting the target scores 80, not 100 — see saturatingScore.
+const AT_TARGET = 80
+
 const entry = (category: string, duration_minutes: number): EntryRow => ({
   category,
   duration_minutes,
@@ -35,18 +38,20 @@ describe('what Heart counts', () => {
 
   it('counts faith', () => {
     expect(SOCIAL_CATS).toContain('faith')
-    expect(calcSocial([entry('faith', SOCIAL_TARGET)])).toBe(100)
+    expect(calcSocial([entry('faith', SOCIAL_TARGET)])).toBe(AT_TARGET)
   })
 
   it('does not require faith — an hour with friends still maxes it', () => {
     // The property that keeps this fair to someone with no religious practice.
-    expect(calcSocial([entry('social', SOCIAL_TARGET)])).toBe(100)
+    expect(calcSocial([entry('social', SOCIAL_TARGET)])).toBe(AT_TARGET)
   })
 
   it('adds faith to time with people rather than replacing it', () => {
     const half = SOCIAL_TARGET / 2
-    expect(calcSocial([entry('calls', half)])).toBe(50)
-    expect(calcSocial([entry('calls', half), entry('faith', half)])).toBe(100)
+    const halfScore = calcSocial([entry('calls', half)])
+    const together = calcSocial([entry('calls', half), entry('faith', half)])
+    expect(together).toBe(AT_TARGET)
+    expect(together).toBeGreaterThan(halfScore)
   })
 
   it('still ignores work interaction', () => {

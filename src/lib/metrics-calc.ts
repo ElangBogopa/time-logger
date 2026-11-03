@@ -60,14 +60,41 @@ export const METRIC_LABELS = {
 } as const
 
 // ── Default targets ──
-export const FOCUS_TARGET = 240 // 4 hours weighted
-export const BODY_TARGET = 90   // ~1.5 hours combined (weighted, with diminishing returns)
-export const SOCIAL_TARGET = 60 // 1 hour
+// Targets are the load that scores 80. See saturatingScore.
+export const FOCUS_TARGET = 240 // 4 hours of deep work, or the weighted equivalent
+export const BODY_TARGET = 48   // an hour of exercise at weight 0.80
+export const SOCIAL_TARGET = 60 // 1 hour with people, or in prayer
 
 // ── Color / Label / Nudge thresholds ──
+// Green is 80 on all three now, because 80 means the same thing on all three:
+// you hit the target. Yellow at 50 is roughly 43% of it.
 export const FOCUS_THRESHOLDS = { green: 80, yellow: 50 }
-export const BODY_THRESHOLDS = { green: 70, yellow: 40 }
-export const SOCIAL_THRESHOLDS = { green: 70, yellow: 35 }
+export const BODY_THRESHOLDS = { green: 80, yellow: 50 }
+export const SOCIAL_THRESHOLDS = { green: 80, yellow: 50 }
+
+/**
+ * Load → score, the Whoop way: accumulate load linearly, show it on a scale
+ * that gets harder the further you go.
+ *
+ *   score = 100 × (1 − e^(−k · load / target)),  k = ln 5
+ *
+ * k is chosen so that hitting the target lands exactly on 80, which gives the
+ * number a meaning it never had while the scale was linear: 80 is "you did
+ * what you set out to do", not an arbitrary line. Past that it saturates —
+ * double the target is 96, triple is 99 — and 100 is an asymptote, so the
+ * display is clamped at 99 and a perfect score is unreachable by design.
+ *
+ * Load stays linear everywhere else, so the breakdowns still add up and a
+ * detail sheet can explain a score in minutes.
+ */
+const SATURATION_K = Math.log(5) // ≈ 1.609: target → 80
+export const MAX_SCORE = 99
+
+export function saturatingScore(load: number, target: number): number {
+  if (load <= 0 || target <= 0) return 0
+  const score = 100 * (1 - Math.exp((-SATURATION_K * load) / target))
+  return Math.min(MAX_SCORE, Math.round(score))
+}
 
 // ── Pure helpers ──
 
@@ -99,7 +126,7 @@ export function calcFocus(dayEntries: EntryRow[]): number {
       weightedMinutes += entry.duration_minutes * weight
     }
   }
-  return Math.round(Math.min(100, (weightedMinutes / FOCUS_TARGET) * 100))
+  return saturatingScore(weightedMinutes, FOCUS_TARGET)
 }
 
 /** Get Focus details breakdown for a set of entries */
@@ -137,23 +164,15 @@ export function calcBody(dayEntries: EntryRow[]): number {
     }
   }
 
-  let totalScore = 0
+  // Weighted minutes, summed linearly. The per-category sqrt and caps that
+  // used to live here are gone: the shared curve now provides the diminishing
+  // returns, and doing it in both places damps twice.
+  let weightedMinutes = 0
   for (const [cat, config] of Object.entries(BODY_WEIGHTS)) {
-    const minutes = minutesByCategory[cat] || 0
-    if (minutes === 0) continue
-
-    // sqrt scaling: diminishing returns as you log more
-    // ratio of 1.0 = hit target, sqrt(1.0) = 1.0 → full weight
-    // ratio of 4.0 = 4x target, sqrt(4.0) = 2.0 → only 2x, not 4x
-    const ratio = minutes / config.target
-    const scaled = Math.sqrt(ratio)
-
-    // Category contribution = scaled * weight * 100, capped
-    const contribution = Math.min(config.cap, scaled * config.weight * 100)
-    totalScore += contribution
+    weightedMinutes += (minutesByCategory[cat] || 0) * config.weight
   }
 
-  return Math.round(Math.min(100, totalScore))
+  return saturatingScore(weightedMinutes, BODY_TARGET)
 }
 
 /** Get Body details breakdown for a set of entries */
@@ -191,7 +210,7 @@ export function calcSocial(dayEntries: EntryRow[]): number {
     .filter(e => SOCIAL_CATS.includes(e.category))
     .reduce((s, e) => s + e.duration_minutes, 0)
 
-  return Math.round(Math.min(100, (socialMinutes / SOCIAL_TARGET) * 100))
+  return saturatingScore(socialMinutes, SOCIAL_TARGET)
 }
 
 /** Get Social details breakdown for a set of entries */
