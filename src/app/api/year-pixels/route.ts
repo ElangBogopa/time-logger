@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     // query that used to boost the score by 10 a session is gone with it.
     const entriesResult = await supabase
       .from('time_entries')
-      .select('date, category, duration_minutes, status')
+      .select('date, activity, category, duration_minutes, status')
       .eq('user_id', userId)
       .eq('status', 'confirmed')
       .gte('date', yearStart)

@@ -1,86 +1,147 @@
 /**
  * What Body counts.
  *
- * It was a training metric with a broader name: reaching 80 without exercise
- * needed 192 minutes of self-care, and sleep and meals counted toward no
- * metric at all. On 3 Nov 2026 a day with a shower, two meals, a haircut and
- * seven hours of work scored 22, labelled "Running on empty".
+ * Two corrections, a day apart, pulling in opposite directions.
  *
- * Body now means "did you look after yourself". Training is still the
- * strongest single lever, but it is no longer the only route.
+ * The first: Body was a training metric with a broader name. A day with a
+ * shower, two meals and seven hours of work scored 22 and was labelled
+ * "Running on empty". Sleep and meals fed no metric at all.
+ *
+ * The second, and the one this file now pins: the fix went too far. Upkeep
+ * and exercise were summed into one pot against one target, so eight hours
+ * of sleep, three meals and a shower came to 45 weighted minutes against a
+ * target of 48 — a score of 78 on a day with no exercise in it. A metric
+ * called Body should not say that.
+ *
+ * So the two are scored separately and upkeep's share is capped: a day of
+ * perfect upkeep and no training cannot reach the seventies, and exercise
+ * is counted in moderate-equivalent minutes, the way the physical activity
+ * guidelines count it.
  */
 
 import {
   calcBody,
   calcBodyDetails,
+  classifyIntensity,
+  exerciseMinutes,
   BODY_CATS,
-  BODY_WEIGHTS,
+  UPKEEP_WEIGHTS,
   BODY_THRESHOLDS,
+  EXERCISE_TARGET,
   EntryRow,
 } from '../metrics-calc'
 
-const entry = (category: string, duration_minutes: number): EntryRow => ({
+const entry = (category: string, duration_minutes: number, activity?: string): EntryRow => ({
   category,
   duration_minutes,
   date: '2026-11-03',
+  activity,
 })
 
 // the real 3 Nov day, minus the entries no body metric should count
 const thatDay = [entry('self_care', 30), entry('meals', 120)]
+// a thorough day of looking after yourself, with no training in it
+const perfectUpkeep = [
+  entry('sleep', 480),
+  entry('meals', 150),
+  entry('self_care', 90),
+  entry('rest', 60),
+]
 
-describe('what Body counts', () => {
-  it('counts sleep and meals, which fed no metric at all', () => {
+describe('upkeep cannot stand in for exercise', () => {
+  it('keeps a day with no exercise out of the seventies, however well kept', () => {
+    const score = calcBody(perfectUpkeep)
+    expect(score).toBeLessThan(70)
+    // and it is not zero either: looking after yourself still counts
+    expect(score).toBeGreaterThan(30)
+  })
+
+  it('no longer scores a night of sleep and some meals at 78', () => {
+    const ordinary = [entry('sleep', 480), entry('meals', 90), entry('self_care', 30)]
+    expect(calcBody(ordinary)).toBeLessThan(60)
+  })
+
+  it('still refuses to call a day of upkeep "running on empty"', () => {
+    expect(calcBody(thatDay)).toBeGreaterThanOrEqual(10)
+  })
+
+  it('counts sleep and meals, which once fed no metric at all', () => {
     expect(BODY_CATS).toContain('sleep')
     expect(BODY_CATS).toContain('meals')
     expect(calcBody([entry('sleep', 480)])).toBeGreaterThan(0)
-    expect(calcBody([entry('meals', 120)])).toBeGreaterThan(0)
   })
 
-  it('keeps exercise the strongest lever', () => {
-    const w = BODY_WEIGHTS
-    expect(w.exercise.weight).toBeGreaterThan(w.self_care.weight)
-    expect(w.self_care.weight).toBeGreaterThan(w.rest.weight)
-    expect(w.rest.weight).toBeGreaterThan(w.meals.weight)
-    expect(w.meals.weight).toBeGreaterThan(w.sleep.weight)
+  it('ranks the same day higher once training is in it', () => {
+    expect(calcBody([...perfectUpkeep, entry('exercise', 45, 'Gym')])).toBeGreaterThan(
+      calcBody(perfectUpkeep)
+    )
   })
 
-  it('still scores an hour of training at exactly the target', () => {
-    expect(calcBody([entry('exercise', 60)])).toBe(80)
-  })
-
-  it('no longer calls a day of upkeep "running on empty"', () => {
-    // 22 before this change
-    const score = calcBody(thatDay)
-    expect(score).toBe(55)
-    expect(score).toBeGreaterThanOrEqual(BODY_THRESHOLDS.yellow)
-  })
-
-  it('lets a full night plus upkeep reach the target without training', () => {
-    expect(calcBody([...thatDay, entry('sleep', 480)])).toBe(80)
-  })
-
-  it('still scores nothing when nothing is logged', () => {
+  it('scores nothing when nothing of the body was logged', () => {
     expect(calcBody([entry('deep_work', 480), entry('social', 120)])).toBe(0)
   })
+})
 
-  it('ranks a training day above the same day without it', () => {
-    expect(calcBody([...thatDay, entry('exercise', 60)])).toBeGreaterThan(calcBody(thatDay))
+describe('exercise is ranked by intensity, not just minutes', () => {
+  it('counts vigorous work double and light movement half', () => {
+    // WHO asks for 150 minutes of moderate a week or 75 of vigorous, so
+    // vigorous is worth twice as much per minute.
+    expect(classifyIntensity('exercise', 'Morning run')).toBe('vigorous')
+    expect(classifyIntensity('exercise', 'Gym: leg day')).toBe('moderate')
+    expect(classifyIntensity('exercise', 'Walk to the shops')).toBe('light')
+    expect(classifyIntensity('movement', 'Stretching')).toBe('light')
+  })
+
+  it('treats an unrecognised exercise entry as moderate, not as nothing', () => {
+    // The person called it exercise; the app should not argue.
+    expect(classifyIntensity('exercise', 'Kettlebell complexes')).toBe('moderate')
+    expect(classifyIntensity('exercise', undefined)).toBe('moderate')
+  })
+
+  it('treats bare movement as light', () => {
+    expect(classifyIntensity('movement', undefined)).toBe('light')
+  })
+
+  it('converts a session into moderate-equivalent minutes', () => {
+    expect(exerciseMinutes([entry('exercise', 30, 'Run')])).toBe(60)
+    expect(exerciseMinutes([entry('exercise', 30, 'Gym')])).toBe(30)
+    expect(exerciseMinutes([entry('movement', 30, 'Walk the dog')])).toBe(15)
+  })
+
+  it('scores a short hard session above a long gentle one', () => {
+    const run = calcBody([entry('exercise', 25, 'Interval run')])
+    const walk = calcBody([entry('movement', 45, 'Walk')])
+    expect(run).toBeGreaterThan(walk)
+  })
+
+  it('puts a session at the target on the published 80', () => {
+    // 45 moderate-equivalent minutes is the target, which scores 80 on the
+    // exercise half before upkeep is added.
+    const { exerciseScore } = calcBodyDetails([entry('exercise', EXERCISE_TARGET, 'Gym')])
+    expect(exerciseScore).toBe(80)
+  })
+
+  it('needs both halves for a strong day', () => {
+    const trainingOnly = calcBody([entry('exercise', 45, 'Gym')])
+    const both = calcBody([...perfectUpkeep, entry('exercise', 45, 'Gym')])
+    expect(trainingOnly).toBeLessThan(70)
+    expect(both).toBeGreaterThanOrEqual(BODY_THRESHOLDS.green)
   })
 })
 
 describe('the breakdown explains the score', () => {
-  it('scores each category on the same scale as the headline', () => {
-    // calcBodyDetails kept the old sqrt-and-caps maths after calcBody moved
-    // to the shared curve, so the parts no longer related to the whole.
-    const { categoryScores } = calcBodyDetails([entry('exercise', 60)])
-    expect(categoryScores.exercise).toBe(calcBody([entry('exercise', 60)]))
+  it('adds up to the headline', () => {
+    const day = [...perfectUpkeep, entry('exercise', 45, 'Gym')]
+    const { categoryScores } = calcBodyDetails(day)
+    const summed = Object.values(categoryScores).reduce((a, b) => a + b, 0)
+    // within rounding of the headline, which is the point of a breakdown
+    expect(Math.abs(summed - calcBody(day))).toBeLessThanOrEqual(4)
   })
 
-  it('agrees with the headline for every single-category day', () => {
-    for (const cat of Object.keys(BODY_WEIGHTS)) {
-      const day = [entry(cat, 90)]
-      expect(calcBodyDetails(day).categoryScores[cat]).toBe(calcBody(day))
-    }
+  it('separates the two halves so the sheet can say which is missing', () => {
+    const { exerciseScore, upkeepScore } = calcBodyDetails(perfectUpkeep)
+    expect(exerciseScore).toBe(0)
+    expect(upkeepScore).toBeGreaterThan(70)
   })
 
   it('reports minutes as logged, not weighted', () => {
@@ -90,9 +151,19 @@ describe('the breakdown explains the score', () => {
     expect(breakdown.meals).toBe(120)
   })
 
-  it('folds movement into exercise in the breakdown', () => {
-    const { breakdown } = calcBodyDetails([entry('movement', 30), entry('exercise', 30)])
+  it('folds movement into exercise in the breakdown, and records the intensity', () => {
+    const { breakdown, intensities } = calcBodyDetails([
+      entry('movement', 30, 'Walk'),
+      entry('exercise', 30, 'Run'),
+    ])
     expect(breakdown.exercise).toBe(60)
     expect(breakdown.movement).toBeUndefined()
+    expect(intensities).toEqual({ light: 30, vigorous: 30 })
+  })
+
+  it('keeps self-care worth more per minute than a meal, and a meal than sleep', () => {
+    expect(UPKEEP_WEIGHTS.self_care).toBeGreaterThan(UPKEEP_WEIGHTS.rest)
+    expect(UPKEEP_WEIGHTS.rest).toBeGreaterThan(UPKEEP_WEIGHTS.meals)
+    expect(UPKEEP_WEIGHTS.meals).toBeGreaterThan(UPKEEP_WEIGHTS.sleep)
   })
 })

@@ -27,6 +27,10 @@ interface BodyDetails {
   totalMinutes: number
   target: number
   breakdown: Record<string, number>
+  exerciseScore?: number
+  upkeepScore?: number
+  moderateEquivalentMinutes?: number
+  exerciseTarget?: number
 }
 
 interface SocialDetails {
@@ -162,9 +166,23 @@ function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricC
 
   return (
     <div className="px-4 mb-6">
-      <h3 className="eyebrow mb-3">
-        Today&apos;s Body — {formatMinutes(details.totalMinutes)} / {formatMinutes(details.target)}
-      </h3>
+      <h3 className="eyebrow mb-3">Today&apos;s Body</h3>
+
+      {/* Body is two things and the score weights them differently, so the
+          sheet says so rather than showing one pile of minutes. */}
+      {details.exerciseScore !== undefined && (
+        <div className="mb-4 rounded-lg bg-secondary/50 p-3 space-y-1">
+          <p className="text-sm text-foreground">
+            {details.moderateEquivalentMinutes ?? 0} of {details.exerciseTarget ?? 45} moderate-equivalent
+            minutes of exercise
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {details.exerciseScore === 0
+              ? 'Upkeep alone tops out in the forties — vigorous minutes count double, light ones half.'
+              : 'Exercise carries three quarters of Body; upkeep carries the rest.'}
+          </p>
+        </div>
+      )}
       <div className="space-y-2">
         {breakdown.map(item => (
           <div key={item.label} className="flex items-center gap-3">

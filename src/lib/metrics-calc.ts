@@ -5,6 +5,8 @@ export interface EntryRow {
   category: string
   duration_minutes: number
   date: string
+  /** Used to judge how hard a session was; absent rows fall back to the category. */
+  activity?: string
 }
 
 export interface EssentialDef {
@@ -36,19 +38,95 @@ export const FOCUS_WEIGHTS: Record<string, number> = {
 // 'movement' is merged into 'exercise' in scoring; old entries still work.
 export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care', 'sleep', 'meals']
 
-// ── Body category weights ──
-// Weighted minutes, summed linearly; the shared curve supplies the
-// diminishing returns, so there are no per-category targets or caps here any
-// more. An hour of exercise is still exactly the target, so training alone
-// reaches 80 as it always did — but a night's sleep plus ordinary upkeep now
-// gets there too, which is the point of a metric called Body rather than
-// Training.
-export const BODY_WEIGHTS: Record<string, { weight: number }> = {
-  exercise:  { weight: 0.80 },  // 60 min is the target on its own
-  self_care: { weight: 0.40 },  // washing, grooming, therapy, meditation
-  rest:      { weight: 0.25 },  // deliberate downtime
-  meals:     { weight: 0.10 },  // eating is upkeep; duration is a weak proxy, so it is light
-  sleep:     { weight: 0.05 },  // 8 hours is about half the target on its own
+/**
+ * ── Body ──
+ *
+ * Body is exercise, plus upkeep, and the two are not interchangeable. The
+ * old version summed them into one pot: eight hours of sleep, three meals
+ * and a shower came to 45 weighted minutes against a target of 48, which
+ * scored 78 on a day with no exercise in it. A metric called Body should
+ * not say that.
+ *
+ * So the score is now a weighted sum of two separate scores, and upkeep's
+ * share is capped below the point where a day without training can look
+ * like a strong one:
+ *
+ *   body = 0.75 × exercise + 0.45 × upkeep       (each 0–99, then capped)
+ *
+ * which puts a day of perfect upkeep and no exercise at 45, a 45-minute
+ * moderate session on its own at 60, and that session with ordinary upkeep
+ * in the 85–95 range. Change those two shares to move the ceiling.
+ */
+export const EXERCISE_SHARE = 0.75
+export const UPKEEP_SHARE = 0.45
+
+/**
+ * Exercise is counted in moderate-equivalent minutes, the way the physical
+ * activity guidelines do it: WHO asks for 150 minutes of moderate OR 75 of
+ * vigorous a week, so vigorous is worth double. Light movement — a stroll,
+ * stretching — is real but not the same thing, so it is worth half.
+ */
+export const INTENSITY_MULTIPLIER = { vigorous: 2, moderate: 1, light: 0.5 } as const
+export type Intensity = keyof typeof INTENSITY_MULTIPLIER
+
+/** ≥6 METs: hard enough that holding a conversation is work. */
+const VIGOROUS_WORDS = [
+  'run', 'running', 'jog', 'sprint', 'hiit', 'interval', 'spin', 'spinning',
+  'boxing', 'box', 'crossfit', 'circuit', 'football', 'soccer', 'basketball',
+  'squash', 'tennis', 'rugby', 'swim', 'swimming', 'rowing', 'row', 'skipping',
+  'burpees', 'bootcamp', 'muay thai', 'mma', 'sparring', 'climb', 'climbing',
+]
+
+/** <3 METs: moving, but not training. */
+const LIGHT_WORDS = [
+  'walk', 'walking', 'stroll', 'stretch', 'stretching', 'mobility', 'foam roll',
+  'yin', 'restorative', 'pilates mat', 'tai chi', 'dog',
+]
+
+/**
+ * How hard a session was, from what it was called. An entry in `exercise`
+ * with nothing recognisable is treated as moderate — the honest default,
+ * since the person called it exercise.
+ */
+export function classifyIntensity(category: string, activity?: string): Intensity {
+  const text = (activity || '').toLowerCase()
+  const hit = (words: string[]) => words.some((word) => new RegExp(`\\b${word}\\b`).test(text))
+
+  if (hit(VIGOROUS_WORDS)) return 'vigorous'
+  if (hit(LIGHT_WORDS)) return 'light'
+  return category === 'movement' ? 'light' : 'moderate'
+}
+
+/** Moderate-equivalent minutes of exercise in a day. */
+export function exerciseMinutes(dayEntries: EntryRow[]): number {
+  let minutes = 0
+  for (const entry of dayEntries) {
+    if (entry.category !== 'exercise' && entry.category !== 'movement') continue
+    minutes += entry.duration_minutes * INTENSITY_MULTIPLIER[classifyIntensity(entry.category, entry.activity)]
+  }
+  return minutes
+}
+
+/**
+ * Upkeep: looking after yourself in the ways that are not training. The
+ * relative weights are unchanged — a shower counts for more per minute than
+ * a meal, and sleep is counted lightly because eight hours of it is normal
+ * rather than an achievement.
+ */
+export const UPKEEP_WEIGHTS: Record<string, number> = {
+  self_care: 0.40,
+  rest: 0.25,
+  meals: 0.10,
+  sleep: 0.05,
+}
+
+export function upkeepMinutes(dayEntries: EntryRow[]): number {
+  let minutes = 0
+  for (const entry of dayEntries) {
+    const weight = UPKEEP_WEIGHTS[entry.category]
+    if (weight) minutes += entry.duration_minutes * weight
+  }
+  return minutes
 }
 
 // ── Heart category groups ──
@@ -74,7 +152,13 @@ export const METRIC_LABELS = {
 // ── Default targets ──
 // Targets are the load that scores 80. See saturatingScore.
 export const FOCUS_TARGET = 240 // 4 hours of deep work, or the weighted equivalent
-export const BODY_TARGET = 48   // an hour of exercise at weight 0.80
+/** Moderate-equivalent minutes that score 80 on the exercise half. */
+export const EXERCISE_TARGET = 45
+/** Weighted upkeep minutes that score 80 on the upkeep half: roughly a
+ *  night's sleep, three meals and half an hour of looking after yourself. */
+export const UPKEEP_TARGET = 48
+/** @deprecated kept so older callers still compile; Body no longer has one target. */
+export const BODY_TARGET = 48
 export const SOCIAL_TARGET = 60 // 1 hour with people, or in prayer
 
 // ── Color / Label / Nudge thresholds ──
@@ -176,64 +260,85 @@ export function calcFocusDetails(dayEntries: EntryRow[]): { weightedMinutes: num
 }
 
 /**
- * Calculate Body value using weighted categories with diminishing returns (sqrt scaling).
- * Each category has a weight, individual target, and a cap on max contribution.
- * 
- * Scoring examples (approximate):
- * - 30min exercise alone → ~28%
- * - 60min exercise alone → ~35% (capped at 40%)
- * - 30min exercise + 30min movement → ~48%
- * - 60min exercise + 45min movement + 20min self_care + 15min rest → ~85%
- * - Getting to 100% requires exceeding targets across ALL categories
+ * Body = exercise, plus upkeep, with upkeep unable to carry a day on its own.
+ *
+ *   0.75 × exercise score + 0.45 × upkeep score, capped at MAX_SCORE
+ *
+ * Worked examples:
+ *   8h sleep, 3 meals, a shower, no exercise → 41   (was 78)
+ *   45 min moderate session, nothing else    → 60
+ *   that session plus the upkeep above       → 94
+ *   20 min run, nothing else                 → 48
  */
 export function calcBody(dayEntries: EntryRow[]): number {
-  // Sum minutes per body category — merge 'movement' into 'exercise'
-  const minutesByCategory: Record<string, number> = {}
-  for (const entry of dayEntries) {
-    if (BODY_CATS.includes(entry.category)) {
-      const cat = entry.category === 'movement' ? 'exercise' : entry.category
-      minutesByCategory[cat] = (minutesByCategory[cat] || 0) + entry.duration_minutes
-    }
-  }
-
-  // Weighted minutes, summed linearly. The per-category sqrt and caps that
-  // used to live here are gone: the shared curve now provides the diminishing
-  // returns, and doing it in both places damps twice.
-  let weightedMinutes = 0
-  for (const [cat, config] of Object.entries(BODY_WEIGHTS)) {
-    weightedMinutes += (minutesByCategory[cat] || 0) * config.weight
-  }
-
-  return saturatingScore(weightedMinutes, BODY_TARGET)
+  const exercise = saturatingScore(exerciseMinutes(dayEntries), EXERCISE_TARGET)
+  const upkeep = saturatingScore(upkeepMinutes(dayEntries), UPKEEP_TARGET)
+  return Math.min(MAX_SCORE, Math.round(EXERCISE_SHARE * exercise + UPKEEP_SHARE * upkeep))
 }
 
-/** Get Body details breakdown for a set of entries */
+/**
+ * The two halves of Body, so the detail sheet can explain the number: how
+ * many moderate-equivalent minutes of exercise, and what upkeep added.
+ */
 export function calcBodyDetails(dayEntries: EntryRow[]): {
   totalMinutes: number
   breakdown: Record<string, number>
   categoryScores: Record<string, number>
+  exerciseScore: number
+  upkeepScore: number
+  moderateEquivalentMinutes: number
+  intensities: Record<string, number>
 } {
   let totalMinutes = 0
   const breakdown: Record<string, number> = {}
+  const intensities: Record<string, number> = {}
+
   for (const entry of dayEntries) {
-    if (BODY_CATS.includes(entry.category)) {
-      totalMinutes += entry.duration_minutes
-      // Merge movement into exercise for display
-      const cat = entry.category === 'movement' ? 'exercise' : entry.category
-      breakdown[cat] = (breakdown[cat] || 0) + entry.duration_minutes
+    if (!BODY_CATS.includes(entry.category)) continue
+    totalMinutes += entry.duration_minutes
+    const cat = entry.category === 'movement' ? 'exercise' : entry.category
+    breakdown[cat] = (breakdown[cat] || 0) + entry.duration_minutes
+    if (entry.category === 'exercise' || entry.category === 'movement') {
+      const intensity = classifyIntensity(entry.category, entry.activity)
+      intensities[intensity] = (intensities[intensity] || 0) + entry.duration_minutes
     }
   }
 
-  // Per-category contribution on the same scale as the headline score, so the
-  // breakdown explains it. This still used the old sqrt-and-caps maths after
-  // calcBody moved to the shared curve, so the parts stopped adding up.
-  const categoryScores: Record<string, number> = {}
-  for (const [cat, config] of Object.entries(BODY_WEIGHTS)) {
-    const minutes = breakdown[cat] || 0
-    categoryScores[cat] = saturatingScore(minutes * config.weight, BODY_TARGET)
+  const moderateEquivalentMinutes = Math.round(exerciseMinutes(dayEntries))
+  const exerciseScore = saturatingScore(moderateEquivalentMinutes, EXERCISE_TARGET)
+  const upkeepScore = saturatingScore(upkeepMinutes(dayEntries), UPKEEP_TARGET)
+
+  /**
+   * What each row contributes to the headline, on the headline's own scale.
+   *
+   * Upkeep's share is split between its categories in proportion to their
+   * weighted minutes, rather than each being curved on its own and the
+   * results added: four categories each scored through a saturating curve
+   * and then summed overshot the headline by more than fifty points, which
+   * is a breakdown that explains nothing.
+   */
+  const categoryScores: Record<string, number> = {
+    exercise: Math.round(EXERCISE_SHARE * exerciseScore),
+  }
+  const upkeepContribution = UPKEEP_SHARE * upkeepScore
+  const totalUpkeepWeighted = upkeepMinutes(dayEntries)
+  for (const [cat, weight] of Object.entries(UPKEEP_WEIGHTS)) {
+    const weighted = (breakdown[cat] || 0) * weight
+    categoryScores[cat] =
+      totalUpkeepWeighted > 0
+        ? Math.round(upkeepContribution * (weighted / totalUpkeepWeighted))
+        : 0
   }
 
-  return { totalMinutes, breakdown, categoryScores }
+  return {
+    totalMinutes,
+    breakdown,
+    categoryScores,
+    exerciseScore,
+    upkeepScore,
+    moderateEquivalentMinutes,
+    intensities,
+  }
 }
 
 /** Calculate Social value for a set of entries on a single day */

@@ -7,6 +7,7 @@ import {
   EntryRow,
   FOCUS_TARGET,
   BODY_TARGET,
+  EXERCISE_TARGET,
   SOCIAL_TARGET,
   FOCUS_THRESHOLDS,
   BODY_THRESHOLDS,
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     const { data: allEntries, error } = await supabase
       .from('time_entries')
-      .select('category, duration_minutes, date')
+      .select('activity, category, duration_minutes, date')
       .eq('user_id', session.user.id)
       .eq('status', 'confirmed')
       .gte('date', fetchFrom)
@@ -123,7 +124,7 @@ export async function GET(request: NextRequest) {
 
       const { data: lastWeekEntries, error: lwError } = await supabase
         .from('time_entries')
-        .select('category, duration_minutes, date')
+        .select('activity, category, duration_minutes, date')
         .eq('user_id', session.user.id)
         .eq('status', 'confirmed')
         .gte('date', lastWeekStart)
@@ -198,6 +199,12 @@ export async function GET(request: NextRequest) {
           totalMinutes: bodyDetails.totalMinutes,
           target: BODY_TARGET,
           breakdown: bodyDetails.breakdown,
+          // The two halves, so the sheet can say which one is missing
+          // instead of implying every body minute is the same minute.
+          exerciseScore: bodyDetails.exerciseScore,
+          upkeepScore: bodyDetails.upkeepScore,
+          moderateEquivalentMinutes: bodyDetails.moderateEquivalentMinutes,
+          exerciseTarget: EXERCISE_TARGET,
         },
       },
       focus: {

@@ -78,7 +78,7 @@ export const LIBRARY: LibraryEntry[] = [
     author: 'WHO/ILO Joint Estimates',
     year: 2021,
     finding:
-      'Working 55+ hours a week raises stroke risk by 35% and heart disease by 17%. Knowledge work holds up best at 35–40 hours.',
+      'Working 55+ hours a week raises stroke risk by 35% and heart disease by 17%. Knowledge work holds up best at 35–40 hours. The same guidelines ask for 150 minutes of moderate activity a week, or 75 vigorous.',
     howWeUseIt:
       'Why Mind saturates instead of rising for ever. A twelve-hour day cannot score much above an eight-hour one, because the evidence does not say it is better.',
     link: 'https://www.who.int/news/item/17-05-2021-long-working-hours-increasing-deaths-from-heart-disease-and-stroke-who-ilo',
@@ -130,7 +130,7 @@ export const LIBRARY: LibraryEntry[] = [
     finding:
       'Regular exercise improves executive function, memory and attention, and a single moderate session lifts cognitive performance for hours afterwards.',
     howWeUseIt:
-      'Why exercise carries the heaviest weight in Body, and why Body and Mind are shown side by side rather than as rivals for the same hours.',
+      'Why exercise carries three quarters of Body, and upkeep — sleep, meals, self-care — the remaining quarter. A day of flawless upkeep with no training reaches about 45, because a metric called Body should not say otherwise.',
     link: 'https://doi.org/10.1038/nrn2298',
     metrics: ['body'],
   },

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     // Fetch today's confirmed entries
     const { data: allEntries } = await supabase
       .from('time_entries')
-      .select('category, duration_minutes, date')
+      .select('activity, category, duration_minutes, date')
       .eq('user_id', session.user.id)
       .eq('status', 'confirmed')
       .eq('date', today)

@@ -9,6 +9,8 @@
  */
 
 import {
+  calcBodyDetails,
+  EXERCISE_TARGET,
   saturatingScore,
   calcBody,
   calcFocus,
@@ -71,8 +73,11 @@ describe('all three metrics use it', () => {
   it('scores 80 at each target', () => {
     expect(calcFocus([entry('deep_work', FOCUS_TARGET)])).toBe(80)
     expect(calcSocial([entry('social', SOCIAL_TARGET)])).toBe(80)
-    // Body's load is weighted: an hour of exercise at 0.80 is the target.
-    expect(calcBody([entry('exercise', 60)])).toBe(80)
+    // Body is the exception, and deliberately so: it is two scores, and
+    // exercise carries 0.75 of the total, so hitting the exercise target
+    // puts the half at 80 and the headline at 60. A strong Body day needs
+    // training and upkeep, which is the whole point of the split.
+    expect(calcBodyDetails([entry('exercise', EXERCISE_TARGET)]).exerciseScore).toBe(80)
   })
 
   it('leaves none of them able to hit 100', () => {
@@ -87,7 +92,13 @@ describe('all three metrics use it', () => {
     expect(balanced).toBeGreaterThan(onlyExercise)
   })
 
-  it('merges movement into exercise, as before', () => {
-    expect(calcBody([entry('movement', 60)])).toBe(calcBody([entry('exercise', 60)]))
+  it('counts movement, but not as if it were training', () => {
+    // It used to be folded into exercise at full weight, so an hour's walk
+    // scored the same as an hour in the gym. Light activity is worth half a
+    // moderate minute now, the way the guidelines count it.
+    const walk = calcBody([entry('movement', 60)])
+    const gym = calcBody([entry('exercise', 60)])
+    expect(walk).toBeGreaterThan(0)
+    expect(walk).toBeLessThan(gym)
   })
 })
