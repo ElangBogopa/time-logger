@@ -35,6 +35,8 @@ it('gives each status class set the hex it is named for', () => {
   for (const status of ['green', 'yellow', 'red'] as const) {
     const hex = STATUS_HEX[status]
     expect(STATUS_CLASSES[status].tint).toBe(`bg-[${hex}]/10`)
+    expect(STATUS_CLASSES[status].tintStrong).toBe(`bg-[${hex}]/20`)
+    expect(STATUS_CLASSES[status].borderStrong).toBe(`border-[${hex}]/40`)
     expect(STATUS_CLASSES[status].border).toBe(`border-[${hex}]/25`)
     expect(STATUS_CLASSES[status].iconBg).toBe(`bg-[${hex}]/15`)
     expect(STATUS_CLASSES[status].icon).toBe(`text-[${hex}]`)

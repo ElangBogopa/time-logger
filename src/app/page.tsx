@@ -15,7 +15,7 @@ import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
 import YourPlan from '@/components/YourPlan'
-import { Sun, Cloud, Moon, ChevronRight, ClipboardList, Lock } from 'lucide-react'
+import { Sun, Cloud, Moon, Check, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
 import { AGGREGATED_CLASSES, STATUS_CLASSES } from '@/lib/palette'
@@ -249,9 +249,9 @@ function HomeContent() {
                   // palette — sage and dusty amber, not green-500 and
                   // amber-500, which were the loudest thing on the screen.
                   const bgClass = isDone
-                    ? `${STATUS_CLASSES.green.tint} border ${STATUS_CLASSES.green.border}`
+                    ? `${STATUS_CLASSES.green.tintStrong} border ${STATUS_CLASSES.green.borderStrong}`
                     : isPartial
-                      ? `${STATUS_CLASSES.yellow.tint} border ${STATUS_CLASSES.yellow.border}`
+                      ? `${STATUS_CLASSES.yellow.tintStrong} border ${STATUS_CLASSES.yellow.borderStrong}`
                       : isActive
                         ? 'bg-accent border border-primary/20'
                         : 'bg-secondary/50 border border-transparent hover:bg-accent/50'
@@ -294,6 +294,11 @@ function HomeContent() {
                           {subtitle}
                         </p>
                       </div>
+                      {isDone ? (
+                        <Check className={`h-4 w-4 ${STATUS_CLASSES.green.icon}`} aria-label="Done" />
+                      ) : isPartial ? (
+                        <span className={`text-[11px] ${STATUS_CLASSES.yellow.icon}`}>Not wrapped up</span>
+                      ) : null}
                     </button>
                   )
                 })}

@@ -82,8 +82,15 @@ export const STATUS_TEXT_HEX = {
 } as const
 
 /** Status as Tailwind classes, for tinted rows and cards. Literals, as above. */
+/**
+ * `tint` and `border` are for a panel that is already set apart by something
+ * else — a heading, an icon, a position. `tintStrong` and `borderStrong` are
+ * for a row whose whole state is the colour: a muted hue at 10% over the card
+ * lands on rgb(34,37,38) against a neutral row's rgb(32,32,35), which is not
+ * a difference anyone can see. At 20% it is.
+ */
 export const STATUS_CLASSES = {
-  green: { tint: 'bg-[#7D9B8A]/10', border: 'border-[#7D9B8A]/25', iconBg: 'bg-[#7D9B8A]/15', icon: 'text-[#7D9B8A]', text: 'text-[#9BB5A6]', solid: 'bg-[#7D9B8A]', stroke: 'stroke-[#7D9B8A]' },
-  yellow: { tint: 'bg-[#B5A07A]/10', border: 'border-[#B5A07A]/25', iconBg: 'bg-[#B5A07A]/15', icon: 'text-[#B5A07A]', text: 'text-[#CBB894]', solid: 'bg-[#B5A07A]', stroke: 'stroke-[#B5A07A]' },
-  red: { tint: 'bg-[#A8706A]/10', border: 'border-[#A8706A]/25', iconBg: 'bg-[#A8706A]/15', icon: 'text-[#A8706A]', text: 'text-[#C79089]', solid: 'bg-[#A8706A]', stroke: 'stroke-[#A8706A]' },
+  green: { tint: 'bg-[#7D9B8A]/10', tintStrong: 'bg-[#7D9B8A]/20', border: 'border-[#7D9B8A]/25', borderStrong: 'border-[#7D9B8A]/40', iconBg: 'bg-[#7D9B8A]/15', icon: 'text-[#7D9B8A]', text: 'text-[#9BB5A6]', solid: 'bg-[#7D9B8A]', stroke: 'stroke-[#7D9B8A]' },
+  yellow: { tint: 'bg-[#B5A07A]/10', tintStrong: 'bg-[#B5A07A]/20', border: 'border-[#B5A07A]/25', borderStrong: 'border-[#B5A07A]/40', iconBg: 'bg-[#B5A07A]/15', icon: 'text-[#B5A07A]', text: 'text-[#CBB894]', solid: 'bg-[#B5A07A]', stroke: 'stroke-[#B5A07A]' },
+  red: { tint: 'bg-[#A8706A]/10', tintStrong: 'bg-[#A8706A]/20', border: 'border-[#A8706A]/25', borderStrong: 'border-[#A8706A]/40', iconBg: 'bg-[#A8706A]/15', icon: 'text-[#A8706A]', text: 'text-[#C79089]', solid: 'bg-[#A8706A]', stroke: 'stroke-[#A8706A]' },
 } as const
