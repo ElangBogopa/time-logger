@@ -104,12 +104,18 @@ every row has a chevron, including ones that are not very important.
 **1. Reduce the cost of logging.** This is the whole game. Every competitor
 with automatic capture beats you on friction, and your own data shows it: 3
 days logged out of the last 21. Concretely —
-   - A one-tap "same as yesterday" for recurring blocks.
-   - Templates for a standard working day.
-   - Confirm-all for calendar ghosts, instead of one at a time.
-   - Natural-language entry. You already built `/api/parse-activity` for this
-     and never wired it up — I deleted it yesterday as dead code; it is one
-     `git revert` away.
+   - ~~A one-tap "same as yesterday" for recurring blocks.~~ Done: an empty
+     session offers the most recent day whose matching session was logged,
+     and copies it — categories included, so it costs no model calls.
+   - Templates for a standard working day. *Not done: "same as yesterday"
+     covers the same ground for a person who logged recently, and a template
+     library is worth building only if that turns out not to be enough.*
+   - ~~Confirm-all for calendar ghosts, instead of one at a time.~~ Done: one
+     categorise call and one insert for the set.
+   - Natural-language entry. *Partly there already: the quick-log modal
+     parses times out of what you type ("coded for 2 hours") client-side. The
+     deleted `/api/parse-activity` was the model-backed version, and is still
+     one `git revert` away if the local parser proves too literal.*
 
 **2. Make the Library the front door.** Move it out of Settings. Each metric
 in the detail sheet should link to the research behind it. The reason to
@@ -172,7 +178,8 @@ rest of the app's 80/50. All now come from `lib/palette.ts` and
 ## 6. If I had a week
 
 1. ~~Consolidate the day review into one implementation.~~ Done.
-2. Logging friction: templates, same-as-yesterday, bulk ghost confirm.
+2. ~~Logging friction: same-as-yesterday, bulk ghost confirm.~~ Done.
+   Templates and model-backed natural language deliberately left.
 3. ~~One palette, one type scale, louder section headers, a desktop
    breakpoint.~~ Done, except that ~140 saturated colours remain in toasts,
    error states, banners, onboarding, settings and the guide page. Those are
@@ -180,4 +187,6 @@ rest of the app's 80/50. All now come from `lib/palette.ts` and
 4. ~~Rebuild Year in Pixels as a GitHub-style grid.~~ Done.
 5. Promote the Library and link metrics to their research.
 
-Item 2 is now the one that decides whether the app gets used.
+Items 1 and 2 are done. Whether the app gets used now depends on whether
+one tap to repeat a day is enough — which only a few weeks of use will
+say.

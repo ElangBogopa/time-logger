@@ -64,6 +64,9 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/entries - Create a new time entry
+// A batch is one person's session, not an import.
+const MAX_BATCH = 25
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -73,35 +76,49 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const entry = {
-      user_id: session.user.id,
-      date: body.date,
-      activity: body.activity,
-      category: body.category ?? null,
-      duration_minutes: body.duration_minutes,
-      start_time: body.start_time || null,
-      end_time: body.end_time || null,
-      description: body.description || null,
-      commentary: body.commentary || null,
-      status: body.status || 'confirmed',
+    // Batch form: { entries: [...] } → one insert, all or nothing. Repeating
+    // a session or confirming a set of calendar events used to be one request
+    // per entry, so a half-failed set left the day in pieces.
+    const isBatch = Array.isArray(body.entries)
+    const input: Record<string, unknown>[] = isBatch ? body.entries : [body]
+
+    if (input.length === 0 || input.length > MAX_BATCH) {
+      return NextResponse.json(
+        { error: `Between 1 and ${MAX_BATCH} entries are required` },
+        { status: 400 }
+      )
     }
 
-    if (!entry.date || !entry.activity || !entry.duration_minutes) {
+    const rows = input.map((item) => ({
+      user_id: session.user!.id,
+      date: item.date,
+      activity: item.activity,
+      category: item.category ?? null,
+      duration_minutes: item.duration_minutes,
+      start_time: item.start_time || null,
+      end_time: item.end_time || null,
+      description: item.description || null,
+      commentary: item.commentary || null,
+      status: item.status || 'confirmed',
+    }))
+
+    if (rows.some((row) => !row.date || !row.activity || !row.duration_minutes)) {
       return NextResponse.json({ error: 'Missing required fields: date, activity, duration_minutes' }, { status: 400 })
     }
 
     const { data, error } = await supabase
       .from('time_entries')
-      .insert(entry)
+      .insert(rows)
       .select()
-      .single()
 
     if (error) {
       console.error('Error creating entry:', error)
       return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 })
     }
 
-    return NextResponse.json({ data })
+    // The single form keeps returning a single object: every existing caller
+    // reads `data.id`.
+    return NextResponse.json({ data: isBatch ? data : data?.[0] })
   } catch (error) {
     console.error('Error in POST /api/entries:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

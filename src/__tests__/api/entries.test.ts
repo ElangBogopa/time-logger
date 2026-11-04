@@ -284,8 +284,7 @@ describe('/api/entries', () => {
       
       const mockQuery = {
         insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: mockCreatedEntry, error: null }),
+        select: jest.fn().mockResolvedValue({ data: [mockCreatedEntry], error: null }),
       }
       mockSupabase.from.mockReturnValue(mockQuery)
       
@@ -306,7 +305,7 @@ describe('/api/entries', () => {
       expect(body.data).toEqual(mockCreatedEntry)
       
       // Verify entry was created with user ID
-      expect(mockQuery.insert).toHaveBeenCalledWith({
+      expect(mockQuery.insert).toHaveBeenCalledWith([{
         user_id: 'user-123',
         date: '2025-01-28',
         activity: 'Deep Work',
@@ -317,7 +316,7 @@ describe('/api/entries', () => {
         description: 'Working on project',
         commentary: null,
         status: 'confirmed',
-      })
+      }])
     })
 
     it('scopes entry to authenticated user ID', async () => {
@@ -325,8 +324,7 @@ describe('/api/entries', () => {
       
       const mockQuery = {
         insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: {}, error: null }),
+        select: jest.fn().mockResolvedValue({ data: [{}], error: null }),
       }
       mockSupabase.from.mockReturnValue(mockQuery)
       
@@ -341,7 +339,7 @@ describe('/api/entries', () => {
       await POST(req)
       
       // Verify the user_id is set to the authenticated user, not anything from the request body
-      expect(mockQuery.insert).toHaveBeenCalledWith({
+      expect(mockQuery.insert).toHaveBeenCalledWith([{
         user_id: 'user-456',
         date: '2025-01-28',
         activity: 'Exercise',
@@ -352,7 +350,7 @@ describe('/api/entries', () => {
         description: null,
         commentary: null,
         status: 'confirmed',
-      })
+      }])
     })
 
     it('handles supabase errors gracefully', async () => {
@@ -360,8 +358,7 @@ describe('/api/entries', () => {
       
       const mockQuery = {
         insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: null, error: { message: 'Database error' } }),
+        select: jest.fn().mockResolvedValue({ data: null, error: { message: 'Database error' } }),
       }
       mockSupabase.from.mockReturnValue(mockQuery)
       

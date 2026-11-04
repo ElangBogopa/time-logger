@@ -3,7 +3,8 @@
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch } from '@/lib/api'
+import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities } from '@/lib/api'
+import { findRepeatCandidate, entriesForRepeat, type RepeatCandidate } from '@/lib/repeat-session'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
 import { TimePeriod, TimeEntry, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, shiftDateString } from '@/lib/types'
 import {
@@ -31,8 +32,11 @@ import {
   Moon,
   Loader2,
   Plus,
+  Check,
   CheckCircle2,
+  CalendarCheck,
   RefreshCw,
+  RotateCcw,
 } from 'lucide-react'
 import { toast as sonnerToast } from 'sonner'
 
@@ -116,6 +120,9 @@ function LogPeriodContent() {
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<string | null>(null) // kept for legacy compat, not shown
+  const [repeatCandidate, setRepeatCandidate] = useState<RepeatCandidate | null>(null)
+  const [isRepeating, setIsRepeating] = useState(false)
+  const [isConfirmingAll, setIsConfirmingAll] = useState(false)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [quickLogDragData, setQuickLogDragData] = useState<DragCreateData | null>(null)
 
@@ -170,6 +177,50 @@ function LogPeriodContent() {
   useEffect(() => {
     fetchEntries()
   }, [fetchEntries])
+
+  // A session with nothing in it can usually be copied from a recent day:
+  // most days have the same shape. Only looked up while the session is
+  // empty, and only from entries already stored, so it costs one request and
+  // no model calls.
+  const hasEntriesForPeriod = getEntriesForPeriod(entries, period).length > 0
+  useEffect(() => {
+    if (isLocked || !userId || !selectedDate || hasEntriesForPeriod) {
+      setRepeatCandidate(null)
+      return
+    }
+    let cancelled = false
+    apiFetchEntries({
+      dateFrom: shiftDateString(selectedDate, -14),
+      dateTo: shiftDateString(selectedDate, -1),
+      status: 'confirmed',
+    })
+      .then((recent) => {
+        if (!cancelled) setRepeatCandidate(findRepeatCandidate(recent, safePeriod, selectedDate))
+      })
+      .catch(() => {
+        if (!cancelled) setRepeatCandidate(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId, selectedDate, safePeriod, isLocked, hasEntriesForPeriod])
+
+  const handleRepeatSession = async () => {
+    if (!repeatCandidate || isRepeating) return
+    setIsRepeating(true)
+    try {
+      const created = await createEntries(entriesForRepeat(repeatCandidate, selectedDate))
+      await fetchEntries()
+      sonnerToast.success(
+        `Logged ${created.length} ${created.length === 1 ? 'activity' : 'activities'} from ${repeatCandidate.label}`
+      )
+    } catch (err) {
+      console.error('Failed to repeat session:', err)
+      sonnerToast.error('Could not copy that session')
+    } finally {
+      setIsRepeating(false)
+    }
+  }
 
   // Cleanup pending delete timers on unmount
   useEffect(() => {
@@ -227,6 +278,46 @@ function LogPeriodContent() {
     })
   })
 
+
+  /**
+   * Confirm every calendar event in this session at once.
+   *
+   * One categorise call for the lot and one insert, where confirming them
+   * one at a time was two model calls and four requests each. No per-entry
+   * commentary: a bulk confirm would generate a remark for each, which is
+   * both expensive and noise — the session and day commentary still cover
+   * them.
+   */
+  const handleConfirmAllGhosts = async () => {
+    if (ghostEvents.length === 0 || isConfirmingAll) return
+    setIsConfirmingAll(true)
+    try {
+      const titles = ghostEvents.map((event) => event.title)
+      const categories = await categorizeActivities(titles).catch(() => [])
+
+      const created = await createEntries(
+        ghostEvents.map((event, i) => ({
+          date: selectedDate,
+          activity: event.title,
+          category: categories[i] ?? null,
+          duration_minutes: Math.max(
+            5,
+            timeToMinutes(event.endTime) - timeToMinutes(event.startTime)
+          ),
+          start_time: event.startTime,
+          end_time: event.endTime,
+        }))
+      )
+
+      await fetchEntries()
+      sonnerToast.success(`Confirmed ${created.length} calendar ${created.length === 1 ? 'event' : 'events'}`)
+    } catch (err) {
+      console.error('Failed to confirm calendar events:', err)
+      sonnerToast.error('Could not confirm those events')
+    } finally {
+      setIsConfirmingAll(false)
+    }
+  }
 
   // Handle "Done with period"
   const handleDone = async () => {
@@ -452,6 +543,52 @@ function LogPeriodContent() {
             </div>
           )}
         </header>
+
+        {/* One tap to re-log a day that looked the same */}
+        {!isLocked && repeatCandidate && (
+          <section className="mb-4 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h2 className="eyebrow mb-1">Same as {repeatCandidate.label}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {repeatCandidate.entries.map((entry) => entry.activity).join(' · ')}
+                </p>
+              </div>
+              <RotateCcw className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleRepeatSession}
+              disabled={isRepeating}
+            >
+              {isRepeating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Log {repeatCandidate.entries.length}{' '}
+                  {repeatCandidate.entries.length === 1 ? 'activity' : 'activities'} again ·{' '}
+                  {formatSessionDuration(repeatCandidate.totalMinutes)}
+                </>
+              )}
+            </Button>
+          </section>
+        )}
+
+        {/* Calendar events waiting to be confirmed, all at once */}
+        {!isLocked && ghostEvents.length > 1 && (
+          <section className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <CalendarCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+              <p className="text-sm text-muted-foreground truncate">
+                {ghostEvents.length} calendar events in this session
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleConfirmAllGhosts} disabled={isConfirmingAll}>
+              {isConfirmingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" />Confirm all</>}
+            </Button>
+          </section>
+        )}
 
         {/* Session content — Whoop-style cards for locked days, timeline for editable */}
         <section className="mb-6">

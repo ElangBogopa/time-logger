@@ -106,6 +106,29 @@ export async function createEntry(params: CreateEntryParams): Promise<TimeEntry>
   return data
 }
 
+/**
+ * Create several entries in one request — repeating a session, or confirming
+ * a set of calendar events. One insert, so the day never lands half written.
+ */
+export async function createEntries(params: CreateEntryParams[]): Promise<TimeEntry[]> {
+  const { data } = await fetchJSON<{ data: TimeEntry[] }>('/api/entries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entries: params }),
+  })
+  return data
+}
+
+/** Categories for several activities in one model call, in the same order. */
+export async function categorizeActivities(activities: string[]): Promise<TimeCategory[]> {
+  const { categories } = await fetchJSON<{ categories: TimeCategory[] }>('/api/categorize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activities }),
+  })
+  return categories
+}
+
 export async function updateEntry(id: string, updates: Partial<TimeEntry>): Promise<TimeEntry> {
   const { data } = await fetchJSON<{ data: TimeEntry }>(`/api/entries/${id}`, {
     method: 'PUT',

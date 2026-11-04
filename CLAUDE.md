@@ -78,6 +78,11 @@ For display, these roll up into six `AggregatedCategory` buckets —
 ### AI API Calls
 - **DO**: Call `/api/categorize` and `/api/commentary` only for confirmed entries
 - **DON'T**: Categorize pending/future entries - wastes API calls
+- **DO**: Use the batch forms when acting on a set — `/api/categorize` takes
+  `{ activities: string[] }` and answers in one model call, `/api/entries`
+  takes `{ entries: [...] }` and inserts in one statement. Confirming four
+  calendar events one at a time was four prompts and four inserts.
+- **DON'T**: Generate per-entry commentary for a bulk action
 - Pending entries use static `PENDING_COMMENTARY.planned` message
 
 ### Timeline Component
