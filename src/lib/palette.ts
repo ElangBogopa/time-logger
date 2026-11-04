@@ -50,6 +50,18 @@ export const AGGREGATED_CLASSES = {
   escape: { bg: 'bg-[#7A7D82]', text: 'text-[#7A7D82]', border: 'border-[#7A7D82]', tint: 'bg-[#7A7D82]/15' },
 } as const satisfies Record<AggregatedCategory, { bg: string; text: string; border: string; tint: string }>
 
+/**
+ * The three sessions, in palette hues: dusty amber for the morning, slate
+ * blue for the afternoon, muted violet for the evening. They were
+ * amber→orange, blue→cyan→teal and indigo→purple→pink gradients, which made
+ * the session page and its summary popup the loudest screens in the app.
+ */
+export const PERIOD_CLASSES = {
+  morning: { icon: 'text-[#B5A07A]', tint: 'bg-[#B5A07A]/15', border: 'border-[#B5A07A]/30' },
+  afternoon: { icon: 'text-[#6B8CAE]', tint: 'bg-[#6B8CAE]/15', border: 'border-[#6B8CAE]/30' },
+  evening: { icon: 'text-[#8A7CA8]', tint: 'bg-[#8A7CA8]/15', border: 'border-[#8A7CA8]/30' },
+} as const
+
 /** Fill colour for each hero metric — the bucket it is computed from. */
 export const METRIC_HEX = {
   body: AGGREGATED_HEX.body,

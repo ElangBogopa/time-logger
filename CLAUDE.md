@@ -168,7 +168,16 @@ time_entries (
    labels inside modals), `metric-number` and `page-title`, all defined as
    Tailwind utilities in `globals.css`. Reach for one of those before writing
    another `text-[11px] uppercase tracking-wider`.
-6. **No loading flash on navigation**: Every component that fetches data MUST cache its state in `sessionStorage`. On re-mount, load from cache instantly (no spinner), then refresh data silently in the background. Pattern:
+6. **One scoring system**: Body / Mind / Heart, from `lib/metrics-calc.ts`,
+   on a saturating curve where the target scores 80 and 100 is unreachable.
+   Anywhere that wants "a number for this day or week" shows those three
+   (`components/MetricRings.tsx`), never a new formula. Four had grown: the
+   day review scored sessions logged ÷ sessions passed, the weekly review
+   scored active days plus entries per day, the session popup had a third,
+   and `/api/year-pixels` still has a fourth. They all measured how
+   diligently you logged, all on the same 0–100 dial, and all hit 100 for
+   showing up.
+7. **No loading flash on navigation**: Every component that fetches data MUST cache its state in `sessionStorage`. On re-mount, load from cache instantly (no spinner), then refresh data silently in the background. Pattern:
    ```typescript
    // Load from cache — no spinner if cached
    const cached = (() => {
@@ -182,8 +191,8 @@ time_entries (
    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: newData }))
    ```
    This prevents the "spinner flash" when navigating back to previously-visited pages.
-7. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
-8. **Planning vs Execution separation**: The goal/productivity page is for PLANNING only (no interactive checkboxes). Task completion ONLY happens from session pages (post-session popup) where each completion is tagged with the session period (morning/afternoon/evening).
+8. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
+9. **Planning vs Execution separation**: The goal/productivity page is for PLANNING only (no interactive checkboxes). Task completion ONLY happens from session pages (post-session popup) where each completion is tagged with the session period (morning/afternoon/evening).
 
 ## Quick Commands
 

@@ -4,7 +4,7 @@ import { Suspense, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, BookOpen, ExternalLink, FlaskConical, Brain } from 'lucide-react'
-import { LIBRARY, entriesForMetric, foundationalEntries, type LibraryEntry } from '@/lib/library'
+import { LIBRARY, entriesForMetric, foundationalEntries, linkHost, type LibraryEntry } from '@/lib/library'
 import { METRIC_LABELS } from '@/lib/metrics-calc'
 import { METRIC_HEX } from '@/lib/palette'
 import type { MetricKey } from '@/lib/chart-colors'
@@ -64,7 +64,8 @@ function EntryCard({ entry }: { entry: LibraryEntry }) {
           className="flex items-center justify-center gap-2 border-t border-border py-3 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
         >
           <ExternalLink className="h-3.5 w-3.5" />
-          Read the source
+          {/* Named, so nobody taps blind into a shop or a paywall */}
+          Read it on {linkHost(entry.link)}
         </a>
       )}
     </div>

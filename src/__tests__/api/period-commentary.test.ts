@@ -1,26 +1,28 @@
 /**
- * /api/period-commentary makes three generations — commentary, insight and
- * prediction — from the same context, differing only in system prompt. They
- * were awaited one after another, so finishing a session waited on three
- * round trips in series while the summary popup span.
+ * /api/period-commentary.
+ *
+ * It used to make three generations from the same context — commentary,
+ * insight and prediction — differing only in system prompt, and the tests
+ * here pinned that they ran in parallel rather than in series.
+ *
+ * The insight and the prediction are gone. On screen they restated what the
+ * card already showed ("You spent 37.5% of your evening on social
+ * activities", above a list reading Social 1h30m) or said nothing worth
+ * reading ("If you maintain this evening routine, you could easily finish
+ * the week strong"). They cost two thirds of this route's model calls, three
+ * times a day. What this file pins now is that only one call is made.
  */
 
 type Completion = { choices: { message: { content: string } }[] }
 
 let started = 0
-let releaseBarrier: () => void = () => {}
-let barrier: Promise<void>
-let failOn: number | null = null
+let shouldFail = false
 
 // hoisted so the jest.mock factory can reach it
 function createCompletion(): Promise<Completion> {
   started += 1
-  const mine = started
-  if (mine === 3) releaseBarrier() // only unblocks if all three were started
-  return barrier.then(() => {
-    if (failOn === mine) throw new Error(`generation ${mine} failed`)
-    return { choices: [{ message: { content: `text ${mine}` } }] }
-  })
+  if (shouldFail) return Promise.reject(new Error('generation failed'))
+  return Promise.resolve({ choices: [{ message: { content: 'A steady morning.' } }] })
 }
 
 jest.mock('next/server', () => ({
@@ -73,50 +75,29 @@ function request(payload: unknown = body): NextRequest {
 beforeEach(() => {
   jest.clearAllMocks()
   started = 0
-  failOn = null
-  barrier = new Promise<void>((resolve) => {
-    releaseBarrier = resolve
-  })
+  shouldFail = false
   ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
 })
 
-type Body = { commentary: string; insight: string | null; prediction: string | null }
+type Body = { commentary: string; insight?: unknown; prediction?: unknown }
 
-it('starts all three generations before any of them resolves', async () => {
-  // The barrier only releases once the third call has been made. If the route
-  // awaited them in series this would never resolve and the test would time out.
+it('generates the commentary in a single call', async () => {
   const res = (await POST(request())) as unknown as { status: number; body: Body }
 
-  expect(started).toBe(3)
+  expect(started).toBe(1)
   expect(res.status).toBe(200)
-  expect(res.body.commentary).toBe('text 1')
-  expect(res.body.insight).toBe('text 2')
-  expect(res.body.prediction).toBe('text 3')
+  expect(res.body.commentary).toBe('A steady morning.')
 })
 
-it('still returns the commentary when the insight fails', async () => {
-  failOn = 2
-
+it('no longer returns an insight or a prediction', async () => {
   const res = (await POST(request())) as unknown as { status: number; body: Body }
 
-  expect(res.status).toBe(200)
-  expect(res.body.commentary).toBe('text 1')
-  expect(res.body.insight).toBeNull()
-  expect(res.body.prediction).toBe('text 3')
+  expect(res.body).not.toHaveProperty('insight')
+  expect(res.body).not.toHaveProperty('prediction')
 })
 
-it('still returns the commentary when the prediction fails', async () => {
-  failOn = 3
-
-  const res = (await POST(request())) as unknown as { status: number; body: Body }
-
-  expect(res.status).toBe(200)
-  expect(res.body.commentary).toBe('text 1')
-  expect(res.body.prediction).toBeNull()
-})
-
-it('fails the request when the commentary itself fails', async () => {
-  failOn = 1
+it('fails the request when the generation fails', async () => {
+  shouldFail = true
 
   const res = (await POST(request())) as unknown as { status: number }
 

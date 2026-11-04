@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities } from '@/lib/api'
 import { findRepeatCandidate, entriesForRepeat, type RepeatCandidate } from '@/lib/repeat-session'
+import { PERIOD_CLASSES } from '@/lib/palette'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
 import { TimePeriod, TimeEntry, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, shiftDateString } from '@/lib/types'
 import {
@@ -46,22 +47,10 @@ const PERIOD_ICONS: Record<TimePeriod, typeof Sun> = {
   evening: Moon,
 }
 
-const PERIOD_COLORS: Record<TimePeriod, { gradient: string; text: string; bg: string }> = {
-  morning: {
-    gradient: 'from-amber-500 via-orange-500 to-yellow-500',
-    text: 'text-amber-500',
-    bg: 'bg-amber-500/10',
-  },
-  afternoon: {
-    gradient: 'from-blue-500 via-cyan-500 to-teal-500',
-    text: 'text-blue-500',
-    bg: 'bg-blue-500/10',
-  },
-  evening: {
-    gradient: 'from-indigo-500 via-purple-500 to-pink-500',
-    text: 'text-indigo-500',
-    bg: 'bg-indigo-500/10',
-  },
+const PERIOD_COLORS: Record<TimePeriod, { text: string; bg: string }> = {
+  morning: { text: PERIOD_CLASSES.morning.icon, bg: PERIOD_CLASSES.morning.tint },
+  afternoon: { text: PERIOD_CLASSES.afternoon.icon, bg: PERIOD_CLASSES.afternoon.tint },
+  evening: { text: PERIOD_CLASSES.evening.icon, bg: PERIOD_CLASSES.evening.tint },
 }
 
 function LogPeriodContent() {
@@ -115,8 +104,6 @@ function LogPeriodContent() {
   const [isLoading, setIsLoading] = useState(!cachedEntries)
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
-  const [summaryInsight, setSummaryInsight] = useState<string | null>(null)
-  const [summaryPrediction, setSummaryPrediction] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<string | null>(null) // kept for legacy compat, not shown
@@ -338,7 +325,7 @@ function LogPeriodContent() {
     setShowSummary(true)
     setIsSummaryLoading(true)
 
-    // Fetch AI commentary, insight, and prediction
+    // Fetch the session commentary
     try {
       const response = await csrfFetch('/api/period-commentary', {
         method: 'POST',
@@ -351,10 +338,8 @@ function LogPeriodContent() {
       })
 
       if (response.ok) {
-        const { commentary, insight, prediction } = await response.json()
+        const { commentary } = await response.json()
         setSummaryCommentary(commentary)
-        setSummaryInsight(insight || null)
-        setSummaryPrediction(prediction || null)
       }
     } catch (err) {
       console.error('Failed to fetch commentary:', err)
@@ -624,7 +609,7 @@ function LogPeriodContent() {
           <div className="space-y-3">
             <Button
               onClick={handleDone}
-              className={`w-full bg-gradient-to-r ${colors.gradient} text-white`}
+              className="w-full"
               size="lg"
             >
               <CheckCircle2 className="h-5 w-5" />
@@ -653,10 +638,10 @@ function LogPeriodContent() {
       {!isLocked && (
         <button
           onClick={() => setIsQuickLogOpen(true)}
-          className={`fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r ${colors.gradient} shadow-lg active:scale-95 transition-transform`}
+          className="fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
           aria-label="Add activity"
         >
-          <Plus className="h-6 w-6 text-white" />
+          <Plus className="h-6 w-6" />
         </button>
       )}
 
@@ -668,8 +653,6 @@ function LogPeriodContent() {
         date={selectedDate}
         entries={periodEntries}
         commentary={summaryCommentary}
-        insight={summaryInsight}
-        prediction={summaryPrediction}
         isLoading={isSummaryLoading}
         isEvening={period === 'evening'}
         onViewDayReview={() => {

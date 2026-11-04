@@ -5,7 +5,9 @@ import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
 import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
+import { getLocalDateString, getWeekStartForDate, shiftDateString, getUserToday } from '@/lib/types'
+import { MetricRingRow } from '@/components/MetricRings'
+import type { MetricKey } from '@/lib/chart-colors'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
 import { STATUS_CLASSES } from '@/lib/palette'
@@ -117,6 +119,7 @@ export default function WeeklyReviewContent() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))
+  const [metrics, setMetrics] = useState<Record<MetricKey, number> | null>(null)
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -168,6 +171,27 @@ export default function WeeklyReviewContent() {
   useEffect(() => {
     if (status === 'authenticated') fetchReview()
   }, [status, fetchReview])
+
+  // The week's Body / Mind / Heart, averaged over its seven days. The ring
+  // here used to be a weekScore: 50 points for active days ÷ evaluated days,
+  // plus 50 for averaging three entries a day. Log three things daily and it
+  // read 100, whatever those things were.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    let cancelled = false
+    const weekEnd = shiftDateString(weekStart, 6)
+    const today = getUserToday()
+    fetch(`/api/metrics/trend?period=7d&date=${weekEnd > today ? today : weekEnd}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return
+        setMetrics({ body: data.body.average, focus: data.focus.average, social: data.social.average })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [status, weekStart])
 
   const goToPreviousWeek = () => {
     setWeekStart(shiftDateString(weekStart, -7))
@@ -234,25 +258,20 @@ export default function WeeklyReviewContent() {
         </button>
       </div>
 
-      {/* Week Score */}
-      <div className="flex flex-col items-center mb-5">
-        <div className="relative flex items-center justify-center" style={{ width: 110, height: 110 }}>
-          <svg width={110} height={110} className="-rotate-90">
-            <circle cx={55} cy={55} r={48} stroke="currentColor" strokeWidth={7} fill="none"
-              className="text-zinc-200 dark:text-zinc-700" />
-            <circle cx={55} cy={55} r={48} stroke="#6366f1" strokeWidth={7} fill="none" strokeLinecap="round"
-              strokeDasharray={2 * Math.PI * 48}
-              strokeDashoffset={2 * Math.PI * 48 - (reviewData.weekScore / 100) * 2 * Math.PI * 48}
-              className="transition-all duration-1000" />
-          </svg>
-          <div className="absolute flex flex-col items-center">
-            <span className="text-2xl font-bold">{reviewData.weekScore}</span>
-            <span className="text-[10px] text-muted-foreground">/ 100</span>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">{reviewData.weekScoreLabel}</p>
+      {/* The week on the app's one scale, averaged across its days */}
+      <div className="mb-5">
+        {metrics ? (
+          <MetricRingRow
+            values={metrics}
+            size={76}
+            srLabel="Average scores for this week"
+            caption={reviewData.weekScoreLabel}
+          />
+        ) : (
+          <p className="text-center text-sm text-muted-foreground">{reviewData.weekScoreLabel}</p>
+        )}
         {weekChange !== null && (
-          <div className="flex items-center gap-1 mt-1 text-xs">
+          <div className="flex items-center justify-center gap-1 mt-2 text-xs">
             {weekChange > 0 ? (
               <><TrendingUp className={`h-3.5 w-3.5 ${STATUS_CLASSES.green.icon}`} /><span className={STATUS_CLASSES.green.icon}>+{weekChange}%</span></>
             ) : weekChange < 0 ? (
@@ -260,7 +279,7 @@ export default function WeeklyReviewContent() {
             ) : (
               <><Minus className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground">Same</span></>
             )}
-            <span className="text-muted-foreground">vs last week</span>
+            <span className="text-muted-foreground">time logged vs last week</span>
           </div>
         )}
       </div>

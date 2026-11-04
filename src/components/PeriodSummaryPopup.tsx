@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, PERIOD_TIME_RANGES, getUserToday, getRealToday } from '@/lib/types'
+import { PERIOD_CLASSES } from '@/lib/palette'
 import CommentaryThread from '@/components/CommentaryThread'
 import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Zap, Share2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,8 +23,6 @@ interface PeriodSummaryPopupProps {
   date: string
   entries: TimeEntry[]
   commentary: string | null
-  insight: string | null
-  prediction: string | null
   isLoading: boolean
   isEvening: boolean
   onViewDayReview?: () => void
@@ -36,54 +35,10 @@ const PERIOD_ICONS: Record<TimePeriod, typeof Sun> = {
   evening: Moon,
 }
 
-const PERIOD_COLORS: Record<TimePeriod, { gradient: string; icon: string; border: string }> = {
-  morning: {
-    gradient: 'from-amber-500 via-orange-500 to-yellow-500',
-    icon: 'text-amber-400',
-    border: 'border-amber-500/30',
-  },
-  afternoon: {
-    gradient: 'from-blue-500 via-cyan-500 to-teal-500',
-    icon: 'text-blue-400',
-    border: 'border-blue-500/30',
-  },
-  evening: {
-    gradient: 'from-indigo-500 via-purple-500 to-pink-500',
-    icon: 'text-indigo-400',
-    border: 'border-indigo-500/30',
-  },
-}
-
-// Confetti particle for celebration
-function ConfettiParticle({ index, total }: { index: number; total: number }) {
-  const angle = (index / total) * 360
-  const distance = 60 + Math.random() * 40
-  const size = 4 + Math.random() * 4
-  const duration = 0.8 + Math.random() * 0.4
-  const delay = Math.random() * 0.2
-  const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4']
-  const color = colors[index % colors.length]
-  const isRound = index % 3 === 0
-
-  return (
-    <div
-      className="absolute"
-      style={{
-        width: isRound ? size : size * 0.6,
-        height: isRound ? size : size * 1.5,
-        backgroundColor: color,
-        borderRadius: isRound ? '50%' : '2px',
-        left: '50%',
-        top: '50%',
-        transform: 'translate(-50%, -50%)',
-        animation: `confetti-burst ${duration}s ease-out ${delay}s forwards`,
-        ['--confetti-x' as string]: `${Math.cos((angle * Math.PI) / 180) * distance}px`,
-        ['--confetti-y' as string]: `${Math.sin((angle * Math.PI) / 180) * distance - 20}px`,
-        ['--confetti-rotate' as string]: `${Math.random() * 360}deg`,
-        opacity: 0,
-      }}
-    />
-  )
+const PERIOD_COLORS: Record<TimePeriod, { icon: string; border: string }> = {
+  morning: { icon: PERIOD_CLASSES.morning.icon, border: PERIOD_CLASSES.morning.border },
+  afternoon: { icon: PERIOD_CLASSES.afternoon.icon, border: PERIOD_CLASSES.afternoon.border },
+  evening: { icon: PERIOD_CLASSES.evening.icon, border: PERIOD_CLASSES.evening.border },
 }
 
 export default function PeriodSummaryPopup({
@@ -93,8 +48,6 @@ export default function PeriodSummaryPopup({
   date,
   entries,
   commentary,
-  insight,
-  prediction,
   isLoading,
   isEvening,
   onViewDayReview,
@@ -102,7 +55,6 @@ export default function PeriodSummaryPopup({
 }: PeriodSummaryPopupProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
-  const [showConfetti, setShowConfetti] = useState(false)
   const shareCardRef = useRef<HTMLDivElement>(null)
 
   // Task completion state
@@ -224,7 +176,6 @@ export default function PeriodSummaryPopup({
             }}
             period={period}
             date={getRealToday()}
-            sessionScore={sessionScore}
             totalMinutes={totalMinutes}
             topCategories={topCategories}
             commentary={commentary || `Great ${PERIOD_LABELS[period].toLowerCase()} session!`}
@@ -266,7 +217,7 @@ export default function PeriodSummaryPopup({
         const shareData = {
           files: [file],
           title: `${PERIOD_LABELS[period]} Session`,
-          text: `My ${PERIOD_LABELS[period].toLowerCase()} session - Score: ${sessionScore}/100`,
+          text: `My ${PERIOD_LABELS[period].toLowerCase()} session — ${totalMinutes} minutes tracked`,
         }
 
         if (navigator.canShare(shareData)) {
@@ -298,39 +249,18 @@ export default function PeriodSummaryPopup({
     })
   }, [entries, period])
 
-  // Calculate session score (0-100)
-  const sessionScore = useMemo(() => {
-    if (periodEntries.length === 0) return 0
-
-    const totalMinutes = periodEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
-    const productiveMinutes = periodEntries
-      .filter(e => ['deep_work', 'learning', 'exercise', 'creating'].includes(e.category || ''))
-      .reduce((sum, e) => sum + e.duration_minutes, 0)
-
-    // Base score on productive ratio (50 points max)
-    const productiveRatio = totalMinutes > 0 ? productiveMinutes / totalMinutes : 0
-    const productiveScore = productiveRatio * 50
-
-    // Engagement score based on entry count (30 points max)
-    const engagementScore = Math.min(30, periodEntries.length * 6)
-
-    // Bonus for hitting target categories (20 points max)
-    const targetScore = 20
-
-    // Calculate total and cap at 100
-    const score = Math.min(100, Math.round(productiveScore + engagementScore + targetScore))
-
-    return score
-  }, [periodEntries])
-
-  // Show confetti for high scores
-  useEffect(() => {
-    if (isOpen && sessionScore > 80) {
-      setShowConfetti(true)
-      const timer = setTimeout(() => setShowConfetti(false), 2000)
-      return () => clearTimeout(timer)
-    }
-  }, [isOpen, sessionScore])
+  /**
+   * There was a session score here, drawn as an unlabelled number in a ring.
+   * It was: 50 × (minutes of deep_work/learning/exercise/creating ÷ total),
+   * plus 6 per entry to a maximum of 30, plus a flat 20 awarded
+   * unconditionally.
+   *
+   * So an evening of seeing a friend, eating, and a shower — the kind of
+   * evening Body and Heart are built to reward — scored 44: nothing from the
+   * first term, 24 for logging four things, 20 for free. A fourth scoring
+   * system, disagreeing with the three it sat beside, with nothing on screen
+   * to say what it measured. Removed rather than repaired.
+   */
 
   // Find session MVP (activity with most time)
   const sessionMVP = useMemo(() => {
@@ -389,36 +319,6 @@ export default function PeriodSummaryPopup({
   return (
     <>
       {/* Confetti animation styles */}
-      {showConfetti && (
-        <style jsx global>{`
-          @keyframes confetti-burst {
-            0% {
-              opacity: 1;
-              transform: translate(-50%, -50%) scale(0) rotate(0deg);
-            }
-            50% {
-              opacity: 1;
-            }
-            100% {
-              opacity: 0;
-              transform: translate(
-                calc(-50% + var(--confetti-x)),
-                calc(-50% + var(--confetti-y))
-              ) scale(1) rotate(var(--confetti-rotate));
-            }
-          }
-          @keyframes glow-pulse {
-            0%, 100% {
-              opacity: 0.3;
-              transform: scale(1);
-            }
-            50% {
-              opacity: 0.6;
-              transform: scale(1.1);
-            }
-          }
-        `}</style>
-      )}
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         {/* Backdrop */}
@@ -437,17 +337,10 @@ export default function PeriodSummaryPopup({
               : 'translate-y-8 opacity-0 scale-95'
           }`}
         >
-          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${colors.gradient} p-[2px] shadow-2xl max-h-[85vh]`}>
+          {/* Was a 2px gradient frame — amber→orange, or indigo→purple→pink
+              for the evening, which is the loudest thing in the app. */}
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-700 shadow-2xl max-h-[85vh]">
             <div className="relative rounded-2xl bg-zinc-900 p-6 overflow-y-auto max-h-[calc(85vh-4px)]">
-              {/* Confetti particles for celebration */}
-              {showConfetti && (
-                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-                  {Array.from({ length: 30 }).map((_, i) => (
-                    <ConfettiParticle key={i} index={i} total={30} />
-                  ))}
-                </div>
-              )}
-
               {/* Header buttons */}
               <div className="absolute right-4 top-4 flex items-center gap-2">
                 <button
@@ -465,7 +358,7 @@ export default function PeriodSummaryPopup({
                 </button>
               </div>
 
-            {/* Header with Session Score */}
+            {/* Header */}
             <div className="flex items-center gap-3 mb-4">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800 ${colors.border} border`}>
                 <Icon className={`h-6 w-6 ${colors.icon}`} />
@@ -475,23 +368,6 @@ export default function PeriodSummaryPopup({
                 <p className="text-sm text-zinc-400">
                   {periodEntries.length} {periodEntries.length === 1 ? 'activity' : 'activities'} logged
                 </p>
-              </div>
-              {/* Session Score */}
-              <div className="relative">
-                {sessionScore > 80 && (
-                  <div
-                    className={`absolute inset-0 rounded-full bg-gradient-to-br ${colors.gradient} blur-lg`}
-                    style={{ animation: 'glow-pulse 2s ease-in-out infinite' }}
-                  />
-                )}
-                <div className={`relative flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800 ${colors.border} border-2`}>
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${sessionScore >= 80 ? 'text-green-400' : sessionScore >= 60 ? 'text-blue-400' : 'text-zinc-400'}`}>
-                      {sessionScore}
-                    </div>
-                    <div className="text-[10px] text-zinc-500">score</div>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -573,21 +449,6 @@ export default function PeriodSummaryPopup({
                 )}
               </div>
 
-              {/* Data-driven insight */}
-              {insight && !isLoading && (
-                <div className="flex items-start gap-2 pt-2 border-t border-zinc-700/50">
-                  <TrendingUp className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
-                  <p className="text-xs text-blue-400 font-medium">{insight}</p>
-                </div>
-              )}
-
-              {/* Forward-looking prediction */}
-              {prediction && !isLoading && (
-                <div className="flex items-start gap-2 pt-2 border-t border-zinc-700/50">
-                  <ArrowRight className="h-4 w-4 text-purple-400 mt-0.5 shrink-0" />
-                  <p className="text-xs text-purple-400 font-medium">{prediction}</p>
-                </div>
-              )}
             </div>
 
             {/* Task completion prompt */}
@@ -698,7 +559,7 @@ export default function PeriodSummaryPopup({
                     handleClose()
                     setTimeout(onViewDayReview, 300)
                   }}
-                  className={`w-full bg-gradient-to-r ${colors.gradient} text-white hover:opacity-90`}
+                  className="w-full"
                 >
                   <Sparkles className="h-4 w-4" />
                   Your Day in Review is ready

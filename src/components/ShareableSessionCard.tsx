@@ -1,7 +1,8 @@
 'use client'
 
 import { forwardRef } from 'react'
-import { TimePeriod, PERIOD_LABELS, CATEGORY_LABELS, TimeCategory } from '@/lib/types'
+import { TimePeriod, PERIOD_LABELS, CATEGORY_LABELS, TimeCategory, getAggregatedCategory } from '@/lib/types'
+import { AGGREGATED_HEX } from '@/lib/palette'
 import { Sun, Cloud, Moon } from 'lucide-react'
 
 const PERIOD_ICONS: Record<TimePeriod, typeof Sun> = {
@@ -24,7 +25,6 @@ interface CategoryStat {
 export interface ShareableSessionCardProps {
   period: TimePeriod
   date: string // YYYY-MM-DD or formatted date string
-  sessionScore: number
   totalMinutes: number
   topCategories: CategoryStat[]
   commentary: string
@@ -35,16 +35,13 @@ export interface ShareableSessionCardProps {
  * Renders as a React component that can be screenshotted or captured with html2canvas.
  */
 const ShareableSessionCard = forwardRef<HTMLDivElement, ShareableSessionCardProps>(
-  ({ period, date, sessionScore, totalMinutes, topCategories, commentary }, ref) => {
+  ({ period, date, totalMinutes, topCategories, commentary }, ref) => {
     const Icon = PERIOD_ICONS[period]
     const periodLabel = PERIOD_LABELS[period]
     const gradient = PERIOD_GRADIENTS[period]
 
     const hours = Math.floor(totalMinutes / 60)
     const minutes = totalMinutes % 60
-
-    const scoreColor =
-      sessionScore >= 80 ? '#22c55e' : sessionScore >= 60 ? '#3b82f6' : '#71717a'
 
     // Format date
     const formattedDate = (() => {
@@ -93,44 +90,15 @@ const ShareableSessionCard = forwardRef<HTMLDivElement, ShareableSessionCardProp
             </div>
           </div>
 
-          {/* Session Score Ring */}
-          <div className="mt-6 flex items-center gap-6">
-            <div className="relative flex-shrink-0">
-              <svg width="100" height="100" viewBox="0 0 100 100" className="-rotate-90">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.08)"
-                  strokeWidth="8"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke={scoreColor}
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(sessionScore / 100) * 251.3} 251.3`}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-3xl font-bold" style={{ color: scoreColor }}>
-                  {sessionScore}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm text-zinc-400">Session Score</p>
-              <p className="text-2xl font-bold text-white">
-                {hours > 0 && `${hours}h `}
-                {minutes}m
-              </p>
-              <p className="text-xs text-zinc-500">tracked</p>
-            </div>
+          {/* The time tracked, which is what the session actually was. A
+              score ring used to lead here; see PeriodSummaryPopup for why it
+              is gone. */}
+          <div className="mt-6">
+            <p className="text-5xl font-bold text-white">
+              {hours > 0 && `${hours}h `}
+              {minutes}m
+            </p>
+            <p className="mt-1 text-sm text-zinc-400">tracked this session</p>
           </div>
 
           {/* Top Categories */}
@@ -167,7 +135,7 @@ const ShareableSessionCard = forwardRef<HTMLDivElement, ShareableSessionCardProp
                             className="h-full rounded-full transition-all"
                             style={{
                               width: `${barWidth}%`,
-                              backgroundColor: scoreColor,
+                              backgroundColor: AGGREGATED_HEX[getAggregatedCategory(stat.category)],
                             }}
                           />
                         </div>

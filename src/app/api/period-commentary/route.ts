@@ -176,87 +176,24 @@ EXAMPLES OF GOOD PERIOD SUMMARIES:
       max_tokens: 150,
     })
 
-    const insightPromise = openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `Generate a ONE-LINER data-driven insight based on patterns in their time tracking.
+    /**
+     * There were two more calls here, for an "insight" one-liner and a
+     * "prediction" one-liner, shown under the commentary in the session
+     * popup. In practice they restated what was already on the screen —
+     * "You spent 37.5% of your evening on social activities", over a card
+     * already listing Social 1h30m — or said nothing at all: "If you
+     * maintain this evening routine, you could easily finish the week
+     * strong."
+     *
+     * They cost two of this route's three model calls, three times a day,
+     * for text nobody needed. The commentary is the part with something to
+     * say.
+     */
 
-EXAMPLES:
-- "You average 2.5h deep work on Tuesdays"
-- "This is your 3rd consecutive productive morning"
-- "You've logged 12h of meetings this week—that's up 40%"
-- "Evening scroll sessions account for 60% of your entertainment time"
-- "You haven't logged exercise in 4 days"
+    const completion = await commentaryPromise
+    const commentary = completion.choices[0]?.message?.content?.trim() || ''
 
-RULES:
-- ONE sentence only (under 12 words)
-- Must be data-driven with specific numbers or patterns
-- NO advice, just observation
-- NO emojis
-- Can be blunt if the data warrants it`,
-        },
-        {
-          role: 'user',
-          content: context,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 50,
-    })
-
-    const predictionPromise = openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `Generate a forward-looking prediction based on their progress and patterns.
-
-EXAMPLES:
-- "At this pace, you'll close your Deep Focus ring by Thursday"
-- "You'll need to pick it up to hit your Exercise goal this week"
-- "If you keep this energy, tomorrow morning could be even better"
-- "Watch the scroll creep tonight—you tend to lose evenings after afternoons like this"
-- "One more solid day like this and you'll beat last week's total"
-
-RULES:
-- ONE sentence (under 15 words)
-- Must be forward-looking and specific
-- Base it on weekly target progress when available
-- Can reference patterns and trends
-- Be specific about timing when possible
-- NO emojis`,
-        },
-        {
-          role: 'user',
-          content: context,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 50,
-    })
-
-    const [commentaryResult, insightResult, predictionResult] = await Promise.allSettled([
-      commentaryPromise,
-      insightPromise,
-      predictionPromise,
-    ])
-
-    // allSettled, not all: the insight and the prediction are extras the client
-    // already treats as optional, so losing one should not cost the summary.
-    if (commentaryResult.status === 'rejected') throw commentaryResult.reason
-
-    const text = (result: PromiseSettledResult<OpenAI.Chat.Completions.ChatCompletion>) =>
-      result.status === 'fulfilled'
-        ? result.value.choices[0]?.message?.content?.trim() || null
-        : null
-
-    const commentary = text(commentaryResult) || ''
-    const insight = text(insightResult)
-    const prediction = text(predictionResult)
-
-    return NextResponse.json({ commentary, insight, prediction })
+    return NextResponse.json({ commentary })
   } catch (error) {
     console.error('Period commentary generation error:', error)
 

@@ -195,7 +195,7 @@ function HomeContent() {
                     disabled={!unlocked}
                     className={`w-full flex items-center gap-3 rounded-xl px-4 py-3.5 transition-all ${
                       unlocked
-                        ? 'bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20 hover:from-primary/30 hover:to-primary/10'
+                        ? 'bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20 hover:from-primary/30 hover:to-primary/10 active:scale-[0.99]'
                         : 'bg-secondary/30 border border-border cursor-default'
                     }`}
                   >
@@ -256,6 +256,12 @@ function HomeContent() {
                         ? 'bg-accent border border-primary/20'
                         : 'bg-secondary/50 border border-transparent hover:bg-accent/50'
 
+                  // One hover and press response for all four states. A tinted
+                  // row has no spare background to shift, so the border does
+                  // the work.
+                  const interaction =
+                    'transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]'
+
                   const iconBgClass = isDone
                     ? STATUS_CLASSES.green.iconBg
                     : isPartial
@@ -279,7 +285,7 @@ function HomeContent() {
                     <button
                       key={info.period}
                       onClick={() => (isDone || hasEntries) ? handleViewClick(info.period) : handleLogClick(info.period)}
-                      className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 transition-all ${bgClass}`}
+                      className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 ${bgClass} ${interaction}`}
                     >
                       <div className={`flex h-9 w-9 items-center justify-center rounded-full ${iconBgClass}`}>
                         <Icon className={`h-4 w-4 ${iconColorClass}`} />

@@ -81,6 +81,40 @@ describe('DayReviewPage', () => {
     back: jest.fn(),
   }
 
+  /**
+   * Routed by URL rather than by call order. The page asks for the review
+   * status, the summary, the day's metrics and the commentary; which of
+   * them resolves first is not part of its contract, and an ordered queue
+   * of mockResolvedValueOnce broke the moment the metrics fetch was added.
+   */
+  const routeFetch = (
+    summary: unknown,
+    metrics = { body: 61, focus: 84, social: 42 },
+    commentary = 'Test commentary'
+  ) =>
+    mockFetch.mockImplementation(async (url: unknown) => {
+      const target = String(url)
+      if (target.includes('/api/day-review')) {
+        return { ok: true, json: async () => ({ source: 'live', review: null }) }
+      }
+      if (target.includes('/api/day-summary')) return { ok: true, json: async () => summary }
+      if (target.includes('/api/metrics/trend')) {
+        return {
+          ok: true,
+          json: async () => ({
+            body: { current: metrics.body, average: metrics.body },
+            focus: { current: metrics.focus, average: metrics.focus },
+            social: { current: metrics.social, average: metrics.social },
+          }),
+        }
+      }
+      if (target.includes('/api/day-commentary')) {
+        return { ok: true, json: async () => ({ commentary }) }
+      }
+      return { ok: false, json: async () => ({}) }
+    })
+
+
   beforeEach(() => {
     jest.clearAllMocks()
     ;(useRouter as jest.Mock).mockReturnValue(mockRouter)
@@ -113,18 +147,7 @@ describe('DayReviewPage', () => {
   })
 
   it('renders day review page with summary data', async () => {
-    const mockSummary = createMockDaySummary()
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Great day of focus!' }),
-      })
+    routeFetch(createMockDaySummary())
 
     render(<DayReviewPage />)
 
@@ -133,25 +156,22 @@ describe('DayReviewPage', () => {
     })
   })
 
-  it('displays the score circle', async () => {
-    const mockSummary = createMockDaySummary({ score: 75 })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test commentary' }),
-      })
+  it("leads with the day's three metrics, not a logging percentage", async () => {
+    // The hero used to be summary.score — sessionsLogged ÷ sessionsPassed,
+    // which reads 100 whenever every session has something in it. It is now
+    // Body / Mind / Heart for that date, on the same scale as the dashboard.
+    routeFetch(createMockDaySummary({ score: 75 }), { body: 61, focus: 84, social: 42 })
 
     render(<DayReviewPage />)
 
     await waitFor(() => {
-      expect(screen.getByText('75')).toBeInTheDocument()
+      expect(screen.getByText('61')).toBeInTheDocument()
     })
+    expect(screen.getByText('84')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument()
+    // the sessions line survives as a caption: a fact, not a score
+    expect(screen.getByText(/2\/3 sessions/)).toBeInTheDocument()
+    expect(screen.queryByText('75')).not.toBeInTheDocument()
   })
 
   // The assertions below cover the Energy Breakdown, Category Breakdown, Mood,
@@ -376,18 +396,7 @@ describe('DayReviewPage', () => {
   })
 
   it('handles back button click', async () => {
-    const mockSummary = createMockDaySummary()
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test' }),
-      })
+    routeFetch(createMockDaySummary())
 
     render(<DayReviewPage />)
 

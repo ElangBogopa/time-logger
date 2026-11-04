@@ -43,6 +43,8 @@ import {
   getUserCurrentHour,
 } from '@/lib/types'
 import { AGGREGATED_CLASSES, STATUS_CLASSES } from '@/lib/palette'
+import { MetricRingRow } from '@/components/MetricRings'
+import type { MetricKey } from '@/lib/chart-colors'
 
 /**
  * Colours come from the one palette, and the category → bucket mapping from
@@ -154,62 +156,6 @@ function formatDate(dateStr: string): string {
     month: 'long',
     day: 'numeric',
   })
-}
-
-// Score Circle Component
-function ScoreCircle({ score, color, size = 'large' }: { score: number; color: 'green' | 'orange' | 'red'; size?: 'small' | 'large' }) {
-  const ringColor = {
-    green: STATUS_CLASSES.green.stroke,
-    orange: STATUS_CLASSES.yellow.stroke,
-    red: STATUS_CLASSES.red.stroke,
-  }
-
-  const textColor = {
-    green: STATUS_CLASSES.green.icon,
-    orange: STATUS_CLASSES.yellow.icon,
-    red: STATUS_CLASSES.red.icon,
-  }
-
-  const radius = size === 'large' ? 54 : 36
-  const strokeWidth = size === 'large' ? 8 : 6
-  const viewBox = size === 'large' ? '0 0 120 120' : '0 0 80 80'
-  const center = size === 'large' ? 60 : 40
-  const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference - (score / 100) * circumference
-
-  return (
-    <div className="relative flex items-center justify-center">
-      <svg className={cn('-rotate-90', size === 'large' ? 'w-[120px] h-[120px]' : 'w-20 h-20')} viewBox={viewBox}>
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-zinc-200 dark:text-zinc-700"
-        />
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          className={ringColor[color]}
-          style={{
-            strokeDasharray: circumference,
-            strokeDashoffset,
-            transition: 'stroke-dashoffset 0.5s ease-in-out',
-          }}
-        />
-      </svg>
-      <div className={cn('absolute flex flex-col items-center', textColor[color])}>
-        <span className={cn('font-bold', size === 'large' ? 'text-4xl' : 'text-2xl')}>{score}</span>
-        {size === 'large' && <span className="text-xs text-muted-foreground">/ 100</span>}
-      </div>
-    </div>
-  )
 }
 
 // Wins Section
@@ -464,6 +410,7 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [commentary, setCommentary] = useState<string | null>(null)
+  const [metrics, setMetrics] = useState<Record<MetricKey, number> | null>(null)
   const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
 
   // Generate AI commentary from summary data (with cache)
@@ -589,6 +536,26 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
     }
   }, [dateParam, generateCommentary, saveReview])
 
+  // The day's Body / Mind / Heart, which is what the review leads with now.
+  // The old hero was sessionsLogged ÷ sessionsPassed × 100 — a measure of
+  // how diligently the day was logged, shown on the same dial as the three
+  // real scores, and at 100 whenever all three sessions had anything in them.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    let cancelled = false
+    const date = dateParam || getUserToday()
+    fetch(`/api/metrics/trend?period=7d&date=${date}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return
+        setMetrics({ body: data.body.current, focus: data.focus.current, social: data.social.current })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [status, dateParam])
+
   // Check if reviewing today or future — block access before 9pm
   // Computed eagerly to avoid extra render cycle
   const [currentHour, setCurrentHour] = useState<number | null>(() => {
@@ -700,12 +667,21 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
           <p className="text-muted-foreground">{formatDate(summary.date)}</p>
         </header>
 
-        {/* Score Hero */}
-        <section className="flex flex-col items-center py-6 mb-6">
-          <ScoreCircle score={summary.score} color={summary.scoreColor} size="large" />
-          <p className="text-sm text-muted-foreground mt-4">
-            {summary.sessionsLogged}/{summary.totalSessions} sessions · {formatMinutes(summary.totalMinutesLogged)} tracked
-          </p>
+        {/* How the day actually went, on the app's one scale */}
+        <section className="py-6 mb-6">
+          {metrics ? (
+            <MetricRingRow
+              values={metrics}
+              size={84}
+              srLabel="Scores for this day"
+              caption={`${summary.sessionsLogged}/${summary.totalSessions} sessions · ${formatMinutes(summary.totalMinutesLogged)} tracked`}
+            />
+          ) : (
+            <p className="text-center text-sm text-muted-foreground">
+              {summary.sessionsLogged}/{summary.totalSessions} sessions ·{' '}
+              {formatMinutes(summary.totalMinutesLogged)} tracked
+            </p>
+          )}
         </section>
 
         {/* AI Commentary */}
