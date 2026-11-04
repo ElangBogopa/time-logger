@@ -15,7 +15,7 @@ scores it as Body / Mind / Heart, and then talks to you about it.
 
 47 API routes, ~34,000 lines, 30 test suites, PWA with offline support, push
 notifications, two cron jobs, Google Calendar import, Google Tasks import,
-Sentry, and a separate Expo app.
+and Sentry.
 
 **The three things genuinely worth protecting:**
 
@@ -175,8 +175,15 @@ rest of the app's 80/50. All now come from `lib/palette.ts` and
 - 13 skipped day-review tests, parked behind commented-out sections.
 - 64 lint errors, mostly React 19 compiler rules (`set-state-in-effect`,
   `purity`), non-blocking in CI by design.
-- The Expo app queries Supabase directly, bypassing every guard and all the
-  scoring logic. It is a second client with a second set of rules.
+- ~~The Expo app queries Supabase directly, bypassing every guard.~~
+  **This was wrong, and the truth was worse in a quieter way.** The guard
+  held: `time_entries` is `FOR ALL USING (false)`, so the anon key the app
+  used read `[]` and every write came back `42501 new row violates
+  row-level security policy`. It also signed into Supabase Auth, whose user
+  ids never match the NextAuth ids the rows are keyed by. Two independent
+  reasons it could not work — a 9-month-old WIP that looked like a second
+  client and was an empty shell. Deleted; the installable PWA already covers
+  phones, and git still has it.
 
 ---
 
@@ -196,5 +203,6 @@ All five are done. Whether the app gets used now depends on whether one tap
 to repeat a day is enough — which only a few weeks of use will say.
 
 What is left is in §5: splitting `lib/types.ts`, a repository layer for the
-33 routes that import Supabase directly, the 13 skipped day-review tests, the
-64 lint errors, and the Expo app that bypasses every guard.
+33 routes that import Supabase directly, the 13 skipped day-review tests and
+the lint errors. All of it is hygiene — none of it is a bug a user can
+hit.
