@@ -6,8 +6,9 @@ import { useSession } from 'next-auth/react'
 import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities } from '@/lib/api'
 import { findRepeatCandidate, entriesForRepeat, type RepeatCandidate } from '@/lib/repeat-session'
 import { PERIOD_CLASSES } from '@/lib/palette'
+import { findUnaccountedGaps } from '@/lib/gaps'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
-import { TimePeriod, TimeEntry, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, shiftDateString } from '@/lib/types'
+import { TimePeriod, TimeEntry, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
 import {
   getEntriesForPeriod,
   getSessionStats,
@@ -17,7 +18,7 @@ import {
   getFlexiblePeriodRange,
   getYesterdayDateString,
 } from '@/lib/session-utils'
-import { timeToMinutes } from '@/lib/time-utils'
+import { timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
@@ -35,6 +36,7 @@ import {
   Plus,
   Check,
   CheckCircle2,
+  CircleDashed,
   CalendarCheck,
   RefreshCw,
   RotateCcw,
@@ -306,6 +308,30 @@ function LogPeriodContent() {
     }
   }
 
+  /**
+   * The stretches of this session with nothing in them. Answering a row is
+   * one tap; the alternative is the hold-and-drag gesture on the timeline,
+   * which needs five conditions to line up (see lib/gaps.ts).
+   */
+  const gaps = useMemo(() => {
+    if (isLocked || !selectedDate) return []
+    const isToday = selectedDate === getUserToday()
+    const currentHour = getUserCurrentHour()
+    return findUnaccountedGaps({
+      entries: periodEntries,
+      events: calendarEvents,
+      periodStart: range.start,
+      periodEnd: range.end,
+      // On today, never ask about time that has not happened yet.
+      nowMinutes: isToday ? currentHour * 60 + new Date().getMinutes() : null,
+    })
+  }, [isLocked, selectedDate, periodEntries, calendarEvents, range.start, range.end])
+
+  const handleFillGap = (startTime: string, endTime: string) => {
+    setQuickLogDragData({ startTime, endTime })
+    setIsQuickLogOpen(true)
+  }
+
   // Handle "Done with period"
   const handleDone = async () => {
     // Save session completion
@@ -572,6 +598,33 @@ function LogPeriodContent() {
             <Button size="sm" variant="outline" onClick={handleConfirmAllGhosts} disabled={isConfirmingAll}>
               {isConfirmingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" />Confirm all</>}
             </Button>
+          </section>
+        )}
+
+        {/* Unaccounted time — one tap each */}
+        {gaps.length > 0 && (
+          <section className="mb-4">
+            <h2 className="eyebrow mb-2">Unaccounted</h2>
+            <div className="space-y-2">
+              {gaps.map((gap) => (
+                <button
+                  key={gap.startTime}
+                  onClick={() => handleFillGap(gap.startTime, gap.endTime)}
+                  className="w-full flex items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 px-4 py-3 text-left transition-all duration-150 hover:border-foreground/25 hover:bg-card active:scale-[0.99]"
+                >
+                  <CircleDashed className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {formatTimeDisplay(gap.startTime)} – {formatTimeDisplay(gap.endTime)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatSessionDuration(gap.durationMinutes)} unaccounted
+                    </p>
+                  </div>
+                  <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                </button>
+              ))}
+            </div>
           </section>
         )}
 

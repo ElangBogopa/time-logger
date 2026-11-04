@@ -36,10 +36,14 @@ manipulation. Making one control do both is what produces the fidget.
 **The session view becomes capture.** No dragging at all:
 
 - The day so far as a list of blocks, newest at the bottom.
-- **Gap rows.** Between the last entry and now: "11:00–13:30 · 2h 30m
-  unaccounted" as a tappable row. Tap it, pick an activity, it fills. This
-  is the satisfying part — the day visibly closes up, and you are answering
-  a question rather than operating a canvas.
+- **Gap rows.** *(Built — `lib/gaps.ts`.)* Between the last entry and now:
+  "10:00 AM – 11:00 AM · 1h unaccounted" as a tappable row. Tap it and the
+  quick-log sheet opens with those times already set; answer it and the row
+  disappears. The day visibly closes up, and you are answering a question
+  rather than operating a canvas. It never asks about the hours before the
+  first thing you logged (the morning session starts at midnight), about
+  time that has not happened yet, or about a stretch a calendar event
+  already covers.
 - **Chips above the keyboard**: the three suggestions `/api/suggestions`
   already returns (same weekday, same time, last four weeks), plus the
   repeat card that is already there. One tap, pre-filled times, done.
@@ -64,7 +68,9 @@ Three changes would fix most of it without the split:
    cannot land on 11:03 and does not need to be precise.
 
 My recommendation: do the split. The gap rows are the single highest-value
-piece, and they work on their own, before any of the rest.
+piece, and they work on their own, before any of the rest — which is why
+they went in first. What is left of the split is moving the drag timeline
+out of the session view into a calendar tab of its own.
 
 ---
 
