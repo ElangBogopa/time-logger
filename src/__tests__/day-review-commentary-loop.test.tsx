@@ -24,6 +24,16 @@ import { csrfFetch } from '@/lib/api'
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 jest.mock('next-auth/react', () => ({ useSession: jest.fn() }))
+// The surviving implementation reads ?date= and can redirect to /login.
+// Both must be stable across renders. Next's own useRouter is; a mock that
+// returns a fresh object each render re-fires every effect that depends on
+// it, which looks exactly like a bug in the component.
+const stableRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() }
+const stableParams = new URLSearchParams('')
+jest.mock('next/navigation', () => ({
+  useRouter: () => stableRouter,
+  useSearchParams: () => stableParams,
+}))
 jest.mock('@/lib/api', () => ({ csrfFetch: jest.fn() }))
 jest.mock('@/lib/client-cache', () => ({ cacheGet: jest.fn(() => null), cacheSet: jest.fn() }))
 jest.mock('@/lib/types', () => ({
@@ -54,7 +64,12 @@ beforeEach(() => {
   jest.clearAllMocks()
   window.localStorage.clear()
   ;(useSession as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => summary })) as unknown as typeof fetch
+  // It asks /api/day-review first (is this day saved?), then /api/day-summary.
+  global.fetch = jest.fn(async (url: string) =>
+    String(url).includes('/api/day-review')
+      ? { ok: true, json: async () => ({ source: 'live', review: null }) }
+      : { ok: true, json: async () => summary }
+  ) as unknown as typeof fetch
 })
 
 async function settle() {
@@ -159,7 +174,11 @@ describe('reusing commentary between visits', () => {
 
     // same date, but another entry has been logged since
     const later = { ...summary, totalMinutesLogged: summary.totalMinutesLogged + 45, score: 71 }
-    global.fetch = jest.fn(async () => ({ ok: true, json: async () => later })) as unknown as typeof fetch
+    global.fetch = jest.fn(async (url: string) =>
+      String(url).includes('/api/day-review')
+        ? { ok: true, json: async () => ({ source: 'live', review: null }) }
+        : { ok: true, json: async () => later }
+    ) as unknown as typeof fetch
     ;(csrfFetch as jest.Mock).mockImplementation(ok('Even better after that session.'))
 
     render(<DayReviewContent />)

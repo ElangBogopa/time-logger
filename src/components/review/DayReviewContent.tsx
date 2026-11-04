@@ -1,94 +1,282 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+/**
+ * The day review.
+ *
+ * This is the only implementation. It used to exist twice — here and as a
+ * leaner copy behind /review?tab=day — which is how the same bug kept needing
+ * two fixes, and how one copy ended up rendering Today's Wins as blank rows
+ * while the other did not. /day-review is now a thin page around this
+ * component, and the review tab renders the same thing.
+ */
+
 import { csrfFetch } from '@/lib/api'
 import CommentaryThread from '@/components/CommentaryThread'
-import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { commentaryFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
-import { Trophy, Clock, Sparkles, Check } from 'lucide-react'
+import { cacheGet, cacheSet } from '@/lib/client-cache'
+
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import {
+  ArrowLeft,
+  Trophy,
+  TrendingUp,
+  Clock,
+  Sparkles,
+  Target,
+  Zap,
+  Calendar,
+  Lock,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { TimeCategory, MoodCheckin, MOOD_EMOJIS, SESSION_MOOD_CONFIG, AggregatedCategory, getUserToday, getUserCurrentHour } from '@/lib/types'
-import { getAggregatedCategory, AGGREGATED_CATEGORY_COLORS } from '@/lib/types'
-// Matches the Win that /api/day-summary returns. This previously declared
-// { icon, label }, which the API has never sent, so every win rendered as two
-// empty spans under the heading.
-interface Win { id: string; text: string; type: 'goal_met' | 'streak' | 'focus' | 'improvement' | 'balance'; value?: number }
-interface TargetProgress { targetId: string; label: string; emoji: string; currentMinutes: number; targetMinutes: number; percentComplete: number; todayMinutes?: number; dailyTarget?: number; progress?: number }
-interface CategoryBreakdown { category: TimeCategory; label: string; totalMinutes: number; percentage: number }
-interface AggregatedBreakdown { category: AggregatedCategory; label: string; totalMinutes: number; percentage: number }
-interface TimelineSlot { hour: number; period: 'morning' | 'afternoon' | 'evening'; hasEntry: boolean; category?: TimeCategory; minutes?: number }
+import {
+  TimeCategory,
+  MoodCheckin,
+  MOOD_EMOJIS,
+  SESSION_MOOD_CONFIG,
+  TimeEntry,
+  AggregatedCategory,
+  getUserToday,
+  getUserCurrentHour,
+} from '@/lib/types'
+
+// Map each TimeCategory → aggregated category (mirrors ENERGY_VIEW)
+const CATEGORY_TO_AGGREGATED: Record<TimeCategory, AggregatedCategory> = {
+  deep_work: 'focus',
+  learning: 'focus',
+  creating: 'focus',
+  shallow_work: 'ops',
+  meetings: 'ops',
+  admin: 'ops',
+  errands: 'ops',
+  chores: 'ops',
+  commute: 'ops',
+  exercise: 'body',
+  movement: 'body',
+  meals: 'body',
+  sleep: 'body',
+  rest: 'recovery',
+  self_care: 'recovery',
+  social: 'connection',
+  calls: 'connection',
+  entertainment: 'escape',
+  faith: 'faith',
+  other: 'escape',
+}
+
+// Muted 6-color palette for aggregated categories
+const AGGREGATED_HEX: Record<AggregatedCategory, string> = {
+  focus: '#6B8CAE',      // Slate blue
+  ops: '#8B8680',        // Warm gray
+  body: '#7D9B8A',       // Sage green
+  recovery: '#B5A07A',   // Dusty amber
+  connection: '#A0848E', // Muted rose
+  faith: '#8A7CA8',
+  escape: '#7A7D82',     // Cool gray
+}
+
+// Category colors for timeline strip — uses aggregated hex colors
+const CATEGORY_COLORS: Record<TimeCategory, string> = Object.fromEntries(
+  (Object.keys(CATEGORY_TO_AGGREGATED) as TimeCategory[]).map(cat => [
+    cat,
+    `bg-[${AGGREGATED_HEX[CATEGORY_TO_AGGREGATED[cat]]}]`,
+  ])
+) as Record<TimeCategory, string>
+
+// Aggregated category colors (for the 6-category energy view)
+const AGGREGATED_COLORS: Record<AggregatedCategory, string> = {
+  focus: 'bg-[#6B8CAE]',
+  ops: 'bg-[#8B8680]',
+  body: 'bg-[#7D9B8A]',
+  recovery: 'bg-[#B5A07A]',
+  connection: 'bg-[#A0848E]',
+  faith: 'bg-[#8A7CA8]',
+  escape: 'bg-[#7A7D82]',
+}
+
+const AGGREGATED_TEXT_COLORS: Record<AggregatedCategory, string> = {
+  focus: 'text-[#6B8CAE]',
+  ops: 'text-[#8B8680]',
+  body: 'text-[#7D9B8A]',
+  recovery: 'text-[#B5A07A]',
+  connection: 'text-[#A0848E]',
+  faith: 'text-[#8A7CA8]',
+  escape: 'text-[#7A7D82]',
+}
+
+interface Win {
+  id: string
+  text: string
+  type: 'goal_met' | 'streak' | 'focus' | 'improvement' | 'balance'
+  value?: number
+}
+
+interface TimelineBlock {
+  hour: number
+  entries: {
+    id: string
+    activity: string
+    category: TimeCategory | null
+    startTime: string
+    endTime: string
+    durationMinutes: number
+  }[]
+  totalMinutes: number
+}
+
+interface CategoryBreakdown {
+  category: TimeCategory
+  label: string
+  minutes: number
+  percentage: number
+}
+
+interface AggregatedBreakdown {
+  category: AggregatedCategory
+  label: string
+  minutes: number
+  percentage: number
+}
+
+interface ProductivityTaskInfo {
+  title: string
+  completed: boolean
+  weight: number
+  slot: number
+}
+
 interface ProductivityScore {
-  score: number; totalTasks: number; completedTasks: number; priorityCompleted: boolean
-  tasks: { id: string; title: string; completed: boolean; weight: number; slot: number }[]
-  label: string; hasPlans: boolean
+  date: string
+  score: number
+  maxPossible: number
+  earnedPoints: number
+  totalTasks: number
+  completedTasks: number
+  priorityCompleted: boolean
+  tasks: ProductivityTaskInfo[]
+  label: string
+  hasPlans: boolean
 }
+
 interface DaySummary {
-  date: string; score: number; scoreColor: string
-  sessionsLogged: number; totalSessions: number; totalMinutesLogged: number
+  score: number
+  scoreColor: 'green' | 'orange' | 'red'
+  sessionsLogged: number
+  totalSessions: number
+  totalMinutesLogged: number
+  hasEveningPassed: boolean
+  date: string
   wins: Win[]
-  categoryBreakdown: CategoryBreakdown[]; aggregatedBreakdown: AggregatedBreakdown[]
-  timeline: TimelineSlot[]; todayMood: MoodCheckin | null
+  timeline: TimelineBlock[]
   longestFocusSession: { activity: string; minutes: number } | null
+  categoryBreakdown: CategoryBreakdown[]
+  aggregatedBreakdown: AggregatedBreakdown[]
+  todayMood: MoodCheckin | null
   productivityScore: ProductivityScore | null
+  entries: TimeEntry[]
 }
 
-// ─── Helpers ─────────────────────────────────────────────────
-function formatMinutes(m: number) {
-  const h = Math.floor(m / 60)
-  const mins = m % 60
-  return h > 0 ? `${h}h ${mins}m` : `${mins}m`
+function formatMinutes(minutes: number): string {
+  if (minutes === 0) return '0m'
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  if (mins === 0) return `${hours}h`
+  return `${hours}h ${mins}m`
 }
 
-function formatDate(d: string) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00')
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
 }
 
-// ─── Sub-components ──────────────────────────────────────────
-function ScoreCircle({ score, color, size = 'large' }: { score: number; color: string; size?: 'large' | 'small' }) {
-  const sz = size === 'large' ? 120 : 64
-  const sw = size === 'large' ? 8 : 4
-  const r = (sz - sw) / 2
-  const circ = 2 * Math.PI * r
-  const offset = circ - (score / 100) * circ
-  const colorMap: Record<string, string> = { green: '#22c55e', yellow: '#eab308', orange: '#f97316', red: '#ef4444' }
-  const strokeColor = colorMap[color] || '#6366f1'
+// Score Circle Component
+function ScoreCircle({ score, color, size = 'large' }: { score: number; color: 'green' | 'orange' | 'red'; size?: 'small' | 'large' }) {
+  const ringColor = {
+    green: 'stroke-green-500',
+    orange: 'stroke-amber-500',
+    red: 'stroke-red-500',
+  }
+
+  const textColor = {
+    green: 'text-green-500',
+    orange: 'text-amber-500',
+    red: 'text-red-500',
+  }
+
+  const radius = size === 'large' ? 54 : 36
+  const strokeWidth = size === 'large' ? 8 : 6
+  const viewBox = size === 'large' ? '0 0 120 120' : '0 0 80 80'
+  const center = size === 'large' ? 60 : 40
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (score / 100) * circumference
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: sz, height: sz }}>
-      <svg width={sz} height={sz} className="-rotate-90">
-        <circle cx={sz/2} cy={sz/2} r={r} stroke="currentColor" strokeWidth={sw} fill="none" className="text-zinc-200 dark:text-zinc-700" />
-        <circle cx={sz/2} cy={sz/2} r={r} stroke={strokeColor} strokeWidth={sw} fill="none" strokeLinecap="round"
-          strokeDasharray={circ} strokeDashoffset={offset} className="transition-all duration-1000" />
+    <div className="relative flex items-center justify-center">
+      <svg className={cn('-rotate-90', size === 'large' ? 'w-[120px] h-[120px]' : 'w-20 h-20')} viewBox={viewBox}>
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-zinc-200 dark:text-zinc-700"
+        />
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          className={ringColor[color]}
+          style={{
+            strokeDasharray: circumference,
+            strokeDashoffset,
+            transition: 'stroke-dashoffset 0.5s ease-in-out',
+          }}
+        />
       </svg>
-      <div className="absolute flex flex-col items-center">
-        <span className={`font-bold ${size === 'large' ? 'text-3xl' : 'text-lg'}`}>{score}</span>
+      <div className={cn('absolute flex flex-col items-center', textColor[color])}>
+        <span className={cn('font-bold', size === 'large' ? 'text-4xl' : 'text-2xl')}>{score}</span>
         {size === 'large' && <span className="text-xs text-muted-foreground">/ 100</span>}
       </div>
     </div>
   )
 }
 
-const WIN_EMOJI: Record<Win['type'], string> = {
-  goal_met: '🎯',
-  streak: '⚡',
-  focus: '⏱️',
-  improvement: '📈',
-  balance: '✨',
-}
-
+// Wins Section
 function WinsSection({ wins }: { wins: Win[] }) {
+  if (wins.length === 0) return null
+
+  const winIcons: Record<Win['type'], React.ReactNode> = {
+    goal_met: <Target className="h-4 w-4 text-green-500" />,
+    streak: <Zap className="h-4 w-4 text-amber-500" />,
+    focus: <Clock className="h-4 w-4 text-blue-500" />,
+    improvement: <TrendingUp className="h-4 w-4 text-purple-500" />,
+    balance: <Sparkles className="h-4 w-4 text-pink-500" />,
+  }
+
   return (
-    <section className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Trophy className="h-4 w-4 text-amber-500" />
-        <h2 className="font-semibold text-foreground text-sm">Today&apos;s Wins</h2>
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-amber-500" />
+        <h2 className="font-semibold text-foreground">Today&apos;s Wins</h2>
       </div>
       <div className="space-y-2">
-        {wins.map((w) => (
-          <div key={w.id} className="flex items-center gap-2 text-sm">
-            <span>{WIN_EMOJI[w.type] ?? '•'}</span>
-            <span className="text-foreground">{w.text}</span>
+        {wins.map(win => (
+          <div
+            key={win.id}
+            className="flex items-center gap-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 px-3 py-2"
+          >
+            {winIcons[win.type]}
+            <span className="text-sm text-foreground">{win.text}</span>
           </div>
         ))}
       </div>
@@ -96,62 +284,142 @@ function WinsSection({ wins }: { wins: Win[] }) {
   )
 }
 
-function TargetCard({ target }: { target: TargetProgress }) {
-  // Handle both field naming conventions from different API responses
-  const current = target.currentMinutes ?? target.todayMinutes ?? 0
-  const total = target.targetMinutes ?? target.dailyTarget ?? 0
-  const pct = Math.min(target.percentComplete ?? target.progress ?? (total > 0 ? (current / total) * 100 : 0), 100)
+// Timeline Strip
+function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: TimelineBlock[]; startHour?: number; endHour?: number }) {
+  const visibleHours = timeline.slice(startHour, endHour + 1)
+
   return (
-    <div className="rounded-lg border border-border bg-card p-3">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          {target.emoji && <span>{target.emoji}</span>}
-          <span className="text-sm font-medium">{target.label}</span>
-        </div>
-        <span className="text-xs text-muted-foreground">{formatMinutes(current)} / {formatMinutes(total)}</span>
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Calendar className="h-5 w-5 text-muted-foreground" />
+        <h2 className="font-semibold text-foreground">Your Day</h2>
       </div>
-      <div className="h-2 rounded-full bg-secondary overflow-hidden">
-        <div className={cn('h-full rounded-full transition-all', pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-blue-500' : 'bg-zinc-400')}
-          style={{ width: `${pct}%` }} />
+      <div className="flex gap-0.5 h-12 rounded-lg overflow-hidden bg-secondary">
+        {visibleHours.map(block => {
+          const hasEntries = block.entries.length > 0
+          const primaryCategory = block.entries[0]?.category
+
+          return (
+            <div
+              key={block.hour}
+              className={cn(
+                'flex-1 relative group',
+                hasEntries && primaryCategory
+                  ? CATEGORY_COLORS[primaryCategory]
+                  : 'bg-zinc-200 dark:bg-zinc-700'
+              )}
+              title={
+                hasEntries
+                  ? `${block.hour}:00 - ${block.entries.map(e => e.activity).join(', ')}`
+                  : `${block.hour}:00 - No activity`
+              }
+            >
+              {/* Hour label on hover */}
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                {block.hour}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {/* Hour labels */}
+      <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+        <span>{startHour}:00</span>
+        <span>12:00</span>
+        <span>{endHour}:00</span>
+      </div>
+    </section>
+  )
+}
+
+// Productivity Plan Card — shows plan completion in Goal Progress
+function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
+  const barColor = score.score >= 80 ? 'bg-green-500' : score.score >= 50 ? 'bg-amber-500' : 'bg-red-400'
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="font-medium text-foreground">Productivity</h3>
+          <p className="text-2xl font-bold text-foreground mt-1">
+            {score.score}%
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              {score.label}
+            </span>
+          </p>
+        </div>
+        <div className="text-right text-sm text-muted-foreground">
+          {score.completedTasks}/{score.totalTasks} tasks
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${score.score}%` }} />
+      </div>
+
+      {/* Task breakdown */}
+      <div className="space-y-1.5">
+        {score.tasks.map((task, i) => (
+          <div key={i} className={`flex items-center gap-2 text-sm ${task.completed ? 'opacity-50' : ''}`}>
+            <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+              task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
+            }`}>
+              {task.completed && (
+                <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className={task.completed ? 'text-muted-foreground' : 'text-foreground'}>
+              {task.title}
+            </span>
+            <span className="ml-auto text-[10px] text-muted-foreground/40">{task.weight}pts</span>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-function TimelineStrip({ timeline }: { timeline: TimelineSlot[] }) {
-  return (
-    <section>
-      <h2 className="font-semibold text-foreground text-sm mb-3">Timeline</h2>
-      <div className="flex gap-0.5">
-        {timeline.map((slot, i) => (
-          <div key={i} title={`${slot.hour}:00 - ${slot.hasEntry ? slot.category : 'empty'}`}
-            className={cn('h-8 flex-1 rounded-sm transition-colors',
-              slot.hasEntry ? AGGREGATED_CATEGORY_COLORS[getAggregatedCategory(slot.category!)] || 'bg-blue-500' : 'bg-secondary'
-            )} />
-        ))}
-      </div>
-      <div className="flex justify-between mt-1">
-        <span className="text-[10px] text-muted-foreground">6am</span>
-        <span className="text-[10px] text-muted-foreground">12pm</span>
-        <span className="text-[10px] text-muted-foreground">6pm</span>
-        <span className="text-[10px] text-muted-foreground">12am</span>
-      </div>
-    </section>
-  )
-}
-
+// Aggregated Category Breakdown (6 energy categories)
 function AggregatedBreakdownSection({ breakdown }: { breakdown: AggregatedBreakdown[] }) {
-  const total = breakdown.reduce((s, b) => s + b.totalMinutes, 0)
+  // Filter to only show categories with time
+  const visibleCategories = breakdown.filter(cat => cat.minutes > 0)
+
+  if (visibleCategories.length === 0) return null
+
+  const maxMinutes = Math.max(...breakdown.map(b => b.minutes), 1)
+
   return (
-    <section>
-      <h2 className="font-semibold text-foreground text-sm mb-3">Energy Breakdown</h2>
-      <div className="space-y-2">
-        {breakdown.map(b => (
-          <div key={b.category} className="flex items-center gap-3">
-            <div className={cn('h-3 w-3 rounded-full', AGGREGATED_CATEGORY_COLORS[b.category as AggregatedCategory])} />
-            <span className="text-sm flex-1">{b.label}</span>
-            <span className="text-sm text-muted-foreground">{formatMinutes(b.totalMinutes)}</span>
-            <span className="text-xs text-muted-foreground w-10 text-right">{Math.round(b.percentage)}%</span>
+    <section className="space-y-4">
+      <h2 className="font-semibold text-foreground">Energy Breakdown</h2>
+      <div className="space-y-3">
+        {visibleCategories.map(cat => (
+          <div key={cat.category} className="space-y-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={cn('w-3 h-3 rounded-full', AGGREGATED_COLORS[cat.category])} />
+                <span className="text-sm font-medium text-muted-foreground">
+                  {cat.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {formatMinutes(cat.minutes)}
+                </span>
+                {cat.minutes > 0 && (
+                  <span className="text-xs text-muted-foreground w-10 text-right">{cat.percentage}%</span>
+                )}
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-500', AGGREGATED_COLORS[cat.category])}
+                style={{ width: `${(cat.minutes / maxMinutes) * 100}%` }}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -159,10 +427,34 @@ function AggregatedBreakdownSection({ breakdown }: { breakdown: AggregatedBreakd
   )
 }
 
+// Granular Category Breakdown (detailed view)
+function CategoryBreakdownSection({ breakdown }: { breakdown: CategoryBreakdown[] }) {
+  if (breakdown.length === 0) return null
+
+  return (
+    <section className="space-y-3">
+      <h2 className="font-semibold text-foreground">Detailed Breakdown</h2>
+      <div className="space-y-2">
+        {breakdown.slice(0, 8).map(cat => (
+          <div key={cat.category} className="flex items-center gap-3">
+            <div className={cn('w-3 h-3 rounded-full', CATEGORY_COLORS[cat.category])} />
+            <span className="flex-1 text-sm text-foreground">{cat.label}</span>
+            <span className="text-sm font-medium text-foreground">{formatMinutes(cat.minutes)}</span>
+            <span className="text-xs text-muted-foreground w-10 text-right">{cat.percentage}%</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// Mood Section
 function MoodSection({ mood }: { mood: MoodCheckin | null }) {
   if (!mood) return null
+
   const config = SESSION_MOOD_CONFIG[mood.period]
   const label = config.labels[mood.mood]
+
   return (
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
@@ -176,73 +468,29 @@ function MoodSection({ mood }: { mood: MoodCheckin | null }) {
   )
 }
 
-// ─── Main Component ──────────────────────────────────────────
 export default function DayReviewContent() {
   const { status } = useSession()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const dateParam = searchParams.get('date')
   const [summary, setSummary] = useState<DaySummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [commentary, setCommentary] = useState<string | null>(null)
   const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
-  const [currentHour, setCurrentHour] = useState<number | null>(null)
-  // Which date we have already asked for commentary for. A ref, not state, so
-  // setting it cannot itself trigger a render — and so one attempt is recorded
-  // before the request starts, closing the re-entry the effect below used to have.
-  const commentaryRequestedFor = useRef<string | null>(null)
 
-  useEffect(() => {
-    // Use rollover-adjusted hour (12:52 AM = hour 24, so review stays unlocked)
-    setCurrentHour(getUserCurrentHour())
-  }, [])
-
-  const isLocked = currentHour !== null && currentHour < 21
-
-  const fetchSummary = useCallback(async () => {
-    // Check cache for summary
-    const cacheKey = `day-summary:${getUserToday()}`
-    const summaryCache = cacheGet<DaySummary>(cacheKey)
-    if (summaryCache) {
-      setSummary(summaryCache)
-      setIsLoading(false)
-      // Reuse the stored commentary when the day's data has not changed
-      const cached = readCachedCommentary(
-        summaryCache.date,
-        commentaryFingerprint({ ...summaryCache, mood: summaryCache.todayMood?.mood ?? null })
-      )
-      if (cached) {
-        setCommentary(cached)
-        return
-      }
-    }
-
-    try {
-      const response = await fetch(`/api/day-summary?date=${getUserToday()}`)
-      if (!response.ok) throw new Error('Failed to fetch')
-      const data = await response.json()
-      cacheSet(`day-summary:${getUserToday()}`, data)
-      setSummary(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  const fetchCommentary = useCallback(async (summaryData: DaySummary) => {
-    // Keyed on the day's data, not just the date, and held in localStorage — so
-    // reopening the app reuses the same line, and logging something new earns a
-    // fresh one.
+  // Generate AI commentary from summary data (with cache)
+  const generateCommentary = useCallback(async (summaryData: DaySummary): Promise<string | null> => {
+    // Keyed on the day's data, not just the date, and held in localStorage —
+    // so reopening the app reuses the line and logging something new earns a
+    // fresh one. The in-memory cache this replaced died on every page load.
     const fingerprint = commentaryFingerprint({
       ...summaryData,
       mood: summaryData.todayMood?.mood ?? null,
     })
     const cached = readCachedCommentary(summaryData.date, fingerprint)
-    if (cached) {
-      setCommentary(cached)
-      return
-    }
+    if (cached) return cached
 
-    setIsLoadingCommentary(true)
     try {
       const response = await csrfFetch('/api/day-commentary', {
         method: 'POST',
@@ -257,167 +505,297 @@ export default function DayReviewContent() {
       })
       if (response.ok) {
         const data = await response.json()
-        writeCachedCommentary(summaryData.date, fingerprint, data.commentary)
-        setCommentary(data.commentary)
+        const text = data.commentary || null
+        if (text) writeCachedCommentary(summaryData.date, fingerprint, text)
+        return text
       }
     } catch (err) {
       console.error('Failed to fetch commentary:', err)
-    } finally {
-      setIsLoadingCommentary(false)
+    }
+    return null
+  }, [])
+
+  // Save a finalized review to the database
+  const saveReview = useCallback(async (summaryData: DaySummary, commentaryText: string | null) => {
+    try {
+      await fetch('/api/day-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: summaryData.date,
+          score: summaryData.score,
+          scoreColor: summaryData.scoreColor,
+          sessionsLogged: summaryData.sessionsLogged,
+          totalSessions: summaryData.totalSessions,
+          totalMinutesLogged: summaryData.totalMinutesLogged,
+          commentary: commentaryText,
+          wins: summaryData.wins,
+          categoryBreakdown: summaryData.categoryBreakdown,
+          aggregatedBreakdown: summaryData.aggregatedBreakdown,
+          timeline: summaryData.timeline,
+          longestFocusSession: summaryData.longestFocusSession,
+          mood: summaryData.todayMood,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to save day review:', err)
     }
   }, [])
 
-  useEffect(() => {
-    if (status === 'authenticated' && !isLocked) fetchSummary()
-  }, [status, fetchSummary, isLocked])
+  // Main fetch logic — checks persistence layer first (with cache)
+  const fetchData = useCallback(async () => {
+    const dateKey = dateParam || 'today'
+    const reviewCacheKey = `day-review:${dateKey}`
 
-  // Ask for commentary at most once per day's summary. This used to be gated on
-  // `!isLoadingCommentary`, which the fetch itself sets — so any request that
-  // finished without commentary (a 429, a thrown error, or the route returning
-  // an empty string) flipped the guard back open and the effect fired again,
-  // forever. The section only renders while (commentary || isLoadingCommentary),
-  // so it mounted and unmounted on every pass: a constant flicker, and roughly
-  // 26 requests a second to /api/day-commentary.
-  useEffect(() => {
-    if (!summary || commentary) return
-    // Keyed on the data, so a changed day asks again exactly once.
-    const key = `${summary.date}:${commentaryFingerprint({ ...summary, mood: summary.todayMood?.mood ?? null })}`
-    if (commentaryRequestedFor.current === key) return
-    commentaryRequestedFor.current = key
-    fetchCommentary(summary)
-  }, [summary, commentary, fetchCommentary])
+    // Check if we have a fully cached review (summary + commentary)
+    const cachedReview = cacheGet<{ summary: DaySummary; commentary: string | null }>(reviewCacheKey)
+    if (cachedReview) {
+      setSummary(cachedReview.summary)
+      setCommentary(cachedReview.commentary)
+      setIsLoading(false)
+      return
+    }
 
-  // Locked before 9pm
+    try {
+      // Step 1: Check persistence status
+      const reviewUrl = `/api/day-review?date=${dateParam || getUserToday()}`
+      const reviewRes = await fetch(reviewUrl)
+      if (!reviewRes.ok) throw new Error('Failed to fetch review status')
+      const reviewData = await reviewRes.json()
+
+      if (reviewData.source === 'saved') {
+        // Locked & finalized — use saved data directly
+        const saved = reviewData.review
+        setSummary(saved)
+        setCommentary(saved.commentary || null)
+        setIsLoading(false)
+        // Cache finalized reviews permanently (they don't change)
+        cacheSet(reviewCacheKey, { summary: saved, commentary: saved.commentary || null })
+        return
+      }
+
+      // Either 'live' (editable) or 'needs_finalization' (locked but not saved yet)
+      // In both cases, fetch fresh summary
+      const summaryUrl = `/api/day-summary?date=${dateParam || getUserToday()}`
+      const summaryRes = await fetch(summaryUrl)
+      if (!summaryRes.ok) throw new Error('Failed to fetch summary')
+      const summaryData: DaySummary = await summaryRes.json()
+      setSummary(summaryData)
+      setIsLoading(false)
+
+      // Fetch AI commentary
+      setIsLoadingCommentary(true)
+      const commentaryText = await generateCommentary(summaryData)
+      setCommentary(commentaryText)
+      setIsLoadingCommentary(false)
+
+      // Cache the complete review
+      cacheSet(reviewCacheKey, { summary: summaryData, commentary: commentaryText })
+
+      // If needs finalization (locked date, first view), save to DB
+      if (reviewData.source === 'needs_finalization') {
+        await saveReview(summaryData, commentaryText)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load')
+      setIsLoading(false)
+    }
+  }, [dateParam, generateCommentary, saveReview])
+
+  // Check if reviewing today or future — block access before 9pm
+  // Computed eagerly to avoid extra render cycle
+  const [currentHour, setCurrentHour] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null
+    return getUserCurrentHour(new Date())
+  })
+  const [clientToday, setClientToday] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return getUserToday(new Date())
+  })
+
+  // Lock if: reviewing today (or no date) and before 9pm, OR reviewing a future date
+  const isTodayReview = clientToday !== null && (!dateParam || dateParam === clientToday)
+  const isFutureReview = clientToday !== null && dateParam !== null && dateParam > clientToday
+  const isLocked = (isTodayReview && currentHour !== null && currentHour < 21) || isFutureReview
+
+  useEffect(() => {
+    if (status === 'authenticated' && !isLocked) {
+      fetchData()
+    } else if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, fetchData, router, isLocked])
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  // Locked state — today before 9pm
   if (isLocked) {
     return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary mb-5">
-          <Clock className="h-7 w-7 text-muted-foreground/50" />
+      <div className="min-h-screen bg-background pb-20">
+        <div className="mx-auto max-w-2xl px-4 py-6">
+          <header className="mb-6">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              Back
+            </button>
+            <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+          </header>
+
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-secondary mb-6">
+              <Lock className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground mb-2">Not available yet</h2>
+            <p className="text-sm text-muted-foreground text-center max-w-xs mb-1">
+              Your daily review unlocks at 9:00 PM once your day is wrapping up.
+            </p>
+            <p className="text-xs text-muted-foreground/50">
+              {currentHour !== null && currentHour < 21 && `${21 - currentHour} hour${21 - currentHour !== 1 ? 's' : ''} to go`}
+            </p>
+          </div>
         </div>
-        <h2 className="text-lg font-semibold text-foreground mb-2">Not available yet</h2>
-        <p className="text-sm text-muted-foreground text-center max-w-xs mb-1">
-          Your daily review unlocks at 9:00 PM once your day is wrapping up.
-        </p>
-        {currentHour !== null && currentHour < 21 && (
-          <p className="text-xs text-muted-foreground/50">
-            {21 - currentHour} hour{21 - currentHour !== 1 ? 's' : ''} to go
-          </p>
-        )}
       </div>
     )
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
   }
 
   if (error || !summary) {
-    return <p className="text-center text-muted-foreground py-12">Unable to load day review</p>
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-muted-foreground mb-6">
+          <ArrowLeft className="h-5 w-5" />
+          Back
+        </button>
+        <p className="text-center text-muted-foreground">Unable to load day review</p>
+      </div>
+    )
   }
 
   return (
-    <div>
-      {/* Score Hero */}
-      <section className="flex flex-col items-center py-6 mb-6">
-        <ScoreCircle score={summary.score} color={summary.scoreColor} size="large" />
-        <h2 className="text-lg font-semibold mt-3">Day in Review</h2>
-        <p className="text-sm text-muted-foreground">
-          {formatDate(summary.date)} · {summary.sessionsLogged}/{summary.totalSessions} sessions · {formatMinutes(summary.totalMinutesLogged)} tracked
-        </p>
-      </section>
+    <div className="min-h-screen bg-background pb-20">
+      <div className="mx-auto max-w-2xl px-4 py-6">
+        {/* Header */}
+        <header className="mb-6">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            Back
+          </button>
+          <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+          <p className="text-muted-foreground">{formatDate(summary.date)}</p>
+        </header>
 
-      {/* AI Commentary */}
-      {(commentary || isLoadingCommentary) && (
-        <section className="mb-6">
-          <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200/50 dark:border-indigo-800/50 p-4">
-            <div className="flex items-start gap-3">
-              <Sparkles className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                {isLoadingCommentary ? (
-                  <div className="space-y-2 animate-pulse">
-                    <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-full" />
-                    <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-3/4" />
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm text-foreground leading-relaxed">{commentary}</p>
-                    <CommentaryThread subjectType="day" subjectKey={summary.date} commentary={commentary} />
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+        {/* Score Hero */}
+        <section className="flex flex-col items-center py-6 mb-6">
+          <ScoreCircle score={summary.score} color={summary.scoreColor} size="large" />
+          <p className="text-sm text-muted-foreground mt-4">
+            {summary.sessionsLogged}/{summary.totalSessions} sessions · {formatMinutes(summary.totalMinutesLogged)} tracked
+          </p>
         </section>
-      )}
 
-      {summary.wins.length > 0 && <div className="mb-6"><WinsSection wins={summary.wins} /></div>}
-      {/* Timeline — commented out, blank and not useful yet
-      <div className="mb-6"><TimelineStrip timeline={summary.timeline} /></div>
-      */}
-      {summary.productivityScore?.hasPlans && (
-        <section className="mb-6 space-y-3">
-          <h2 className="font-semibold text-foreground text-sm">Goal Progress</h2>
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <span className="text-2xl font-bold text-foreground">{summary.productivityScore.score}%</span>
-                <p className="text-xs text-muted-foreground mt-0.5">{summary.productivityScore.label}</p>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {summary.productivityScore.completedTasks}/{summary.productivityScore.totalTasks} tasks
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {summary.productivityScore.tasks.map((task, i) => (
-                <div key={i} className={`flex items-center gap-2 ${task.completed ? 'opacity-50' : ''}`}>
-                  <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                    task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
-                  }`}>
-                    {task.completed && <Check className="h-3 w-3 text-white" />}
-                  </div>
-                  <span className={`text-sm flex-1 ${task.completed ? 'text-muted-foreground' : 'text-foreground'}`}>
-                    {task.title}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/40">{task.weight}pts</span>
+        {/* AI Commentary */}
+        {(commentary || isLoadingCommentary) && (
+          <section className="mb-6">
+            <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200/50 dark:border-indigo-800/50 p-4">
+              <div className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  {isLoadingCommentary ? (
+                    <div className="space-y-2 animate-pulse">
+                      <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-full" />
+                      <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-3/4" />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-foreground leading-relaxed">{commentary}</p>
+                      <CommentaryThread
+                        subjectType="day"
+                        subjectKey={summary.date}
+                        commentary={commentary}
+                      />
+                    </>
+                  )}
                 </div>
-              ))}
+              </div>
             </div>
-            <div className="mt-3 h-2 rounded-full bg-secondary overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  summary.productivityScore.score >= 80 ? 'bg-green-500' : summary.productivityScore.score >= 50 ? 'bg-amber-500' : 'bg-red-400'
-                }`}
-                style={{ width: `${summary.productivityScore.score}%` }}
-              />
-            </div>
+          </section>
+        )}
+
+        {/* Wins */}
+        {summary.wins.length > 0 && (
+          <div className="mb-6">
+            <WinsSection wins={summary.wins} />
           </div>
-        </section>
-      )}
-      {/* Energy breakdown — commented out until science-based measurement is ready
-      {summary.aggregatedBreakdown && summary.aggregatedBreakdown.length > 0 && (
-        <div className="mb-6"><AggregatedBreakdownSection breakdown={summary.aggregatedBreakdown} /></div>
-      )}
-      */}
-      {/* Mood — commented out until science-based measurement is ready
-      {summary.todayMood && <div className="mb-6"><MoodSection mood={summary.todayMood} /></div>}
-      */}
-      {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
-        <section className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
-              <Clock className="h-5 w-5 text-blue-500" />
+        )}
+
+        {/* Timeline */}
+        <div className="mb-6">
+          <TimelineStrip timeline={summary.timeline} />
+        </div>
+
+        {/* Goal Progress — productivity plan only */}
+        {summary.productivityScore?.hasPlans && (
+          <section className="mb-6 space-y-3">
+            <h2 className="font-semibold text-foreground">Goal Progress</h2>
+            <div className="space-y-3">
+              <ProductivityPlanCard score={summary.productivityScore} />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Longest focus session</p>
-              <p className="font-medium text-foreground">{summary.longestFocusSession.minutes} min on &quot;{summary.longestFocusSession.activity}&quot;</p>
-            </div>
+          </section>
+        )}
+
+        {/* Energy Breakdown, Category Breakdown, and Mood — commented out until science-based measurement is ready
+        {summary.aggregatedBreakdown && summary.aggregatedBreakdown.length > 0 && (
+          <div className="mb-6">
+            <AggregatedBreakdownSection breakdown={summary.aggregatedBreakdown} />
           </div>
-        </section>
-      )}
+        )}
+        {summary.categoryBreakdown && summary.categoryBreakdown.length > 5 && (
+          <div className="mb-6">
+            <CategoryBreakdownSection breakdown={summary.categoryBreakdown} />
+          </div>
+        )}
+        {summary.todayMood && (
+          <div className="mb-6">
+            <MoodSection mood={summary.todayMood} />
+          </div>
+        )}
+        */}
+
+        {/* Longest Focus */}
+        {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
+          <section className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
+                <Clock className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Longest focus session</p>
+                <p className="font-medium text-foreground">
+                  {summary.longestFocusSession.minutes} min on &quot;{summary.longestFocusSession.activity}&quot;
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   )
 }
