@@ -178,8 +178,8 @@ function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricC
           </p>
           <p className="text-[11px] text-muted-foreground">
             {details.exerciseScore === 0
-              ? 'Upkeep alone tops out in the forties — vigorous minutes count double, light ones half.'
-              : 'Exercise carries three quarters of Body; upkeep carries the rest.'}
+              ? 'Looking after yourself gets Body into the high sixties; only exercise takes it past 70.'
+              : 'Vigorous minutes count double, light ones half — as the activity guidelines count them.'}
           </p>
         </div>
       )}

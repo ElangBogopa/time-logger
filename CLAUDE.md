@@ -179,13 +179,15 @@ time_entries (
    labels inside modals), `metric-number` and `page-title`, all defined as
    Tailwind utilities in `globals.css`. Reach for one of those before writing
    another `text-[11px] uppercase tracking-wider`.
-6. **Body needs exercise**: Body is `0.75 × exercise + 0.45 × upkeep`, each
-   scored on its own saturating curve. Exercise is counted in
-   moderate-equivalent minutes — vigorous counts double and light half, as
-   the WHO guidelines count them — and the intensity comes from the activity
-   text via `classifyIntensity`. A day of flawless upkeep and no training
-   reaches about 45 and cannot reach 70; that ceiling is the point, and the
-   two shares are where you move it.
+6. **Body needs exercise**: upkeep earns its way up a curve that approaches
+   69 and never reaches it; exercise closes the gap from there to 99.
+   `body = upkeep + (99 − upkeep) × curve(exercise)`. So a flawless day of
+   looking after yourself scores about 66 — a good day — and no amount of
+   sleep, food or self-care reaches 70, because the app should not tell you
+   your body had a strong day when you did not move it. Exercise is counted
+   in moderate-equivalent minutes: vigorous double, light half, as the WHO
+   guidelines count them, with the intensity read from the activity text by
+   `classifyIntensity`. `UPKEEP_CEILING` is where you move the line.
 7. **One scoring system**: Body / Mind / Heart, from `lib/metrics-calc.ts`,
    on a saturating curve where the target scores 80 and 100 is unreachable.
    Anywhere that wants "a number for this day or week" shows those three

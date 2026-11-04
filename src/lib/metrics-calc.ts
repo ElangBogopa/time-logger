@@ -47,18 +47,20 @@ export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care', 'sleep', 
  * scored 78 on a day with no exercise in it. A metric called Body should
  * not say that.
  *
- * So the score is now a weighted sum of two separate scores, and upkeep's
- * share is capped below the point where a day without training can look
- * like a strong one:
+ * So upkeep is put on a curve of its own that *approaches* a ceiling below
+ * 70 without ever reaching it, and exercise closes whatever gap is left to
+ * the top of the scale:
  *
- *   body = 0.75 × exercise + 0.45 × upkeep       (each 0–99, then capped)
+ *   upkeep part = 69 × curve(upkeep minutes ÷ upkeep target)
+ *   body        = upkeep part + (99 − upkeep part) × curve(exercise ÷ target)
  *
- * which puts a day of perfect upkeep and no exercise at 45, a 45-minute
- * moderate session on its own at 60, and that session with ordinary upkeep
- * in the 85–95 range. Change those two shares to move the ceiling.
+ * A first attempt capped upkeep's contribution at 45 instead, which is not
+ * what "should not be able to get above 70" means: it took a flawless day
+ * of looking after yourself and called it 43. Upkeep should be able to earn
+ * a high-sixties day. What it must never do is reach the point where the
+ * app says your body had a strong day when you did not move it.
  */
-export const EXERCISE_SHARE = 0.75
-export const UPKEEP_SHARE = 0.45
+export const UPKEEP_CEILING = 69
 
 /**
  * Exercise is counted in moderate-equivalent minutes, the way the physical
@@ -190,6 +192,15 @@ export const SOCIAL_THRESHOLDS = METRIC_THRESHOLDS
 const SATURATION_K = Math.log(5) // ≈ 1.609: target → 80
 export const MAX_SCORE = 99
 
+/**
+ * The same curve as saturatingScore, as a fraction of the way to a ceiling:
+ * 0 at nothing, 0.8 at the target, approaching 1 and never arriving.
+ */
+export function curveFraction(load: number, target: number): number {
+  if (load <= 0 || target <= 0) return 0
+  return 1 - Math.exp((-SATURATION_K * load) / target)
+}
+
 export function saturatingScore(load: number, target: number): number {
   if (load <= 0 || target <= 0) return 0
   const score = 100 * (1 - Math.exp((-SATURATION_K * load) / target))
@@ -265,15 +276,18 @@ export function calcFocusDetails(dayEntries: EntryRow[]): { weightedMinutes: num
  *   0.75 × exercise score + 0.45 × upkeep score, capped at MAX_SCORE
  *
  * Worked examples:
- *   8h sleep, 3 meals, a shower, no exercise → 41   (was 78)
- *   45 min moderate session, nothing else    → 60
- *   that session plus the upkeep above       → 94
- *   20 min run, nothing else                 → 48
+ *   8h sleep, 3 meals, a shower, no exercise → 54   (was 78)
+ *   a flawless day of upkeep, no exercise    → 66
+ *   absurd upkeep — 12h sleep, 4h self-care  → 69   (the ceiling, approached)
+ *   45 min walk, nothing else                → 55
+ *   20 min run, nothing else                 → 75
+ *   45 min gym, nothing else                 → 79
+ *   45 min gym plus ordinary upkeep          → 90
  */
 export function calcBody(dayEntries: EntryRow[]): number {
-  const exercise = saturatingScore(exerciseMinutes(dayEntries), EXERCISE_TARGET)
-  const upkeep = saturatingScore(upkeepMinutes(dayEntries), UPKEEP_TARGET)
-  return Math.min(MAX_SCORE, Math.round(EXERCISE_SHARE * exercise + UPKEEP_SHARE * upkeep))
+  const upkeepPart = UPKEEP_CEILING * curveFraction(upkeepMinutes(dayEntries), UPKEEP_TARGET)
+  const headroom = MAX_SCORE - upkeepPart
+  return Math.round(upkeepPart + headroom * curveFraction(exerciseMinutes(dayEntries), EXERCISE_TARGET))
 }
 
 /**
@@ -309,18 +323,22 @@ export function calcBodyDetails(dayEntries: EntryRow[]): {
   const upkeepScore = saturatingScore(upkeepMinutes(dayEntries), UPKEEP_TARGET)
 
   /**
-   * What each row contributes to the headline, on the headline's own scale.
+   * What each row contributes to the headline, on the headline's own scale:
+   * upkeep earns its part on its own curve, and exercise closes a slice of
+   * whatever headroom is left above it.
    *
-   * Upkeep's share is split between its categories in proportion to their
+   * Upkeep's part is split between its categories in proportion to their
    * weighted minutes, rather than each being curved on its own and the
    * results added: four categories each scored through a saturating curve
    * and then summed overshot the headline by more than fifty points, which
    * is a breakdown that explains nothing.
    */
+  const upkeepContribution = UPKEEP_CEILING * curveFraction(upkeepMinutes(dayEntries), UPKEEP_TARGET)
   const categoryScores: Record<string, number> = {
-    exercise: Math.round(EXERCISE_SHARE * exerciseScore),
+    exercise: Math.round(
+      (MAX_SCORE - upkeepContribution) * curveFraction(moderateEquivalentMinutes, EXERCISE_TARGET)
+    ),
   }
-  const upkeepContribution = UPKEEP_SHARE * upkeepScore
   const totalUpkeepWeighted = upkeepMinutes(dayEntries)
   for (const [cat, weight] of Object.entries(UPKEEP_WEIGHTS)) {
     const weighted = (breakdown[cat] || 0) * weight

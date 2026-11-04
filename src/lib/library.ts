@@ -130,7 +130,7 @@ export const LIBRARY: LibraryEntry[] = [
     finding:
       'Regular exercise improves executive function, memory and attention, and a single moderate session lifts cognitive performance for hours afterwards.',
     howWeUseIt:
-      'Why exercise carries three quarters of Body, and upkeep — sleep, meals, self-care — the remaining quarter. A day of flawless upkeep with no training reaches about 45, because a metric called Body should not say otherwise.',
+      'Why upkeep — sleep, meals, self-care — can carry Body into the high sixties on its own, and why only exercise takes it past 70. A flawless day of looking after yourself scores about 66; twenty minutes of running beats it.',
     link: 'https://doi.org/10.1038/nrn2298',
     metrics: ['body'],
   },

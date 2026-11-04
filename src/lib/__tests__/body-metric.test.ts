@@ -13,10 +13,14 @@
  * target of 48 — a score of 78 on a day with no exercise in it. A metric
  * called Body should not say that.
  *
- * So the two are scored separately and upkeep's share is capped: a day of
- * perfect upkeep and no training cannot reach the seventies, and exercise
- * is counted in moderate-equivalent minutes, the way the physical activity
- * guidelines count it.
+ * So upkeep is given a curve that approaches a ceiling just under 70 and
+ * never reaches it, and exercise closes the gap from there to the top. A
+ * first attempt capped upkeep at 45 instead, which is a different claim
+ * entirely: it called a flawless day of looking after yourself a 43. The
+ * rule is "upkeep cannot take you past 70", not "upkeep barely counts".
+ *
+ * Exercise is counted in moderate-equivalent minutes, the way the physical
+ * activity guidelines count it.
  */
 
 import {
@@ -52,8 +56,22 @@ describe('upkeep cannot stand in for exercise', () => {
   it('keeps a day with no exercise out of the seventies, however well kept', () => {
     const score = calcBody(perfectUpkeep)
     expect(score).toBeLessThan(70)
-    // and it is not zero either: looking after yourself still counts
-    expect(score).toBeGreaterThan(30)
+    // but a thorough day of looking after yourself is a good day, not a
+    // failing one: the curve approaches the ceiling rather than stopping short
+    expect(score).toBeGreaterThanOrEqual(60)
+  })
+
+  it('approaches the ceiling without ever crossing it', () => {
+    // Twelve hours of sleep, four of self-care, four of rest and four of
+    // meals. Absurd, and still not a seventy.
+    const absurd = [
+      entry('sleep', 720),
+      entry('meals', 240),
+      entry('self_care', 240),
+      entry('rest', 240),
+    ]
+    expect(calcBody(absurd)).toBeLessThan(70)
+    expect(calcBody(absurd)).toBeGreaterThan(calcBody(perfectUpkeep))
   })
 
   it('no longer scores a night of sleep and some meals at 78', () => {
@@ -121,11 +139,16 @@ describe('exercise is ranked by intensity, not just minutes', () => {
     expect(exerciseScore).toBe(80)
   })
 
-  it('needs both halves for a strong day', () => {
-    const trainingOnly = calcBody([entry('exercise', 45, 'Gym')])
-    const both = calcBody([...perfectUpkeep, entry('exercise', 45, 'Gym')])
-    expect(trainingOnly).toBeLessThan(70)
-    expect(both).toBeGreaterThanOrEqual(BODY_THRESHOLDS.green)
+  it('lets exercise open the part of the scale upkeep cannot reach', () => {
+    // Twenty minutes of running beats any amount of sleeping and showering.
+    expect(calcBody([entry('exercise', 20, 'Morning run')])).toBeGreaterThan(calcBody(perfectUpkeep))
+    expect(calcBody([entry('exercise', 20, 'Morning run')])).toBeGreaterThan(70)
+  })
+
+  it('reaches a strong day when both halves are there', () => {
+    expect(calcBody([...perfectUpkeep, entry('exercise', 45, 'Gym')])).toBeGreaterThanOrEqual(
+      BODY_THRESHOLDS.green
+    )
   })
 })
 
