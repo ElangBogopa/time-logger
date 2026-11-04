@@ -2,7 +2,8 @@
 
 import React from 'react'
 import { timeToMinutes } from '@/lib/time-utils'
-import { Check } from 'lucide-react'
+import { Check, ArrowRight } from 'lucide-react'
+import type { PlanOutcome } from '@/lib/plan-adherence'
 
 export interface CommittedTask {
   id: string
@@ -16,6 +17,12 @@ export interface CommittedTask {
 interface TimelineCommittedProps {
   task: CommittedTask
   startHour: number
+  /**
+   * What became of this plan, once the day has reached it. The block is a
+   * promise until then and a record afterwards, and it should not look the
+   * same in both states.
+   */
+  outcome?: PlanOutcome
 }
 
 import { PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT } from './constants'
@@ -30,7 +37,7 @@ const COMMITTED_COLORS = {
   textDone: 'text-[#8B7E74]/50 dark:text-[#A89F96]/50',
 }
 
-export default function TimelineCommitted({ task, startHour }: TimelineCommittedProps) {
+export default function TimelineCommitted({ task, startHour, outcome }: TimelineCommittedProps) {
   const startMinutes = timeToMinutes(task.committed_start)
   const endMinutes = timeToMinutes(task.committed_end)
   const durationMinutes = endMinutes - startMinutes
@@ -45,7 +52,7 @@ export default function TimelineCommitted({ task, startHour }: TimelineCommitted
         task.completed
           ? `${COMMITTED_COLORS.bgDone} ${COMMITTED_COLORS.border}/30`
           : `${COMMITTED_COLORS.bg} ${COMMITTED_COLORS.border}/40`
-      }`}
+      } ${outcome === 'missed' ? 'border-dashed opacity-60' : ''}`}
       style={{
         top,
         height,
@@ -71,8 +78,15 @@ export default function TimelineCommitted({ task, startHour }: TimelineCommitted
                 {task.title}
               </span>
             </div>
-            <span className="text-[10px] opacity-70 mt-0.5">
+            <span className="text-[10px] opacity-70 mt-0.5 flex items-center gap-1">
               {task.committed_start.slice(0,5)} – {task.committed_end.slice(0,5)}
+              {outcome === 'moved' && (
+                <>
+                  <ArrowRight className="h-2.5 w-2.5" />
+                  done later
+                </>
+              )}
+              {outcome === 'missed' && <>· not logged</>}
             </span>
           </>
         )}

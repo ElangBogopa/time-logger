@@ -81,6 +81,16 @@ Three changes would fix most of it without the split:
 3. **Snap to 15 minutes** and show the time as you move, so the gesture
    cannot land on 11:03 and does not need to be precise.
 
+**Plan against actual.** *(Built — `lib/plan-adherence.ts`.)* Whether a task
+happened is recorded explicitly, because you tick it in the post-session
+popup; what was never recorded is whether it happened *when you said it
+would*. The day review now says "1 of 3 kept · 1 moved", and per task:
+"Gym — planned 6:00 PM, you logged Netflix". A plan you did at another time
+is **moved**, not missed, because calling it missed would be the app being
+wrong about a day that went fine. Deliberately not a score: it replaced a
+"Productivity 67%" headline with a progress bar that sat directly under
+Body / Mind / Heart and read as a fifth metric.
+
 My recommendation: do the split. The gap rows are the single highest-value
 piece, and they work on their own, before any of the rest — which is why
 they went in first. What is left of the split is moving the drag timeline

@@ -9,6 +9,7 @@ import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } f
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
 import CommitTimeModal from '@/components/CommitTimeModal'
+import { comparePlanToActual, type PlanOutcome } from '@/lib/plan-adherence'
 
 /** A row of daily_plans: a task for a date, with a time once you give it one. */
 interface PlanTask {
@@ -128,6 +129,27 @@ function CalendarContent() {
       isPastDay: !isToday && !display.isFuture
     }
   }, [selectedDate, isToday])
+
+  /**
+   * What became of each plan on this day. Plan and actual already sit on
+   * this one grid — this is the comparison between them, so a block that
+   * did not survive the day stops looking like one that did.
+   */
+  const planOutcomes = useMemo(() => {
+    const now = new Date()
+    const comparisons = comparePlanToActual({
+      plans: committedTasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        completed: task.completed,
+        committed_start: task.committed_start,
+        committed_end: task.committed_end,
+      })),
+      entries,
+      nowMinutes: isToday ? now.getHours() * 60 + now.getMinutes() : isFutureDay ? 0 : null,
+    })
+    return Object.fromEntries(comparisons.map((c) => [c.id, c.outcome])) as Record<string, PlanOutcome>
+  }, [committedTasks, entries, isToday, isFutureDay])
 
   // Check if logging is allowed for the selected date
   const canLog = isDateLoggable(selectedDate)
@@ -453,6 +475,7 @@ function CalendarContent() {
               entries={entries}
               calendarEvents={calendarEvents}
               committedTasks={committedTasks}
+              planOutcomes={planOutcomes}
               isLoading={isLoading}
               onEntryDeleted={fetchEntriesForDate}
               onGhostEntryClick={setSelectedGhostEvent}

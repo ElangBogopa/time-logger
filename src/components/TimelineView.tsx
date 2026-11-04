@@ -15,6 +15,7 @@ import TimelineEntry from './timeline/TimelineEntry'
 import TimelineGap from './timeline/TimelineGap'
 import TimelineGhost, { type CalendarEvent } from './timeline/TimelineGhost'
 import TimelineCommitted, { type CommittedTask } from './timeline/TimelineCommitted'
+import type { PlanOutcome } from '@/lib/plan-adherence'
 import { CurrentTimeIndicator, DragPreview, PIXELS_PER_MINUTE } from './timeline'
 import { HOUR_HEIGHT } from './timeline/constants'
 import { yToTime as createYToTime } from './timeline/utils'
@@ -25,6 +26,8 @@ export interface TimelineViewProps {
   entries: TimeEntry[]
   calendarEvents?: CalendarEvent[]
   committedTasks?: CommittedTask[]
+  /** What became of each planned task, keyed by plan id. */
+  planOutcomes?: Record<string, PlanOutcome>
   isLoading: boolean
   onEntryDeleted: () => void
   onGhostEntryClick?: (event: CalendarEvent) => void
@@ -43,6 +46,7 @@ export default function TimelineView({
   entries,
   calendarEvents = [],
   committedTasks = [],
+  planOutcomes,
   isLoading,
   onEntryDeleted,
   onGhostEntryClick,
@@ -504,6 +508,7 @@ export default function TimelineView({
                   key={`committed-${task.id}`}
                   task={task}
                   startHour={updatedStartHour}
+                  outcome={planOutcomes?.[task.id]}
                 />
               ))}
 

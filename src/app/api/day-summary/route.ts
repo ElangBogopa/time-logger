@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import { calculateDailyScore, DailyProductivityScore, PlanItem } from '@/lib/productivity-score'
+import { comparePlanToActual, summarisePlanAdherence, type PlanAdherence, type PlanRow } from '@/lib/plan-adherence'
 import { TimeEntry, SessionCompletion, getUserToday, getUserCurrentHour, TimeCategory, CATEGORY_LABELS, MoodCheckin, AggregatedCategory, ENERGY_VIEW, AGGREGATED_CATEGORY_LABELS, aggregateByView } from '@/lib/types'
 interface Win {
   id: string
@@ -46,6 +47,7 @@ interface DaySummary {
   totalSessions: number
   totalMinutesLogged: number
   hasEveningPassed: boolean
+  planAdherence: PlanAdherence | null
   date: string
 
   // Wins
@@ -289,6 +291,21 @@ export async function GET(request: NextRequest) {
     // Calculate productivity score from plans
     const productivityScore = todayPlans.length > 0 ? calculateDailyScore(todayPlans) : null
 
+    /**
+     * Plan against actual. Both halves are already loaded here — the plans
+     * and the day's entries — so this costs no extra query and the client
+     * no extra request.
+     */
+    const planAdherence: PlanAdherence | null = (() => {
+      const comparisons = comparePlanToActual({
+        plans: todayPlans as unknown as PlanRow[],
+        entries: todayEntries,
+        // A finished day judges everything; today leaves the rest of it alone.
+        nowMinutes: isViewingToday ? new Date().getHours() * 60 + new Date().getMinutes() : null,
+      })
+      return comparisons.length > 0 ? summarisePlanAdherence(comparisons) : null
+    })()
+
     const totalMinutesLogged = todayEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
     const sessionsLogged = completions.filter(c => !c.skipped).length
 
@@ -318,6 +335,7 @@ export async function GET(request: NextRequest) {
       todayMood,
       entries: todayEntries,
       productivityScore,
+      planAdherence,
     }
 
     return NextResponse.json(summary)
