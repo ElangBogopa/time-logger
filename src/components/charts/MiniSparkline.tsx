@@ -10,7 +10,7 @@ import { StatusDelta } from './StatusDelta'
 interface MiniSparklineProps {
   /** Array of numeric values (one per day, typically 7) */
   data: number[]
-  /** Metric identity color hex, e.g. '#3b82f6' */
+  /** Metric identity colour, from METRIC_HEX in lib/palette.ts */
   color: string
   /** Average value to display */
   average: number

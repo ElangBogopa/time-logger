@@ -21,9 +21,8 @@ import {
 import { timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
-import TimelineView, { DragCreateData } from '@/components/TimelineView'
+import TimeEntryModal from '@/components/TimeEntryModal'
 import ActivityList from '@/components/ActivityList'
-import GhostEntryModal from '@/components/GhostEntryModal'
 import QuickLogModal from '@/components/QuickLogModal'
 import { Button } from '@/components/ui/button'
 // Task completion happens exclusively in the post-session popup
@@ -34,6 +33,7 @@ import {
   Moon,
   Loader2,
   Plus,
+  CalendarDays,
   Check,
   CheckCircle2,
   CircleDashed,
@@ -107,20 +107,21 @@ function LogPeriodContent() {
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
-  const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<string | null>(null) // kept for legacy compat, not shown
   const [repeatCandidate, setRepeatCandidate] = useState<RepeatCandidate | null>(null)
   const [isRepeating, setIsRepeating] = useState(false)
   const [isConfirmingAll, setIsConfirmingAll] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
-  const [quickLogDragData, setQuickLogDragData] = useState<DragCreateData | null>(null)
+  /** The time range a gap row hands to the quick-log sheet. */
+  const [quickLogRange, setQuickLogRange] = useState<{ startTime: string; endTime: string } | null>(null)
 
   // Soft-delete: track entry IDs pending deletion (hidden from UI, deleted after toast expires)
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
   const deleteTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   // Calendar context for ghost events
-  const { getEventsForDate, refreshCalendar, isLoading: isCalendarLoading } = useCalendar()
+  const { getEventsForDate, refreshCalendar } = useCalendar()
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncDone, setSyncDone] = useState(false)
 
@@ -328,7 +329,7 @@ function LogPeriodContent() {
   }, [isLocked, selectedDate, periodEntries, calendarEvents, range.start, range.end])
 
   const handleFillGap = (startTime: string, endTime: string) => {
-    setQuickLogDragData({ startTime, endTime })
+    setQuickLogRange({ startTime, endTime })
     setIsQuickLogOpen(true)
   }
 
@@ -447,17 +448,6 @@ function LogPeriodContent() {
     })
   }
 
-  // Handle drag-to-create from timeline view
-  const handleDragCreate = (data: DragCreateData) => {
-    // Open QuickLogModal with drag data
-    setQuickLogDragData(data)
-    setIsQuickLogOpen(true)
-  }
-
-  // Handle ghost entry click from timeline
-  const handleTimelineGhostClick = (event: CalendarEvent) => {
-    setSelectedGhostEvent(event)
-  }
 
   // Redirect if invalid period (after all hooks to satisfy Rules of Hooks)
   useEffect(() => {
@@ -628,32 +618,37 @@ function LogPeriodContent() {
           </section>
         )}
 
-        {/* Session content — Whoop-style cards for locked days, timeline for editable */}
+        {/* What the session holds. This was the drag timeline, which is a
+            canvas: hold still, hold again, do not move, now drag. Capture
+            wants a list and one tap, so the canvas moved to /calendar and
+            kept the jobs it is good at — ghosts, precise times, planning
+            ahead. */}
         <section className="mb-6">
-          {isLocked ? (
-            <ActivityList entries={periodEntries} />
+          {isLoading && periodEntries.length === 0 ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-[66px] rounded-xl border border-border bg-card animate-pulse" />
+              ))}
+            </div>
           ) : (
-            <>
-              <TimelineView
-                entries={visibleEntries}
-                calendarEvents={calendarEvents}
-                isLoading={isLoading}
-                onEntryDeleted={fetchEntries}
-                onGhostEntryClick={handleTimelineGhostClick}
-                onDragCreate={handleDragCreate}
-                onShowToast={setToast}
-                selectedDate={selectedDate}
-                isToday={selectedDate === getUserToday()}
-                isFutureDay={false}
-                isPastDay={selectedDate !== "" && selectedDate !== getUserToday()}
-                canLog={!isLocked}
-                visibleStartHour={range.start}
-                visibleEndHour={range.end}
-              />
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                Drag to create entries, tap calendar events to confirm
-              </p>
-            </>
+            <ActivityList
+              entries={periodEntries}
+              onEntryClick={isLocked ? undefined : setEditingEntry}
+              emptyMessage={
+                isLocked
+                  ? 'No activities logged for this session'
+                  : 'Nothing logged yet. Add the first thing you did.'
+              }
+            />
+          )}
+          {!isLocked && (
+            <button
+              onClick={() => router.push(`/calendar?date=${selectedDate}`)}
+              className="mt-3 flex w-full items-center justify-center gap-2 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Open the calendar to drag, resize or plan ahead
+            </button>
           )}
         </section>
 
@@ -719,15 +714,15 @@ function LogPeriodContent() {
         isOpen={isQuickLogOpen}
         onClose={() => {
           setIsQuickLogOpen(false)
-          setQuickLogDragData(null)
+          setQuickLogRange(null)
         }}
         onEntryAdded={() => {
           fetchEntries()
-          setQuickLogDragData(null)
+          setQuickLogRange(null)
         }}
         lastEntryEndTime={lastEntryEndTime}
-        initialStartTime={quickLogDragData?.startTime}
-        initialEndTime={quickLogDragData?.endTime}
+        initialStartTime={quickLogRange?.startTime}
+        initialEndTime={quickLogRange?.endTime}
         onShowToast={setToast}
         userId={userId}
         calendarEvents={calendarEvents}
@@ -738,18 +733,25 @@ function LogPeriodContent() {
         disablePostSubmit={true}
       />
 
-      {/* Ghost Entry Modal (for timeline view) */}
-      <GhostEntryModal
-        event={selectedGhostEvent}
-        onClose={() => setSelectedGhostEvent(null)}
-        onConfirm={() => {
-          setSelectedGhostEvent(null)
-          fetchEntries()
-        }}
-        onShowToast={setToast}
-        userId={userId}
-        selectedDate={selectedDate}
-      />
+      {/* Editing one activity — the timeline used to own this modal */}
+      {editingEntry && (
+        <TimeEntryModal
+          entry={editingEntry}
+          onClose={() => setEditingEntry(null)}
+          onUpdate={() => {
+            setEditingEntry(null)
+            fetchEntries()
+          }}
+          onDelete={() => {
+            setEditingEntry(null)
+            fetchEntries()
+          }}
+        />
+      )}
+
+      {/* The per-ghost confirm modal went with the timeline: in this view
+          calendar events are confirmed as a set, and one at a time on the
+          calendar itself. */}
 
       {/* Toast removed — no popups on entry add/confirm */}
     </div>

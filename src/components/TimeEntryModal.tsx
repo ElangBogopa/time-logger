@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { fetchEntries, updateEntry, deleteEntry, csrfFetch } from '@/lib/api'
-import { TimeEntry, TimeCategory, CATEGORY_LABELS, isPendingEntryReadyToConfirm } from '@/lib/types'
+import { TimeEntry, TimeCategory, CATEGORY_LABELS, getAggregatedCategory, isPendingEntryReadyToConfirm } from '@/lib/types'
+import { AGGREGATED_CLASSES } from '@/lib/palette'
 import {
   Dialog,
   DialogContent,
@@ -26,36 +27,19 @@ interface TimeEntryModalProps {
   onShowToast?: (message: string) => void
 }
 
-const CATEGORY_COLORS: Record<TimeCategory, string> = {
-  // Productive
-  deep_work: 'bg-[#3b82f6]/20 text-[#60a5fa]',
-  shallow_work: 'bg-[#64748b]/20 text-[#94a3b8]',
-  meetings: 'bg-[#8b7aa8]/20 text-[#b8a8d8]',
-  learning: 'bg-[#0891b2]/20 text-[#22d3ee]',
-  creating: 'bg-[#7c3aed]/20 text-[#a78bfa]',
-  // Maintenance
-  admin: 'bg-[#9ca3af]/20 text-[#d1d5db]',
-  errands: 'bg-[#78716c]/20 text-[#a8a29e]',
-  chores: 'bg-[#a1a1aa]/20 text-[#d4d4d8]',
-  commute: 'bg-[#737373]/20 text-[#a3a3a3]',
-  // Body
-  exercise: 'bg-[#22c55e]/20 text-[#4ade80]',
-  movement: 'bg-[#86efac]/20 text-[#bbf7d0]',
-  meals: 'bg-[#f59e0b]/20 text-[#fbbf24]',
-  sleep: 'bg-[#1e3a5f]/20 text-[#3b82f6]',
-  // Mind
-  rest: 'bg-[#a8a4ce]/20 text-[#c8c4ee]',
-  self_care: 'bg-[#c4b5fd]/20 text-[#ddd6fe]',
-  // Connection
-  social: 'bg-[#ec4899]/20 text-[#f472b6]',
-  calls: 'bg-[#f472b6]/20 text-[#f9a8d4]',
-  // Leisure
-  entertainment: 'bg-[#71717a]/20 text-[#a1a1aa]',
-  // Faith
-  faith: 'bg-[#8b5cf6]/20 text-[#c4b5fd]',
-  // Fallback
-  other: 'bg-[#52525b]/20 text-[#71717a]',
-}
+/**
+ * The category chips, from the one palette by way of each category's
+ * bucket. This was a seventh private copy of the colours — twenty entries
+ * of raw hex, at category granularity, so deep work was blue-500 here and
+ * slate blue everywhere else. Raw hex is how it survived the sweep that
+ * removed the Tailwind utilities.
+ */
+const CATEGORY_COLORS = Object.fromEntries(
+  (Object.keys(CATEGORY_LABELS) as TimeCategory[]).map((category) => {
+    const classes = AGGREGATED_CLASSES[getAggregatedCategory(category)]
+    return [category, `${classes.tint} ${classes.text}`]
+  })
+) as Record<TimeCategory, string>
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} minutes`

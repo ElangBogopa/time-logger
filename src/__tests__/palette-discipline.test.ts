@@ -52,3 +52,20 @@ it('uses no saturated Tailwind colours anywhere in the app', () => {
 it('scans a meaningful number of files, so the check cannot pass by accident', () => {
   expect(sourceFiles('src').length).toBeGreaterThan(100)
 })
+
+it('writes no saturated hex literals outside the palette either', () => {
+  // ActivityList carried a sixth copy of the aggregated colours as raw hex
+  // — '#3b82f6', '#22c55e' — which is how it survived the sweep that
+  // removed the utility classes.
+  const BANNED = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#6366f1', '#06b6d4', '#10b981']
+  const offenders: string[] = []
+
+  for (const file of sourceFiles('src')) {
+    if (file.endsWith('palette.ts')) continue
+    const text = readFileSync(file, 'utf-8').toLowerCase()
+    const found = BANNED.filter((hex) => text.includes(hex))
+    if (found.length) offenders.push(`${file}: ${found.join(', ')}`)
+  }
+
+  expect(offenders).toEqual([])
+})

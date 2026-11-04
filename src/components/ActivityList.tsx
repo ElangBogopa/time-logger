@@ -1,6 +1,7 @@
 'use client'
 
 import { TimeEntry, CATEGORY_LABELS, getAggregatedCategory, AggregatedCategory } from '@/lib/types'
+import { AGGREGATED_HEX } from '@/lib/palette'
 import {
   Brain,
   Briefcase,
@@ -13,20 +14,16 @@ import {
 } from 'lucide-react'
 
 /**
- * Whoop-style activity list for locked (past) days.
- * Replaces the timeline calendar view with a clean card layout.
+ * The session's activities as cards.
+ *
+ * This is now the capture surface for every day, not just locked ones: the
+ * drag timeline moved to /calendar, where precision is the point. Here you
+ * read the day and tap a card to change one.
+ *
+ * The colours used to be a sixth private copy of the aggregated palette, in
+ * bright Tailwind 500 hexes — written as raw hex, which is how they
+ * survived the sweep that removed the utility classes.
  */
-
-// Aggregated category → hex color for the pill
-const AGG_HEX: Record<AggregatedCategory, string> = {
-  focus: '#3b82f6',   // blue-500
-  ops: '#64748b',     // slate-500
-  body: '#22c55e',    // green-500
-  recovery: '#f59e0b', // amber-500
-  connection: '#ec4899', // pink-500
-  escape: '#71717a',  // zinc-500
-  faith: '#8b5cf6',   // violet-500
-}
 
 // Aggregated category → icon
 const AGG_ICONS: Record<AggregatedCategory, React.ElementType> = {
@@ -37,6 +34,22 @@ const AGG_ICONS: Record<AggregatedCategory, React.ElementType> = {
   connection: Users,
   escape: Tv,
   faith: Sparkles,
+}
+
+/** A card, interactive only when there is something to open. */
+function Row({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+  const className =
+    'w-full flex items-center gap-3 rounded-xl bg-card border border-border px-3 py-3 text-left'
+  if (!onClick) return <div className={className}>{children}</div>
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${className} transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]`}
+    >
+      {children}
+    </button>
+  )
 }
 
 function formatDuration(minutes: number): string {
@@ -59,13 +72,18 @@ function formatTime(time: string | null): string {
 
 interface ActivityListProps {
   entries: TimeEntry[]
+  /** Omitted on a locked day, where there is nothing to change. */
+  onEntryClick?: (entry: TimeEntry) => void
+  emptyMessage?: string
 }
 
-export default function ActivityList({ entries }: ActivityListProps) {
+export default function ActivityList({ entries, onEntryClick, emptyMessage }: ActivityListProps) {
   if (entries.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
-        <p className="text-sm text-muted-foreground">No activities logged for this session</p>
+        <p className="text-sm text-muted-foreground">
+          {emptyMessage ?? 'No activities logged for this session'}
+        </p>
       </div>
     )
   }
@@ -80,14 +98,14 @@ export default function ActivityList({ entries }: ActivityListProps) {
     <div className="space-y-2">
       {sorted.map((entry) => {
         const aggCat = entry.category ? getAggregatedCategory(entry.category) : 'escape'
-        const color = AGG_HEX[aggCat]
+        const color = AGGREGATED_HEX[aggCat]
         const Icon = AGG_ICONS[aggCat] || HelpCircle
         const label = entry.activity || (entry.category ? CATEGORY_LABELS[entry.category] : 'Activity')
 
         return (
-          <div
+          <Row
             key={entry.id}
-            className="flex items-center gap-3 rounded-xl bg-card border border-border px-3 py-3"
+            onClick={onEntryClick ? () => onEntryClick(entry) : undefined}
           >
             {/* Duration pill */}
             <div
@@ -128,7 +146,7 @@ export default function ActivityList({ entries }: ActivityListProps) {
                 style={{ backgroundColor: color }}
               />
             </div>
-          </div>
+          </Row>
         )
       })}
     </div>

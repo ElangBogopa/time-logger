@@ -33,7 +33,7 @@ manipulation. Making one control do both is what produces the fidget.
 
 ### The split you suggested, made concrete
 
-**The session view becomes capture.** No dragging at all:
+**The session view becomes capture.** *(Built.)* No dragging at all:
 
 - The day so far as a list of blocks, newest at the bottom.
 - **Gap rows.** *(Built — `lib/gaps.ts`.)* Between the last entry and now:
@@ -51,9 +51,17 @@ manipulation. Making one control do both is what produces the fidget.
   already set to the end of the last entry, because that is the answer
   nine times out of ten.
 
-**The calendar view stays precision.** Drag, resize, ghost events, calendar
-sync, planning ahead. A separate tab, where a deliberate gesture is expected
-and nothing scrolls under your thumb.
+**The calendar view stays precision.** *(Built — `/calendar`, which already
+existed and was reachable only from Settings. The session view now links to
+it for the day you are looking at.)* Drag, resize, ghost events, calendar
+sync, planning ahead: a surface where a deliberate gesture is expected.
+
+One thing to check when you are next signed in: in a stubbed harness the
+calendar's timeline rendered as an empty panel — the hour labels are in the
+DOM but painted outside their clipping box. Neutralising the phone-frame CSS
+changed nothing, and the same component renders correctly in the session
+view, so it is not the frame; it may be an artifact of the stub or a
+pre-existing issue on that page.
 
 ### If the timeline stays in the session view
 
