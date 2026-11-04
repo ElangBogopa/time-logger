@@ -489,15 +489,15 @@ function LogPeriodContent() {
                 disabled={isSyncing || syncDone}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-2 transition-all duration-300 ${
                   syncDone
-                    ? 'bg-green-500/15 border border-green-500/30'
+                    ? 'bg-[#7D9B8A]/15 border border-[#7D9B8A]/30'
                     : 'bg-secondary hover:bg-accent disabled:opacity-50'
                 }`}
                 aria-label="Sync calendar"
               >
                 {syncDone ? (
                   <>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                    <span className="text-xs font-medium text-green-500">Synced!</span>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#7D9B8A]" />
+                    <span className="text-xs font-medium text-[#7D9B8A]">Synced!</span>
                   </>
                 ) : (
                   <>

@@ -374,8 +374,8 @@ export default function PeriodSummaryPopup({
             {/* Comparison line */}
             {comparison && (
               <div className="mb-4 flex items-center gap-2 text-sm">
-                <TrendingUp className={`h-4 w-4 ${comparison.isPositive ? 'text-green-400' : 'text-red-400'}`} />
-                <span className={comparison.isPositive ? 'text-green-400' : 'text-red-400'}>
+                <TrendingUp className={`h-4 w-4 ${comparison.isPositive ? 'text-[#9BB5A6]' : 'text-[#C79089]'}`} />
+                <span className={comparison.isPositive ? 'text-[#9BB5A6]' : 'text-[#C79089]'}>
                   vs last {periodLabel.toLowerCase()}: {comparison.text}
                 </span>
               </div>
@@ -393,7 +393,7 @@ export default function PeriodSummaryPopup({
               {/* Session MVP */}
               {sessionMVP && (
                 <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-zinc-700/30 px-3 py-2">
-                  <Zap className="h-4 w-4 text-yellow-400" />
+                  <Zap className="h-4 w-4 text-[#CBB894]" />
                   <div className="flex-1 text-center">
                     <p className="field-label">Session MVP</p>
                     <p className="text-sm font-medium text-white truncate">{sessionMVP.activity}</p>
@@ -468,7 +468,7 @@ export default function PeriodSummaryPopup({
                       </p>
                     </div>
                     {completedCount > 0 && (
-                      <span className="text-[11px] text-green-500 font-medium">
+                      <span className="text-[11px] text-[#7D9B8A] font-medium">
                         {completedCount}/{tasks.length}
                       </span>
                     )}
@@ -476,9 +476,9 @@ export default function PeriodSummaryPopup({
 
                   {/* All done celebration */}
                   {allDone && (
-                    <div className="flex items-center justify-center gap-2 py-2 mb-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                      <Sparkles className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-medium text-green-500">All tasks done!</span>
+                    <div className="flex items-center justify-center gap-2 py-2 mb-3 rounded-lg bg-[#7D9B8A]/10 border border-[#7D9B8A]/20">
+                      <Sparkles className="h-4 w-4 text-[#7D9B8A]" />
+                      <span className="text-sm font-medium text-[#7D9B8A]">All tasks done!</span>
                     </div>
                   )}
 
@@ -498,7 +498,7 @@ export default function PeriodSummaryPopup({
                           {task.title}
                         </span>
                         {i === 0 && incompleteTasks[0]?.sort_order === 0 && (
-                          <span className="text-[10px] text-amber-400/70 font-medium">#1</span>
+                          <span className="text-[10px] text-[#CBB894]/70 font-medium">#1</span>
                         )}
                       </div>
                     ))}
@@ -513,7 +513,7 @@ export default function PeriodSummaryPopup({
                           completed={true}
                           onToggle={() => {}}
                         />
-                        <span className="text-sm flex-1 text-green-400 transition-all duration-500">
+                        <span className="text-sm flex-1 text-[#9BB5A6] transition-all duration-500">
                           {task.title}
                         </span>
                       </div>
@@ -541,7 +541,7 @@ export default function PeriodSummaryPopup({
                     <div className="mt-3 h-1.5 rounded-full bg-zinc-700/50 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-700 ${
-                          allDone ? 'bg-green-500' : completedCount > 0 ? 'bg-green-500/70' : 'bg-zinc-600'
+                          allDone ? 'bg-[#7D9B8A]' : completedCount > 0 ? 'bg-[#7D9B8A]/70' : 'bg-zinc-600'
                         }`}
                         style={{ width: `${(completedCount / tasks.length) * 100}%` }}
                       />

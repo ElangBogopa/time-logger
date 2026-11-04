@@ -152,8 +152,19 @@ time_entries (
 
 ## Design Principles
 
-1. **Mobile-first**: Touch targets 44px+, hold-to-drag, responsive layouts
-2. **Muted palette**: Slate/zinc tones, no bright neons. Every colour the app
+1. **Mobile only**: Touch targets 44px+, hold-to-drag. The whole app renders
+   in a 430px column (`.app-frame` in globals.css) on every screen size, so a
+   browser window shows exactly what the phone shows. The frame carries a
+   transform, which makes it the containing block for `position: fixed`, so
+   the bottom bar, the floating button and the modals stay inside the column
+   — and the scrolling lives one level in, on `.app-scroll`, because a
+   scrolling containing block drags its fixed children up the screen.
+2. **Muted palette**: Slate/zinc tones, no bright neons. Colour has exactly
+   three jobs, and anything else is neutral (`text-muted-foreground`,
+   `bg-secondary`): it encodes data, it signals good/warning/bad, or it is
+   not colour. Decoration — a settings row's icon in its own hue — is the
+   habit that made the app look busy. Tailwind's saturated scales are banned
+   outright and `palette-discipline.test.ts` fails if one reappears. Every colour the app
    paints data with — categories, the three hero rings, status, score bars —
    comes from `lib/palette.ts`. Each hero metric takes the colour of the
    bucket it is computed from (Body→body, Mind→focus, Heart→connection), so a

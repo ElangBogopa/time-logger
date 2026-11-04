@@ -207,8 +207,8 @@ export default function GhostEntryModal({
   return (
     <Dialog open={!!event} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
       <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting}>
-        <DialogHeader className="bg-blue-500/10 -mx-6 -mt-6 px-6 pt-6 pb-4 border-b border-blue-500/20 rounded-t-lg">
-          <DialogTitle className="flex items-center gap-2 text-blue-400">
+        <DialogHeader className="bg-[#6B8CAE]/10 -mx-6 -mt-6 px-6 pt-6 pb-4 border-b border-[#6B8CAE]/20 rounded-t-lg">
+          <DialogTitle className="flex items-center gap-2 text-[#93AEC9]">
             <Calendar className="h-5 w-5" />
             Confirm Calendar Event
           </DialogTitle>
@@ -271,8 +271,8 @@ export default function GhostEntryModal({
 
           {/* Info/Warning */}
           {!hasEnded && (
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
-              <p className="text-sm text-amber-400">
+            <div className="rounded-lg bg-[#B5A07A]/10 border border-[#B5A07A]/20 p-3">
+              <p className="text-sm text-[#CBB894]">
                 You can confirm this entry after {formatTimeDisplay(endTime)}
               </p>
             </div>

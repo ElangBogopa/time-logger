@@ -429,7 +429,7 @@ export default function GoalPage() {
                           onClick={() => setCommitModalIdx(idx)}
                           className={`rounded-lg p-1.5 transition-colors ${
                             isCommitted
-                              ? 'text-green-500 hover:bg-green-500/10'
+                              ? 'text-muted-foreground hover:bg-secondary'
                               : 'text-muted-foreground/40 hover:text-muted-foreground/70 hover:bg-secondary/50'
                           }`}
                           title={isCommitted ? `${plan.committed_start?.slice(0,5)} – ${plan.committed_end?.slice(0,5)}` : 'Commit to a time'}
@@ -473,7 +473,7 @@ export default function GoalPage() {
             onClick={handleSave}
             disabled={!hasContent || isSaving || saved}
             className={`mt-4 w-full rounded-xl py-3 text-sm font-medium transition-all ${
-              saved ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+              saved ? 'bg-secondary text-muted-foreground border border-border'
                 : hasContent ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                 : 'bg-secondary text-muted-foreground cursor-not-allowed'
             }`}
@@ -533,7 +533,7 @@ export default function GoalPage() {
                   <div className="mt-2 pt-2 border-t border-border/50">
                     <button
                       onClick={() => setShowCompleted(!showCompleted)}
-                      className="w-full text-[11px] text-green-500/70 font-medium flex items-center gap-1.5 hover:text-green-500 transition-colors"
+                      className="w-full text-[11px] text-muted-foreground/70 font-medium flex items-center gap-1.5 hover:text-muted-foreground transition-colors"
                     >
                       <Check className="h-3 w-3" />
                       {todayScore.tasks.filter(t => t.completed).length} task{todayScore.tasks.filter(t => t.completed).length !== 1 ? 's' : ''} completed
@@ -568,7 +568,7 @@ export default function GoalPage() {
               <div className="mt-3 h-2 rounded-full bg-secondary overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    todayScore.score >= 80 ? 'bg-green-500' : todayScore.score >= 50 ? 'bg-amber-500' : 'bg-red-400'
+                    todayScore.score >= 80 ? 'bg-secondary' : todayScore.score >= 50 ? 'bg-secondary' : 'bg-secondary'
                   }`}
                   style={{ width: `${todayScore.score}%` }}
                 />
@@ -615,7 +615,7 @@ export default function GoalPage() {
                         {day.hasPlans && (
                           <div
                             className={`absolute bottom-0 w-full rounded-md transition-all duration-500 ${
-                              day.score >= 80 ? 'bg-green-500/80' : day.score >= 50 ? 'bg-amber-500/80' : day.score > 0 ? 'bg-red-400/80' : 'bg-zinc-400/30'
+                              day.score >= 80 ? 'bg-secondary' : day.score >= 50 ? 'bg-secondary' : day.score > 0 ? 'bg-secondary' : 'bg-zinc-400/30'
                             }`}
                             style={{ height: `${Math.max(day.score, 4)}%` }}
                           />
@@ -654,9 +654,9 @@ export default function GoalPage() {
                   {/* Planning streak */}
                   <div className="flex-1 flex items-center gap-2.5">
                     <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                      planningUnlocked ? 'bg-blue-500/15' : 'bg-secondary'
+                      planningUnlocked ? 'bg-secondary' : 'bg-secondary'
                     }`}>
-                      <CalendarCheck className={`h-4 w-4 ${planningUnlocked ? 'text-blue-500' : 'text-muted-foreground/50'}`} />
+                      <CalendarCheck className={`h-4 w-4 ${planningUnlocked ? 'text-muted-foreground' : 'text-muted-foreground/50'}`} />
                     </div>
                     <div>
                       {planningUnlocked ? (
@@ -683,9 +683,9 @@ export default function GoalPage() {
                   {/* Execution streak */}
                   <div className="flex-1 flex items-center gap-2.5">
                     <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                      executionUnlocked ? 'bg-orange-500/15' : 'bg-secondary'
+                      executionUnlocked ? 'bg-secondary' : 'bg-secondary'
                     }`}>
-                      <Flame className={`h-4 w-4 ${executionUnlocked ? 'text-orange-500' : 'text-muted-foreground/50'}`} />
+                      <Flame className={`h-4 w-4 ${executionUnlocked ? 'text-muted-foreground' : 'text-muted-foreground/50'}`} />
                     </div>
                     <div>
                       {executionUnlocked ? (

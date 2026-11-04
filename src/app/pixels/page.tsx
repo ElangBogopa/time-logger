@@ -159,7 +159,7 @@ export default function YearInPixelsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="mx-auto max-w-2xl px-4 py-6 lg:max-w-4xl">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Header */}
         <header className="mb-6">
           <div className="flex items-center gap-3 mb-2">
@@ -205,8 +205,8 @@ export default function YearInPixelsPage() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900 dark:bg-red-900/20">
-            <p className="text-red-600 dark:text-red-400">{error}</p>
+          <div className="rounded-xl border border-[#A8706A] bg-[#A8706A] p-6 text-center dark:border-[#A8706A] dark:bg-[#A8706A]/20">
+            <p className="text-[#A8706A] dark:text-[#C79089]">{error}</p>
             <Button variant="outline" onClick={fetchPixels} className="mt-4">
               Try again
             </Button>

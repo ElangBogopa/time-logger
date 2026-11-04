@@ -51,13 +51,13 @@ export default function Toast({ title, message, onClose, duration = 4000 }: Toas
       >
         {/* Celebration particles */}
         <div className="pointer-events-none absolute -inset-8 overflow-hidden">
-          <div className="absolute left-1/4 top-0 h-2 w-2 animate-bounce rounded-full bg-amber-400 opacity-80" style={{ animationDelay: '0ms', animationDuration: '1s' }} />
-          <div className="absolute right-1/4 top-2 h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400 opacity-80" style={{ animationDelay: '150ms', animationDuration: '1.2s' }} />
-          <div className="absolute left-1/3 top-4 h-1 w-1 animate-bounce rounded-full bg-blue-400 opacity-80" style={{ animationDelay: '300ms', animationDuration: '0.9s' }} />
-          <div className="absolute right-1/3 top-1 h-2 w-2 animate-bounce rounded-full bg-pink-400 opacity-80" style={{ animationDelay: '200ms', animationDuration: '1.1s' }} />
+          <div className="absolute left-1/4 top-0 h-2 w-2 animate-bounce rounded-full bg-[#B5A07A] opacity-80" style={{ animationDelay: '0ms', animationDuration: '1s' }} />
+          <div className="absolute right-1/4 top-2 h-1.5 w-1.5 animate-bounce rounded-full bg-[#7D9B8A] opacity-80" style={{ animationDelay: '150ms', animationDuration: '1.2s' }} />
+          <div className="absolute left-1/3 top-4 h-1 w-1 animate-bounce rounded-full bg-[#6B8CAE] opacity-80" style={{ animationDelay: '300ms', animationDuration: '0.9s' }} />
+          <div className="absolute right-1/3 top-1 h-2 w-2 animate-bounce rounded-full bg-[#A0848E] opacity-80" style={{ animationDelay: '200ms', animationDuration: '1.1s' }} />
         </div>
 
-        <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 p-[2px] shadow-2xl shadow-emerald-500/30">
+        <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br from-[#7D9B8A] via-[#7D9B8A] to-[#6B8CAE] p-[2px] shadow-2xl shadow-[#7D9B8A]/30">
           {/* Shimmer effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_ease-in-out_infinite]" />
 
@@ -65,8 +65,8 @@ export default function Toast({ title, message, onClose, duration = 4000 }: Toas
             {/* Success icon */}
             <div className="mb-4 flex justify-center">
               <div className="relative">
-                <div className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
-                <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg shadow-emerald-500/40">
+                <div className="absolute inset-0 animate-ping rounded-full bg-[#7D9B8A]/30" />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#7D9B8A] to-[#7D9B8A] shadow-lg shadow-[#7D9B8A]/40">
                   <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
@@ -87,7 +87,7 @@ export default function Toast({ title, message, onClose, duration = 4000 }: Toas
             {/* Progress bar */}
             <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700/50">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400"
+                className="h-full rounded-full bg-gradient-to-r from-[#7D9B8A] via-[#7D9B8A] to-[#6B8CAE]"
                 style={{
                   animation: `shrink ${duration}ms linear forwards`,
                 }}

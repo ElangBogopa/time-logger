@@ -197,8 +197,8 @@ function ConnectionsContent() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-blue-500" fill="currentColor">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-muted-foreground" fill="currentColor">
                       <path d="M19.5 22h-15A2.5 2.5 0 0 1 2 19.5v-15A2.5 2.5 0 0 1 4.5 2h15A2.5 2.5 0 0 1 22 4.5v15a2.5 2.5 0 0 1-2.5 2.5zM9.047 6.5v.469c-.703 0-1.266.562-1.266 1.265v1.266c0 .703.563 1.266 1.266 1.266h.469v4.968h-.469c-.703 0-1.266.563-1.266 1.266v1.266c0 .703.563 1.265 1.266 1.265V20h5.906v-.469c.703 0 1.266-.562 1.266-1.265V17c0-.703-.563-1.266-1.266-1.266h-.469V10.766h.469c.703 0 1.266-.563 1.266-1.266V8.234c0-.703-.563-1.265-1.266-1.265V6.5H9.047z"/>
                     </svg>
                   </div>
@@ -207,7 +207,7 @@ function ConnectionsContent() {
                     <CardDescription>
                       {calendarStatus?.connected ? (
                         <span className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-green-500" />
+                          <span className="h-2 w-2 rounded-full bg-secondary" />
                           Connected as {calendarStatus.googleEmail}
                         </span>
                       ) : (

@@ -42,37 +42,37 @@ export function OfflineIndicator() {
       <div className={`
         rounded-lg px-4 py-3 shadow-lg flex items-center justify-between
         ${isOffline
-          ? 'bg-amber-900/90 border border-amber-700'
+          ? 'bg-[#B5A07A]/90 border border-[#B5A07A]'
           : queuedCount > 0
-            ? 'bg-blue-900/90 border border-blue-700'
-            : 'bg-green-900/90 border border-green-700'
+            ? 'bg-[#6B8CAE]/90 border border-[#6B8CAE]'
+            : 'bg-[#7D9B8A]/90 border border-[#7D9B8A]'
         }
       `}>
         <div className="flex items-center gap-3">
           {isOffline ? (
             <>
-              <WifiOff className="h-5 w-5 text-amber-400" />
+              <WifiOff className="h-5 w-5 text-[#CBB894]" />
               <div>
-                <p className="text-sm font-medium text-amber-100">You&apos;re offline</p>
-                <p className="text-xs text-amber-300">Changes will sync when you&apos;re back online</p>
+                <p className="text-sm font-medium text-[#CBB894]">You&apos;re offline</p>
+                <p className="text-xs text-[#CBB894]">Changes will sync when you&apos;re back online</p>
               </div>
             </>
           ) : queuedCount > 0 ? (
             <>
-              <CloudOff className="h-5 w-5 text-blue-400" />
+              <CloudOff className="h-5 w-5 text-[#93AEC9]" />
               <div>
-                <p className="text-sm font-medium text-blue-100">
+                <p className="text-sm font-medium text-[#93AEC9]">
                   {isSyncing ? 'Syncing...' : `${queuedCount} action${queuedCount > 1 ? 's' : ''} pending`}
                 </p>
-                <p className="text-xs text-blue-300">
+                <p className="text-xs text-[#93AEC9]">
                   {isSyncing ? 'Please wait' : 'Tap to sync now'}
                 </p>
               </div>
             </>
           ) : (
             <>
-              <RefreshCw className="h-5 w-5 text-green-400" />
-              <p className="text-sm font-medium text-green-100">Back online</p>
+              <RefreshCw className="h-5 w-5 text-[#9BB5A6]" />
+              <p className="text-sm font-medium text-[#9BB5A6]">Back online</p>
             </>
           )}
         </div>
@@ -80,7 +80,7 @@ export function OfflineIndicator() {
         {!isOffline && queuedCount > 0 && !isSyncing && (
           <button
             onClick={syncQueue}
-            className="px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500
+            className="px-3 py-1.5 text-sm font-medium bg-[#6B8CAE] hover:bg-[#6B8CAE]
                        text-white rounded-md transition-colors"
           >
             Sync now

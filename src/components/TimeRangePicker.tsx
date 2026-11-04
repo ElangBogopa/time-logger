@@ -241,7 +241,7 @@ export default function TimeRangePicker({
           {/* Duration display and error */}
           <div className="py-2">
             {isEndBeforeStart ? (
-              <p className="text-center text-sm text-amber-500">
+              <p className="text-center text-sm text-[#B5A07A]">
                 End time must be after start time
               </p>
             ) : duration > 0 ? (
@@ -259,7 +259,7 @@ export default function TimeRangePicker({
               disabled={!isValidRange}
               className={`w-full ${
                 variant === 'quicklog'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'
+                  ? 'bg-gradient-to-r from-[#B5A07A] to-[#B5A07A] hover:from-[#B5A07A] hover:to-[#B5A07A] text-white'
                   : ''
               }`}
             >

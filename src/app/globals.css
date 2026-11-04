@@ -135,6 +135,57 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   The phone column
+   This is a mobile app. On a laptop it used to stretch — or,
+   worse, lay itself out differently from the thing being built.
+   One column at phone width on every screen, so what you see in
+   a browser is what you get on the device.
+
+   The transform is load-bearing: a transformed ancestor becomes
+   the containing block for `position: fixed` descendants, so the
+   bottom bar, the floating add button and every full-screen
+   modal land inside the column instead of against the window.
+   ═══════════════════════════════════════════════════════════ */
+
+.app-frame {
+  position: relative;
+  margin-inline: auto;
+  width: 100%;
+  max-width: 430px;
+  height: 100%;
+  overflow: hidden;
+  background: var(--background);
+
+  /* A transformed ancestor becomes the containing block for `position:
+     fixed` descendants, which is how the bottom bar, the floating button
+     and the modals land inside the column instead of against the window.
+     The frame must NOT be the scroller for that to hold: when it was, the
+     bar resolved against the scrolled content and drifted up the screen as
+     the page moved. The scrolling happens one level in. */
+  transform: translateZ(0);
+}
+
+.app-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The page itself does not scroll; .app-scroll does. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (min-width: 448px) {
+  /* Only once there is room around it: a seam between app and desk. */
+  .app-frame {
+    border-inline: 1px solid var(--border);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
    Type scale
    The app had ten arbitrary sizes — text-[10px] through
    text-[22px] — spread over fifteen files, so the same kind of

@@ -39,8 +39,8 @@ const TIME_BLOCKS: TimeBlock[] = [
     percentage: [25, 30],
     hours: '4–5h',
     icon: Brain,
-    color: 'text-blue-500',
-    barColor: 'bg-blue-500',
+    color: 'text-[#6B8CAE]',
+    barColor: 'bg-[#6B8CAE]',
     description: 'Focused, cognitively demanding work. Your real output happens here. Diminishing returns after ~5 hours.',
   },
   {
@@ -48,8 +48,8 @@ const TIME_BLOCKS: TimeBlock[] = [
     percentage: [18, 25],
     hours: '3–4h',
     icon: Gamepad2,
-    color: 'text-purple-500',
-    barColor: 'bg-purple-500',
+    color: 'text-[#8A7CA8]',
+    barColor: 'bg-[#8A7CA8]',
     description: 'Active recovery is crucial. Aim for 70% active leisure (hobbies, reading) and 30% passive (TV, scrolling).',
   },
   {
@@ -66,8 +66,8 @@ const TIME_BLOCKS: TimeBlock[] = [
     percentage: [12, 15],
     hours: '2–2.5h',
     icon: Users,
-    color: 'text-rose-500',
-    barColor: 'bg-rose-500',
+    color: 'text-[#A8706A]',
+    barColor: 'bg-[#A8706A]',
     description: 'Harvard\'s 80-year study found relationships are the #1 predictor of happiness. Not optional.',
   },
   {
@@ -75,8 +75,8 @@ const TIME_BLOCKS: TimeBlock[] = [
     percentage: [8, 12],
     hours: '1.5–2h',
     icon: UtensilsCrossed,
-    color: 'text-amber-500',
-    barColor: 'bg-amber-500',
+    color: 'text-[#B5A07A]',
+    barColor: 'bg-[#B5A07A]',
     description: 'Mindful eating, grooming, hygiene. Often underestimated in time planning.',
   },
   {
@@ -84,8 +84,8 @@ const TIME_BLOCKS: TimeBlock[] = [
     percentage: [6, 8],
     hours: '1–1.5h',
     icon: Dumbbell,
-    color: 'text-green-500',
-    barColor: 'bg-green-500',
+    color: 'text-[#7D9B8A]',
+    barColor: 'bg-[#7D9B8A]',
     description: 'WHO recommends 150+ min/week. Daily movement is critical for cognitive function.',
   },
   {
@@ -93,8 +93,8 @@ const TIME_BLOCKS: TimeBlock[] = [
     percentage: [6, 10],
     hours: '1–1.5h',
     icon: BookOpen,
-    color: 'text-cyan-500',
-    barColor: 'bg-cyan-500',
+    color: 'text-[#6B8CAE]',
+    barColor: 'bg-[#6B8CAE]',
     description: 'Courses, reading, skill building. Maintains cognitive flexibility and long-term growth.',
   },
 ]
@@ -110,24 +110,24 @@ interface TimingBlock {
 }
 
 const MORNING_BLOCKS: TimingBlock[] = [
-  { time: '6–7 AM', activity: 'Wake + Light Exposure', icon: Sun, iconColor: 'text-amber-400', reason: 'Resets circadian clock, boosts cortisol for alertness' },
-  { time: '7–8 AM', activity: 'Exercise', icon: Dumbbell, iconColor: 'text-green-500', reason: 'Jumpstarts metabolism, enhances mood for entire day' },
-  { time: '8–9 AM', activity: 'Breakfast + Planning', icon: UtensilsCrossed, iconColor: 'text-amber-500', reason: 'Fuel your brain, set priorities before reactive work pulls you in' },
-  { time: '9–12 PM', activity: 'Deep Work Block 1', icon: Brain, iconColor: 'text-blue-500', reason: 'Peak cognitive hours. Cortisol + body temp rising = maximum focus' },
+  { time: '6–7 AM', activity: 'Wake + Light Exposure', icon: Sun, iconColor: 'text-[#CBB894]', reason: 'Resets circadian clock, boosts cortisol for alertness' },
+  { time: '7–8 AM', activity: 'Exercise', icon: Dumbbell, iconColor: 'text-[#7D9B8A]', reason: 'Jumpstarts metabolism, enhances mood for entire day' },
+  { time: '8–9 AM', activity: 'Breakfast + Planning', icon: UtensilsCrossed, iconColor: 'text-[#B5A07A]', reason: 'Fuel your brain, set priorities before reactive work pulls you in' },
+  { time: '9–12 PM', activity: 'Deep Work Block 1', icon: Brain, iconColor: 'text-[#6B8CAE]', reason: 'Peak cognitive hours. Cortisol + body temp rising = maximum focus' },
 ]
 
 const AFTERNOON_BLOCKS: TimingBlock[] = [
-  { time: '12–1 PM', activity: 'Lunch + Social', icon: Users, iconColor: 'text-rose-500', reason: 'Refuel and connect. Post-lunch dip is coming — don\'t fight it' },
+  { time: '12–1 PM', activity: 'Lunch + Social', icon: Users, iconColor: 'text-[#A8706A]', reason: 'Refuel and connect. Post-lunch dip is coming — don\'t fight it' },
   { time: '1–2 PM', activity: 'Shallow Work', icon: Clock, iconColor: 'text-slate-400', reason: 'Post-lunch dip. Handle emails, admin, low-stakes tasks' },
-  { time: '2–4 PM', activity: 'Deep Work Block 2', icon: Brain, iconColor: 'text-blue-500', reason: 'Second cognitive peak. 90-min block + break + 90-min block' },
-  { time: '4–5 PM', activity: 'Learning', icon: BookOpen, iconColor: 'text-cyan-500', reason: 'Still engaged but past peak intensity. Ideal for growth activities' },
+  { time: '2–4 PM', activity: 'Deep Work Block 2', icon: Brain, iconColor: 'text-[#6B8CAE]', reason: 'Second cognitive peak. 90-min block + break + 90-min block' },
+  { time: '4–5 PM', activity: 'Learning', icon: BookOpen, iconColor: 'text-[#6B8CAE]', reason: 'Still engaged but past peak intensity. Ideal for growth activities' },
 ]
 
 const EVENING_BLOCKS: TimingBlock[] = [
-  { time: '5–6 PM', activity: 'Wrap-up + Exercise', icon: Dumbbell, iconColor: 'text-green-500', reason: 'Body temp peaks — best physical performance window. Or wind down work.' },
-  { time: '7–9 PM', activity: 'Social + Connection', icon: Users, iconColor: 'text-rose-500', reason: 'Dinner, family, meaningful conversations. Relationships compound.' },
-  { time: '9–10 PM', activity: 'Leisure', icon: Gamepad2, iconColor: 'text-purple-500', reason: 'Natural wind-down. Prefer active leisure (hobbies, reading) over scrolling.' },
-  { time: '10 PM', activity: 'Sleep Prep', icon: Moon, iconColor: 'text-indigo-400', reason: 'No screens, dim lights. Your next day starts with tonight\'s sleep.' },
+  { time: '5–6 PM', activity: 'Wrap-up + Exercise', icon: Dumbbell, iconColor: 'text-[#7D9B8A]', reason: 'Body temp peaks — best physical performance window. Or wind down work.' },
+  { time: '7–9 PM', activity: 'Social + Connection', icon: Users, iconColor: 'text-[#A8706A]', reason: 'Dinner, family, meaningful conversations. Relationships compound.' },
+  { time: '9–10 PM', activity: 'Leisure', icon: Gamepad2, iconColor: 'text-[#8A7CA8]', reason: 'Natural wind-down. Prefer active leisure (hobbies, reading) over scrolling.' },
+  { time: '10 PM', activity: 'Sleep Prep', icon: Moon, iconColor: 'text-[#AFA3C8]', reason: 'No screens, dim lights. Your next day starts with tonight\'s sleep.' },
 ]
 
 // ── Research citations ──
@@ -267,8 +267,8 @@ export default function GuidePage() {
             Back
           </button>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
-              <Lightbulb className="h-5 w-5 text-blue-500" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6B8CAE]/10">
+              <Lightbulb className="h-5 w-5 text-[#6B8CAE]" />
             </div>
             <div>
               <h1 className="page-title text-foreground">Your Ideal Day</h1>
@@ -298,9 +298,9 @@ export default function GuidePage() {
         </section>
 
         {/* Key insight callout */}
-        <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4 mb-10">
+        <div className="rounded-xl bg-[#6B8CAE]/5 border border-[#6B8CAE]/20 p-4 mb-10">
           <div className="flex items-start gap-3">
-            <Lightbulb className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <Lightbulb className="h-5 w-5 text-[#6B8CAE] flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-foreground mb-1">The 90-Minute Rule</p>
               <p className="text-xs text-foreground/70 leading-relaxed">
@@ -318,16 +318,16 @@ export default function GuidePage() {
           <p className="text-xs text-muted-foreground mb-5">Aligned with your circadian rhythm and energy cycles</p>
 
           <div className="space-y-6">
-            <ScheduleSection title="Morning" icon={Sun} iconColor="text-amber-400" blocks={MORNING_BLOCKS} />
-            <ScheduleSection title="Afternoon" icon={Sunset} iconColor="text-orange-500" blocks={AFTERNOON_BLOCKS} />
-            <ScheduleSection title="Evening" icon={Moon} iconColor="text-indigo-400" blocks={EVENING_BLOCKS} />
+            <ScheduleSection title="Morning" icon={Sun} iconColor="text-[#CBB894]" blocks={MORNING_BLOCKS} />
+            <ScheduleSection title="Afternoon" icon={Sunset} iconColor="text-[#B5A07A]" blocks={AFTERNOON_BLOCKS} />
+            <ScheduleSection title="Evening" icon={Moon} iconColor="text-[#AFA3C8]" blocks={EVENING_BLOCKS} />
           </div>
         </section>
 
         {/* Leisure insight callout */}
-        <div className="rounded-xl bg-purple-500/5 border border-purple-500/20 p-4 mb-10">
+        <div className="rounded-xl bg-[#8A7CA8]/5 border border-[#8A7CA8]/20 p-4 mb-10">
           <div className="flex items-start gap-3">
-            <Gamepad2 className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+            <Gamepad2 className="h-5 w-5 text-[#8A7CA8] flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-foreground mb-1">Leisure Isn&apos;t Lazy</p>
               <p className="text-xs text-foreground/70 leading-relaxed">
@@ -342,7 +342,7 @@ export default function GuidePage() {
         {/* Section 3: The Research */}
         <section className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <FlaskConical className="h-5 w-5 text-green-500" />
+            <FlaskConical className="h-5 w-5 text-[#7D9B8A]" />
             <h2 className="text-lg font-bold text-foreground">The Research</h2>
           </div>
           <div className="space-y-3">

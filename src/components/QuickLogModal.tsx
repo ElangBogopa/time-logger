@@ -575,8 +575,8 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             </button>
 
             <div className="flex flex-col items-center py-6">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10 mb-4">
-                <CheckCircle2 className="h-7 w-7 text-green-500" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#7D9B8A]/10 mb-4">
+                <CheckCircle2 className="h-7 w-7 text-[#7D9B8A]" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-1">Entry logged!</h3>
               <p className="text-sm text-muted-foreground text-center">
@@ -599,7 +599,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                 type="button"
                 onClick={handleDoneWithPeriod}
                 disabled={isDoneLoading}
-                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                className="w-full bg-gradient-to-r from-[#B5A07A] to-[#B5A07A] hover:from-[#B5A07A] hover:to-[#B5A07A] text-white"
               >
                 {isDoneLoading ? (
                   <>
@@ -626,12 +626,12 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
               <DialogTitle className="flex items-center gap-2">
                 {isPlanningMode && initialActivity ? (
                   <>
-                    <CalendarCheck className="h-5 w-5 text-green-500" />
+                    <CalendarCheck className="h-5 w-5 text-[#7D9B8A]" />
                     Commit Task
                   </>
                 ) : isPlanningMode ? (
                   <>
-                    <Clock className="h-5 w-5 text-blue-500" />
+                    <Clock className="h-5 w-5 text-[#6B8CAE]" />
                     Plan Ahead
                   </>
                 ) : isPastDay ? (
@@ -641,7 +641,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                   </>
                 ) : (
                   <>
-                    <Zap className="h-5 w-5 text-amber-500" />
+                    <Zap className="h-5 w-5 text-[#B5A07A]" />
                     Quick Log
                   </>
                 )}
@@ -672,9 +672,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                     className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:border-primary hover:bg-primary/5 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-primary"
                   >
                     {suggestion.source === 'pattern' ? (
-                      <TrendingUp className="h-3 w-3 text-green-500" />
+                      <TrendingUp className="h-3 w-3 text-[#7D9B8A]" />
                     ) : (
-                      <History className="h-3 w-3 text-blue-500" />
+                      <History className="h-3 w-3 text-[#6B8CAE]" />
                     )}
                     <span className="font-medium">{suggestion.activity}</span>
                     <span className="text-muted-foreground">
@@ -690,22 +690,22 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
           {/* Calendar suggestion chip - also only when input focused AND empty */}
           {isInputFocused && suggestedEvent && !activity && (
-            <div className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 border border-blue-500/20">
+            <div className="flex items-center gap-2 rounded-lg bg-[#6B8CAE]/10 px-3 py-2 border border-[#6B8CAE]/20">
               <button
                 type="button"
                 onClick={handleSuggestionClick}
-                className="flex flex-1 items-center gap-2 text-left text-sm text-blue-400 hover:text-blue-300"
+                className="flex flex-1 items-center gap-2 text-left text-sm text-[#93AEC9] hover:text-[#93AEC9]"
               >
                 <Calendar className="h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate">
                   <span className="font-medium">{suggestedEvent.title}</span>
-                  <span className="text-blue-500"> ended at {formatTimeDisplay(suggestedEvent.endTime)}</span>
+                  <span className="text-[#6B8CAE]"> ended at {formatTimeDisplay(suggestedEvent.endTime)}</span>
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => setDismissedSuggestion(suggestedEvent.id)}
-                className="shrink-0 rounded p-0.5 text-blue-500 hover:bg-blue-500/20 hover:text-blue-400"
+                className="shrink-0 rounded p-0.5 text-[#6B8CAE] hover:bg-[#6B8CAE]/20 hover:text-[#93AEC9]"
                 aria-label="Dismiss suggestion"
               >
                 <X className="h-4 w-4" />
@@ -787,7 +787,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
 
             {/* Applied confirmation */}
             {isAutoParseApplied && (
-              <p className="text-xs text-green-600 flex items-center gap-1">
+              <p className="text-xs text-[#7D9B8A] flex items-center gap-1">
                 <Sparkles className="h-3 w-3" />
                 Times applied from your input
               </p>
@@ -842,12 +842,12 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
             disabled={isSubmitting || !activity.trim() || duration <= 0}
             className={`w-full text-white ${
               isPlanningMode && initialActivity
-                ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                ? 'bg-gradient-to-r from-[#7D9B8A] to-[#7D9B8A] hover:from-[#7D9B8A] hover:to-[#7D9B8A]'
                 : isPlanningMode
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
+                  ? 'bg-gradient-to-r from-[#6B8CAE] to-[#8A7CA8] hover:from-[#6B8CAE] hover:to-[#8A7CA8]'
                   : isPastDay
                     ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
-                    : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                    : 'bg-gradient-to-r from-[#B5A07A] to-[#B5A07A] hover:from-[#B5A07A] hover:to-[#B5A07A]'
             }`}
           >
             {isSubmitting ? (

@@ -41,8 +41,8 @@ export default function AnimatedCheckbox({ completed, onToggle, size = 'md', rea
       disabled={readOnly}
       className={`relative flex shrink-0 items-center justify-center rounded-full transition-all duration-200 ${sizeClasses} ${
         completed
-          ? 'border-green-500 bg-green-500 scale-100'
-          : 'border-zinc-300 dark:border-zinc-600 hover:border-green-400 active:scale-90'
+          ? 'border-[#7D9B8A] bg-[#7D9B8A] scale-100'
+          : 'border-zinc-300 dark:border-zinc-600 hover:border-[#7D9B8A] active:scale-90'
       } ${readOnly ? 'cursor-default' : 'cursor-pointer'} ${
         justCompleted ? 'animate-checkbox-pop' : ''
       }`}
@@ -53,7 +53,7 @@ export default function AnimatedCheckbox({ completed, onToggle, size = 'md', rea
       )}
       {/* Success ring pulse */}
       {justCompleted && (
-        <span className="absolute inset-0 rounded-full animate-ring-pulse border-2 border-green-500" />
+        <span className="absolute inset-0 rounded-full animate-ring-pulse border-2 border-[#7D9B8A]" />
       )}
     </button>
   )

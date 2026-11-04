@@ -102,10 +102,10 @@ export default function NotificationsPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                  push.isSubscribed ? 'bg-green-500/10' : 'bg-muted'
+                  push.isSubscribed ? 'bg-secondary' : 'bg-muted'
                 }`}>
                   {push.isSubscribed ? (
-                    <Bell className="h-5 w-5 text-green-500" />
+                    <Bell className="h-5 w-5 text-muted-foreground" />
                   ) : (
                     <BellOff className="h-5 w-5 text-muted-foreground" />
                   )}
@@ -142,8 +142,8 @@ export default function NotificationsPage() {
           {/* Reminder Times */}
           <div className={`rounded-xl border border-border bg-card p-4 ${!push.isSubscribed ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <Clock className="h-5 w-5 text-blue-500" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                <Clock className="h-5 w-5 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">Reminder Times</p>

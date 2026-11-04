@@ -226,8 +226,8 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                   )}
 
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
-                      <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary dark:bg-secondary">
+                      <TrendingUp className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
                     </div>
                     <span className="font-semibold text-lg text-zinc-900 dark:text-zinc-100">
                       Increase Productivity
@@ -298,8 +298,8 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                 </div>
 
                 {/* Recommendation */}
-                <div className="mt-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3">
-                  <p className="text-sm text-green-700 dark:text-green-400">
+                <div className="mt-4 rounded-lg bg-secondary dark:bg-secondary border border-border dark:border-border p-3">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                     <span className="font-medium">Recommended: 80%</span>
                     {' — '}
                     Studies show 80% task completion correlates with sustainable high performance without burnout.
@@ -311,7 +311,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
 
           {/* Error message */}
           {error && (
-            <p className="mt-4 text-center text-sm text-red-500">{error}</p>
+            <p className="mt-4 text-center text-sm text-muted-foreground">{error}</p>
           )}
 
           {/* Navigation */}
@@ -358,7 +358,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-secondary hover:bg-secondary"
                 >
                   {isSubmitting ? (
                     <>

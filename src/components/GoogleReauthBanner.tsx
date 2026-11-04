@@ -18,20 +18,20 @@ export default function GoogleReauthBanner() {
   if (!shouldShow) return null
 
   return (
-    <div className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5">
-      <p className="text-sm text-amber-200">
+    <div className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-[#B5A07A]/30 bg-[#B5A07A]/10 px-4 py-2.5">
+      <p className="text-sm text-[#CBB894]">
         Your Google session has expired.
       </p>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
           onClick={() => signIn('google')}
-          className="text-sm font-medium text-amber-400 hover:text-amber-300 transition-colors"
+          className="text-sm font-medium text-[#CBB894] hover:text-[#CBB894] transition-colors"
         >
           Sign in again
         </button>
         <button
           onClick={() => setDismissed(true)}
-          className="p-1 text-amber-400/60 hover:text-amber-300 transition-colors"
+          className="p-1 text-[#CBB894]/60 hover:text-[#CBB894] transition-colors"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />

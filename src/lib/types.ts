@@ -252,17 +252,12 @@ export const MOOD_EMOJIS: Record<MoodLevel, string> = {
 }
 
 // Mood colors (same across all sessions)
-export const MOOD_COLORS: Record<MoodLevel, string> = {
-  low: 'text-amber-500',
-  okay: 'text-blue-500',
-  great: 'text-green-500',
-}
 
 // Legacy MOOD_CONFIG for backwards compatibility with tests
 export const MOOD_CONFIG: Record<MoodLevel, { emoji: string; label: string; color: string }> = {
-  low: { emoji: '😴', label: 'Low energy', color: 'text-amber-500' },
-  okay: { emoji: '😐', label: 'Okay', color: 'text-blue-500' },
-  great: { emoji: '⚡', label: 'Energized', color: 'text-green-500' },
+  low: { emoji: '😴', label: 'Low energy', color: 'text-[#CBB894]' },
+  okay: { emoji: '😐', label: 'Okay', color: 'text-[#93AEC9]' },
+  great: { emoji: '⚡', label: 'Energized', color: 'text-[#9BB5A6]' },
 }
 
 /**
@@ -446,15 +441,6 @@ export const AGGREGATED_CATEGORY_LABELS: Record<AggregatedCategory, string> = {
   faith: 'Faith',
 }
 
-export const AGGREGATED_CATEGORY_COLORS: Record<AggregatedCategory, string> = {
-  focus: 'bg-blue-500',
-  ops: 'bg-slate-500',
-  body: 'bg-green-500',
-  recovery: 'bg-amber-500',
-  connection: 'bg-pink-500',
-  escape: 'bg-zinc-500',
-  faith: 'bg-violet-500',
-}
 
 /**
  * Research-based category definitions to help users categorize correctly.

@@ -3,7 +3,6 @@ import {
   AggregatedCategory,
   ENERGY_VIEW,
   AGGREGATED_CATEGORY_LABELS,
-  AGGREGATED_CATEGORY_COLORS,
   getAggregatedCategory,
   aggregateByView,
   CATEGORY_LABELS,
@@ -117,24 +116,6 @@ describe('AGGREGATED_CATEGORY_LABELS', () => {
   })
 })
 
-describe('AGGREGATED_CATEGORY_COLORS', () => {
-  it('has colors for all 6 categories', () => {
-    const categories: AggregatedCategory[] = ['focus', 'ops', 'body', 'recovery', 'connection', 'escape']
-
-    categories.forEach(cat => {
-      expect(AGGREGATED_CATEGORY_COLORS[cat]).toMatch(/^bg-/)
-    })
-  })
-
-  it('uses distinct colors for each category', () => {
-    expect(AGGREGATED_CATEGORY_COLORS.focus).toBe('bg-blue-500')
-    expect(AGGREGATED_CATEGORY_COLORS.ops).toBe('bg-slate-500')
-    expect(AGGREGATED_CATEGORY_COLORS.body).toBe('bg-green-500')
-    expect(AGGREGATED_CATEGORY_COLORS.recovery).toBe('bg-amber-500')
-    expect(AGGREGATED_CATEGORY_COLORS.connection).toBe('bg-pink-500')
-    expect(AGGREGATED_CATEGORY_COLORS.escape).toBe('bg-zinc-500')
-  })
-})
 
 describe('getAggregatedCategory', () => {
   it('returns focus for deep_work', () => {

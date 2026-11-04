@@ -104,9 +104,9 @@ function formatMinutes(m: number) {
 }
 
 const RATING_STYLES = {
-  good: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  neutral: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  rough: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  good: 'bg-[#7D9B8A] text-[#7D9B8A] dark:bg-[#7D9B8A]/30 dark:text-[#9BB5A6]',
+  neutral: 'bg-[#B5A07A] text-[#B5A07A] dark:bg-[#B5A07A]/30 dark:text-[#CBB894]',
+  rough: 'bg-[#A8706A] text-[#A8706A] dark:bg-[#A8706A]/30 dark:text-[#C79089]',
   no_data: 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500',
 }
 
@@ -212,8 +212,8 @@ export default function WeeklyReviewContent() {
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 dark:border-red-800 p-6 text-center">
-        <p className="text-red-500 mb-3">{error}</p>
+      <div className="rounded-xl border border-[#A8706A] dark:border-[#A8706A] p-6 text-center">
+        <p className="text-[#A8706A] mb-3">{error}</p>
         <button onClick={fetchReview} className="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 text-sm">
           Try again
         </button>
@@ -300,9 +300,9 @@ export default function WeeklyReviewContent() {
       {/* AI Coach Summary */}
       {reviewData.coachSummary && (
         <section className="mb-5">
-          <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200/50 dark:border-indigo-800/50 p-4">
+          <div className="rounded-xl bg-gradient-to-br from-[#8A7CA8] to-[#8A7CA8] dark:from-[#8A7CA8]/30 dark:to-[#8A7CA8]/30 border border-[#8A7CA8]/50 dark:border-[#8A7CA8]/50 p-4">
             <div className="flex items-start gap-3">
-              <Sparkles className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5" />
+              <Sparkles className="h-5 w-5 text-[#8A7CA8] flex-shrink-0 mt-0.5" />
               <p className="text-sm text-foreground leading-relaxed">{reviewData.coachSummary}</p>
             </div>
           </div>
@@ -347,8 +347,8 @@ export default function WeeklyReviewContent() {
         onClick={() => router.push('/pixels')}
         className="w-full rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors text-left"
       >
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10">
-          <Grid3X3 className="h-5 w-5 text-emerald-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7D9B8A]/10">
+          <Grid3X3 className="h-5 w-5 text-[#7D9B8A]" />
         </div>
         <div className="flex-1">
           <p className="font-medium text-foreground">Year in Pixels</p>

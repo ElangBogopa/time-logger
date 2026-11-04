@@ -76,12 +76,12 @@ export default function TimelineEntry({
             : 'hover:opacity-80 opacity-60'
         } ${
           isReadyToConfirm
-            ? 'border-amber-400/80 bg-amber-100/50 dark:border-amber-500/60 dark:bg-amber-900/30'
+            ? 'border-[#B5A07A]/80 bg-[#B5A07A]/50 dark:border-[#B5A07A]/60 dark:bg-[#B5A07A]/30'
             : 'border-zinc-400/60 bg-zinc-100/50 dark:border-zinc-500/40 dark:bg-zinc-700/30'
         } ${hasTimes ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
         style={{ top: pendingDisplayTop, height: pendingDisplayHeight }}
       >
-        <div className={`flex h-full flex-col justify-center px-2 py-1 ${isReadyToConfirm ? 'text-amber-700 dark:text-amber-300' : 'text-zinc-600 dark:text-zinc-300'}`}>
+        <div className={`flex h-full flex-col justify-center px-2 py-1 ${isReadyToConfirm ? 'text-[#B5A07A] dark:text-[#CBB894]' : 'text-zinc-600 dark:text-zinc-300'}`}>
           {isShort ? (
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1 truncate text-xs font-medium">

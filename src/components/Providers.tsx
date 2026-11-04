@@ -22,12 +22,17 @@ export default function Providers({ children }: { children: ReactNode }) {
       <SessionProvider>
         <TimezoneSync />
         <CalendarProvider>
-          <GoogleReauthBanner />
-          <FocusSessionBar />
-          {children}
-          <BottomTabBar />
-          <OfflineIndicator />
-          <Toaster position="bottom-center" />
+          {/* The phone column. Everything lives inside it, including the
+              fixed nav, the floating button and the modals — see .app-frame
+              in globals.css for why that works. */}
+          <div className="app-frame">
+            <GoogleReauthBanner />
+            <FocusSessionBar />
+            <div className="app-scroll">{children}</div>
+            <BottomTabBar />
+            <OfflineIndicator />
+            <Toaster position="bottom-center" />
+          </div>
         </CalendarProvider>
       </SessionProvider>
     </ThemeProvider>

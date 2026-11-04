@@ -130,7 +130,7 @@ function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
                   <Star
                     className={`h-8 w-8 transition-colors ${
                       star <= (hoverRating || rating)
-                        ? 'fill-amber-400 text-amber-400'
+                        ? 'fill-[#B5A07A] text-muted-foreground'
                         : 'text-muted-foreground/30'
                     }`}
                   />
@@ -240,8 +240,8 @@ export default function MorePage() {
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
             icon={Bell}
-            iconBg="bg-blue-500/10"
-            iconColor="text-blue-500"
+            iconBg="bg-secondary"
+            iconColor="text-muted-foreground"
             label="Push Notifications"
             description="Manage reminders and alerts"
             onClick={() => router.push('/settings/notifications')}
@@ -254,8 +254,8 @@ export default function MorePage() {
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
             icon={Calendar}
-            iconBg="bg-green-500/10"
-            iconColor="text-green-500"
+            iconBg="bg-secondary"
+            iconColor="text-muted-foreground"
             label="View Calendar"
             onClick={() => router.push('/calendar')}
           />
@@ -266,24 +266,24 @@ export default function MorePage() {
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
             icon={Lightbulb}
-            iconBg="bg-blue-500/10"
-            iconColor="text-blue-500"
+            iconBg="bg-secondary"
+            iconColor="text-muted-foreground"
             label="Your Ideal Day"
             description="Science-backed daily planning guide"
             onClick={() => router.push('/guide')}
           />
           <RowItem
             icon={BookOpen}
-            iconBg="bg-amber-500/10"
-            iconColor="text-amber-500"
+            iconBg="bg-secondary"
+            iconColor="text-muted-foreground"
             label="The Science"
             description="Research and books behind Better"
             onClick={() => router.push('/library')}
           />
           <RowItem
             icon={MessageSquare}
-            iconBg="bg-pink-500/10"
-            iconColor="text-pink-500"
+            iconBg="bg-secondary"
+            iconColor="text-muted-foreground"
             label="Send Feedback"
             description="Rate the app and share your thoughts"
             onClick={() => setShowFeedback(true)}
@@ -303,7 +303,7 @@ export default function MorePage() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+              className="text-muted-foreground hover:text-muted-foreground hover:bg-secondary"
               onClick={() => signOut({ callbackUrl: '/login' })}
             >
               <LogOut className="h-4 w-4 mr-1.5" />

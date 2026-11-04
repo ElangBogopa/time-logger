@@ -143,10 +143,7 @@ function HomeContent() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
-        {/* One column on a phone, two above lg. The app was a 420px strip
-            centred in whatever window it was opened in, with the rest of the
-            screen empty. */}
-        <div className="mx-auto max-w-2xl px-4 py-4 lg:max-w-5xl lg:py-8">
+        <div className="mx-auto max-w-2xl px-4 py-4">
           {/* 1. Header - date nav + greeting */}
           <GreetingHeader
             greeting={greeting}
@@ -167,8 +164,6 @@ function HomeContent() {
               for the three rings directly beneath it. The launcher icon, the
               login screen and the tab title all carry the name already. */}
 
-          <div className="lg:grid lg:grid-cols-[1.05fr_1fr] lg:gap-8 lg:items-start">
-            <div>
           {/* 3. HERO SECTION: Tappable metric circles + sparklines */}
           <DashboardHero
             onMetricTap={handleMetricTap}
@@ -312,13 +307,8 @@ function HomeContent() {
             </div>
           </div>
 
-            </div>
-
-            {/* 5. YOUR PLAN section */}
-            <div className="lg:sticky lg:top-8">
-              <YourPlan date={selectedDate} isToday={isToday} />
-            </div>
-          </div>
+          {/* 5. YOUR PLAN section */}
+          <YourPlan date={selectedDate} isToday={isToday} />
         </div>
 
         {/* MetricDetailSheet — rendered at page level */}

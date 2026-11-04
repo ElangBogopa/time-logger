@@ -340,7 +340,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isPending && <Clock className="h-5 w-5 text-amber-500" />}
+            {isPending && <Clock className="h-5 w-5 text-[#B5A07A]" />}
             {getDialogTitle()}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -359,19 +359,19 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
             <div className="space-y-4">
               {/* Add Times Prompt */}
               {showTimesPrompt && (
-                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+                <div className="rounded-lg border border-[#B5A07A]/20 bg-[#B5A07A]/10 p-3">
                   <div className="flex items-start gap-2">
-                    <Clock className="h-5 w-5 text-amber-400 mt-0.5" />
+                    <Clock className="h-5 w-5 text-[#CBB894] mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-amber-300">
+                      <p className="text-sm font-medium text-[#CBB894]">
                         Add start and end times?
                       </p>
-                      <p className="mt-0.5 text-xs text-amber-400/80">
+                      <p className="mt-0.5 text-xs text-[#CBB894]/80">
                         This entry was placed on the timeline using estimated times. Add actual times for more accurate tracking.
                       </p>
                       <button
                         onClick={() => setShowTimesPrompt(false)}
-                        className="mt-2 text-xs text-amber-400 hover:text-amber-300"
+                        className="mt-2 text-xs text-[#CBB894] hover:text-[#CBB894]"
                       >
                         Dismiss
                       </button>
@@ -428,7 +428,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                 <Label htmlFor="edit-duration">
                   Duration (minutes)
                   {isDurationAutoCalculated && (
-                    <span className="ml-2 text-xs text-blue-400">Auto-calculated</span>
+                    <span className="ml-2 text-xs text-[#93AEC9]">Auto-calculated</span>
                   )}
                 </Label>
                 <Input
@@ -460,15 +460,15 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
               {isPending && (
                 <div className={`rounded-lg border p-4 ${
                   isReadyToConfirm
-                    ? 'border-amber-500/30 bg-amber-500/10'
+                    ? 'border-[#B5A07A]/30 bg-[#B5A07A]/10'
                     : 'border-zinc-500/30 bg-zinc-500/10'
                 }`}>
                   {isReadyToConfirm ? (
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                      <CheckCircle2 className="h-5 w-5 text-[#B5A07A] mt-0.5 shrink-0" />
                       <div>
-                        <p className="font-medium text-amber-400">Did this happen as planned?</p>
-                        <p className="mt-1 text-sm text-amber-500/80">
+                        <p className="font-medium text-[#CBB894]">Did this happen as planned?</p>
+                        <p className="mt-1 text-sm text-[#B5A07A]/80">
                           Confirm this entry to finalize it with AI categorization and commentary.
                         </p>
                       </div>
@@ -644,7 +644,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                 <Button
                   onClick={handleConfirmEntry}
                   disabled={isConfirming}
-                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                  className="bg-[#B5A07A] hover:bg-[#B5A07A] text-white"
                 >
                   {isConfirming ? (
                     <>

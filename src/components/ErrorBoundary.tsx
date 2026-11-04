@@ -49,15 +49,15 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-[400px] items-center justify-center p-4">
           <div className="max-w-md text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
-              <AlertTriangle className="h-8 w-8 text-red-500" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#A8706A]/10">
+              <AlertTriangle className="h-8 w-8 text-[#A8706A]" />
             </div>
             <h2 className="text-xl font-semibold text-foreground">Something went wrong</h2>
             <p className="mt-2 text-muted-foreground">
               An unexpected error occurred. Try refreshing the page or going back.
             </p>
             {process.env.NODE_ENV === 'development' && this.state.error && (
-              <pre className="mt-4 rounded-lg bg-red-500/10 p-4 text-left text-xs text-red-400 overflow-auto max-h-40">
+              <pre className="mt-4 rounded-lg bg-[#A8706A]/10 p-4 text-left text-xs text-[#C79089] overflow-auto max-h-40">
                 {this.state.error.message}
               </pre>
             )}
