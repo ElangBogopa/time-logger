@@ -4,13 +4,16 @@ import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import {
   TimeEntry,
-  SessionCompletion,
   getLocalDateString,
 } from '@/lib/types'
+import { EntryRow, calcBody, calcFocus, calcSocial, countMetricsOnTarget } from '@/lib/metrics-calc'
 
 interface DayPixel {
   date: string
-  score: number | null // null = no data
+  /** Body, Mind and Heart for the day, or null when nothing was logged. */
+  metrics: { body: number; focus: number; social: number } | null
+  /** How many of the three reached their target: the grid's colour. */
+  onTarget: number
   entryCount: number
   totalMinutes: number
 }
@@ -33,27 +36,18 @@ export async function GET(request: NextRequest) {
   const yearEnd = `${year}-12-31`
 
   try {
-    // Fetch all confirmed entries for the year
-    const [entriesResult, completionsResult] = await Promise.all([
-      supabase
-        .from('time_entries')
-        .select('date, category, duration_minutes, status')
-        .eq('user_id', userId)
-        .eq('status', 'confirmed')
-        .gte('date', yearStart)
-        .lte('date', yearEnd)
-        .order('date'),
-
-      supabase
-        .from('session_completions')
-        .select('date, skipped')
-        .eq('user_id', userId)
-        .gte('date', yearStart)
-        .lte('date', yearEnd),
-    ])
+    // The day is scored from what was logged, so the session_completions
+    // query that used to boost the score by 10 a session is gone with it.
+    const entriesResult = await supabase
+      .from('time_entries')
+      .select('date, category, duration_minutes, status')
+      .eq('user_id', userId)
+      .eq('status', 'confirmed')
+      .gte('date', yearStart)
+      .lte('date', yearEnd)
+      .order('date')
 
     const entries = (entriesResult.data || []) as Pick<TimeEntry, 'date' | 'category' | 'duration_minutes' | 'status'>[]
-    const completions = (completionsResult.data || []) as Pick<SessionCompletion, 'date' | 'skipped'>[]
 
     // Group entries by date
     const entriesByDate = new Map<string, typeof entries>()
@@ -61,14 +55,6 @@ export async function GET(request: NextRequest) {
       const existing = entriesByDate.get(entry.date) || []
       existing.push(entry)
       entriesByDate.set(entry.date, existing)
-    }
-
-    // Group completions by date
-    const completionsByDate = new Map<string, number>()
-    for (const c of completions) {
-      if (!c.skipped) {
-        completionsByDate.set(c.date, (completionsByDate.get(c.date) || 0) + 1)
-      }
     }
 
     // Calculate score for each day
@@ -87,28 +73,28 @@ export async function GET(request: NextRequest) {
       const totalMinutes = dayEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
 
       if (entryCount === 0) {
-        pixels.push({ date: dateStr, score: null, entryCount: 0, totalMinutes: 0 })
+        pixels.push({ date: dateStr, metrics: null, onTarget: 0, entryCount: 0, totalMinutes: 0 })
         continue
       }
 
-      // Calculate score based on activity level
-      const sessionsLogged = completionsByDate.get(dateStr) || 0
-
-      let score: number
-      if (entryCount <= 3) {
-        score = 20 + entryCount * 10
-      } else if (entryCount <= 6) {
-        score = 40 + (entryCount - 3) * 10
-      } else {
-        score = Math.min(100, 60 + (entryCount - 6) * 5)
-      }
-
-      // Boost by session completions
-      if (sessionsLogged > 0) {
-        score = Math.min(100, score + sessionsLogged * 10)
-      }
-
-      pixels.push({ date: dateStr, score, entryCount, totalMinutes })
+      /**
+       * The day's real scores. This used to be 20 + entryCount × 10, rising
+       * with the number of entries and boosted by 10 for each session marked
+       * done — so the grid coloured by how diligently the day was logged,
+       * and six short entries beat four hours of deep work.
+       */
+      const rows = dayEntries as EntryRow[]
+      pixels.push({
+        date: dateStr,
+        metrics: {
+          body: calcBody(rows),
+          focus: calcFocus(rows),
+          social: calcSocial(rows),
+        },
+        onTarget: countMetricsOnTarget(rows),
+        entryCount,
+        totalMinutes,
+      })
     }
 
     return NextResponse.json({ year, pixels })

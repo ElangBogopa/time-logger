@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { STATUS_CLASSES } from '@/lib/palette'
+import { SEQUENTIAL_CLASSES } from '@/lib/palette'
+import { METRIC_LABELS } from '@/lib/metrics-calc'
 import { buildPixelsGrid, columnForDate, WEEKDAYS } from '@/lib/pixels-grid'
 import { getUserToday } from '@/lib/types'
 
@@ -24,7 +25,9 @@ const GAP = 3
 
 interface DayPixel {
   date: string
-  score: number | null
+  metrics: { body: number; focus: number; social: number } | null
+  /** How many of Body, Mind and Heart hit their target that day, 0–3. */
+  onTarget: number
   entryCount: number
   totalMinutes: number
 }
@@ -34,23 +37,25 @@ interface YearPixelsData {
   pixels: DayPixel[]
 }
 
-// Thresholds are the grid's own (70/40 on the day-summary score, which is a
-// different scale from the hero metrics); only the colours changed, from
-// emerald/amber/red-500 to the palette's sage, dusty amber and muted clay.
-const NO_DATA_CLASS = 'bg-zinc-200 dark:bg-zinc-700/50'
-
-function getScoreColor(score: number | null): string {
-  if (score === null) return NO_DATA_CLASS
-  if (score >= 70) return STATUS_CLASSES.green.solid
-  if (score >= 40) return STATUS_CLASSES.yellow.solid
-  return STATUS_CLASSES.red.solid
+/**
+ * One hue, rising with how many of Body, Mind and Heart hit their target
+ * that day. The grid used to colour by a score of its own — 20 + entryCount
+ * × 10, plus 10 per session marked done — so it showed how diligently a day
+ * was logged rather than how it went, and six short entries beat four hours
+ * of deep work.
+ */
+function getDayColor(pixel: DayPixel | null): string {
+  // Nothing logged and a logged day that met no target are different things,
+  // and used to be the same grey square.
+  if (!pixel || pixel.metrics === null) return SEQUENTIAL_CLASSES[0]
+  return SEQUENTIAL_CLASSES[Math.min(3, pixel.onTarget) + 1]
 }
 
-function getScoreLabel(score: number | null): string {
-  if (score === null) return 'No data'
-  if (score >= 70) return 'Great day'
-  if (score >= 40) return 'Okay day'
-  return 'Rough day'
+function getDayLabel(pixel: DayPixel | null): string {
+  if (!pixel || pixel.metrics === null) return 'Nothing logged'
+  if (pixel.onTarget === 0) return 'No targets met'
+  if (pixel.onTarget === 3) return 'All three on target'
+  return `${pixel.onTarget} of 3 on target`
 }
 
 function formatMinutes(minutes: number): string {
@@ -134,15 +139,12 @@ export default function YearInPixelsPage() {
 
   // Calculate stats
   const stats = pixelsData ? (() => {
-    const daysWithData = pixelsData.pixels.filter(p => p.score !== null)
-    const greatDays = daysWithData.filter(p => p.score! >= 70).length
-    const okayDays = daysWithData.filter(p => p.score! >= 40 && p.score! < 70).length
-    const roughDays = daysWithData.filter(p => p.score! < 40).length
-    const avgScore = daysWithData.length > 0
-      ? Math.round(daysWithData.reduce((sum, p) => sum + p.score!, 0) / daysWithData.length)
-      : 0
+    const daysWithData = pixelsData.pixels.filter(p => p.metrics !== null)
+    const allThree = daysWithData.filter(p => p.onTarget === 3).length
+    const someTargets = daysWithData.filter(p => p.onTarget > 0 && p.onTarget < 3).length
+    const noTargets = daysWithData.filter(p => p.onTarget === 0).length
 
-    return { total: daysWithData.length, greatDays, okayDays, roughDays, avgScore }
+    return { total: daysWithData.length, allThree, someTargets, noTargets }
   })() : null
 
   if (status === 'loading') {
@@ -215,10 +217,10 @@ export default function YearInPixelsPage() {
             {stats && stats.total > 0 && (
               <div className="mb-6 grid grid-cols-4 gap-3">
                 {[
-                  { value: stats.avgScore, label: 'Average', color: 'text-foreground' },
-                  { value: stats.greatDays, label: 'Great', color: STATUS_CLASSES.green.icon },
-                  { value: stats.okayDays, label: 'Okay', color: STATUS_CLASSES.yellow.icon },
-                  { value: stats.roughDays, label: 'Rough', color: STATUS_CLASSES.red.icon },
+                  { value: stats.total, label: 'Days logged', color: 'text-foreground' },
+                  { value: stats.allThree, label: 'All three', color: 'text-foreground' },
+                  { value: stats.someTargets, label: 'One or two', color: 'text-muted-foreground' },
+                  { value: stats.noTargets, label: 'None met', color: 'text-muted-foreground' },
                 ].map(({ value, label, color }) => (
                   <div key={label} className="rounded-lg bg-secondary p-3 text-center">
                     <p className={`metric-number ${color}`}>{value}</p>
@@ -281,7 +283,8 @@ export default function YearInPixelsPage() {
                         }
                         const pixel = pixelsByDate.get(date) ?? {
                           date,
-                          score: null,
+                          metrics: null,
+                          onTarget: 0,
                           entryCount: 0,
                           totalMinutes: 0,
                         }
@@ -290,11 +293,11 @@ export default function YearInPixelsPage() {
                             key={date}
                             onClick={() => setSelectedDay(pixel)}
                             style={position}
-                            title={`${formatDate(date)} — ${getScoreLabel(pixel.score)}`}
-                            className={`rounded-[2px] transition-transform hover:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getScoreColor(pixel.score)} ${
+                            title={`${formatDate(date)} — ${getDayLabel(pixel)}`}
+                            className={`rounded-[2px] transition-transform hover:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getDayColor(pixel)} ${
                               date === today ? 'ring-1 ring-foreground/50' : ''
                             }`}
-                            aria-label={`${date}: ${getScoreLabel(pixel.score)}`}
+                            aria-label={`${date}: ${getDayLabel(pixel)}`}
                           />
                         )
                       })
@@ -307,10 +310,11 @@ export default function YearInPixelsPage() {
             {/* Legend */}
             <div className="mt-3 flex items-center justify-end gap-4 text-xs text-muted-foreground">
               {[
-                { swatch: NO_DATA_CLASS, label: 'No data' },
-                { swatch: STATUS_CLASSES.red.solid, label: 'Under 40' },
-                { swatch: STATUS_CLASSES.yellow.solid, label: '40–69' },
-                { swatch: STATUS_CLASSES.green.solid, label: '70+' },
+                { swatch: SEQUENTIAL_CLASSES[0], label: 'Not logged' },
+                { swatch: SEQUENTIAL_CLASSES[1], label: 'None' },
+                { swatch: SEQUENTIAL_CLASSES[2], label: '1' },
+                { swatch: SEQUENTIAL_CLASSES[3], label: '2' },
+                { swatch: SEQUENTIAL_CLASSES[4], label: '3 on target' },
               ].map(({ swatch, label }) => (
                 <span key={label} className="flex items-center gap-1.5">
                   <span className={`inline-block h-3 w-3 rounded-[2px] ${swatch}`} />
@@ -330,24 +334,24 @@ export default function YearInPixelsPage() {
               {selectedDay ? formatDate(selectedDay.date) : ''}
             </DialogTitle>
             <DialogDescription>
-              {selectedDay ? getScoreLabel(selectedDay.score) : ''}
+              {selectedDay ? getDayLabel(selectedDay) : ''}
             </DialogDescription>
           </DialogHeader>
 
           {selectedDay && (
             <div className="space-y-4">
-              {/* Score */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-zinc-500">Day Score</span>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-block h-4 w-4 rounded-full ${getScoreColor(selectedDay.score)}`}
-                  />
-                  <span className="text-lg font-bold text-foreground">
-                    {selectedDay.score !== null ? selectedDay.score : '—'}
-                  </span>
+              {/* The three scores themselves, rather than one number
+                  standing in for them */}
+              {selectedDay.metrics && (
+                <div className="grid grid-cols-3 gap-2">
+                  {(['body', 'focus', 'social'] as const).map((metric) => (
+                    <div key={metric} className="rounded-lg bg-secondary p-3 text-center">
+                      <p className="metric-number text-foreground">{selectedDay.metrics![metric]}</p>
+                      <p className="field-label mt-1">{METRIC_LABELS[metric]}</p>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
 
               {/* Entries */}
               <div className="flex items-center justify-between">

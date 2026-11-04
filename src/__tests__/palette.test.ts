@@ -9,7 +9,7 @@
  * copy of this map was typed `Record<string, …>` and silently lost `faith`.
  */
 
-import { AGGREGATED_HEX, AGGREGATED_CLASSES, METRIC_HEX, STATUS_HEX, STATUS_CLASSES } from '@/lib/palette'
+import { AGGREGATED_HEX, AGGREGATED_CLASSES, METRIC_HEX, STATUS_HEX, STATUS_CLASSES, SEQUENTIAL_CLASSES } from '@/lib/palette'
 import { ENERGY_VIEW } from '@/lib/types'
 import type { AggregatedCategory } from '@/lib/types'
 
@@ -66,4 +66,17 @@ it('keeps every colour muted', () => {
   for (const hex of [...Object.values(AGGREGATED_HEX), ...Object.values(STATUS_HEX), ...Object.values(METRIC_HEX)]) {
     expect(saturation(hex)).toBeLessThan(0.45)
   }
+})
+
+it('ramps the year grid in one hue, from empty to full', () => {
+  // A heatmap wants one colour getting stronger, not three categories: a
+  // day with one target met is not "bad", it is less than a day with three.
+  // Five steps: nothing logged, then none / one / two / three on target.
+  // The first two were one square until a screenshot showed a logged day
+  // that met no target looking exactly like a day off.
+  expect(SEQUENTIAL_CLASSES).toHaveLength(5)
+  for (const step of SEQUENTIAL_CLASSES.slice(1)) {
+    expect(step).toContain(AGGREGATED_HEX.body)
+  }
+  expect(SEQUENTIAL_CLASSES[0]).not.toContain('#')
 })

@@ -80,6 +80,22 @@ export const METRIC_TEXT_HEX = {
   social: '#C0A3AC',
 } as const
 
+/**
+ * A sequential ramp for the year grid: one hue at rising strength, the way a
+ * heatmap should read. Not the red/amber/green status set — those three are
+ * categories, and a day with one target met is not "bad", it is less than a
+ * day with three.
+ */
+export const SEQUENTIAL_CLASSES = [
+  // index 0 is "nothing logged", which is not the same as a logged day that
+  // met no target — that is index 1, faint but present.
+  'bg-zinc-200 dark:bg-zinc-700/50',
+  'bg-[#7D9B8A]/15',
+  'bg-[#7D9B8A]/40',
+  'bg-[#7D9B8A]/70',
+  'bg-[#7D9B8A]',
+] as const
+
 /** Status colours, in the same family: sage, dusty amber, muted clay. */
 export const STATUS_HEX = {
   green: AGGREGATED_HEX.body,

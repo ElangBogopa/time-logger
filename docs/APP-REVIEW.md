@@ -135,7 +135,9 @@ and it lives behind a tab.
 
 **5. An honest empty state.** With no entries, the dashboard shows three
 zeros, which reads as failure rather than as "nothing logged yet". Zero and
-unknown are different states and should look different.
+unknown are different states and should look different. *(Done in the year
+grid, where a logged day that met no target used to be the same grey square
+as a day off. The dashboard's three zeros are still outstanding.)*
 
 ---
 

@@ -171,12 +171,14 @@ time_entries (
 6. **One scoring system**: Body / Mind / Heart, from `lib/metrics-calc.ts`,
    on a saturating curve where the target scores 80 and 100 is unreachable.
    Anywhere that wants "a number for this day or week" shows those three
-   (`components/MetricRings.tsx`), never a new formula. Four had grown: the
+   (`components/MetricRings.tsx`), never a new formula. Four had grown — the
    day review scored sessions logged ÷ sessions passed, the weekly review
-   scored active days plus entries per day, the session popup had a third,
-   and `/api/year-pixels` still has a fourth. They all measured how
-   diligently you logged, all on the same 0–100 dial, and all hit 100 for
-   showing up.
+   scored active days plus entries per day, the session popup had a third
+   and the year grid a fourth. All measured how diligently you logged, all
+   on the same 0–100 dial, and all hit 100 for showing up. Where only one
+   value fits, as in the year grid, use `countMetricsOnTarget` — how many of
+   the three reached their target — rather than averaging them or inventing
+   a scale.
 7. **No loading flash on navigation**: Every component that fetches data MUST cache its state in `sessionStorage`. On re-mount, load from cache instantly (no spinner), then refresh data silently in the background. Pattern:
    ```typescript
    // Load from cache — no spinner if cached

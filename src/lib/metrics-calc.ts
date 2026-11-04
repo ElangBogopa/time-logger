@@ -120,6 +120,22 @@ export function getStatusColor(value: number, thresholds: { green: number; yello
   return 'red'
 }
 
+/**
+ * A day reduced to one number, for the places that can only show one.
+ *
+ * It is how many of Body, Mind and Heart reached their target that day — 0
+ * to 3 — rather than an average of the three. Averaging three saturating
+ * scores puts almost every real day in the middle: hitting the deep-work
+ * target and nothing else gives 80, 0, 0 → 27, which reads as a bad day when
+ * it was a focused one. Counting targets says something true at a glance and
+ * needs no threshold of its own: it reuses the 80 that already means "you
+ * did what you set out to do".
+ */
+export function countMetricsOnTarget(dayEntries: EntryRow[]): number {
+  const scores = [calcBody(dayEntries), calcFocus(dayEntries), calcSocial(dayEntries)]
+  return scores.filter((score) => score >= METRIC_THRESHOLDS.green).length
+}
+
 export function getDateNDaysAgo(baseDate: string, n: number): string {
   const d = new Date(baseDate + 'T12:00:00')
   d.setDate(d.getDate() - n)
