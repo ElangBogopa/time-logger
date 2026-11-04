@@ -116,7 +116,7 @@ export default function CommitTimeModal({
           <div className="mb-2">
             <div className="flex items-center gap-2">
               <div className="w-[120px]">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Start</label>
+                <label className="field-label">Start</label>
                 <input
                   type="time"
                   value={startTime}
@@ -126,7 +126,7 @@ export default function CommitTimeModal({
               </div>
               <span className="text-muted-foreground/30 mt-4 text-xs">–</span>
               <div className="w-[120px]">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">End</label>
+                <label className="field-label">End</label>
                 <input
                   type="time"
                   value={endTime}

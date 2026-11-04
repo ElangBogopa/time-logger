@@ -170,7 +170,7 @@ export default function TimeRangePicker({
               : 'border-dashed border-input bg-muted/30 text-muted-foreground hover:border-ring hover:bg-background'
           }`}
         >
-          <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="block field-label">
             Start
           </span>
           <span className="mt-0.5 block">
@@ -198,7 +198,7 @@ export default function TimeRangePicker({
               : 'border-dashed border-input bg-muted/30 text-muted-foreground hover:border-ring hover:bg-background'
           }`}
         >
-          <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="block field-label">
             End
           </span>
           <span className="mt-0.5 block">

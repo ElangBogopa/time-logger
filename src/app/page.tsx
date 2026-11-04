@@ -18,6 +18,7 @@ import YourPlan from '@/components/YourPlan'
 import { Sun, Cloud, Moon, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
+import { AGGREGATED_CLASSES, STATUS_CLASSES } from '@/lib/palette'
 
 // Dynamic import MetricDetailSheet to keep Recharts out of initial bundle
 const MetricDetailSheet = dynamic(
@@ -142,7 +143,10 @@ function HomeContent() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
-        <div className="mx-auto max-w-2xl px-4 py-4">
+        {/* One column on a phone, two above lg. The app was a 420px strip
+            centred in whatever window it was opened in, with the rest of the
+            screen empty. */}
+        <div className="mx-auto max-w-2xl px-4 py-4 lg:max-w-5xl lg:py-8">
           {/* 1. Header - date nav + greeting */}
           <GreetingHeader
             greeting={greeting}
@@ -159,11 +163,12 @@ function HomeContent() {
             </p>
           )}
 
-          {/* 2. Brand wordmark */}
-          <p className="text-center text-[13px] font-bold uppercase tracking-[0.3em] text-muted-foreground mb-3">
-            Better
-          </p>
+          {/* The letter-spaced BETTER that used to sit here read as a label
+              for the three rings directly beneath it. The launcher icon, the
+              login screen and the tab title all carry the name already. */}
 
+          <div className="lg:grid lg:grid-cols-[1.05fr_1fr] lg:gap-8 lg:items-start">
+            <div>
           {/* 3. HERO SECTION: Tappable metric circles + sparklines */}
           <DashboardHero
             onMetricTap={handleMetricTap}
@@ -174,7 +179,7 @@ function HomeContent() {
 
           {/* 4. YOUR DAY section */}
           <div className="mt-4">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            <h3 className="eyebrow mb-3">
               Your Day
             </h3>
 
@@ -222,7 +227,7 @@ function HomeContent() {
             {/* Sessions card */}
             <div className="rounded-xl bg-card border border-border p-4 mb-3">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <h3 className="eyebrow">
                   Sessions
                 </h3>
               </div>
@@ -240,27 +245,28 @@ function HomeContent() {
                   const hasEntries = info.hasEntries
                   const isPartial = hasEntries && !isDone
 
-                  // Background styles
+                  // Done and partial take the status colours from the one
+                  // palette — sage and dusty amber, not green-500 and
+                  // amber-500, which were the loudest thing on the screen.
                   const bgClass = isDone
-                    ? 'bg-green-500/10 border border-green-500/20'
+                    ? `${STATUS_CLASSES.green.tint} border ${STATUS_CLASSES.green.border}`
                     : isPartial
-                      ? 'bg-amber-500/10 border border-amber-500/20'
+                      ? `${STATUS_CLASSES.yellow.tint} border ${STATUS_CLASSES.yellow.border}`
                       : isActive
                         ? 'bg-accent border border-primary/20'
                         : 'bg-secondary/50 border border-transparent hover:bg-accent/50'
 
-                  // Icon container styles
                   const iconBgClass = isDone
-                    ? 'bg-green-500/15'
+                    ? STATUS_CLASSES.green.iconBg
                     : isPartial
-                      ? 'bg-amber-500/15'
-                      : isActive ? 'bg-blue-500/15' : 'bg-secondary'
+                      ? STATUS_CLASSES.yellow.iconBg
+                      : isActive ? AGGREGATED_CLASSES.focus.tint : 'bg-secondary'
 
                   const iconColorClass = isDone
-                    ? 'text-green-500'
+                    ? STATUS_CLASSES.green.icon
                     : isPartial
-                      ? 'text-amber-500'
-                      : isActive ? 'text-blue-500' : 'text-muted-foreground'
+                      ? STATUS_CLASSES.yellow.icon
+                      : isActive ? AGGREGATED_CLASSES.focus.text : 'text-muted-foreground'
 
                   // Subtitle text
                   const subtitle = (isDone || hasEntries)
@@ -288,7 +294,6 @@ function HomeContent() {
                           {subtitle}
                         </p>
                       </div>
-                      <ChevronRight className={`h-4 w-4 ${isActive ? 'text-muted-foreground' : 'text-muted-foreground/50'}`} />
                     </button>
                   )
                 })}
@@ -296,8 +301,13 @@ function HomeContent() {
             </div>
           </div>
 
-          {/* 5. YOUR PLAN section */}
-          <YourPlan date={selectedDate} isToday={isToday} />
+            </div>
+
+            {/* 5. YOUR PLAN section */}
+            <div className="lg:sticky lg:top-8">
+              <YourPlan date={selectedDate} isToday={isToday} />
+            </div>
+          </div>
         </div>
 
         {/* MetricDetailSheet — rendered at page level */}

@@ -1,5 +1,7 @@
 'use client'
 
+import { STATUS_CLASSES } from '@/lib/palette'
+
 interface StatusDeltaProps {
   /** Numeric delta value (positive = good, negative = bad, 0 = neutral, null = unavailable) */
   value: number | null | undefined
@@ -38,7 +40,7 @@ export function StatusDelta({ value, size = 'sm', label }: StatusDeltaProps) {
 
   if (value > 0) {
     return (
-      <span className={`${sizeClass} font-medium text-green-400 inline-flex items-center gap-0.5`}>
+      <span className={`${sizeClass} font-medium ${STATUS_CLASSES.green.text} inline-flex items-center gap-0.5`}>
         ▲ {value}{label ? ` ${label}` : ''}
       </span>
     )
@@ -46,7 +48,7 @@ export function StatusDelta({ value, size = 'sm', label }: StatusDeltaProps) {
 
   if (value < 0) {
     return (
-      <span className={`${sizeClass} font-medium text-red-400 inline-flex items-center gap-0.5`}>
+      <span className={`${sizeClass} font-medium ${STATUS_CLASSES.red.text} inline-flex items-center gap-0.5`}>
         ▼ {Math.abs(value)}{label ? ` ${label}` : ''}
       </span>
     )

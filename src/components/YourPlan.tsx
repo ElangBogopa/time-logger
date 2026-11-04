@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Target, ChevronRight, Loader2, Flame } from 'lucide-react'
 import { getUserToday } from '@/lib/types'
 import { fetchGoals, type Goal } from '@/lib/goals'
+import { STATUS_CLASSES } from '@/lib/palette'
 
 interface StreakData {
   planning: { current: number; best: number; label: string }
@@ -73,7 +74,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
   if (isLoading) {
     return (
       <div className="mt-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+        <h3 className="eyebrow mb-3">
           Your Plan
         </h3>
         <div className="rounded-xl bg-card border border-border p-4">
@@ -94,20 +95,20 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
 
   return (
     <div className="mt-4">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+      <h3 className="eyebrow mb-3">
         Your Plan
       </h3>
 
       {/* Streaks card — only visible when a real streak exists (3+ days) */}
       {showStreaks && (
         <div className="rounded-xl bg-card border border-border p-4 mb-3">
-          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Streaks</h4>
+          <h4 className="eyebrow mb-3">Streaks</h4>
           <div className={`flex items-center ${showProductive && showCrushing ? 'gap-4' : ''}`}>
             {/* Productive Day streak — completed #1 task */}
             {showProductive && (
               <div className="flex-1 flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/15">
-                  <Target className="h-4 w-4 text-green-500" />
+                <div className={`flex h-9 w-9 items-center justify-center rounded-full ${STATUS_CLASSES.green.iconBg}`}>
+                  <Target className={`h-4 w-4 ${STATUS_CLASSES.green.icon}`} />
                 </div>
                 <div>
                   <div className="flex items-baseline gap-1">
@@ -133,8 +134,8 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
             {/* Crushing It streak — completed 3+ tasks */}
             {showCrushing && (
               <div className="flex-1 flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500/15">
-                  <Flame className="h-4 w-4 text-orange-500" />
+                <div className={`flex h-9 w-9 items-center justify-center rounded-full ${STATUS_CLASSES.yellow.iconBg}`}>
+                  <Flame className={`h-4 w-4 ${STATUS_CLASSES.yellow.icon}`} />
                 </div>
                 <div>
                   <div className="flex items-baseline gap-1">
@@ -158,7 +159,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
       {/* Goal pills card */}
       {goals.length > 0 ? (
         <div className="rounded-xl bg-card border border-border p-4">
-          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Goals</h4>
+          <h4 className="eyebrow mb-3">Goals</h4>
           <div className="space-y-2">
             {goals.map(goal => (
               <button
@@ -186,7 +187,7 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
         </div>
       ) : (
         <div className="rounded-xl bg-card border border-border p-4">
-          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Goals</h4>
+          <h4 className="eyebrow mb-3">Goals</h4>
           <p className="text-sm text-muted-foreground/60 text-center py-2">
             No goals set yet
           </p>

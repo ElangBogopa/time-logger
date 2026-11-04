@@ -126,7 +126,64 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Geist has been loaded by next/font since the app was built, and wired
+       to --font-sans above, but nothing ever applied it: Tailwind's preflight
+       left the browser default on <html>, so every screen rendered in
+       ui-sans-serif. */
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Type scale
+   The app had ten arbitrary sizes — text-[10px] through
+   text-[22px] — spread over fifteen files, so the same kind of
+   label was a different size depending on the screen. These are
+   the three that carry structure; everything else uses Tailwind's
+   own scale.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Section labels: YOUR DAY, SESSIONS, YOUR PLAN. They carry the page's
+   structure and were its least visible element — 11px semibold at
+   muted-foreground. Now 12px at full contrast. Add `opacity-70` where a
+   label is genuinely secondary, such as the date navigator. */
+@utility eyebrow {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--foreground);
+}
+
+/* Field labels inside modals and pickers. Deliberately quieter than
+   `eyebrow`: these sit above the value they describe and should not compete
+   with it. Replaces four different 10–12px combinations. */
+@utility field-label {
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+/* Any number the eye returns to: ring values, scores, totals. Tabular so
+   digits do not shift as the value changes. */
+@utility metric-number {
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one heading per screen. */
+@utility page-title {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 /* Safe area utilities for iOS notch/home indicator */

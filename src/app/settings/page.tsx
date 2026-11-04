@@ -9,7 +9,7 @@ import { BookOpen, Calendar, ChevronRight, LogOut, Loader2, Star, MessageSquare,
 // ── Section label ──
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-4 mb-2 mt-6 first:mt-0">
+    <h2 className="eyebrow px-4 mb-2 mt-6 first:mt-0">
       {children}
     </h2>
   )
@@ -209,7 +209,7 @@ export default function MorePage() {
       <div className="mx-auto max-w-2xl py-6">
         {/* Header */}
         <header className="px-4 mb-2">
-          <h1 className="text-2xl font-bold text-foreground">More</h1>
+          <h1 className="page-title text-foreground">More</h1>
         </header>
 
         {/* Account & Settings */}

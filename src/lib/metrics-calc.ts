@@ -80,9 +80,13 @@ export const SOCIAL_TARGET = 60 // 1 hour with people, or in prayer
 // ── Color / Label / Nudge thresholds ──
 // Green is 80 on all three now, because 80 means the same thing on all three:
 // you hit the target. Yellow at 50 is roughly 43% of it.
-export const FOCUS_THRESHOLDS = { green: 80, yellow: 50 }
-export const BODY_THRESHOLDS = { green: 80, yellow: 50 }
-export const SOCIAL_THRESHOLDS = { green: 80, yellow: 50 }
+export const METRIC_THRESHOLDS = { green: 80, yellow: 50 }
+// The three names are kept because the routes read one per metric, but there
+// is one line to change. chart-colors.ts used to carry its own 70/40 pair, so
+// a weekly bar turned green ten points before the ring it came from did.
+export const FOCUS_THRESHOLDS = METRIC_THRESHOLDS
+export const BODY_THRESHOLDS = METRIC_THRESHOLDS
+export const SOCIAL_THRESHOLDS = METRIC_THRESHOLDS
 
 /**
  * Load → score, the Whoop way: accumulate load linearly, show it on a scale
@@ -271,5 +275,5 @@ export function getNudge(
     if (lowest.name === METRIC_LABELS.focus) return 'One more focus session pushes you to green.'
     return 'Make time for people today — Heart is slipping.'
   }
-  return 'All metrics looking strong. Keep it up! 🔥'
+  return 'All three metrics are strong today.'
 }

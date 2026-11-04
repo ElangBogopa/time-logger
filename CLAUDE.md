@@ -116,6 +116,7 @@ src/
 ├── hooks/                    # Data fetching + timeline interaction hooks
 ├── lib/
 │   ├── types.ts              # TimeEntry, TimeCategory, date + domain helpers
+│   ├── palette.ts            # Every data colour, defined once
 │   ├── time-utils.ts         # Time formatting, calculations
 │   ├── supabase-server.ts    # Supabase client (server-side; the only one)
 │   ├── auth.ts               # NextAuth options
@@ -147,10 +148,22 @@ time_entries (
 ## Design Principles
 
 1. **Mobile-first**: Touch targets 44px+, hold-to-drag, responsive layouts
-2. **Muted palette**: Slate/zinc tones, no bright neons. Category colors are desaturated.
+2. **Muted palette**: Slate/zinc tones, no bright neons. Every colour the app
+   paints data with — categories, the three hero rings, status, score bars —
+   comes from `lib/palette.ts`. Each hero metric takes the colour of the
+   bucket it is computed from (Body→body, Mind→focus, Heart→connection), so a
+   ring matches the timeline blocks that filled it. The Tailwind classes there
+   are written out as literals on purpose: Tailwind v4 scans source text, so
+   `bg-[${hex}]` built at runtime emits no CSS. `palette.test.ts` checks the
+   literals against the hexes and rejects anything as saturated as a Tailwind
+   500.
 3. **Minimal UI**: shadcn/ui for consistency, no unnecessary chrome
 4. **Progressive disclosure**: Quick log for speed, modal for details
-5. **No loading flash on navigation**: Every component that fetches data MUST cache its state in `sessionStorage`. On re-mount, load from cache instantly (no spinner), then refresh data silently in the background. Pattern:
+5. **One type scale**: `eyebrow` (section labels), `field-label` (quieter
+   labels inside modals), `metric-number` and `page-title`, all defined as
+   Tailwind utilities in `globals.css`. Reach for one of those before writing
+   another `text-[11px] uppercase tracking-wider`.
+6. **No loading flash on navigation**: Every component that fetches data MUST cache its state in `sessionStorage`. On re-mount, load from cache instantly (no spinner), then refresh data silently in the background. Pattern:
    ```typescript
    // Load from cache — no spinner if cached
    const cached = (() => {
@@ -164,8 +177,8 @@ time_entries (
    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: newData }))
    ```
    This prevents the "spinner flash" when navigating back to previously-visited pages.
-6. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
-7. **Planning vs Execution separation**: The goal/productivity page is for PLANNING only (no interactive checkboxes). Task completion ONLY happens from session pages (post-session popup) where each completion is tagged with the session period (morning/afternoon/evening).
+7. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
+8. **Planning vs Execution separation**: The goal/productivity page is for PLANNING only (no interactive checkboxes). Task completion ONLY happens from session pages (post-session popup) where each completion is tagged with the session period (morning/afternoon/evening).
 
 ## Quick Commands
 

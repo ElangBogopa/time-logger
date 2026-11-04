@@ -32,78 +32,39 @@ import {
 import { cn } from '@/lib/utils'
 import {
   TimeCategory,
+  CATEGORY_LABELS,
   MoodCheckin,
   MOOD_EMOJIS,
   SESSION_MOOD_CONFIG,
   TimeEntry,
   AggregatedCategory,
+  getAggregatedCategory,
   getUserToday,
   getUserCurrentHour,
 } from '@/lib/types'
+import { AGGREGATED_CLASSES, STATUS_CLASSES } from '@/lib/palette'
 
-// Map each TimeCategory → aggregated category (mirrors ENERGY_VIEW)
-const CATEGORY_TO_AGGREGATED: Record<TimeCategory, AggregatedCategory> = {
-  deep_work: 'focus',
-  learning: 'focus',
-  creating: 'focus',
-  shallow_work: 'ops',
-  meetings: 'ops',
-  admin: 'ops',
-  errands: 'ops',
-  chores: 'ops',
-  commute: 'ops',
-  exercise: 'body',
-  movement: 'body',
-  meals: 'body',
-  sleep: 'body',
-  rest: 'recovery',
-  self_care: 'recovery',
-  social: 'connection',
-  calls: 'connection',
-  entertainment: 'escape',
-  faith: 'faith',
-  other: 'escape',
-}
+/**
+ * Colours come from the one palette, and the category → bucket mapping from
+ * types.ts. Both were declared again here, and this copy put `other` in
+ * escape where ENERGY_VIEW puts it in ops — so an uncategorised hour was
+ * painted as leisure on the timeline strip and scored as work everywhere
+ * else.
+ */
+const byBucket = (key: 'bg' | 'text') =>
+  Object.fromEntries(
+    Object.entries(AGGREGATED_CLASSES).map(([bucket, classes]) => [bucket, classes[key]])
+  ) as Record<AggregatedCategory, string>
 
-// Muted 6-color palette for aggregated categories
-const AGGREGATED_HEX: Record<AggregatedCategory, string> = {
-  focus: '#6B8CAE',      // Slate blue
-  ops: '#8B8680',        // Warm gray
-  body: '#7D9B8A',       // Sage green
-  recovery: '#B5A07A',   // Dusty amber
-  connection: '#A0848E', // Muted rose
-  faith: '#8A7CA8',
-  escape: '#7A7D82',     // Cool gray
-}
-
-// Category colors for timeline strip — uses aggregated hex colors
-const CATEGORY_COLORS: Record<TimeCategory, string> = Object.fromEntries(
-  (Object.keys(CATEGORY_TO_AGGREGATED) as TimeCategory[]).map(cat => [
+const CATEGORY_COLORS = Object.fromEntries(
+  (Object.keys(CATEGORY_LABELS) as TimeCategory[]).map((cat) => [
     cat,
-    `bg-[${AGGREGATED_HEX[CATEGORY_TO_AGGREGATED[cat]]}]`,
+    AGGREGATED_CLASSES[getAggregatedCategory(cat)].bg,
   ])
 ) as Record<TimeCategory, string>
 
-// Aggregated category colors (for the 6-category energy view)
-const AGGREGATED_COLORS: Record<AggregatedCategory, string> = {
-  focus: 'bg-[#6B8CAE]',
-  ops: 'bg-[#8B8680]',
-  body: 'bg-[#7D9B8A]',
-  recovery: 'bg-[#B5A07A]',
-  connection: 'bg-[#A0848E]',
-  faith: 'bg-[#8A7CA8]',
-  escape: 'bg-[#7A7D82]',
-}
-
-const AGGREGATED_TEXT_COLORS: Record<AggregatedCategory, string> = {
-  focus: 'text-[#6B8CAE]',
-  ops: 'text-[#8B8680]',
-  body: 'text-[#7D9B8A]',
-  recovery: 'text-[#B5A07A]',
-  connection: 'text-[#A0848E]',
-  faith: 'text-[#8A7CA8]',
-  escape: 'text-[#7A7D82]',
-}
+const AGGREGATED_COLORS = byBucket('bg')
+const AGGREGATED_TEXT_COLORS = byBucket('text')
 
 interface Win {
   id: string
@@ -198,15 +159,15 @@ function formatDate(dateStr: string): string {
 // Score Circle Component
 function ScoreCircle({ score, color, size = 'large' }: { score: number; color: 'green' | 'orange' | 'red'; size?: 'small' | 'large' }) {
   const ringColor = {
-    green: 'stroke-green-500',
-    orange: 'stroke-amber-500',
-    red: 'stroke-red-500',
+    green: STATUS_CLASSES.green.stroke,
+    orange: STATUS_CLASSES.yellow.stroke,
+    red: STATUS_CLASSES.red.stroke,
   }
 
   const textColor = {
-    green: 'text-green-500',
-    orange: 'text-amber-500',
-    red: 'text-red-500',
+    green: STATUS_CLASSES.green.icon,
+    orange: STATUS_CLASSES.yellow.icon,
+    red: STATUS_CLASSES.red.icon,
   }
 
   const radius = size === 'large' ? 54 : 36
@@ -256,24 +217,27 @@ function WinsSection({ wins }: { wins: Win[] }) {
   if (wins.length === 0) return null
 
   const winIcons: Record<Win['type'], React.ReactNode> = {
-    goal_met: <Target className="h-4 w-4 text-green-500" />,
-    streak: <Zap className="h-4 w-4 text-amber-500" />,
-    focus: <Clock className="h-4 w-4 text-blue-500" />,
-    improvement: <TrendingUp className="h-4 w-4 text-purple-500" />,
-    balance: <Sparkles className="h-4 w-4 text-pink-500" />,
+    // Five hues, all from the palette: body, recovery, focus, faith,
+    // connection. They were green-500 through pink-500, which made the wins
+    // list the brightest thing in the review.
+    goal_met: <Target className={`h-4 w-4 ${AGGREGATED_CLASSES.body.text}`} />,
+    streak: <Zap className={`h-4 w-4 ${AGGREGATED_CLASSES.recovery.text}`} />,
+    focus: <Clock className={`h-4 w-4 ${AGGREGATED_CLASSES.focus.text}`} />,
+    improvement: <TrendingUp className={`h-4 w-4 ${AGGREGATED_CLASSES.faith.text}`} />,
+    balance: <Sparkles className={`h-4 w-4 ${AGGREGATED_CLASSES.connection.text}`} />,
   }
 
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <Trophy className="h-5 w-5 text-amber-500" />
+        <Trophy className={`h-5 w-5 ${AGGREGATED_CLASSES.recovery.text}`} />
         <h2 className="font-semibold text-foreground">Today&apos;s Wins</h2>
       </div>
       <div className="space-y-2">
         {wins.map(win => (
           <div
             key={win.id}
-            className="flex items-center gap-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 px-3 py-2"
+            className={`flex items-center gap-3 rounded-lg ${STATUS_CLASSES.green.tint} border ${STATUS_CLASSES.green.border} px-3 py-2`}
           >
             {winIcons[win.type]}
             <span className="text-sm text-foreground">{win.text}</span>
@@ -334,7 +298,12 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
 
 // Productivity Plan Card — shows plan completion in Goal Progress
 function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
-  const barColor = score.score >= 80 ? 'bg-green-500' : score.score >= 50 ? 'bg-amber-500' : 'bg-red-400'
+  const barColor =
+    score.score >= 80
+      ? STATUS_CLASSES.green.solid
+      : score.score >= 50
+        ? STATUS_CLASSES.yellow.solid
+        : STATUS_CLASSES.red.solid
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -363,7 +332,9 @@ function ProductivityPlanCard({ score }: { score: ProductivityScore }) {
         {score.tasks.map((task, i) => (
           <div key={i} className={`flex items-center gap-2 text-sm ${task.completed ? 'opacity-50' : ''}`}>
             <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
-              task.completed ? 'border-green-500 bg-green-500' : 'border-zinc-300 dark:border-zinc-600'
+              task.completed
+                ? `${STATUS_CLASSES.green.border.replace('/25', '')} ${STATUS_CLASSES.green.solid}`
+                : 'border-zinc-300 dark:border-zinc-600'
             }`}>
               {task.completed && (
                 <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -665,7 +636,7 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
                   <ArrowLeft className="h-5 w-5" />
                   Back
                 </button>
-                <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+                <h1 className="page-title text-foreground">Day in Review</h1>
               </>
             )}
           </header>
@@ -723,7 +694,7 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
                 <ArrowLeft className="h-5 w-5" />
                 Back
               </button>
-              <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+              <h1 className="page-title text-foreground">Day in Review</h1>
             </>
           )}
           <p className="text-muted-foreground">{formatDate(summary.date)}</p>
@@ -740,14 +711,17 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
         {/* AI Commentary */}
         {(commentary || isLoadingCommentary) && (
           <section className="mb-6">
-            <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200/50 dark:border-indigo-800/50 p-4">
+            {/* Was an indigo→purple gradient with an indigo-500 icon, which
+                made the one piece of writing on the page shout. The muted
+                violet is the same hue, from the palette. */}
+            <div className={`rounded-xl ${AGGREGATED_CLASSES.faith.tint} border ${AGGREGATED_CLASSES.faith.border}/40 p-4`}>
               <div className="flex items-start gap-3">
-                <Sparkles className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5" />
+                <Sparkles className={`h-5 w-5 ${AGGREGATED_CLASSES.faith.text} flex-shrink-0 mt-0.5`} />
                 <div className="flex-1">
                   {isLoadingCommentary ? (
                     <div className="space-y-2 animate-pulse">
-                      <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-full" />
-                      <div className="h-4 bg-indigo-200 dark:bg-indigo-800 rounded w-3/4" />
+                      <div className={`h-4 ${AGGREGATED_CLASSES.faith.tint} rounded w-full`} />
+                      <div className={`h-4 ${AGGREGATED_CLASSES.faith.tint} rounded w-3/4`} />
                     </div>
                   ) : (
                     <>
@@ -809,8 +783,8 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
         {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
           <section className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
-                <Clock className="h-5 w-5 text-blue-500" />
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${AGGREGATED_CLASSES.focus.tint}`}>
+                <Clock className={`h-5 w-5 ${AGGREGATED_CLASSES.focus.text}`} />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Longest focus session</p>

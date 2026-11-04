@@ -507,7 +507,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
               {/* Details Grid */}
               <div className="grid grid-cols-2 gap-4 rounded-lg bg-muted/50 p-4">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="field-label">
                     Date
                   </p>
                   <p className="mt-1 text-sm text-foreground">
@@ -515,7 +515,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="field-label">
                     Duration
                   </p>
                   <p className="mt-1 text-sm text-foreground">
@@ -523,7 +523,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="field-label">
                     Start Time
                   </p>
                   <p className="mt-1 text-sm text-foreground">
@@ -531,7 +531,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="field-label">
                     End Time
                   </p>
                   <p className="mt-1 text-sm text-foreground">
@@ -543,7 +543,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
               {/* Notes */}
               {entry.description && (
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="field-label">
                     Notes
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">

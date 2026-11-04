@@ -315,7 +315,7 @@ export default function GuidePage() {
               <Lightbulb className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Your Ideal Day</h1>
+              <h1 className="page-title text-foreground">Your Ideal Day</h1>
               <p className="text-sm text-muted-foreground">Science-backed daily planning guide</p>
             </div>
           </div>

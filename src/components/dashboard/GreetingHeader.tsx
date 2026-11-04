@@ -1,11 +1,11 @@
 'use client'
 
 import React from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sun, Cloud, Moon } from 'lucide-react'
 import { TimePeriod, shiftDateString } from '@/lib/types'
 
 interface GreetingHeaderProps {
-  greeting: { text: string; emoji: string }
+  greeting: { text: string }
   currentPeriod: TimePeriod
   selectedDate: string        // YYYY-MM-DD
   onDateChange: (date: string) => void
@@ -28,14 +28,18 @@ export default function GreetingHeader({
   onDateChange,
   isToday,
 }: GreetingHeaderProps) {
+  const PeriodIcon = currentPeriod === 'morning' ? Sun : currentPeriod === 'afternoon' ? Cloud : Moon
+
   return (
     <header className="mb-3">
       {/* Greeting — visible for today, invisible placeholder on other dates to keep layout stable */}
       <div className={`flex items-center gap-2 mb-2 ${isToday ? '' : 'invisible'}`}>
-        <span className="text-2xl" role="img" aria-label={currentPeriod}>
-          {greeting.emoji}
-        </span>
-        <h1 className="text-xl font-bold text-foreground">{greeting.text}</h1>
+        {/* The emoji this replaces was the one piece of product copy that
+            did not match the restrained tone of everything around it, and it
+            sat next to the same three icons drawn as line art further down
+            the page. */}
+        <PeriodIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        <h1 className="page-title text-foreground">{greeting.text}</h1>
       </div>
 
       {/* Date navigation bar */}
@@ -47,7 +51,7 @@ export default function GreetingHeader({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px] text-center">
+        <span className="eyebrow opacity-60 min-w-[140px] text-center">
           {formatDateNav(selectedDate, isToday)}
         </span>
         <button

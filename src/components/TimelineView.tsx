@@ -552,7 +552,7 @@ export default function TimelineView({
       {/* Below-timeline hint for discoverability */}
       {updatedIsEmpty && canLog && (
         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-2">
-          💡 Tip: Hold and drag on the timeline to create entries quickly
+          Hold and drag on the timeline to create entries quickly
         </p>
       )}
 

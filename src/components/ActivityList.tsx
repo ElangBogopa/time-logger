@@ -106,7 +106,7 @@ export default function ActivityList({ entries }: ActivityListProps) {
                 {label}
               </p>
               {entry.category && (
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                <p className="field-label">
                   {CATEGORY_LABELS[entry.category]}
                 </p>
               )}

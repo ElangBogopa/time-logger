@@ -5,27 +5,21 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
 import type { TrendAPIResponse } from '@/lib/trend-types'
 import { METRIC_LABELS } from '@/lib/metrics-calc'
+import { METRIC_HEX, METRIC_TEXT_HEX } from '@/lib/palette'
 
 export type { TrendAPIResponse }
 
-/* ── Per-metric color identity ── */
+/**
+ * Per-metric colour identity, from the one palette: each ring is the colour
+ * of the bucket it is computed from, so the ring and the timeline blocks that
+ * filled it match. These were saturated Tailwind 500s with a neon glow,
+ * against CLAUDE.md's "no bright neons".
+ */
 const METRIC_IDENTITY = {
-  body: {
-    active: '#22c55e',
-    track: '#22c55e20',
-    trackDim: '#22c55e10',
-  },
-  focus: {
-    active: '#3b82f6',
-    track: '#3b82f620',
-    trackDim: '#3b82f610',
-  },
-  social: {
-    active: '#f59e0b',
-    track: '#f59e0b20',
-    trackDim: '#f59e0b10',
-  },
-}
+  body: { active: METRIC_HEX.body, text: METRIC_TEXT_HEX.body },
+  focus: { active: METRIC_HEX.focus, text: METRIC_TEXT_HEX.focus },
+  social: { active: METRIC_HEX.social, text: METRIC_TEXT_HEX.social },
+} as const
 
 /* ── Props ── */
 interface DashboardHeroProps {
@@ -57,9 +51,10 @@ function MetricCircle({
   const center = size / 2
   const hasProgress = value > 0
 
-  const trackColor = hasProgress ? identity.track : identity.trackDim
+  // One track colour: the ring reads as a dial, not as two states.
   const activeColor = identity.active
-  const textColor = hasProgress ? activeColor : 'var(--muted-foreground)'
+  const trackColor = 'var(--color-border)'
+  const textColor = hasProgress ? identity.text : 'var(--muted-foreground)'
 
   return (
     <div className="flex flex-col items-center">
@@ -91,27 +86,20 @@ function MetricCircle({
               strokeDashoffset={offset}
               strokeLinecap="round"
               className="transition-all duration-1000 ease-out"
-              style={{ filter: `drop-shadow(0 0 8px ${activeColor}50)` }}
             />
           )}
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span
-            className="text-[22px] font-bold tabular-nums"
-            style={{ color: textColor }}
-            aria-hidden="true"
-          >
+          <span className="metric-number" style={{ color: textColor }} aria-hidden="true">
             {value}
           </span>
         </div>
       </div>
-      <span
-        className={`text-[11px] font-semibold uppercase tracking-wider mt-1 ${
-          hasProgress ? 'text-foreground' : 'text-muted-foreground'
-        }`}
-        aria-hidden="true"
-      >
-        {label} ›
+      {/* Full contrast whether or not there is progress: the number below
+          already says which metrics are empty, and three labels in three
+          different greys was the noisiest part of the hero. */}
+      <span className="eyebrow mt-1.5" aria-hidden="true">
+        {label}
       </span>
     </div>
   )
@@ -194,7 +182,9 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
   return (
     <div className="mb-4">
       {/* Three Metric Circles — each is a tappable button with sparkline inside */}
-      <div className="flex justify-center items-start gap-4 mb-3">
+      {/* items-end: Mind is drawn larger on purpose, and aligning the tops
+          stepped the three labels down the page. */}
+      <div className="flex justify-center items-end gap-4 mb-3">
         {metrics.map(({ key, label, size, strokeWidth }) => {
           const metricTrend = trendData[key]
           const trendValues = metricTrend.trend.map(t => t.value)

@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import { STATUS_CLASSES } from '@/lib/palette'
 
 interface DayPixel {
   date: string
@@ -27,11 +28,14 @@ interface YearPixelsData {
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+// Thresholds are the grid's own (70/40 on the day-summary score, which is a
+// different scale from the hero metrics); only the colours changed, from
+// emerald/amber/red-500 to the palette's sage, dusty amber and muted clay.
 function getScoreColor(score: number | null): string {
   if (score === null) return 'bg-zinc-300 dark:bg-zinc-800'
-  if (score >= 70) return 'bg-emerald-500'
-  if (score >= 40) return 'bg-amber-500'
-  return 'bg-red-400'
+  if (score >= 70) return STATUS_CLASSES.green.solid
+  if (score >= 40) return STATUS_CLASSES.yellow.solid
+  return STATUS_CLASSES.red.solid
 }
 
 function getScoreLabel(score: number | null): string {
@@ -178,7 +182,7 @@ export default function YearInPixelsPage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Year in Pixels</h1>
+              <h1 className="page-title text-foreground">Year in Pixels</h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Every day, one colored dot
               </p>
@@ -231,7 +235,7 @@ export default function YearInPixelsPage() {
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Great</p>
                 </div>
                 <div className="rounded-lg bg-secondary p-3 text-center">
-                  <p className="text-2xl font-bold text-amber-500">{stats.okayDays}</p>
+                  <p className={`text-2xl font-bold ${STATUS_CLASSES.yellow.icon}`}>{stats.okayDays}</p>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Okay</p>
                 </div>
                 <div className="rounded-lg bg-secondary p-3 text-center">
@@ -289,11 +293,11 @@ export default function YearInPixelsPage() {
                 <span className="text-xs text-zinc-500">No data</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-red-400" />
+                <span className={`inline-block h-3 w-3 rounded-sm ${STATUS_CLASSES.red.solid}`} />
                 <span className="text-xs text-zinc-500">&lt;40</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-amber-500" />
+                <span className={`inline-block h-3 w-3 rounded-sm ${STATUS_CLASSES.yellow.solid}`} />
                 <span className="text-xs text-zinc-500">40-69</span>
               </div>
               <div className="flex items-center gap-1.5">

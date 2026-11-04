@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
+import { STATUS_CLASSES } from '@/lib/palette'
 
 // ─── Types matching API route response ────────────────
 
@@ -253,9 +254,9 @@ export default function WeeklyReviewContent() {
         {weekChange !== null && (
           <div className="flex items-center gap-1 mt-1 text-xs">
             {weekChange > 0 ? (
-              <><TrendingUp className="h-3.5 w-3.5 text-green-500" /><span className="text-green-500">+{weekChange}%</span></>
+              <><TrendingUp className={`h-3.5 w-3.5 ${STATUS_CLASSES.green.icon}`} /><span className={STATUS_CLASSES.green.icon}>+{weekChange}%</span></>
             ) : weekChange < 0 ? (
-              <><TrendingDown className="h-3.5 w-3.5 text-red-500" /><span className="text-red-500">{weekChange}%</span></>
+              <><TrendingDown className={`h-3.5 w-3.5 ${STATUS_CLASSES.red.icon}`} /><span className={STATUS_CLASSES.red.icon}>{weekChange}%</span></>
             ) : (
               <><Minus className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground">Same</span></>
             )}

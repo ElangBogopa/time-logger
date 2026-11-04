@@ -11,6 +11,7 @@ import { ChevronLeft, Sparkles } from 'lucide-react'
 import type { MetricKey, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { METRIC_LABELS as SHARED_METRIC_LABELS, FOCUS_WEIGHTS } from '@/lib/metrics-calc'
+import { STATUS_CLASSES } from '@/lib/palette'
 
 // ── Detail types (cast from the generic Record at usage site) ──
 
@@ -102,7 +103,7 @@ function FocusBreakdown({ details, metricColor }: { details: FocusDetails; metri
   if (breakdown.length === 0) {
     return (
       <div className="px-4 mb-6">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+        <h3 className="eyebrow mb-3">
           Today&apos;s Breakdown
         </h3>
         <p className="text-sm text-muted-foreground">No focus activities logged yet today.</p>
@@ -112,7 +113,7 @@ function FocusBreakdown({ details, metricColor }: { details: FocusDetails; metri
 
   return (
     <div className="px-4 mb-6">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+      <h3 className="eyebrow mb-3">
         Today&apos;s Breakdown
       </h3>
       <div className="space-y-2">
@@ -149,7 +150,7 @@ function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricC
   if (breakdown.length === 0) {
     return (
       <div className="px-4 mb-6">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+        <h3 className="eyebrow mb-3">
           Today&apos;s Body
         </h3>
         <p className="text-sm text-muted-foreground">No body care logged yet. Move, eat, or rest to fill this up.</p>
@@ -159,7 +160,7 @@ function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricC
 
   return (
     <div className="px-4 mb-6">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+      <h3 className="eyebrow mb-3">
         Today&apos;s Body — {formatMinutes(details.totalMinutes)} / {formatMinutes(details.target)}
       </h3>
       <div className="space-y-2">
@@ -197,7 +198,7 @@ function SocialBreakdown({ details, metricColor }: { details: SocialDetails; met
   if (breakdown.length === 0) {
     return (
       <div className="px-4 mb-6">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+        <h3 className="eyebrow mb-3">
           Today&apos;s Social
         </h3>
         <p className="text-sm text-muted-foreground">No social time logged yet. Connect with someone today.</p>
@@ -207,7 +208,7 @@ function SocialBreakdown({ details, metricColor }: { details: SocialDetails; met
 
   return (
     <div className="px-4 mb-6">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+      <h3 className="eyebrow mb-3">
         Today&apos;s Social — {formatMinutes(details.totalMinutes)} / {formatMinutes(details.target)}
       </h3>
       <div className="space-y-2">
@@ -237,8 +238,8 @@ function SocialBreakdown({ details, metricColor }: { details: SocialDetails; met
 
 function PersonalBestBadge({ personalBest }: { personalBest: PersonalBest }) {
   return (
-    <div className="mx-4 mb-6 flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3">
-      <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+    <div className={`mx-4 mb-6 flex items-center gap-3 ${STATUS_CLASSES.yellow.tint} border ${STATUS_CLASSES.yellow.border} rounded-lg px-4 py-3`}>
+      <Sparkles className={`h-4 w-4 ${STATUS_CLASSES.yellow.icon} shrink-0`} />
       <div>
         <p className="text-sm font-medium text-foreground">
           Personal Best: {personalBest.value}

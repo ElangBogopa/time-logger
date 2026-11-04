@@ -1,6 +1,6 @@
-import { TimeEntry, TimeCategory } from '@/lib/types'
+import { TimeEntry } from '@/lib/types'
 import { timeToMinutes, minutesToTime } from '@/lib/time-utils'
-import { AGGREGATED_COLORS, CATEGORY_TO_AGGREGATED, PIXELS_PER_MINUTE, ENTRY_EDGE_ZONE } from './constants'
+import { PIXELS_PER_MINUTE, ENTRY_EDGE_ZONE } from './constants'
 
 // Interfaces
 export interface PlacedEntry extends TimeEntry {
@@ -17,16 +17,9 @@ export interface TimeGap {
   durationMinutes: number
 }
 
-// Utility functions
-export function getCategoryColors(category: TimeCategory): { bg: string; border: string; text: string } {
-  const agg = CATEGORY_TO_AGGREGATED[category] || 'escape'
-  const colors = AGGREGATED_COLORS[agg]
-  return {
-    bg: `${colors.bgLight} ${colors.bgDark}`,
-    border: colors.border,
-    text: 'text-zinc-800 dark:text-zinc-200',
-  }
-}
+// One implementation, in constants.ts, re-exported for the callers that
+// imported it from here.
+export { getCategoryColors } from './constants'
 
 // Find gaps in the timeline where untimed entries could fit
 export function findGaps(timedEntries: TimeEntry[], startHour: number, endHour: number): { start: number; end: number }[] {

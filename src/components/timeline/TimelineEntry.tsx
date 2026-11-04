@@ -27,50 +27,7 @@ interface TimelineEntryProps {
   onClick?: (entry: PlacedEntry) => void
 }
 
-import { PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT } from './constants'
-
-// Aggregated color palette — 6 muted colors mapped to energy categories
-const AGGREGATED_COLORS: Record<string, { border: string; bgLight: string; bgDark: string }> = {
-  focus:      { border: 'border-[#6B8CAE]', bgLight: 'bg-[#6B8CAE]/15', bgDark: 'dark:bg-[#6B8CAE]/15' },      // Slate blue
-  ops:        { border: 'border-[#8B8680]', bgLight: 'bg-[#8B8680]/15', bgDark: 'dark:bg-[#8B8680]/15' },        // Warm gray
-  body:       { border: 'border-[#7D9B8A]', bgLight: 'bg-[#7D9B8A]/15', bgDark: 'dark:bg-[#7D9B8A]/15' },       // Sage green
-  recovery:   { border: 'border-[#B5A07A]', bgLight: 'bg-[#B5A07A]/15', bgDark: 'dark:bg-[#B5A07A]/15' },   // Dusty amber
-  connection: { border: 'border-[#A0848E]', bgLight: 'bg-[#A0848E]/15', bgDark: 'dark:bg-[#A0848E]/15' }, // Muted rose
-  escape:     { border: 'border-[#7A7D82]', bgLight: 'bg-[#7A7D82]/15', bgDark: 'dark:bg-[#7A7D82]/15' },     // Cool gray
-}
-
-// Map each TimeCategory → aggregated category (mirrors ENERGY_VIEW from types.ts)
-const CATEGORY_TO_AGGREGATED: Record<string, string> = {
-  deep_work: 'focus',
-  learning: 'focus',
-  creating: 'focus',
-  shallow_work: 'ops',
-  meetings: 'ops',
-  admin: 'ops',
-  errands: 'ops',
-  chores: 'ops',
-  commute: 'ops',
-  exercise: 'body',
-  movement: 'body',
-  meals: 'body',
-  sleep: 'body',
-  rest: 'recovery',
-  self_care: 'recovery',
-  social: 'connection',
-  calls: 'connection',
-  entertainment: 'escape',
-  other: 'escape',
-}
-
-function getCategoryColors(category: string): { bg: string; border: string; text: string } {
-  const agg = CATEGORY_TO_AGGREGATED[category] || 'escape'
-  const colors = AGGREGATED_COLORS[agg]
-  return {
-    bg: `${colors.bgLight} ${colors.bgDark}`,
-    border: colors.border,
-    text: 'text-zinc-800 dark:text-zinc-200',
-  }
-}
+import { PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT, getCategoryColors } from './constants'
 
 export default function TimelineEntry({
   entry,

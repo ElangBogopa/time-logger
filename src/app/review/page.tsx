@@ -67,7 +67,7 @@ function ReviewContent() {
       <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Header */}
         <header className="mb-4">
-          <h1 className="text-2xl font-bold text-foreground">Review</h1>
+          <h1 className="page-title text-foreground">Review</h1>
           <p className="text-sm text-muted-foreground">
             Your progress and reflections
           </p>

@@ -335,14 +335,14 @@ export default function GoalPage() {
           <button onClick={() => router.push('/')} className="mb-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
-          <h1 className="text-2xl font-bold text-foreground">{goal.title}</h1>
+          <h1 className="page-title text-foreground">{goal.title}</h1>
           {goal.description && <p className="mt-1 text-sm text-muted-foreground">{goal.description}</p>}
         </header>
 
         {/* Tomorrow's Tasks */}
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="eyebrow">
               Tasks for tomorrow
             </h2>
             <button
@@ -502,7 +502,7 @@ export default function GoalPage() {
 
           return (
           <section className="mb-6">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            <h2 className="eyebrow mb-3">
               Today
             </h2>
             <div className="rounded-xl border border-border bg-card p-4">
@@ -581,7 +581,7 @@ export default function GoalPage() {
         {/* This Week */}
         {weeklyStats && weeklyStats.plannedDays > 0 && (
           <section className="mb-6">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            <h2 className="eyebrow mb-3">
               This week
             </h2>
             <div className="rounded-xl border border-border bg-card p-4">
@@ -646,7 +646,7 @@ export default function GoalPage() {
 
           return (
             <section className="mb-6">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              <h2 className="eyebrow mb-3">
                 Streaks
               </h2>
               <div className="rounded-xl border border-border bg-card p-4">

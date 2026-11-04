@@ -75,7 +75,7 @@ function LibraryCard({ entry }: { entry: LibraryEntry }) {
 
       {/* Key insight */}
       <div className="px-4 pb-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        <p className="eyebrow mb-1">
           Key Insight
         </p>
         <p className="text-sm text-foreground/80 leading-relaxed">
@@ -85,7 +85,7 @@ function LibraryCard({ entry }: { entry: LibraryEntry }) {
 
       {/* How we use it */}
       <div className="px-4 pb-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        <p className="eyebrow mb-1">
           How We Use This
         </p>
         <p className="text-sm text-foreground/80 leading-relaxed">
@@ -147,7 +147,7 @@ export default function LibraryPage() {
               <BookOpen className="h-5 w-5 text-amber-500" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">The Science</h1>
+              <h1 className="page-title text-foreground">The Science</h1>
               <p className="text-sm text-muted-foreground">
                 Research and books behind how Better works
               </p>

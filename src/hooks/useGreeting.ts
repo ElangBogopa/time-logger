@@ -6,7 +6,6 @@ import { getRandomQuote } from '@/lib/quotes'
 
 interface GreetingData {
   text: string
-  emoji: string
 }
 
 interface UseGreetingReturn {
@@ -20,14 +19,16 @@ function getTimeOfDayGreeting(name?: string, hour?: number | null): GreetingData
   const nameGreeting = name ? `, ${name}` : ''
 
   // Handle late-night hours (24-27 = midnight to 3am, still evening)
+  // The emoji that used to come with each greeting is gone: GreetingHeader
+  // draws the matching lucide icon from currentPeriod instead.
   if (h >= 24) {
-    return { text: `Good evening${nameGreeting}`, emoji: '🌙' }
+    return { text: `Good evening${nameGreeting}` }
   } else if (h < 12) {
-    return { text: `Good morning${nameGreeting}`, emoji: '☀️' }
+    return { text: `Good morning${nameGreeting}` }
   } else if (h < 18) {
-    return { text: `Good afternoon${nameGreeting}`, emoji: '🌤️' }
+    return { text: `Good afternoon${nameGreeting}` }
   } else {
-    return { text: `Good evening${nameGreeting}`, emoji: '🌙' }
+    return { text: `Good evening${nameGreeting}` }
   }
 }
 

@@ -519,7 +519,7 @@ export default function PeriodSummaryPopup({
                 <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-zinc-700/30 px-3 py-2">
                   <Zap className="h-4 w-4 text-yellow-400" />
                   <div className="flex-1 text-center">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Session MVP</p>
+                    <p className="field-label">Session MVP</p>
                     <p className="text-sm font-medium text-white truncate">{sessionMVP.activity}</p>
                     <p className="text-xs text-zinc-400">
                       {Math.floor(sessionMVP.duration_minutes / 60) > 0
@@ -602,7 +602,7 @@ export default function PeriodSummaryPopup({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-zinc-500" />
-                      <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                      <p className="field-label">
                         Complete any tasks?
                       </p>
                     </div>

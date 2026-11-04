@@ -184,7 +184,7 @@ function ConnectionsContent() {
             <ArrowLeft className="h-4 w-4" />
             Settings
           </Button>
-          <h1 className="text-2xl font-bold text-foreground">Connected Accounts</h1>
+          <h1 className="page-title text-foreground">Connected Accounts</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage your calendar integrations
           </p>
