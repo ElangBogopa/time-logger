@@ -10,7 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:tz": "for tz in UTC America/Toronto America/Los_Angeles Europe/Berlin Asia/Tokyo Pacific/Kiritimati Pacific/Midway; do echo \"\\n\u2500\u2500 TZ=$tz \u2500\u2500\"; TZ=$tz jest src/lib/__tests__/date-shift.test.ts || exit 1; done",
+    "test:tz": "for tz in UTC America/Toronto America/Los_Angeles Europe/Berlin Asia/Tokyo Pacific/Kiritimati Pacific/Midway; do echo \"\\n\u2500\u2500 TZ=$tz \u2500\u2500\"; TZ=$tz jest src/lib/__tests__/date-shift.test.ts src/__tests__/pixels-grid.test.ts || exit 1; done",
     "eval": "jest --testMatch='**/scripts/eval/**/*.eval.ts' --testTimeout=1800000 --runInBand"
   },
   "dependencies": {

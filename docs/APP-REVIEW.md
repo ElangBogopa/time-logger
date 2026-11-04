@@ -83,6 +83,9 @@ review and plan right — would cost one breakpoint.
 year is a long scroll through mostly empty space. The established idiom
 (GitHub contributions) is weeks as columns and days as rows: 7 rows, the whole
 year visible at once, immediately legible. Same data, a fifth of the height.
+*(Done — `lib/pixels-grid.ts`. A row is now a weekday, which the old 31-row
+grid could not express: the 14th of one month is not the same weekday as the
+14th of the next.)*
 
 **Typography is the browser default.** `ui-sans-serif, system-ui`. For an app
 whose whole pitch is considered judgement about your life, one typeface with
@@ -146,11 +149,15 @@ Each was written to work, and did. The cost only appears on the day you change
 a shared idea and have to find all five copies — which is exactly what adding
 `faith` did.
 
+**Fixed since this was written:** the day review existed twice and is now one
+component behind both routes; the aggregated colours existed four times, one
+copy silently missing `faith`; two category → bucket maps disagreed about
+`other`; and `chart-colors.ts` carried its own 70/40 thresholds against the
+rest of the app's 80/50. All now come from `lib/palette.ts` and
+`lib/metrics-calc.ts`.
+
 **Still outstanding:**
 
-- **The day review exists twice** (`/day-review` and `/review?tab=day`), both
-  live. Every bug today needed fixing in two places. This is the single
-  highest-value cleanup left.
 - `lib/types.ts` is 1,400 lines holding types, date maths, scoring helpers and
   category definitions. It is the de facto domain layer and should be split.
 - 33 API routes import Supabase directly; there is no repository layer.
@@ -164,12 +171,13 @@ a shared idea and have to find all five copies — which is exactly what adding
 
 ## 6. If I had a week
 
-1. Consolidate the day review into one implementation. Everything else is
-   cheaper afterwards.
+1. ~~Consolidate the day review into one implementation.~~ Done.
 2. Logging friction: templates, same-as-yesterday, bulk ghost confirm.
-3. One palette, one type scale, louder section headers, a desktop breakpoint.
-4. Rebuild Year in Pixels as a GitHub-style grid.
+3. ~~One palette, one type scale, louder section headers, a desktop
+   breakpoint.~~ Done, except that ~140 saturated colours remain in toasts,
+   error states, banners, onboarding, settings and the guide page. Those are
+   UI semantics rather than data, and were left deliberately.
+4. ~~Rebuild Year in Pixels as a GitHub-style grid.~~ Done.
 5. Promote the Library and link metrics to their research.
 
-Items 1 and 2 decide whether the app gets used. Items 3–5 decide whether it
-feels like a product.
+Item 2 is now the one that decides whether the app gets used.

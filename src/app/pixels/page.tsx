@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -13,6 +13,14 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { STATUS_CLASSES } from '@/lib/palette'
+import { buildPixelsGrid, columnForDate, WEEKDAYS } from '@/lib/pixels-grid'
+import { getUserToday } from '@/lib/types'
+
+// Cell geometry. 53 columns at this size is ~820px: the whole year at once on
+// a laptop, a short sideways scroll on a phone, which is the trade the
+// GitHub layout makes.
+const CELL = 12
+const GAP = 3
 
 interface DayPixel {
   date: string
@@ -26,13 +34,13 @@ interface YearPixelsData {
   pixels: DayPixel[]
 }
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
 // Thresholds are the grid's own (70/40 on the day-summary score, which is a
 // different scale from the hero metrics); only the colours changed, from
 // emerald/amber/red-500 to the palette's sage, dusty amber and muted clay.
+const NO_DATA_CLASS = 'bg-zinc-200 dark:bg-zinc-700/50'
+
 function getScoreColor(score: number | null): string {
-  if (score === null) return 'bg-zinc-300 dark:bg-zinc-800'
+  if (score === null) return NO_DATA_CLASS
   if (score >= 70) return STATUS_CLASSES.green.solid
   if (score >= 40) return STATUS_CLASSES.yellow.solid
   return STATUS_CLASSES.red.solid
@@ -100,47 +108,29 @@ export default function YearInPixelsPage() {
     }
   }, [status, fetchPixels])
 
-  // Build the grid: 12 months × up to 31 days
-  const buildGrid = useCallback(() => {
-    if (!pixelsData) return null
+  // One column per week, seven rows for the days — see lib/pixels-grid.ts.
+  const today = getUserToday()
+  const grid = useMemo(
+    () => (pixelsData ? buildPixelsGrid(year, today) : null),
+    [pixelsData, year, today]
+  )
 
-    // Create a map for quick lookup
-    const pixelMap = new Map<string, DayPixel>()
-    for (const p of pixelsData.pixels) {
-      pixelMap.set(p.date, p)
-    }
+  const pixelsByDate = useMemo(() => {
+    const map = new Map<string, DayPixel>()
+    for (const pixel of pixelsData?.pixels ?? []) map.set(pixel.date, pixel)
+    return map
+  }, [pixelsData])
 
-    const grid: (DayPixel | null)[][] = []
-
-    // For each day (1-31), create a row with 12 columns (months)
-    for (let day = 1; day <= 31; day++) {
-      const row: (DayPixel | null)[] = []
-      for (let month = 0; month < 12; month++) {
-        // Check if this day exists in this month
-        const daysInMonth = new Date(year, month + 1, 0).getDate()
-        if (day > daysInMonth) {
-          row.push(null) // Day doesn't exist for this month
-        } else {
-          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-          const pixel = pixelMap.get(dateStr)
-
-          // Check if date is in the future
-          const dateObj = new Date(dateStr + 'T00:00:00')
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-
-          if (dateObj > today) {
-            row.push(null) // Future date
-          } else {
-            row.push(pixel || { date: dateStr, score: null, entryCount: 0, totalMinutes: 0 })
-          }
-        }
-      }
-      grid.push(row)
-    }
-
-    return grid
-  }, [pixelsData, year])
+  // Open on the current week rather than on January.
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!grid || !scrollerRef.current) return
+    const column = columnForDate(grid, today)
+    if (column < 0) return
+    const scroller = scrollerRef.current
+    const target = (column + 1) * (CELL + GAP) - scroller.clientWidth / 2
+    scroller.scrollLeft = Math.max(0, target)
+  }, [grid, today])
 
   // Calculate stats
   const stats = pixelsData ? (() => {
@@ -165,11 +155,9 @@ export default function YearInPixelsPage() {
 
   if (status === 'unauthenticated') return null
 
-  const grid = buildGrid()
-
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className="mx-auto max-w-2xl px-4 py-6 lg:max-w-4xl">
         {/* Header */}
         <header className="mb-6">
           <div className="flex items-center gap-3 mb-2">
@@ -184,7 +172,7 @@ export default function YearInPixelsPage() {
             <div>
               <h1 className="page-title text-foreground">Year in Pixels</h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Every day, one colored dot
+                Every day of the year, one square
               </p>
             </div>
           </div>
@@ -226,84 +214,109 @@ export default function YearInPixelsPage() {
             {/* Stats Summary */}
             {stats && stats.total > 0 && (
               <div className="mb-6 grid grid-cols-4 gap-3">
-                <div className="rounded-lg bg-secondary p-3 text-center">
-                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.avgScore}</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Avg Score</p>
-                </div>
-                <div className="rounded-lg bg-secondary p-3 text-center">
-                  <p className="text-2xl font-bold text-emerald-500">{stats.greatDays}</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Great</p>
-                </div>
-                <div className="rounded-lg bg-secondary p-3 text-center">
-                  <p className={`text-2xl font-bold ${STATUS_CLASSES.yellow.icon}`}>{stats.okayDays}</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Okay</p>
-                </div>
-                <div className="rounded-lg bg-secondary p-3 text-center">
-                  <p className="text-2xl font-bold text-red-400">{stats.roughDays}</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Rough</p>
-                </div>
+                {[
+                  { value: stats.avgScore, label: 'Average', color: 'text-foreground' },
+                  { value: stats.greatDays, label: 'Great', color: STATUS_CLASSES.green.icon },
+                  { value: stats.okayDays, label: 'Okay', color: STATUS_CLASSES.yellow.icon },
+                  { value: stats.roughDays, label: 'Rough', color: STATUS_CLASSES.red.icon },
+                ].map(({ value, label, color }) => (
+                  <div key={label} className="rounded-lg bg-secondary p-3 text-center">
+                    <p className={`metric-number ${color}`}>{value}</p>
+                    <p className="field-label mt-1 whitespace-nowrap">{label}</p>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* Pixel Grid */}
-            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800 overflow-x-auto">
-              <table className="w-full border-collapse" style={{ minWidth: '320px' }}>
-                <thead>
-                  <tr>
-                    <th className="w-8 text-[10px] text-zinc-500 font-normal text-left pr-1"></th>
-                    {MONTH_LABELS.map((label) => (
-                      <th
-                        key={label}
-                        className="text-[10px] text-zinc-500 font-normal text-center px-0"
-                      >
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {grid.map((row, dayIndex) => (
-                    <tr key={dayIndex}>
-                      <td className="text-[10px] text-zinc-500 text-right pr-1 py-0">
-                        {dayIndex + 1}
-                      </td>
-                      {row.map((pixel, monthIndex) => (
-                        <td key={monthIndex} className="text-center p-0">
-                          {pixel ? (
-                            <button
-                              onClick={() => setSelectedDay(pixel)}
-                              className={`inline-block w-[14px] h-[14px] rounded-[3px] m-[1px] transition-transform hover:scale-150 ${getScoreColor(pixel.score)}`}
-                              aria-label={`${pixel.date}: ${getScoreLabel(pixel.score)}`}
-                            />
-                          ) : (
-                            <span className="inline-block w-[14px] h-[14px] m-[1px]" />
-                          )}
-                        </td>
-                      ))}
-                    </tr>
+            {/* The grid: one column per week, one row per weekday. The
+                weekday gutter sits outside the scroller, so only the weeks
+                move sideways on a phone. */}
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex">
+                <div
+                  className="grid shrink-0 pr-2"
+                  style={{ gap: `${GAP}px`, gridTemplateRows: `auto repeat(7, ${CELL}px)` }}
+                >
+                  <span aria-hidden="true" />
+                  {WEEKDAYS.map((day, row) => (
+                    <span
+                      key={day}
+                      className="text-[10px] leading-none text-muted-foreground self-center"
+                      style={{ gridRow: row + 2 }}
+                    >
+                      {/* every other day, so the labels do not crowd 12px rows */}
+                      {row % 2 === 0 ? day : ''}
+                    </span>
                   ))}
-                </tbody>
-              </table>
+                </div>
+
+                <div ref={scrollerRef} className="overflow-x-auto">
+                  <div
+                    className="grid w-max"
+                    style={{
+                      gap: `${GAP}px`,
+                      gridTemplateColumns: `repeat(${grid.weeks.length}, ${CELL}px)`,
+                      gridTemplateRows: `auto repeat(7, ${CELL}px)`,
+                    }}
+                  >
+                    {/* Month labels, each above the first week of its month */}
+                    {grid.monthLabels.map(({ label, column }, i) => {
+                      const next = grid.monthLabels[i + 1]?.column ?? grid.weeks.length
+                      return (
+                        <span
+                          key={label}
+                          className="text-[10px] leading-none text-muted-foreground"
+                          style={{ gridRow: 1, gridColumn: `${column + 1} / span ${next - column}` }}
+                        >
+                          {label}
+                        </span>
+                      )
+                    })}
+
+                    {grid.weeks.map((week, weekIndex) =>
+                      week.map((date, dayIndex) => {
+                        const position = { gridRow: dayIndex + 2, gridColumn: weekIndex + 1 }
+                        if (!date) {
+                          return <span key={`${weekIndex}-${dayIndex}`} style={position} />
+                        }
+                        const pixel = pixelsByDate.get(date) ?? {
+                          date,
+                          score: null,
+                          entryCount: 0,
+                          totalMinutes: 0,
+                        }
+                        return (
+                          <button
+                            key={date}
+                            onClick={() => setSelectedDay(pixel)}
+                            style={position}
+                            title={`${formatDate(date)} — ${getScoreLabel(pixel.score)}`}
+                            className={`rounded-[2px] transition-transform hover:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getScoreColor(pixel.score)} ${
+                              date === today ? 'ring-1 ring-foreground/50' : ''
+                            }`}
+                            aria-label={`${date}: ${getScoreLabel(pixel.score)}`}
+                          />
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Legend */}
-            <div className="mt-4 flex items-center justify-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-zinc-300 dark:bg-zinc-800" />
-                <span className="text-xs text-zinc-500">No data</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`inline-block h-3 w-3 rounded-sm ${STATUS_CLASSES.red.solid}`} />
-                <span className="text-xs text-zinc-500">&lt;40</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`inline-block h-3 w-3 rounded-sm ${STATUS_CLASSES.yellow.solid}`} />
-                <span className="text-xs text-zinc-500">40-69</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-emerald-500" />
-                <span className="text-xs text-zinc-500">70+</span>
-              </div>
+            <div className="mt-3 flex items-center justify-end gap-4 text-xs text-muted-foreground">
+              {[
+                { swatch: NO_DATA_CLASS, label: 'No data' },
+                { swatch: STATUS_CLASSES.red.solid, label: 'Under 40' },
+                { swatch: STATUS_CLASSES.yellow.solid, label: '40–69' },
+                { swatch: STATUS_CLASSES.green.solid, label: '70+' },
+              ].map(({ swatch, label }) => (
+                <span key={label} className="flex items-center gap-1.5">
+                  <span className={`inline-block h-3 w-3 rounded-[2px] ${swatch}`} />
+                  {label}
+                </span>
+              ))}
             </div>
           </>
         ) : null}
