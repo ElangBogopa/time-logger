@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { LIBRARY } from '@/lib/library'
 import {
   ArrowLeft,
   Brain,
@@ -130,6 +131,9 @@ const EVENING_BLOCKS: TimingBlock[] = [
 ]
 
 // ── Research citations ──
+// The same entries the library shows — they used to be listed again here,
+// and the two lists had already drifted: the library had one source, this
+// page had seven, and neither mentioned the other.
 
 interface Citation {
   id: string
@@ -140,62 +144,14 @@ interface Citation {
   link?: string
 }
 
-const CITATIONS: Citation[] = [
-  {
-    id: 'who-hours',
-    title: 'Long working hours and health outcomes',
-    authors: 'WHO/ILO Joint Estimates',
-    year: 2021,
-    finding: 'Working 55+ hours/week increases stroke risk by 35% and heart disease by 17%. Optimal knowledge work: 35–40 hours/week.',
-    link: 'https://www.who.int/news/item/17-05-2021-long-working-hours-increasing-deaths-from-heart-disease-and-stroke-who-ilo',
-  },
-  {
-    id: 'harvard-happiness',
-    title: 'Harvard Study of Adult Development',
-    authors: 'Waldinger, R. & Schulz, M.',
-    year: 2023,
-    finding: 'The longest study on happiness (80+ years) found that quality of relationships is the strongest predictor of well-being — stronger than wealth, fame, or career success.',
-    link: 'https://www.amazon.com/Good-Life-Lessons-Scientific-Happiness/dp/198216669X',
-  },
-  {
-    id: 'ultradian',
-    title: 'Basic Rest-Activity Cycle (BRAC)',
-    authors: 'Kleitman, N. & Rossi, E.',
-    year: 1993,
-    finding: 'The human body operates on 90–120 minute ultradian cycles. Working in 90-minute blocks with 15–20 min breaks aligns with natural attention rhythms and prevents cognitive fatigue.',
-  },
-  {
-    id: 'deep-work',
-    title: 'Deep Work: Rules for Focused Success',
-    authors: 'Newport, C.',
-    year: 2016,
-    finding: 'Context switching reduces productivity by up to 40%. Scheduled deep work blocks prevent reactive, scattered patterns. Most people can sustain 4–5 hours of truly focused work per day.',
-    link: 'https://www.amazon.com/Deep-Work-Focused-Success-Distracted/dp/1455586692',
-  },
-  {
-    id: 'leisure-wellbeing',
-    title: 'Leisure and Subjective Well-Being',
-    authors: 'Sharif, M., Mogilner, C., & Hershfield, H.',
-    year: 2021,
-    finding: 'Having too little free time (<2 hours/day) is as harmful to well-being as having too much (>5 hours). The sweet spot is 2–5 hours, especially when spent on active pursuits.',
-    link: 'https://doi.org/10.1037/pspp0000391',
-  },
-  {
-    id: 'circadian',
-    title: 'Physiology, Circadian Rhythm',
-    authors: 'Reddy, S., Reddy, V., & Sharma, S.',
-    year: 2023,
-    finding: 'Circadian rhythms govern cognitive performance throughout the day. Cortisol peaks at 8–9 AM, body temperature rises through morning — aligning demanding tasks with these peaks maximizes output.',
-  },
-  {
-    id: 'exercise-cognition',
-    title: 'Exercise and Cognitive Performance',
-    authors: 'Hillman, C., Erickson, K., & Kramer, A.',
-    year: 2008,
-    finding: 'Regular exercise improves executive function, memory, and attention. Even a single session of moderate exercise enhances cognitive performance for several hours.',
-    link: 'https://doi.org/10.1038/nrn2298',
-  },
-]
+const CITATIONS: Citation[] = LIBRARY.map((entry) => ({
+  id: entry.id,
+  title: entry.title,
+  authors: entry.author,
+  year: entry.year,
+  finding: entry.finding,
+  link: entry.link,
+}))
 
 // ── Components ──
 

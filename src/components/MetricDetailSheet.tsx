@@ -7,7 +7,9 @@ import { StatusDelta } from '@/components/charts/StatusDelta'
 import { METRIC_COLORS, getStatusLabel, getStatusTailwind } from '@/lib/chart-colors'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { ChartErrorBoundary } from '@/components/charts/ChartErrorBoundary'
-import { ChevronLeft, Sparkles } from 'lucide-react'
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { entriesForMetric } from '@/lib/library'
 import type { MetricKey, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { METRIC_LABELS as SHARED_METRIC_LABELS, FOCUS_WEIGHTS } from '@/lib/metrics-calc'
@@ -254,6 +256,35 @@ function PersonalBestBadge({ personalBest }: { personalBest: PersonalBest }) {
 
 // ── Main Component ──
 
+/** The research behind one metric, linking into the library's section. */
+function MetricSources({ metric, onNavigate }: { metric: MetricKey; onNavigate: () => void }) {
+  const router = useRouter()
+  const sources = entriesForMetric(metric)
+  if (sources.length === 0) return null
+
+  return (
+    <div className="mx-4 mb-8 rounded-xl border border-border bg-card p-4">
+      <h3 className="eyebrow mb-2">Why this is measured</h3>
+      <p className="text-sm text-foreground/80 leading-relaxed mb-3">
+        {sources[0].howWeUseIt}
+      </p>
+      <button
+        onClick={() => {
+          onNavigate()
+          router.push(`/library?metric=${metric}`)
+        }}
+        className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+      >
+        <BookOpen className="h-3.5 w-3.5" />
+        {sources.length === 1
+          ? `${sources[0].author}, ${sources[0].year}`
+          : `${sources.length} sources behind this`}
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
 export default function MetricDetailSheet({
   metric,
   isOpen,
@@ -440,6 +471,12 @@ export default function MetricDetailSheet({
             {metricData.personalBest && metricData.personalBest.value > 0 && (
               <PersonalBestBadge personalBest={metricData.personalBest} />
             )}
+
+            {/* The evidence for this particular number. The reason to believe
+                a score is a target someone chose is that the target came from
+                somewhere, and this is the only place that says so at the
+                moment the person is looking at the score. */}
+            <MetricSources metric={metric} onNavigate={onClose} />
           </>
         ) : (
           <div className="text-center py-20 text-muted-foreground">

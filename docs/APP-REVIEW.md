@@ -19,10 +19,13 @@ Sentry, and a separate Expo app.
 
 **The three things genuinely worth protecting:**
 
-1. **The Library.** "The Science" page cites Zimbardo on the perception gap,
-   WHO on working hours, the Harvard study. No competitor I looked at
-   explains *why* its metrics exist. This is the most defensible thing in the
-   product and it is buried behind Settings → More.
+1. **The Library.** The app cites Zimbardo on the perception gap, WHO on
+   working hours, the Harvard study. No competitor I looked at explains *why*
+   its metrics exist. This is the most defensible thing in the product and it
+   is buried behind Settings → More. *(Correction: when I wrote this I said
+   the Library page held those citations. It held one — Zimbardo. The other
+   seven were in a second page, /guide, which nothing linked to either. Both
+   now read `lib/library.ts`, and the Science tab is in the bottom bar.)*
 2. **Conversational commentary.** Being able to argue with the AI about your
    own day is novel. Within an hour of shipping it, it surfaced a scoring bug
    nothing else had caught.
@@ -117,9 +120,11 @@ days logged out of the last 21. Concretely —
      deleted `/api/parse-activity` was the model-backed version, and is still
      one `git revert` away if the local parser proves too literal.*
 
-**2. Make the Library the front door.** Move it out of Settings. Each metric
-in the detail sheet should link to the research behind it. The reason to
-believe your numbers is sitting in a page nobody visits.
+**2. Make the Library the front door.** ~~Move it out of Settings. Each
+metric in the detail sheet should link to the research behind it.~~ Done: a
+Science tab in the bottom bar, entries grouped by the metric they back, and a
+"Why this is measured" block in each metric's detail sheet linking to its own
+section. A test fails if a hero metric has no source behind it.
 
 **3. Give the commentary thread a home on the entry and the week.** The API
 already supports `entry` and `week` subjects; only `day` and `session` have UI.
@@ -185,8 +190,11 @@ rest of the app's 80/50. All now come from `lib/palette.ts` and
    error states, banners, onboarding, settings and the guide page. Those are
    UI semantics rather than data, and were left deliberately.
 4. ~~Rebuild Year in Pixels as a GitHub-style grid.~~ Done.
-5. Promote the Library and link metrics to their research.
+5. ~~Promote the Library and link metrics to their research.~~ Done.
 
-Items 1 and 2 are done. Whether the app gets used now depends on whether
-one tap to repeat a day is enough — which only a few weeks of use will
-say.
+All five are done. Whether the app gets used now depends on whether one tap
+to repeat a day is enough — which only a few weeks of use will say.
+
+What is left is in §5: splitting `lib/types.ts`, a repository layer for the
+33 routes that import Supabase directly, the 13 skipped day-review tests, the
+64 lint errors, and the Expo app that bypasses every guard.

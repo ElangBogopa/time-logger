@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, BarChart3, Menu } from 'lucide-react'
+import { Home, BarChart3, BookOpen, Menu } from 'lucide-react'
 
 interface TabItem {
   label: string
@@ -24,6 +24,15 @@ const tabs: TabItem[] = [
     icon: BarChart3,
     path: '/review',
     matchPaths: ['/review', '/day-review'],
+  },
+  {
+    // The research behind the metrics was two taps into Settings → About,
+    // which is where things go to not be read. It is the one thing here no
+    // other tracker has.
+    label: 'Science',
+    icon: BookOpen,
+    path: '/library',
+    matchPaths: ['/library', '/guide'],
   },
   {
     label: 'More',
