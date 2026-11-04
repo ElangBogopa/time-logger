@@ -8,6 +8,17 @@ import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
 import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
+import CommitTimeModal from '@/components/CommitTimeModal'
+
+/** A row of daily_plans: a task for a date, with a time once you give it one. */
+interface PlanTask {
+  id: string
+  title: string
+  date: string
+  committed_start: string | null
+  committed_end: string | null
+  completed: boolean
+}
 import { useCalendar, CalendarEvent } from '@/contexts/CalendarContext'
 import QuickLogModal from '@/components/QuickLogModal'
 import Toast from '@/components/Toast'
@@ -16,7 +27,8 @@ import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Calendar, ChevronLeft, ChevronRight, Loader2, RefreshCw, Clock, X } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, Loader2, RefreshCw, Clock, X, Plus, CalendarClock } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
   const date = new Date(dateStr + 'T00:00:00')
@@ -78,6 +90,11 @@ function CalendarContent() {
     }
   }, [searchParams, selectedDate])
   const [committedTasks, setCommittedTasks] = useState<CommittedTask[]>([])
+  /** Tasks for this date with no time yet — the tray you plan from. */
+  const [unscheduledTasks, setUnscheduledTasks] = useState<PlanTask[]>([])
+  const [schedulingTask, setSchedulingTask] = useState<PlanTask | null>(null)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [isAddingTask, setIsAddingTask] = useState(false)
 
   // Use cached calendar events from context
   const {
@@ -114,6 +131,37 @@ function CalendarContent() {
 
   // Check if logging is allowed for the selected date
   const canLog = isDateLoggable(selectedDate)
+
+  /** Give a task a time. The grid draws it as soon as it has one. */
+  const handleCommitTask = async (planId: string, start: string, end: string) => {
+    await csrfFetch('/api/plans', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: planId, committed_start: start, committed_end: end }),
+    })
+    setSchedulingTask(null)
+    fetchEntriesForDate()
+  }
+
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const title = newTaskTitle.trim()
+    if (!title || isAddingTask) return
+    setIsAddingTask(true)
+    try {
+      await csrfFetch('/api/plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: selectedDate, title }),
+      })
+      setNewTaskTitle('')
+      fetchEntriesForDate()
+    } catch (err) {
+      console.error('Failed to add task:', err)
+    } finally {
+      setIsAddingTask(false)
+    }
+  }
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -152,20 +200,24 @@ function CalendarContent() {
       setEntries(data)
       setCachedEntries(selectedDate, data)
 
-      // Fetch committed tasks for this date
+      // A task either has a time, and belongs on the grid, or it does not
+      // yet, and belongs in the tray waiting to be given one.
       if (plansRes.ok) {
         const { plans } = await plansRes.json()
-        const committed = (plans || [])
-          .filter((p: CommittedTask & { committed_start: string | null }) => p.committed_start && p.committed_end)
-          .map((p: CommittedTask) => ({
-            id: p.id,
-            title: p.title,
-            date: p.date,
-            committed_start: p.committed_start,
-            committed_end: p.committed_end,
-            completed: p.completed,
-          }))
-        setCommittedTasks(committed)
+        const all: PlanTask[] = plans || []
+        setCommittedTasks(
+          all
+            .filter((p) => p.committed_start && p.committed_end)
+            .map((p) => ({
+              id: p.id,
+              title: p.title,
+              date: p.date,
+              committed_start: p.committed_start,
+              committed_end: p.committed_end,
+              completed: p.completed,
+            })) as CommittedTask[]
+        )
+        setUnscheduledTasks(all.filter((p) => !p.committed_start || !p.committed_end))
       }
     } catch (error) {
       console.error('Failed to fetch entries:', error)
@@ -228,9 +280,11 @@ function CalendarContent() {
           {/* Header */}
           <header className="mb-4">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Calendar
+              {/* The screen has two jobs, and says which one it is doing:
+                  a future date is a plan, today and the past are a record. */}
+              <h1 className="page-title text-foreground flex items-center gap-2">
+                {isFutureDay ? <CalendarClock className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
+                {isFutureDay ? `Plan ${dateDisplay.label}` : 'Calendar'}
               </h1>
 
               {calendarStatus?.connected && (
@@ -347,6 +401,51 @@ function CalendarContent() {
             </div>
           )}
 
+          {/* The tray: tasks for this day with no time yet. Tapping one
+              gives it a time and it moves onto the grid. Until now the only
+              way to do that was a modal inside a goal's page, and the result
+              landed on a calendar reachable only from Settings. */}
+          {!isPastDay && (
+            <section className="mb-4 rounded-xl border border-border bg-card p-4">
+              <h2 className="eyebrow mb-3">
+                {isFutureDay ? 'What matters tomorrow' : 'To schedule'}
+              </h2>
+
+              {unscheduledTasks.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {unscheduledTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => setSchedulingTask(task)}
+                      className="flex items-center gap-1.5 rounded-full border border-dashed border-border bg-secondary/50 px-3 py-1.5 text-sm text-foreground transition-all duration-150 hover:border-foreground/25 active:scale-[0.98]"
+                    >
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      {task.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <form onSubmit={handleAddTask} className="flex gap-2">
+                <Input
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder={isFutureDay ? 'Add something for tomorrow' : 'Add a task for today'}
+                  className="flex-1"
+                />
+                <Button type="submit" variant="outline" size="icon" disabled={!newTaskTitle.trim() || isAddingTask}>
+                  {isAddingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                </Button>
+              </form>
+
+              {unscheduledTasks.length === 0 && committedTasks.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  Everything planned for this day has a time.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* Timeline */}
           <section>
             <TimelineView
@@ -367,6 +466,19 @@ function CalendarContent() {
             />
           </section>
         </div>
+
+        {schedulingTask && (
+          <CommitTimeModal
+            isOpen={true}
+            onClose={() => setSchedulingTask(null)}
+            onCommit={(start, end) => handleCommitTask(schedulingTask.id, start, end)}
+            taskTitle={schedulingTask.title}
+            date={selectedDate}
+            planId={schedulingTask.id}
+            existingStart={schedulingTask.committed_start}
+            existingEnd={schedulingTask.committed_end}
+          />
+        )}
 
         <QuickLogModal
           isOpen={isQuickLogOpen}

@@ -20,6 +20,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   ArrowLeft,
+  CalendarClock,
+  ChevronRight,
   Trophy,
   TrendingUp,
   Clock,
@@ -40,6 +42,7 @@ import {
   AggregatedCategory,
   getAggregatedCategory,
   getUserToday,
+  shiftDateString,
   getUserCurrentHour,
 } from '@/lib/types'
 import { AGGREGATED_CLASSES, STATUS_CLASSES } from '@/lib/palette'
@@ -754,6 +757,24 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
           </div>
         )}
         */}
+
+        {/* The day is reviewed; the next move is tomorrow. This is the
+            moment the planner is for. */}
+        {summary.date >= getUserToday() && (
+          <button
+            onClick={() => router.push(`/calendar?date=${shiftDateString(summary.date, 1)}`)}
+            className="w-full flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 mb-6 text-left transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]"
+          >
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${AGGREGATED_CLASSES.focus.tint}`}>
+              <CalendarClock className={`h-4 w-4 ${AGGREGATED_CLASSES.focus.text}`} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">Plan tomorrow</p>
+              <p className="text-[11px] text-muted-foreground">Give tomorrow&apos;s tasks a time</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
 
         {/* Longest Focus */}
         {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (

@@ -38,7 +38,7 @@ const tabs: TabItem[] = [
     label: 'More',
     icon: Menu,
     path: '/settings',
-    matchPaths: ['/settings', '/settings/connections', '/settings/notifications', '/intentions'],
+    matchPaths: ['/settings', '/settings/connections', '/settings/notifications'],
   },
 ]
 

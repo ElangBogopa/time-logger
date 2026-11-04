@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Target, ChevronRight, Loader2, Flame } from 'lucide-react'
-import { getUserToday } from '@/lib/types'
+import { Target, ChevronRight, Loader2, Flame, CalendarClock } from 'lucide-react'
+import { getUserToday, shiftDateString } from '@/lib/types'
 import { fetchGoals, type Goal } from '@/lib/goals'
 import { STATUS_CLASSES } from '@/lib/palette'
 
@@ -95,9 +95,19 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
 
   return (
     <div className="mt-4">
-      <h3 className="eyebrow mb-3">
-        Your Plan
-      </h3>
+      {/* Nothing in the app pointed at the planner: you set a task inside a
+          goal, gave it a time in a modal there, and it appeared on a
+          calendar reachable only from Settings. */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="eyebrow">Your Plan</h3>
+        <button
+          onClick={() => router.push(`/calendar?date=${shiftDateString(getUserToday(), 1)}`)}
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <CalendarClock className="h-3.5 w-3.5" />
+          Plan tomorrow
+        </button>
+      </div>
 
       {/* Streaks card — only visible when a real streak exists (3+ days) */}
       {showStreaks && (

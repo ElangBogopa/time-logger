@@ -51,6 +51,12 @@ manipulation. Making one control do both is what produces the fidget.
   already set to the end of the last entry, because that is the answer
   nine times out of ten.
 
+**The calendar view is the planner.** *(Built.)* On a future date it says
+"Plan Tomorrow" and carries a tray of that day's tasks that have no time
+yet; tapping one gives it a time and it moves onto the grid. The dashboard's
+YOUR PLAN section and the end of the day review both point at it — until
+now nothing did.
+
 **The calendar view stays precision.** *(Built — `/calendar`, which already
 existed and was reachable only from Settings. The session view now links to
 it for the day you are looking at.)* Drag, resize, ghost events, calendar

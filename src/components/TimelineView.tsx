@@ -252,8 +252,15 @@ export default function TimelineView({
     timeGaps: updatedTimeGaps,
     hours: updatedHours,
     timelineHeight: updatedTimelineHeight,
-    isEmpty: updatedIsEmpty,
+    isEmpty: timelineIsEmpty,
   } = timelineData
+
+  /**
+   * A day you have planned is not an empty day. The hook only counts entries
+   * and calendar events, so a date whose tasks all have times still reported
+   * "No plans yet" — on the planner, which is the screen that put them there.
+   */
+  const updatedIsEmpty = timelineIsEmpty && committedTasks.length === 0
 
   // Scroll to appropriate position on load
   useEffect(() => {
@@ -379,6 +386,12 @@ export default function TimelineView({
                 : isFutureDay
                   ? "No plans yet — tap or drag to schedule activities"
                   : "No entries for this day — tap to add what happened"}
+          </span>
+        ) : isFutureDay ? (
+          // A future day has nothing logged by definition; what it has is a
+          // plan, so count that instead of reporting "0 entries".
+          <span>
+            {committedTasks.length} {committedTasks.length === 1 ? 'task' : 'tasks'} scheduled
           </span>
         ) : (
           <>
