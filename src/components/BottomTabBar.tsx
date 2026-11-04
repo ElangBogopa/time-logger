@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, BarChart3, BookOpen, Menu } from 'lucide-react'
+import { Home, BarChart3, CalendarClock, Menu } from 'lucide-react'
 
 interface TabItem {
   label: string
@@ -26,19 +26,19 @@ const tabs: TabItem[] = [
     matchPaths: ['/review', '/day-review'],
   },
   {
-    // The research behind the metrics was two taps into Settings → About,
-    // which is where things go to not be read. It is the one thing here no
-    // other tracker has.
-    label: 'Science',
-    icon: BookOpen,
-    path: '/library',
-    matchPaths: ['/library', '/guide'],
+    // Today, Review and Plan are what the app is for. The research moved
+    // back into More, where it leads the page, and is linked from the
+    // places it explains instead of competing for a tab.
+    label: 'Plan',
+    icon: CalendarClock,
+    path: '/calendar',
+    matchPaths: ['/calendar'],
   },
   {
     label: 'More',
     icon: Menu,
     path: '/settings',
-    matchPaths: ['/settings', '/settings/connections', '/settings/notifications'],
+    matchPaths: ['/settings', '/settings/connections', '/settings/notifications', '/library', '/guide'],
   },
 ]
 

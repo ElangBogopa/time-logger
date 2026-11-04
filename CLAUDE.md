@@ -150,6 +150,20 @@ time_entries (
 )
 ```
 
+## What the app is for
+
+Google Calendar holds commitments with other people, at times other people
+chose. Everything else — deep work, the gym, the call home — has no owner
+and no time, which is most of why it does not happen. Better fits those
+around the fixed things and says why it chose each hour, then records what
+actually happened. It never writes to Google: the sync is read-only by
+design.
+
+The four tabs are Today (capture), Review (what happened), Plan (what is
+next) and More. The research lives in More and is cited from the places it
+explains — every scheduling suggestion carries the library entry that
+backs it.
+
 ## Design Principles
 
 1. **Mobile only**: Touch targets 44px+, hold-to-drag. The whole app renders

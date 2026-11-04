@@ -37,7 +37,8 @@ function KindBadge({ kind }: { kind: LibraryEntry['kind'] }) {
 
 function EntryCard({ entry }: { entry: LibraryEntry }) {
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    // The id is the anchor a suggestion's "why?" links to.
+    <div id={entry.id} className="rounded-xl border border-border bg-card overflow-hidden scroll-mt-4">
       <div className="p-4 pb-3">
         <KindBadge kind={entry.kind} />
         <h3 className="text-base font-semibold text-foreground mt-2 leading-tight">{entry.title}</h3>
@@ -81,10 +82,17 @@ function LibraryContent() {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
-  // Arriving from a metric's detail sheet: open on that metric's section.
+  // Arriving from a metric's detail sheet, or from a scheduling suggestion
+  // asking "why then?" — open on the thing that was clicked.
   useEffect(() => {
-    if (!highlighted || status !== 'authenticated') return
-    document.getElementById(`metric-${highlighted}`)?.scrollIntoView({ block: 'start' })
+    if (status !== 'authenticated') return
+    const anchor = window.location.hash.slice(1)
+    const target = anchor
+      ? document.getElementById(anchor)
+      : highlighted
+        ? document.getElementById(`metric-${highlighted}`)
+        : null
+    target?.scrollIntoView({ block: 'start' })
   }, [highlighted, status])
 
   if (status === 'loading') {

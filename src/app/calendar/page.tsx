@@ -14,7 +14,9 @@ import DayAtAGlance, { blocksForGlance } from '@/components/DayAtAGlance'
 import TimeEntryModal from '@/components/TimeEntryModal'
 import { AGGREGATED_HEX } from '@/lib/palette'
 import { dayWindow, isWholeDay } from '@/lib/day-window'
-import { formatDuration, formatTimeDisplay } from '@/lib/time-utils'
+import { suggestTimes, type Suggestion } from '@/lib/suggest-times'
+import { categorizeActivities } from '@/lib/api'
+import { formatDuration, formatTimeDisplay, timeToMinutes } from '@/lib/time-utils'
 
 /** A row of daily_plans: a task for a date, with a time once you give it one. */
 interface PlanTask {
@@ -33,7 +35,7 @@ import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Calendar, ChevronLeft, ChevronRight, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, CalendarClock } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, CalendarClock, Sparkles } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
@@ -105,6 +107,9 @@ function CalendarContent() {
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [showWholeDay, setShowWholeDay] = useState(false)
   const [isAddingTask, setIsAddingTask] = useState(false)
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
+  const [unplaced, setUnplaced] = useState<{ title: string; reason: string }[]>([])
+  const [isSuggesting, setIsSuggesting] = useState(false)
 
   // Use cached calendar events from context
   const {
@@ -265,6 +270,82 @@ function CalendarContent() {
     if (entries.length === 0) return 'Nothing logged yet'
     return `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} · ${formatDuration(logged)}`
   }, [entries, committedTasks, isFutureDay])
+
+  /**
+   * Fit the untimed tasks around everything already in the day.
+   *
+   * The categoriser decides what kind of thing each task is — one batched
+   * call for the whole tray — and lib/suggest-times.ts does the placing,
+   * never over a calendar event and never without a reason.
+   */
+  const handleSuggestTimes = async () => {
+    if (unscheduledTasks.length === 0 || isSuggesting) return
+    setIsSuggesting(true)
+    try {
+      const categories = await categorizeActivities(unscheduledTasks.map((t) => t.title)).catch(
+        () => []
+      )
+
+      const busy = [
+        ...entries
+          .filter((e) => e.start_time)
+          .map((e) => ({
+            startMinutes: timeToMinutes(e.start_time!),
+            endMinutes: e.end_time
+              ? timeToMinutes(e.end_time)
+              : timeToMinutes(e.start_time!) + e.duration_minutes,
+          })),
+        ...calendarEvents.map((e) => ({
+          startMinutes: timeToMinutes(e.startTime),
+          endMinutes: timeToMinutes(e.endTime),
+        })),
+        ...committedTasks.map((t) => ({
+          startMinutes: timeToMinutes(t.committed_start),
+          endMinutes: timeToMinutes(t.committed_end),
+        })),
+      ]
+
+      const result = suggestTimes({
+        tasks: unscheduledTasks.map((task, i) => ({
+          id: task.id,
+          title: task.title,
+          category: categories[i] ?? null,
+        })),
+        busy,
+        nowMinutes,
+      })
+
+      setSuggestions(result.suggestions)
+      setUnplaced(result.unplaced.map((u) => ({ title: u.title, reason: u.reason })))
+    } catch (err) {
+      console.error('Failed to suggest times:', err)
+    } finally {
+      setIsSuggesting(false)
+    }
+  }
+
+  const acceptSuggestion = async (suggestion: Suggestion) => {
+    await handleCommitTask(suggestion.taskId, suggestion.startTime, suggestion.endTime)
+    setSuggestions((current) => current?.filter((s) => s.taskId !== suggestion.taskId) ?? null)
+  }
+
+  const acceptAllSuggestions = async () => {
+    if (!suggestions) return
+    for (const suggestion of suggestions) {
+      await csrfFetch('/api/plans', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: suggestion.taskId,
+          committed_start: suggestion.startTime,
+          committed_end: suggestion.endTime,
+        }),
+      })
+    }
+    setSuggestions(null)
+    setUnplaced([])
+    fetchEntriesForDate()
+  }
 
   // Check if logging is allowed for the selected date
   const canLog = isDateLoggable(selectedDate)
@@ -574,6 +655,86 @@ function CalendarContent() {
                   {isAddingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 </Button>
               </form>
+
+              {unscheduledTasks.length > 0 && !suggestions && (
+                <button
+                  onClick={handleSuggestTimes}
+                  disabled={isSuggesting}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground transition-all duration-150 hover:border-foreground/25 hover:text-foreground active:scale-[0.99]"
+                >
+                  {isSuggesting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Suggest times around my calendar
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Proposals. Nothing is committed until you say so, and each
+                  one says why that hour — the reason is the point. */}
+              {suggestions && suggestions.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {suggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.taskId}
+                      className="rounded-lg border border-dashed border-border bg-secondary/40 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm text-foreground truncate">{suggestion.title}</p>
+                          <p className="text-[11px] tabular-nums text-muted-foreground mt-0.5">
+                            {formatTimeDisplay(suggestion.startTime)} –{' '}
+                            {formatTimeDisplay(suggestion.endTime)}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => acceptSuggestion(suggestion)}>
+                          Accept
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-2">
+                        {suggestion.reason}
+                        {suggestion.source && (
+                          <button
+                            onClick={() => router.push(`/library#${suggestion.source}`)}
+                            className="ml-1 underline hover:no-underline"
+                          >
+                            why?
+                          </button>
+                        )}
+                      </p>
+                    </div>
+                  ))}
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button size="sm" className="flex-1" onClick={acceptAllSuggestions}>
+                      Accept all
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSuggestions(null)
+                        setUnplaced([])
+                      }}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {unplaced.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {unplaced.map((item) => (
+                    <p key={item.title} className="text-[11px] text-muted-foreground">
+                      <span className="text-foreground">{item.title}</span> — {item.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
 
               {unscheduledTasks.length === 0 && committedTasks.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-3">

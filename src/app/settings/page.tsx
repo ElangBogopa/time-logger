@@ -212,6 +212,25 @@ export default function MorePage() {
           <h1 className="page-title text-foreground">More</h1>
         </header>
 
+        {/* The research leads this page. It lost its tab to Plan, but it is
+            the one thing in the app no other tracker has, so it should not
+            be the last row above Sign out. */}
+        <button
+          onClick={() => router.push('/library')}
+          className="mx-4 mb-6 flex w-[calc(100%-2rem)] items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all duration-150 hover:border-foreground/25 active:scale-[0.995]"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
+            <BookOpen className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground">The Science</p>
+            <p className="text-sm text-muted-foreground">
+              Why the three numbers are the three numbers, and where every target came from
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground mt-1" />
+        </button>
+
         {/* Account & Settings */}
         <SectionLabel>Account &amp; Settings</SectionLabel>
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
@@ -262,14 +281,6 @@ export default function MorePage() {
             label="Your Ideal Day"
             description="Science-backed daily planning guide"
             onClick={() => router.push('/guide')}
-          />
-          <RowItem
-            icon={BookOpen}
-            iconBg="bg-secondary"
-            iconColor="text-muted-foreground"
-            label="The Science"
-            description="Research and books behind Better"
-            onClick={() => router.push('/library')}
           />
           <RowItem
             icon={MessageSquare}
