@@ -8,7 +8,7 @@
  * you give it one.
  */
 
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { csrfFetch } from '@/lib/api'
 
 const TOMORROW = '2026-11-05'
@@ -71,9 +71,14 @@ it('says it is a plan when the date is ahead', async () => {
 it('puts a task with no time in the tray, and keeps one that has a time off it', async () => {
   render(<CalendarPage />)
 
-  expect(await screen.findByText('Write the pricing memo')).toBeInTheDocument()
-  // Gym already has 07:00–08:00, so it belongs on the grid, not the tray.
-  expect(screen.queryByText('Gym')).not.toBeInTheDocument()
+  const untimed = await screen.findByText('Write the pricing memo')
+  const tray = untimed.closest('section')!
+
+  // Gym already has 07:00–08:00, so it belongs on the day, not in the tray
+  // of things still waiting for one.
+  expect(within(tray).queryByText('Gym')).not.toBeInTheDocument()
+  // and it is listed on the day itself
+  expect(screen.getByText('Gym')).toBeInTheDocument()
 })
 
 it('opens the time picker for the task you tap', async () => {

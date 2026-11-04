@@ -51,6 +51,15 @@ manipulation. Making one control do both is what produces the fidget.
   already set to the end of the last entry, because that is the answer
   nine times out of ten.
 
+**The calendar closes when you are not using it.** *(Built.)* The grid was
+always open: 1080 pixels of mostly empty night in a 500-pixel window,
+dominating the screen whether or not anything was being edited. The resting
+state is now the day as one band — coloured for what was logged, dashed for
+what is only planned, with a current-time mark — over a list of the day's
+items you can tap to change. "Open" gives you the grid, cropped by
+`lib/day-window.ts` to the hours that have something in them rather than all
+twenty-four, with "show the whole day" a tap away.
+
 **The calendar view is the planner.** *(Built.)* On a future date it says
 "Plan Tomorrow" and carries a tray of that day's tasks that have no time
 yet; tapping one gives it a time and it moves onto the grid. The dashboard's

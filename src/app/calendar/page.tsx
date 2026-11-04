@@ -5,11 +5,16 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchEntries, csrfFetch } from '@/lib/api'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
-import { TimeEntry, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
+import { TimeEntry, getAggregatedCategory, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
 import CommitTimeModal from '@/components/CommitTimeModal'
 import { comparePlanToActual, type PlanOutcome } from '@/lib/plan-adherence'
+import DayAtAGlance, { blocksForGlance } from '@/components/DayAtAGlance'
+import TimeEntryModal from '@/components/TimeEntryModal'
+import { AGGREGATED_HEX } from '@/lib/palette'
+import { dayWindow, isWholeDay } from '@/lib/day-window'
+import { formatDuration, formatTimeDisplay } from '@/lib/time-utils'
 
 /** A row of daily_plans: a task for a date, with a time once you give it one. */
 interface PlanTask {
@@ -28,7 +33,7 @@ import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Calendar, ChevronLeft, ChevronRight, Loader2, RefreshCw, Clock, X, Plus, CalendarClock } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, CalendarClock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
@@ -95,6 +100,10 @@ function CalendarContent() {
   const [unscheduledTasks, setUnscheduledTasks] = useState<PlanTask[]>([])
   const [schedulingTask, setSchedulingTask] = useState<PlanTask | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  /** The grid is the editing surface, not the resting state. */
+  const [isGridOpen, setIsGridOpen] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
+  const [showWholeDay, setShowWholeDay] = useState(false)
   const [isAddingTask, setIsAddingTask] = useState(false)
 
   // Use cached calendar events from context
@@ -150,6 +159,112 @@ function CalendarContent() {
     })
     return Object.fromEntries(comparisons.map((c) => [c.id, c.outcome])) as Record<string, PlanOutcome>
   }, [committedTasks, entries, isToday, isFutureDay])
+
+  /** The day drawn as one band, for the closed state. */
+  const glanceBlocks = useMemo(
+    () =>
+      blocksForGlance({
+        entries,
+        events: calendarEvents,
+        planned: committedTasks.map((t) => ({
+          id: t.id,
+          committed_start: t.committed_start,
+          committed_end: t.committed_end,
+        })),
+      }),
+    [entries, calendarEvents, committedTasks]
+  )
+
+  const nowMinutes = useMemo(() => {
+    if (!isToday) return null
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  }, [isToday])
+
+  /** Only the hours worth drawing, unless asked for all of them. */
+  const gridWindow = useMemo(() => {
+    if (showWholeDay) return { startHour: 0, endHour: 24 }
+    return dayWindow({
+      blocks: glanceBlocks.map((b) => ({ startMinutes: b.startMinutes, endMinutes: b.endMinutes })),
+      nowMinutes,
+    })
+  }, [glanceBlocks, nowMinutes, showWholeDay])
+
+  /**
+   * Everything on the day, in order, for the closed state. A band on its own
+   * is a shape; this is the shape with names on it, and each row goes to the
+   * thing that can change it.
+   */
+  const dayItems = useMemo(() => {
+    type Item = {
+      key: string
+      start: string
+      end: string
+      title: string
+      colour: string
+      kind: 'entry' | 'plan' | 'event'
+      onOpen: () => void
+    }
+    const items: Item[] = []
+
+    for (const entry of entries) {
+      if (!entry.start_time) continue
+      items.push({
+        key: `entry-${entry.id}`,
+        start: entry.start_time,
+        end: entry.end_time || entry.start_time,
+        title: entry.activity,
+        colour: AGGREGATED_HEX[entry.category ? getAggregatedCategory(entry.category) : 'escape'],
+        kind: 'entry',
+        onOpen: () => setEditingEntry(entry),
+      })
+    }
+
+    for (const task of committedTasks) {
+      items.push({
+        key: `plan-${task.id}`,
+        start: task.committed_start,
+        end: task.committed_end,
+        title: task.title,
+        colour: '#8B7E74',
+        kind: 'plan',
+        onOpen: () =>
+          setSchedulingTask({
+            id: task.id,
+            title: task.title,
+            date: task.date,
+            committed_start: task.committed_start,
+            committed_end: task.committed_end,
+            completed: task.completed,
+          }),
+      })
+    }
+
+    for (const event of calendarEvents) {
+      items.push({
+        key: `event-${event.id}`,
+        start: event.startTime,
+        end: event.endTime,
+        title: event.title,
+        colour: '#8B8680',
+        kind: 'event',
+        onOpen: () => setSelectedGhostEvent(event),
+      })
+    }
+
+    return items.sort((a, b) => a.start.localeCompare(b.start))
+  }, [entries, committedTasks, calendarEvents])
+
+  const glanceSummary = useMemo(() => {
+    const logged = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
+    if (isFutureDay) {
+      return committedTasks.length > 0
+        ? `${committedTasks.length} ${committedTasks.length === 1 ? 'task' : 'tasks'} scheduled`
+        : 'Nothing scheduled yet'
+    }
+    if (entries.length === 0) return 'Nothing logged yet'
+    return `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} · ${formatDuration(logged)}`
+  }, [entries, committedTasks, isFutureDay])
 
   // Check if logging is allowed for the selected date
   const canLog = isDateLoggable(selectedDate)
@@ -468,8 +583,66 @@ function CalendarContent() {
             </section>
           )}
 
-          {/* Timeline */}
+          {/* Closed by default: the day as a band, with the grid a tap away.
+              The grid was always open, 1080px of mostly empty night in a
+              500px window, whether or not anything was being edited. */}
+          {!isGridOpen ? (
+            <section>
+              <DayAtAGlance
+                blocks={glanceBlocks}
+                summary={glanceSummary}
+                nowMinutes={nowMinutes}
+                onOpen={() => setIsGridOpen(true)}
+              />
+
+              {dayItems.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {dayItems.map((item) => (
+                    <button
+                      key={item.key}
+                      onClick={item.onOpen}
+                      className="w-full flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-all duration-150 hover:border-foreground/25 active:scale-[0.995]"
+                    >
+                      <span
+                        className="h-8 w-1 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: item.kind === 'entry' ? item.colour : 'transparent',
+                          border: item.kind === 'entry' ? undefined : `1px dashed ${item.colour}`,
+                        }}
+                      />
+                      <span className="text-[11px] tabular-nums text-muted-foreground w-[92px] shrink-0">
+                        {formatTimeDisplay(item.start)}
+                      </span>
+                      <span className="flex-1 min-w-0 truncate text-sm text-foreground">{item.title}</span>
+                      {item.kind !== 'entry' && (
+                        <span className="field-label shrink-0">
+                          {item.kind === 'plan' ? 'planned' : 'calendar'}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : (
           <section>
+            <div className="flex items-center justify-between mb-2">
+              <button
+                onClick={() => setShowWholeDay((v) => !v)}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showWholeDay || isWholeDay(gridWindow)
+                  ? `Showing all 24 hours`
+                  : `Showing ${gridWindow.startHour}:00–${gridWindow.endHour}:00 · show the whole day`}
+              </button>
+              <button
+                onClick={() => setIsGridOpen(false)}
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Close
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <TimelineView
               key={refreshKey}
               entries={entries}
@@ -486,8 +659,11 @@ function CalendarContent() {
               isFutureDay={isFutureDay}
               isPastDay={isPastDay}
               canLog={canLog}
+              visibleStartHour={gridWindow.startHour}
+              visibleEndHour={gridWindow.endHour}
             />
           </section>
+          )}
         </div>
 
         {schedulingTask && (
@@ -500,6 +676,21 @@ function CalendarContent() {
             planId={schedulingTask.id}
             existingStart={schedulingTask.committed_start}
             existingEnd={schedulingTask.committed_end}
+          />
+        )}
+
+        {editingEntry && (
+          <TimeEntryModal
+            entry={editingEntry}
+            onClose={() => setEditingEntry(null)}
+            onUpdate={() => {
+              setEditingEntry(null)
+              fetchEntriesForDate()
+            }}
+            onDelete={() => {
+              setEditingEntry(null)
+              fetchEntriesForDate()
+            }}
           />
         )}
 
