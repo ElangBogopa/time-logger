@@ -98,7 +98,7 @@ function ReviewContent() {
         </div>
 
         {/* Tab Content — conditionally render (caching handles fast re-mounts) */}
-        {activeTab === 'day' && <DayReviewContent />}
+        {activeTab === 'day' && <DayReviewContent embedded />}
         {activeTab === 'weekly' && <WeeklyReviewContent />}
       </div>
     </div>

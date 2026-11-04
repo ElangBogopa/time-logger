@@ -468,11 +468,27 @@ function MoodSection({ mood }: { mood: MoodCheckin | null }) {
   )
 }
 
-export default function DayReviewContent() {
+interface DayReviewContentProps {
+  /**
+   * Rendered inside the review page's Today tab, which already provides the
+   * page heading, the padding and the navigation. The standalone /day-review
+   * route provides none of those, so this component owns them — and drops
+   * them when embedded, or the tab shows two headings, double padding and a
+   * Back button that leaves the tab altogether.
+   */
+  embedded?: boolean
+}
+
+export default function DayReviewContent({ embedded = false }: DayReviewContentProps) {
   const { status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
+  const shellClass = embedded ? '' : 'min-h-screen bg-background pb-20'
+  const innerClass = embedded ? '' : 'mx-auto max-w-2xl px-4 py-6'
+  const spinnerClass = embedded
+    ? 'flex items-center justify-center py-20'
+    : 'min-h-screen bg-background flex items-center justify-center'
   const [summary, setSummary] = useState<DaySummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -628,7 +644,7 @@ export default function DayReviewContent() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={spinnerClass}>
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
@@ -637,17 +653,21 @@ export default function DayReviewContent() {
   // Locked state — today before 9pm
   if (isLocked) {
     return (
-      <div className="min-h-screen bg-background pb-20">
-        <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className={shellClass}>
+        <div className={innerClass}>
           <header className="mb-6">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              Back
-            </button>
-            <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+            {!embedded && (
+              <>
+                <button
+                  onClick={() => router.back()}
+                  className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                  Back
+                </button>
+                <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+              </>
+            )}
           </header>
 
           <div className="flex flex-col items-center justify-center py-20">
@@ -669,7 +689,7 @@ export default function DayReviewContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={spinnerClass}>
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
@@ -677,29 +697,35 @@ export default function DayReviewContent() {
 
   if (error || !summary) {
     return (
-      <div className="min-h-screen bg-background p-4">
-        <button onClick={() => router.back()} className="flex items-center gap-2 text-muted-foreground mb-6">
-          <ArrowLeft className="h-5 w-5" />
-          Back
-        </button>
+      <div className={embedded ? 'py-10' : 'min-h-screen bg-background p-4'}>
+        {!embedded && (
+          <button onClick={() => router.back()} className="flex items-center gap-2 text-muted-foreground mb-6">
+            <ArrowLeft className="h-5 w-5" />
+            Back
+          </button>
+        )}
         <p className="text-center text-muted-foreground">Unable to load day review</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className={shellClass}>
+      <div className={innerClass}>
         {/* Header */}
         <header className="mb-6">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Back
-          </button>
-          <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+          {!embedded && (
+            <>
+              <button
+                onClick={() => router.back()}
+                className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                Back
+              </button>
+              <h1 className="text-2xl font-bold text-foreground">Day in Review</h1>
+            </>
+          )}
           <p className="text-muted-foreground">{formatDate(summary.date)}</p>
         </header>
 
