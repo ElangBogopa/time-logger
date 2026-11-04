@@ -26,17 +26,29 @@ export const FOCUS_WEIGHTS: Record<string, number> = {
   shallow_work: 0.3,
 }
 
-// ── Body category groups (no meals/sleep — only intentional physical well-being) ──
-// 'movement' included for backward compat with old entries — treated as exercise in scoring
-export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care']
+// ── Body category groups ──
+// Body is "did you look after yourself", not "did you train". Sleeping,
+// eating and washing are how a body is kept, and leaving them out produced
+// days like 3 Nov 2026: showered, two meals, a haircut, seven hours of work,
+// and a Body of 22 labelled "Running on empty" because there was no gym.
+// sleep and meals also fed no metric at all before this — the same hole
+// meetings had in Mind.
+// 'movement' is merged into 'exercise' in scoring; old entries still work.
+export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care', 'sleep', 'meals']
 
-// ── Body category weights (weighted + diminishing returns via sqrt scaling) ──
-// 'movement' is merged into 'exercise' for scoring — old DB entries still work
-// Multiple paths to 100%: beast gym session alone, or balanced mix
-export const BODY_WEIGHTS: Record<string, { weight: number; target: number; cap: number }> = {
-  exercise:  { weight: 0.80, target: 60, cap: 100 },  // 60min=80%, 90min=98%, no cap — gym CAN hit 100%
-  self_care: { weight: 0.25, target: 30, cap: 25 },   // 30min=25%, supplements exercise
-  rest:      { weight: 0.15, target: 20, cap: 15 },    // 20min=15%, supplements exercise
+// ── Body category weights ──
+// Weighted minutes, summed linearly; the shared curve supplies the
+// diminishing returns, so there are no per-category targets or caps here any
+// more. An hour of exercise is still exactly the target, so training alone
+// reaches 80 as it always did — but a night's sleep plus ordinary upkeep now
+// gets there too, which is the point of a metric called Body rather than
+// Training.
+export const BODY_WEIGHTS: Record<string, { weight: number }> = {
+  exercise:  { weight: 0.80 },  // 60 min is the target on its own
+  self_care: { weight: 0.40 },  // washing, grooming, therapy, meditation
+  rest:      { weight: 0.25 },  // deliberate downtime
+  meals:     { weight: 0.10 },  // eating is upkeep; duration is a weak proxy, so it is light
+  sleep:     { weight: 0.05 },  // 8 hours is about half the target on its own
 }
 
 // ── Heart category groups ──
@@ -192,13 +204,13 @@ export function calcBodyDetails(dayEntries: EntryRow[]): {
     }
   }
 
-  // Also compute per-category scores for transparency
+  // Per-category contribution on the same scale as the headline score, so the
+  // breakdown explains it. This still used the old sqrt-and-caps maths after
+  // calcBody moved to the shared curve, so the parts stopped adding up.
   const categoryScores: Record<string, number> = {}
   for (const [cat, config] of Object.entries(BODY_WEIGHTS)) {
     const minutes = breakdown[cat] || 0
-    const ratio = minutes / config.target
-    const scaled = Math.sqrt(ratio)
-    categoryScores[cat] = Math.round(Math.min(config.cap, scaled * config.weight * 100))
+    categoryScores[cat] = saturatingScore(minutes * config.weight, BODY_TARGET)
   }
 
   return { totalMinutes, breakdown, categoryScores }
