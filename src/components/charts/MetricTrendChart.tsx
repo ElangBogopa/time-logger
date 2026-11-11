@@ -172,6 +172,10 @@ function MetricTrendChartInner({
               tickLine={false}
               tick={{ fontSize: CHART_THEME.axis.fontSize, fill: CHART_THEME.axis.fill }}
               dy={CHART_THEME.axis.dy}
+              // Room for the first and last labels, which are centred on
+              // points at the very edges and were being cut in half.
+              padding={{ left: 14, right: 14 }}
+              interval="preserveStartEnd"
             />
             <ReferenceLine
               y={average}

@@ -8,7 +8,7 @@
  * suggestion without a reason attached.
  */
 
-import { suggestTimes } from '@/lib/suggest-times'
+import { suggestTimes, rankSlots, defaultDuration } from '@/lib/suggest-times'
 import { LIBRARY } from '@/lib/library'
 
 const busy = (startHour: number, endHour: number) => ({
@@ -139,4 +139,135 @@ it('keeps everything inside waking hours', () => {
     expect(suggestion.startMinutes).toBeGreaterThanOrEqual(6 * 60)
     expect(suggestion.endMinutes).toBeLessThanOrEqual(23 * 60)
   }
+})
+
+/**
+ * Your own habit outranks the textbook. The suggester proposed the gym at
+ * 6am to someone whose log showed a run at 6pm every time: correct by the
+ * research and useless to the person.
+ */
+describe('a usual hour from the log', () => {
+  const at = (h: number, m = 0) => h * 60 + m
+
+  it('is proposed ahead of the research window', () => {
+    const { suggestions } = suggestTimes({
+      tasks: [{ id: 'run', title: 'Run', category: 'exercise' as never, usualStartMinutes: at(18) }],
+      busy: [],
+    })
+    expect(suggestions[0]).toMatchObject({ startTime: '18:00', basis: 'habit' })
+  })
+
+  it('quotes the research where it agrees with the habit', () => {
+    const { suggestions } = suggestTimes({
+      tasks: [{ id: 'run', title: 'Run', category: 'exercise' as never, usualStartMinutes: at(18) }],
+      busy: [],
+    })
+    expect(suggestions[0].reason).toBe(
+      'When you usually do this — body temperature peaks — your best window for physical effort'
+    )
+    expect(suggestions[0].source).toBe('exercise-cognition')
+  })
+
+  it('stands on the habit alone where the research has nothing to say', () => {
+    const { suggestions } = suggestTimes({
+      tasks: [{ id: 'run', title: 'Run', category: 'exercise' as never, usualStartMinutes: at(13) }],
+      busy: [],
+    })
+    expect(suggestions[0]).toMatchObject({
+      startTime: '13:00',
+      reason: 'When you usually do this',
+      source: null,
+      basis: 'habit',
+    })
+  })
+
+  it('takes the nearest free time when the usual hour is taken', () => {
+    const { suggestions } = suggestTimes({
+      tasks: [{ id: 'run', title: 'Run', category: 'exercise' as never, usualStartMinutes: at(18) }],
+      busy: [{ startMinutes: at(17, 30), endMinutes: at(19) }],
+    })
+    // 19:00 is an hour off the habit; 16:30, the nearest before, is 90 minutes off.
+    expect(suggestions[0].startTime).toBe('19:00')
+    expect(suggestions[0].reason).toMatch(/^Close to when you usually do this/)
+  })
+
+  it('falls back to the research when the habit is out of reach', () => {
+    const { suggestions } = suggestTimes({
+      tasks: [{ id: 'run', title: 'Run', category: 'exercise' as never, usualStartMinutes: at(18) }],
+      busy: [{ startMinutes: at(15), endMinutes: at(22) }],
+    })
+    expect(suggestions[0]).toMatchObject({ startTime: '06:00', basis: 'research' })
+  })
+
+  it('changes nothing for a task with no habit', () => {
+    const { suggestions } = suggestTimes({ tasks: [task('a', 'deep_work')], busy: [] })
+    expect(suggestions[0]).toMatchObject({ startTime: '09:00', basis: 'research' })
+  })
+})
+
+describe('how long to plan', () => {
+  it.each([
+    ['deep_work', 90],
+    ['calls', 30],
+    ['exercise', 60],
+    ['social', 90],
+    [null, 60],
+  ])('gives %s a block of %i minutes', (category, minutes) => {
+    expect(defaultDuration(category as never)).toBe(minutes)
+    const { suggestions } = suggestTimes({
+      tasks: [{ id: 'a', title: 'A', category: category as never }],
+      busy: [],
+    })
+    expect(suggestions[0].durationMinutes).toBe(minutes)
+    expect(suggestions[0].endMinutes - suggestions[0].startMinutes).toBe(minutes)
+  })
+
+  it('lets a stated length win', () => {
+    const { suggestions } = suggestTimes({
+      tasks: [{ id: 'a', title: 'A', category: 'deep_work' as never, durationMinutes: 45 }],
+      busy: [],
+    })
+    expect(suggestions[0].durationMinutes).toBe(45)
+  })
+})
+
+describe('starting the day when you do', () => {
+  it('proposes nothing before the earliest minute it is given', () => {
+    // Someone who gets up at seven is not offered the gym at six.
+    const { suggestions } = suggestTimes({
+      tasks: [task('gym', 'exercise')],
+      busy: [],
+      earliestMinutes: 7 * 60 + 30,
+    })
+    expect(suggestions[0].startMinutes).toBeGreaterThanOrEqual(7 * 60 + 30)
+  })
+})
+
+describe('rankSlots', () => {
+  it('offers different answers, not the same one a quarter of an hour later', () => {
+    const slots = rankSlots({ duration: 60, category: 'exercise' as never, taken: [] })
+    expect(slots.length).toBeGreaterThan(1)
+    for (let i = 0; i < slots.length; i++) {
+      for (let j = i + 1; j < slots.length; j++) {
+        expect(Math.abs(slots[i].start - slots[j].start)).toBeGreaterThanOrEqual(90)
+      }
+    }
+  })
+
+  it('puts the best first', () => {
+    const slots = rankSlots({ duration: 60, category: 'exercise' as never, usualStartMinutes: 18 * 60, taken: [] })
+    expect(slots[0].start).toBe(18 * 60)
+    expect(slots.every((slot, i) => i === 0 || slot.score <= slots[i - 1].score)).toBe(true)
+  })
+
+  it('never offers anything on top of what is taken', () => {
+    const taken = [{ startMinutes: 9 * 60, endMinutes: 17 * 60 }]
+    for (const slot of rankSlots({ duration: 60, category: 'deep_work' as never, taken })) {
+      expect(slot.start + 60 <= 9 * 60 || slot.start >= 17 * 60).toBe(true)
+    }
+  })
+
+  it('returns nothing when there is no room', () => {
+    expect(rankSlots({ duration: 60, category: null, taken: [{ startMinutes: 0, endMinutes: 1440 }] })).toEqual([])
+  })
 })

@@ -9,7 +9,10 @@ const openai = new OpenAI({
 })
 
 interface DayData {
-  score: number
+  /** Body / Mind / Heart, each 0–99. */
+  metrics?: { body: number; focus: number; social: number } | null
+  /** Planned blocks with a time: how many were kept, moved or missed. */
+  plan?: { kept: number; moved: number; missed: number } | null
   totalMinutesLogged: number
   // Optional: /api/day-summary stopped returning targetProgress when the
   // weekly targets system was removed, so the client omits it entirely.
@@ -71,10 +74,32 @@ export async function POST(request: NextRequest) {
       ? `Longest focus session: ${dayData.longestFocusSession.minutes} minutes on "${dayData.longestFocusSession.activity}".`
       : ''
 
-    const prompt = `You are a warm, encouraging life coach reviewing someone's day. Based on their time tracking data, write a brief, personalized 2-3 sentence commentary. Be specific about what they did well. If it was a tough day, acknowledge that with compassion. Never be preachy or guilt-inducing.
+    const metrics = dayData.metrics
+    const scoresText = metrics
+      ? `Body: ${metrics.body}/100\nMind: ${metrics.focus}/100\nHeart: ${metrics.social}/100`
+      : 'Scores unavailable.'
 
-Day Score: ${dayData.score}/100
-Total Time Tracked: ${dayData.totalMinutesLogged} minutes
+    const plan = dayData.plan
+    const planned = plan ? plan.kept + plan.moved + plan.missed : 0
+    const planText = plan && planned > 0
+      ? `Plan: ${planned} timed ${planned === 1 ? 'block' : 'blocks'} — ${plan.kept} kept, ${plan.moved} done at another time, ${plan.missed} not done.`
+      : ''
+
+    const hours = Math.floor(dayData.totalMinutesLogged / 60)
+    const minutes = dayData.totalMinutesLogged % 60
+
+    // What the model is told is what the person can see. It used to get a
+    // "Day Score" that was sessions wrapped up ÷ sessions passed — not shown
+    // anywhere — plus "if it was a tough day, acknowledge that", and so it
+    // consoled people for days that had gone well.
+    const prompt = `You are reviewing someone's day from their time log. Write 2-3 sentences: warm, specific, a little dry. Name what actually happened. Never be preachy or guilt-inducing, and never describe the day as hard, tough or challenging unless their mood says so.
+
+The day is scored on three things, each out of 100. 80 means the target for that area was met, 70 or more is a strong day for it, and 100 is not reachable. A low number is often a choice rather than a failure.
+Use the scores to judge the day, but do not recite them: they are on screen above your words.
+This may be read on the day itself or days later, so never write "today", "yesterday" or "tomorrow": say "the day". You know nothing about any other day, so make no comparisons such as "lower than usual". Do not suggest improving a score and give no advice about tomorrow. You may note, lightly and once, an area that got no time at all.
+${scoresText}
+Time tracked: ${hours}h ${minutes}m (this only says how much was written down — do not praise or criticise it)
+${planText}
 ${winsText}
 ${targetsText}
 ${moodText}

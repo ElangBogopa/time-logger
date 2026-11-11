@@ -9,9 +9,9 @@
  *
  * It is a default, not a claim about you. Someone who works nights has a
  * different curve, and the honest fix for that is to learn it from their
- * own logged history rather than to argue with them — see
- * `preferredWindows` in suggest-times.ts, which already prefers your own
- * pattern when there is one.
+ * own logged history rather than to argue with them — which is what
+ * `rankSlots` in suggest-times.ts does: a usual hour read from the log by
+ * lib/habits.ts outranks any window here.
  */
 
 import type { TimeCategory } from './types'

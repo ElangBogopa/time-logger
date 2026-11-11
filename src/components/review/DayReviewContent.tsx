@@ -13,7 +13,7 @@
 import { csrfFetch } from '@/lib/api'
 import CommentaryThread from '@/components/CommentaryThread'
 import { commentaryFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
-import { cacheGet, cacheSet } from '@/lib/client-cache'
+import { cacheGet, cacheSet, cacheDelete } from '@/lib/client-cache'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -32,9 +32,10 @@ import {
   Zap,
   Calendar,
   Lock,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatTimeDisplay } from '@/lib/time-utils'
+import { formatTimeDisplay, formatDuration } from '@/lib/time-utils'
 import {
   TimeCategory,
   CATEGORY_LABELS,
@@ -45,6 +46,8 @@ import {
   AggregatedCategory,
   getAggregatedCategory,
   getUserToday,
+  getLocalDateString,
+  isTaskCompletable,
   shiftDateString,
   getUserCurrentHour,
 } from '@/lib/types'
@@ -132,6 +135,8 @@ interface ProductivityScore {
 
 interface DaySummary {
   planAdherence?: PlanAdherence | null
+  /** Absent on reviews saved before the summary carried the three scores. */
+  metrics?: { body: number; focus: number; social: number } | null
   score: number
   scoreColor: 'green' | 'orange' | 'red'
   sessionsLogged: number
@@ -168,7 +173,41 @@ function formatDate(dateStr: string): string {
 }
 
 // Wins Section
-function WinsSection({ wins }: { wins: Win[] }) {
+/**
+ * The step after a review: plan the next day that can still be planned.
+ * Reviewing today (after 9pm) that is tomorrow. Reviewing an earlier day it
+ * is the rest of today, until the evening, when it becomes tomorrow too.
+ */
+function PlanNextCard({ reviewDate }: { reviewDate: string }) {
+  const router = useRouter()
+  const today = getUserToday()
+  const planToday = reviewDate < today && getUserCurrentHour() < 18
+  const target = planToday ? today : shiftDateString(today, 1)
+
+  return (
+    <section className="mt-6">
+      <button
+        onClick={() => router.push(planToday ? '/calendar' : `/calendar?date=${target}`)}
+        className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 text-left transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
+          <CalendarClock className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            {planToday ? 'Plan the rest of today' : 'Plan tomorrow'}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Give what matters a time, around your calendar
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </button>
+    </section>
+  )
+}
+
+function WinsSection({ wins, isToday }: { wins: Win[]; isToday: boolean }) {
   if (wins.length === 0) return null
 
   const winIcons: Record<Win['type'], React.ReactNode> = {
@@ -186,7 +225,7 @@ function WinsSection({ wins }: { wins: Win[] }) {
     <section className="space-y-3">
       <div className="flex items-center gap-2">
         <Trophy className={`h-5 w-5 ${AGGREGATED_CLASSES.recovery.text}`} />
-        <h2 className="font-semibold text-foreground">Today&apos;s Wins</h2>
+        <h2 className="font-semibold text-foreground">{isToday ? "Today's Wins" : 'Wins'}</h2>
       </div>
       <div className="space-y-2">
         {wins.map(win => (
@@ -265,9 +304,14 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
 function PlanVsActualCard({
   score,
   adherence,
+  onConfirm,
+  confirmingId = null,
 }: {
   score: ProductivityScore
   adherence: PlanAdherence | null
+  /** Say that what was logged in a plan's hour was the plan. Absent once the day is locked. */
+  onConfirm?: (taskId: string, committedStart: string) => void
+  confirmingId?: string | null
 }) {
   const byId = new Map((adherence?.comparisons ?? []).map((c) => [c.id, c]))
 
@@ -301,7 +345,7 @@ function PlanVsActualCard({
           return (
             <div key={task.id} className="flex items-start gap-2 text-sm">
               <span className={`mt-0.5 ${tone}`}>
-                {task.completed ? <Check className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                {task.completed || comparison?.inferred ? <Check className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
               </span>
               <div className="min-w-0 flex-1">
                 <p className={task.completed ? 'text-muted-foreground' : 'text-foreground'}>
@@ -310,9 +354,13 @@ function PlanVsActualCard({
                 {comparison && (
                   <p className="text-[11px] text-muted-foreground">
                     {comparison.outcome === 'kept' &&
-                      `Planned ${formatTimeDisplay(comparison.committedStart)} — and that is when it happened`}
+                      (comparison.inferred && comparison.matchedActivity
+                        ? `Planned ${formatTimeDisplay(comparison.committedStart)} — you logged ${comparison.matchedActivity} then`
+                        : `Planned ${formatTimeDisplay(comparison.committedStart)} — and that is when it happened`)}
                     {comparison.outcome === 'moved' &&
-                      `Planned ${formatTimeDisplay(comparison.committedStart)}, done at another time`}
+                      (comparison.matchedActivity && comparison.matchedStart
+                        ? `Planned ${formatTimeDisplay(comparison.committedStart)} — you logged ${comparison.matchedActivity} at ${formatTimeDisplay(comparison.matchedStart)}`
+                        : `Planned ${formatTimeDisplay(comparison.committedStart)}, done at another time`)}
                     {comparison.outcome === 'missed' &&
                       (comparison.loggedActivity
                         ? `Planned ${formatTimeDisplay(comparison.committedStart)} — you logged ${comparison.loggedActivity}`
@@ -322,6 +370,18 @@ function PlanVsActualCard({
                   </p>
                 )}
               </div>
+              {/* The matcher reads words, and words differ: when something was
+                  logged in the plan's hour and it did not recognise it, one
+                  tap says it was the plan. */}
+              {onConfirm && comparison?.outcome === 'missed' && comparison.loggedActivity && (
+                <button
+                  onClick={() => onConfirm(task.id, comparison.committedStart)}
+                  disabled={confirmingId !== null}
+                  className="shrink-0 min-h-9 rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/25 transition-colors disabled:opacity-50"
+                >
+                  {confirmingId === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'That was it'}
+                </button>
+              )}
             </div>
           )
         })}
@@ -425,13 +485,18 @@ interface DayReviewContentProps {
    * Back button that leaves the tab altogether.
    */
   embedded?: boolean
+  /**
+   * The day to review, chosen by the review tab's own navigator. Without
+   * it the day comes from `?date=` in the URL, as /day-review supplies.
+   */
+  date?: string
 }
 
-export default function DayReviewContent({ embedded = false }: DayReviewContentProps) {
+export default function DayReviewContent({ embedded = false, date: dateProp }: DayReviewContentProps) {
   const { status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const dateParam = searchParams.get('date')
+  const dateParam = dateProp ?? searchParams.get('date')
   const shellClass = embedded ? '' : 'min-h-screen bg-background pb-20'
   const innerClass = embedded ? '' : 'mx-auto max-w-2xl px-4 py-6'
   const spinnerClass = embedded
@@ -461,7 +526,14 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          score: summaryData.score,
+          metrics: summaryData.metrics ?? null,
+          plan: summaryData.planAdherence
+            ? {
+                kept: summaryData.planAdherence.kept,
+                moved: summaryData.planAdherence.moved,
+                missed: summaryData.planAdherence.missed,
+              }
+            : null,
           totalMinutesLogged: summaryData.totalMinutesLogged,
           wins: summaryData.wins,
           mood: summaryData.todayMood?.mood || null,
@@ -541,12 +613,29 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
 
       // Either 'live' (editable) or 'needs_finalization' (locked but not saved yet)
       // In both cases, fetch fresh summary
-      const summaryUrl = `/api/day-summary?date=${dateParam || getUserToday()}`
+      // The server cannot know the user's clock (it runs in UTC), so the
+      // client says how far through the day it is. No `now` means a day
+      // that is over, which includes "today" in the hours after midnight.
+      const reviewDate = dateParam || getUserToday()
+      const clock = new Date()
+      const nowQuery =
+        reviewDate === getLocalDateString() ? `&now=${clock.getHours() * 60 + clock.getMinutes()}` : ''
+      const summaryUrl = `/api/day-summary?date=${reviewDate}${nowQuery}`
       const summaryRes = await fetch(summaryUrl)
       if (!summaryRes.ok) throw new Error('Failed to fetch summary')
       const summaryData: DaySummary = await summaryRes.json()
       setSummary(summaryData)
       setIsLoading(false)
+
+      // A day with nothing logged has nothing to say anything about. Now
+      // that the review can be paged day by day, every blank day passed
+      // through would otherwise cost a model call for a paragraph of filler
+      // and save it as that day's review.
+      if (summaryData.totalMinutesLogged === 0) {
+        setCommentary(null)
+        cacheSet(reviewCacheKey, { summary: summaryData, commentary: null })
+        return
+      }
 
       // Fetch AI commentary
       setIsLoadingCommentary(true)
@@ -566,6 +655,34 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
       setIsLoading(false)
     }
   }, [dateParam, generateCommentary, saveReview])
+
+  /** "That was it": what was logged in a plan's hour was the plan. */
+  const [confirmingPlanId, setConfirmingPlanId] = useState<string | null>(null)
+  const handleConfirmPlan = useCallback(
+    async (taskId: string, committedStart: string) => {
+      setConfirmingPlanId(taskId)
+      try {
+        const hour = parseInt(committedStart.split(':')[0], 10)
+        const res = await csrfFetch('/api/plans', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: taskId,
+            completed: true,
+            completed_session: hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening',
+          }),
+        })
+        if (!res.ok) throw new Error('Failed to confirm plan')
+        cacheDelete(`day-review:${dateParam || 'today'}`)
+        await fetchData()
+      } catch (err) {
+        console.error('Failed to confirm plan:', err)
+      } finally {
+        setConfirmingPlanId(null)
+      }
+    },
+    [dateParam, fetchData]
+  )
 
   // The day's Body / Mind / Heart, which is what the review leads with now.
   // The old hero was sessionsLogged ÷ sessionsPassed × 100 — a measure of
@@ -678,6 +795,33 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
     )
   }
 
+  if (summary.totalMinutesLogged === 0) {
+    return (
+      <div className={shellClass}>
+        <div className={innerClass}>
+          {!embedded && (
+            <header className="mb-6">
+              <button
+                onClick={() => router.back()}
+                className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                Back
+              </button>
+              <h1 className="page-title text-foreground">Day in Review</h1>
+              <p className="text-muted-foreground">{formatDate(summary.date)}</p>
+            </header>
+          )}
+          <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
+            <p className="text-sm text-foreground">Nothing was logged on this day</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">There is nothing to review until something is.</p>
+          </div>
+          <PlanNextCard reviewDate={summary.date} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={shellClass}>
       <div className={innerClass}>
@@ -695,7 +839,9 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
               <h1 className="page-title text-foreground">Day in Review</h1>
             </>
           )}
-          <p className="text-muted-foreground">{formatDate(summary.date)}</p>
+          {/* The review tab's own navigator names the day; saying it again
+              directly underneath was the same date twice. */}
+          {!dateProp && <p className="text-muted-foreground">{formatDate(summary.date)}</p>}
         </header>
 
         {/* How the day actually went, on the app's one scale */}
@@ -749,7 +895,7 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
         {/* Wins */}
         {summary.wins.length > 0 && (
           <div className="mb-6">
-            <WinsSection wins={summary.wins} />
+            <WinsSection wins={summary.wins} isToday={isTodayReview} />
           </div>
         )}
 
@@ -764,6 +910,8 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
             <PlanVsActualCard
               score={summary.productivityScore}
               adherence={summary.planAdherence ?? null}
+              onConfirm={isTaskCompletable(summary.date) ? handleConfirmPlan : undefined}
+              confirmingId={confirmingPlanId}
             />
           </section>
         )}
@@ -814,12 +962,17 @@ export default function DayReviewContent({ embedded = false }: DayReviewContentP
               <div>
                 <p className="text-sm text-muted-foreground">Longest focus session</p>
                 <p className="font-medium text-foreground">
-                  {summary.longestFocusSession.minutes} min on &quot;{summary.longestFocusSession.activity}&quot;
+                  {formatDuration(summary.longestFocusSession.minutes)} on &quot;{summary.longestFocusSession.activity}&quot;
                 </p>
               </div>
             </div>
           </section>
         )}
+
+        {/* Where a review leads. It used to simply end: the one moment you
+            are looking at how a day went, and nothing pointed at the next
+            one. */}
+        <PlanNextCard reviewDate={summary.date} />
       </div>
     </div>
   )

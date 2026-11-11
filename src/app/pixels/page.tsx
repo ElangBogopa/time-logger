@@ -215,16 +215,18 @@ export default function YearInPixelsPage() {
           <>
             {/* Stats Summary */}
             {stats && stats.total > 0 && (
-              <div className="mb-6 grid grid-cols-4 gap-3">
+              <div className="mb-6 grid grid-cols-4 gap-2">
                 {[
                   { value: stats.total, label: 'Days logged', color: 'text-foreground' },
                   { value: stats.allThree, label: 'All three', color: 'text-foreground' },
                   { value: stats.someTargets, label: 'One or two', color: 'text-muted-foreground' },
                   { value: stats.noTargets, label: 'None met', color: 'text-muted-foreground' },
                 ].map(({ value, label, color }) => (
-                  <div key={label} className="rounded-lg bg-secondary p-3 text-center">
+                  <div key={label} className="rounded-lg bg-secondary px-1.5 py-3 text-center">
                     <p className={`metric-number ${color}`}>{value}</p>
-                    <p className="field-label mt-1 whitespace-nowrap">{label}</p>
+                    {/* Two short lines, not one clipped one: "DAYS LOGGED"
+                        ran out of the tile at phone width. */}
+                    <p className="field-label mt-1 leading-tight">{label}</p>
                   </div>
                 ))}
               </div>

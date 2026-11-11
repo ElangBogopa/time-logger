@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase-server'
 import { calculateDailyScore, DailyProductivityScore, PlanItem } from '@/lib/productivity-score'
+import { calcBody, calcFocus, calcSocial, type EntryRow } from '@/lib/metrics-calc'
+import { formatDuration } from '@/lib/time-utils'
 import { comparePlanToActual, summarisePlanAdherence, type PlanAdherence, type PlanRow } from '@/lib/plan-adherence'
 import { TimeEntry, SessionCompletion, getUserToday, getUserCurrentHour, TimeCategory, CATEGORY_LABELS, MoodCheckin, AggregatedCategory, ENERGY_VIEW, AGGREGATED_CATEGORY_LABELS, aggregateByView } from '@/lib/types'
 interface Win {
@@ -48,6 +50,8 @@ interface DaySummary {
   totalMinutesLogged: number
   hasEveningPassed: boolean
   planAdherence: PlanAdherence | null
+  /** Body / Mind / Heart for the day — what the commentary is written from. */
+  metrics: { body: number; focus: number; social: number }
   date: string
 
   // Wins
@@ -97,7 +101,7 @@ function generateWins(
   if (longestFocus && longestFocus.minutes >= 60) {
     wins.push({
       id: 'longest-focus',
-      text: `${longestFocus.minutes} min focus session on "${longestFocus.activity}"`,
+      text: `${formatDuration(longestFocus.minutes)} focus session on "${longestFocus.activity}"`,
       type: 'focus',
       value: longestFocus.minutes,
     })
@@ -240,6 +244,15 @@ export async function GET(request: NextRequest) {
   const isViewingToday = !dateParam || dateParam === getUserToday()
   const currentHour = getUserCurrentHour()
 
+  // Where the day has got to, in the user's own clock. The server's clock is
+  // UTC in production, so "now" computed here judged a 6pm plan as missed at
+  // 1pm Toronto time. The client says what time it is; with no `now` and an
+  // explicit date, the day is treated as finished.
+  const nowParam = request.nextUrl.searchParams.get('now')
+  const clientNow = nowParam !== null && /^\d{1,4}$/.test(nowParam) ? Math.min(1440, Number(nowParam)) : null
+  const nowMinutes =
+    clientNow ?? (dateParam ? null : new Date().getHours() * 60 + new Date().getMinutes())
+
   // For past dates, all sessions have passed
   const sessionsPassed = isViewingToday
     ? (currentHour >= 24 ? 3 : currentHour >= 18 ? 3 : currentHour >= 12 ? 2 : 1)
@@ -301,7 +314,7 @@ export async function GET(request: NextRequest) {
         plans: todayPlans as unknown as PlanRow[],
         entries: todayEntries,
         // A finished day judges everything; today leaves the rest of it alone.
-        nowMinutes: isViewingToday ? new Date().getHours() * 60 + new Date().getMinutes() : null,
+        nowMinutes,
       })
       return comparisons.length > 0 ? summarisePlanAdherence(comparisons) : null
     })()
@@ -319,9 +332,21 @@ export async function GET(request: NextRequest) {
     const aggregatedBreakdown = buildAggregatedBreakdown(todayEntries)
     const wins = generateWins(todayEntries, longestFocusSession, categoryBreakdown)
 
+    // The day on the app's one scale. The commentary used to be written from
+    // `score` above — sessions wrapped up ÷ sessions passed — so a day at
+    // Body 92, Mind 75 with no session closed was told it had been
+    // "challenging". `score` stays only because saved reviews store it.
+    const scoredRows = todayEntries.filter((e) => e.category) as unknown as EntryRow[]
+    const metrics = {
+      body: calcBody(scoredRows),
+      focus: calcFocus(scoredRows),
+      social: calcSocial(scoredRows),
+    }
+
     const summary: DaySummary = {
       score,
       scoreColor,
+      metrics,
       sessionsLogged,
       totalSessions: sessionsPassed,
       totalMinutesLogged,

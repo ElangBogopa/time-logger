@@ -31,7 +31,10 @@ export default function Providers({ children }: { children: ReactNode }) {
             <div className="app-scroll">{children}</div>
             <BottomTabBar />
             <OfflineIndicator />
-            <Toaster position="bottom-center" />
+            {/* Lifted clear of the tab bar, which toasts used to cover, and of
+                the floating add button above it — a toast sitting on that
+                button blocks logging the next thing for as long as it shows. */}
+            <Toaster position="bottom-center" offset={{ bottom: 160 }} mobileOffset={{ bottom: 160 }} />
           </div>
         </CalendarProvider>
       </SessionProvider>

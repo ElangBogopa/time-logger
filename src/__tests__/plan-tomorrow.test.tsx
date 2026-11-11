@@ -11,7 +11,16 @@
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { csrfFetch } from '@/lib/api'
 
-const TOMORROW = '2026-11-05'
+// Relative to the real clock. These were fixed dates — "today" 4 November,
+// "tomorrow" the 5th — with only one of the page's two notions of today
+// mocked, so the suite passed until the 5th and has failed ever since: the
+// planner correctly stopped calling a past date "Tomorrow".
+const mockDates = (() => {
+  const types = jest.requireActual('@/lib/types')
+  const today: string = types.getLocalDateString()
+  return { today, tomorrow: types.shiftDateString(today, 1) as string }
+})()
+const TOMORROW = mockDates.tomorrow
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
@@ -36,7 +45,6 @@ jest.mock('@/lib/api', () => ({
 }))
 jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),
-  getLocalDateString: (d?: Date) => (d ? jest.requireActual('@/lib/types').getLocalDateString(d) : '2026-11-04'),
   isDateLoggable: () => false,
 }))
 jest.mock('@/components/TimelineView', () => ({ __esModule: true, default: () => <div data-testid="grid" /> }))

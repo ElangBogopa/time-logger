@@ -1,6 +1,7 @@
 'use client'
 
 import { TimeEntry, CATEGORY_LABELS, getAggregatedCategory, AggregatedCategory } from '@/lib/types'
+import { formatDuration } from '@/lib/time-utils'
 import { AGGREGATED_HEX } from '@/lib/palette'
 import {
   Brain,
@@ -52,13 +53,9 @@ function Row({ children, onClick }: { children: React.ReactNode; onClick?: () =>
   )
 }
 
-function formatDuration(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}m`
-  if (m === 0) return `${h}h`
-  return `${h}:${String(m).padStart(2, '0')}`
-}
+// Durations come from the one formatter in time-utils. This file had its
+// own, which wrote "2:28" beside rows reading "1h" — a clock time and a
+// length in the same column.
 
 function formatTime(time: string | null): string {
   if (!time) return '--'
@@ -109,7 +106,7 @@ export default function ActivityList({ entries, onEntryClick, emptyMessage }: Ac
           >
             {/* Duration pill */}
             <div
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 min-w-[72px] justify-center"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 min-w-[84px] justify-center whitespace-nowrap"
               style={{ backgroundColor: color }}
             >
               <Icon className="h-3.5 w-3.5 text-white" />
@@ -120,7 +117,9 @@ export default function ActivityList({ entries, onEntryClick, emptyMessage }: Ac
 
             {/* Activity name */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate uppercase tracking-wide">
+              {/* As typed. It was upper-cased and letter-spaced, which
+                  shouted the user's own words back and cut them short. */}
+              <p className="text-sm font-medium text-foreground truncate">
                 {label}
               </p>
               {entry.category && (

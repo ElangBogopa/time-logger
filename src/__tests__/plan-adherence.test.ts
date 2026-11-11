@@ -105,3 +105,80 @@ it('summarises the day without inventing a score', () => {
 
   expect(summarisePlanAdherence(comparisons)).toMatchObject({ kept: 1, moved: 1, missed: 1, settled: 3 })
 })
+
+/**
+ * Reading the plan out of the log. "Kept" used to need a tick in the popup
+ * that follows a session; a plan logged exactly on time without that tick
+ * was reported as missed, and a day review said "0 of 3 kept" beside two
+ * rows reading "you logged Ran 5k".
+ */
+describe('a plan recognised in the log, without a tick', () => {
+  it('is kept when the planned thing was logged in its hour', () => {
+    const result = comparePlanToActual({
+      plans: [plan('Run', '18:00', '19:00')],
+      entries: [entry('Ran 5k', '18:00', '19:00')],
+    })
+    expect(result[0]).toMatchObject({ outcome: 'kept', inferred: true, matchedActivity: 'Ran 5k' })
+  })
+
+  it.each([
+    ['Gym', 'Weights session'],
+    ['Call home', 'Called home'],
+    ['Call home', 'Called mom'],
+    ['Reserving model build', 'Reserving model build'],
+    ['Finish pricing model', 'built the pricing model'],
+    ['Study for the exam', 'Studying'],
+  ])('recognises "%s" in "%s"', (title, activity) => {
+    expect(outcomes([plan(title, '10:00', '11:00')], [entry(activity, '10:00', '11:00')])).toEqual([[title, 'kept']])
+  })
+
+  it('does not claim a match on a general word', () => {
+    // "work" proves nothing: this hour went to something else.
+    expect(
+      outcomes([plan('Deep work on the reserving model', '09:00', '11:00')], [entry('Work admin', '09:00', '11:00')])
+    ).toEqual([['Deep work on the reserving model', 'missed']])
+  })
+
+  it('still says missed when the hour went to something else', () => {
+    const result = comparePlanToActual({
+      plans: [plan('Run', '18:00', '19:00')],
+      entries: [entry('Emails', '18:00', '19:00')],
+    })
+    expect(result[0]).toMatchObject({ outcome: 'missed', loggedActivity: 'Emails' })
+  })
+
+  it('needs the matching entry to cover half the hour', () => {
+    expect(outcomes([plan('Run', '18:00', '19:00')], [entry('Ran 5k', '18:45', '19:30')])).toEqual([
+      ['Run', 'missed'],
+    ])
+  })
+
+  it('is moved when the planned thing was logged at another time', () => {
+    const result = comparePlanToActual({
+      plans: [plan('Run', '18:00', '19:00')],
+      entries: [entry('Ran 5k', '07:00', '08:00')],
+    })
+    expect(result[0]).toMatchObject({ outcome: 'moved', inferred: true, matchedStart: '07:00' })
+  })
+
+  it('knows a plan done early is done, even before its hour arrives', () => {
+    expect(outcomes([plan('Run', '18:00', '19:00')], [entry('Ran 5k', '07:00', '08:00')], 12 * 60)).toEqual([
+      ['Run', 'moved'],
+    ])
+  })
+
+  it('asks more of a match outside the planned hour', () => {
+    // Half the words is enough at 8pm; at 10am "a call" is not "call home".
+    expect(outcomes([plan('Call home', '20:00', '20:30')], [entry('Call with a client', '10:00', '11:00')])).toEqual([
+      ['Call home', 'missed'],
+    ])
+  })
+
+  it('lets a tick stand whatever the words say', () => {
+    const result = comparePlanToActual({
+      plans: [plan('Run', '18:00', '19:00', true)],
+      entries: [entry('Emails', '18:00', '19:00')],
+    })
+    expect(result[0]).toMatchObject({ outcome: 'kept', inferred: false })
+  })
+})

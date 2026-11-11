@@ -15,12 +15,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { ArrowRight, ArrowLeft, Loader2, User, TrendingUp, Info } from 'lucide-react'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { invalidateGoals } from '@/lib/goals'
 
 interface OnboardingModalProps {
@@ -31,6 +25,7 @@ interface OnboardingModalProps {
 export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
   const { data: session } = useSession()
   const [step, setStep] = useState(0)
+  const [showTargetInfo, setShowTargetInfo] = useState(false)
   const [preferredName, setPreferredName] = useState('')
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [productivityTarget, setProductivityTarget] = useState(80)
@@ -136,7 +131,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
   }
 
   return (
-    <TooltipProvider>
+    <>
       <Dialog open={isOpen} onOpenChange={() => {}}>
         <DialogContent
           className="max-h-[90vh] overflow-y-auto sm:max-w-xl"
@@ -257,21 +252,26 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                   <p className="text-zinc-500 dark:text-zinc-400">
                     Your daily productivity goal
                   </p>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
-                        <Info className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[280px]">
-                      <p className="text-sm">
-                        We measure productivity by how well you follow through on your daily plan.
-                        Each day, you set 1-3 priority tasks — your score is based on completing them,
-                        weighted by priority. Your #1 task is worth the most.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {/* A tooltip opens on hover, and a phone has no hover: this
+                      explanation could not be opened on the only device the
+                      app is built for. It toggles on tap now. */}
+                  <button
+                    type="button"
+                    onClick={() => setShowTargetInfo((open) => !open)}
+                    aria-expanded={showTargetInfo}
+                    aria-label="What does the target measure?"
+                    className="flex h-11 w-11 items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
                 </div>
+                {showTargetInfo && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    We measure productivity by how well you follow through on your daily plan.
+                    Each day, you set 1-3 priority tasks — your score is based on completing them,
+                    weighted by priority. Your #1 task is worth the most.
+                  </p>
+                )}
               </div>
 
               <div className="rounded-xl border border-border p-6">
@@ -358,7 +358,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="flex-1 bg-secondary hover:bg-secondary"
+                  className="flex-1"
                 >
                   {isSubmitting ? (
                     <>
@@ -392,6 +392,6 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
           </div>
         </DialogContent>
       </Dialog>
-    </TooltipProvider>
+    </>
   )
 }

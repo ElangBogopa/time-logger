@@ -4,19 +4,25 @@ import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchEntries, csrfFetch } from '@/lib/api'
+import { unconfirmedEvents } from '@/lib/calendar-match'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
-import { TimeEntry, getAggregatedCategory, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
+import { TimeEntry, getAggregatedCategory, getLocalDateString, shiftDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
 import CommitTimeModal from '@/components/CommitTimeModal'
+import SourceSheet from '@/components/SourceSheet'
 import { comparePlanToActual, type PlanOutcome } from '@/lib/plan-adherence'
 import DayAtAGlance, { blocksForGlance } from '@/components/DayAtAGlance'
 import TimeEntryModal from '@/components/TimeEntryModal'
-import { AGGREGATED_HEX } from '@/lib/palette'
+import { AGGREGATED_HEX, METRIC_TEXT_HEX } from '@/lib/palette'
 import { dayWindow, isWholeDay } from '@/lib/day-window'
-import { suggestTimes, type Suggestion } from '@/lib/suggest-times'
+import { suggestTimes, rankSlots, defaultDuration, type Suggestion, type Busy } from '@/lib/suggest-times'
+import { usualFor, usualWakeMinutes, recurringActivities } from '@/lib/habits'
+import { useHabitHistory } from '@/hooks/useHabitHistory'
+import { calcBody, calcFocus, calcSocial, type EntryRow } from '@/lib/metrics-calc'
+import type { TimeCategory } from '@/lib/types'
 import { categorizeActivities } from '@/lib/api'
-import { formatDuration, formatTimeDisplay, timeToMinutes } from '@/lib/time-utils'
+import { formatDuration, formatTimeDisplay, timeToMinutes, minutesToTime } from '@/lib/time-utils'
 
 /** A row of daily_plans: a task for a date, with a time once you give it one. */
 interface PlanTask {
@@ -108,8 +114,37 @@ function CalendarContent() {
   const [showWholeDay, setShowWholeDay] = useState(false)
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
+  /** The library entry behind the suggestion whose "why?" was tapped. */
+  const [whySource, setWhySource] = useState<string | null>(null)
   const [unplaced, setUnplaced] = useState<{ title: string; reason: string }[]>([])
   const [isSuggesting, setIsSuggesting] = useState(false)
+  /**
+   * What the categoriser said each task is, by task id. Plans are stored
+   * without a category, so this is kept for the session: it is what lets a
+   * proposal be drawn in its colour and the plan be scored before it is lived.
+   */
+  const [taskCategories, setTaskCategories] = useState<Record<string, TimeCategory | null>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      return JSON.parse(sessionStorage.getItem('plan-task-categories') || '{}')
+    } catch {
+      return {}
+    }
+  })
+  const rememberCategories = useCallback((found: Record<string, TimeCategory | null>) => {
+    setTaskCategories((current) => {
+      const next = { ...current, ...found }
+      try {
+        sessionStorage.setItem('plan-task-categories', JSON.stringify(next))
+      } catch {
+        /* storage is a convenience */
+      }
+      return next
+    })
+  }, [])
+
+  // The last four weeks of the log: where "your usual hour" comes from.
+  const history = useHabitHistory(status === 'authenticated')
 
   // Use cached calendar events from context
   const {
@@ -176,8 +211,23 @@ function CalendarContent() {
           committed_start: t.committed_start,
           committed_end: t.committed_end,
         })),
-      }),
-    [entries, calendarEvents, committedTasks]
+      }).concat(
+        // Proposals, drawn on the day before they are accepted, each in the
+        // colour of the ring it would feed — so the shape of the day being
+        // offered can be seen, not just read as a list of times.
+        (suggestions ?? []).map((s) => {
+          const category = taskCategories[s.taskId]
+          return {
+            id: `proposed-${s.taskId}`,
+            startMinutes: s.startMinutes,
+            endMinutes: s.endMinutes,
+            colour: category ? AGGREGATED_HEX[getAggregatedCategory(category)] : '#8B7E74',
+            outlined: true,
+            proposed: true,
+          }
+        })
+      ),
+    [entries, calendarEvents, committedTasks, suggestions, taskCategories]
   )
 
   const nowMinutes = useMemo(() => {
@@ -245,7 +295,9 @@ function CalendarContent() {
       })
     }
 
-    for (const event of calendarEvents) {
+    // A confirmed meeting is already in the list as its entry; listing the
+    // calendar's copy beside it showed the same hour twice.
+    for (const event of unconfirmedEvents(calendarEvents, entries)) {
       items.push({
         key: `event-${event.id}`,
         start: event.startTime,
@@ -262,6 +314,11 @@ function CalendarContent() {
 
   const glanceSummary = useMemo(() => {
     const logged = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
+    // While proposals are drawn on the band, say what they are: it read
+    // "Nothing scheduled yet" above three blocks.
+    if (suggestions && suggestions.length > 0) {
+      return `${suggestions.length} proposed · not saved until you accept`
+    }
     if (isFutureDay) {
       return committedTasks.length > 0
         ? `${committedTasks.length} ${committedTasks.length === 1 ? 'task' : 'tasks'} scheduled`
@@ -269,7 +326,7 @@ function CalendarContent() {
     }
     if (entries.length === 0) return 'Nothing logged yet'
     return `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} · ${formatDuration(logged)}`
-  }, [entries, committedTasks, isFutureDay])
+  }, [entries, committedTasks, isFutureDay, suggestions])
 
   /**
    * Fit the untimed tasks around everything already in the day.
@@ -278,41 +335,73 @@ function CalendarContent() {
    * call for the whole tray — and lib/suggest-times.ts does the placing,
    * never over a calendar event and never without a reason.
    */
+  /** Everything already in the day: logged, on the calendar, or planned. */
+  const busyBlocks = useMemo<Busy[]>(
+    () => [
+      ...entries
+        .filter((e) => e.start_time)
+        .map((e) => ({
+          startMinutes: timeToMinutes(e.start_time!),
+          endMinutes: e.end_time
+            ? timeToMinutes(e.end_time)
+            : timeToMinutes(e.start_time!) + e.duration_minutes,
+        })),
+      ...calendarEvents.map((e) => ({
+        startMinutes: timeToMinutes(e.startTime),
+        endMinutes: timeToMinutes(e.endTime),
+      })),
+      ...committedTasks.map((t) => ({
+        startMinutes: timeToMinutes(t.committed_start),
+        endMinutes: timeToMinutes(t.committed_end),
+      })),
+    ],
+    [entries, calendarEvents, committedTasks]
+  )
+
+  /**
+   * The day starts when you do. Half an hour after you usually get up, and
+   * never before five; six, as before, until the log has a few mornings in it.
+   */
+  const earliestMinutes = useMemo(() => {
+    const wake = usualWakeMinutes(history)
+    return wake === null ? 6 * 60 : Math.max(5 * 60, wake + 30)
+  }, [history])
+  const searchFrom = Math.max(earliestMinutes, nowMinutes ?? earliestMinutes)
+
   const handleSuggestTimes = async () => {
     if (unscheduledTasks.length === 0 || isSuggesting) return
     setIsSuggesting(true)
     try {
-      const categories = await categorizeActivities(unscheduledTasks.map((t) => t.title)).catch(
-        () => []
-      )
-
-      const busy = [
-        ...entries
-          .filter((e) => e.start_time)
-          .map((e) => ({
-            startMinutes: timeToMinutes(e.start_time!),
-            endMinutes: e.end_time
-              ? timeToMinutes(e.end_time)
-              : timeToMinutes(e.start_time!) + e.duration_minutes,
-          })),
-        ...calendarEvents.map((e) => ({
-          startMinutes: timeToMinutes(e.startTime),
-          endMinutes: timeToMinutes(e.endTime),
-        })),
-        ...committedTasks.map((t) => ({
-          startMinutes: timeToMinutes(t.committed_start),
-          endMinutes: timeToMinutes(t.committed_end),
-        })),
-      ]
+      // One model call for everything not yet categorised this session —
+      // the tasks to place, and the ones already placed, so the whole plan
+      // can be scored.
+      const unknown = [...unscheduledTasks, ...committedTasks].filter((t) => !(t.id in taskCategories))
+      const found: Record<string, TimeCategory | null> = {}
+      if (unknown.length > 0) {
+        const categories = await categorizeActivities(unknown.map((t) => t.title)).catch(() => [])
+        unknown.forEach((task, i) => {
+          found[task.id] = categories[i] ?? null
+        })
+        rememberCategories(found)
+      }
+      const categoryOf = (id: string) => found[id] ?? taskCategories[id] ?? null
 
       const result = suggestTimes({
-        tasks: unscheduledTasks.map((task, i) => ({
-          id: task.id,
-          title: task.title,
-          category: categories[i] ?? null,
-        })),
-        busy,
+        tasks: unscheduledTasks.map((task) => {
+          const category = categoryOf(task.id)
+          const usual = usualFor(task.title, category, history)
+          return {
+            id: task.id,
+            title: task.title,
+            category,
+            // Your own length and hour for this, where the log has them.
+            durationMinutes: usual?.durationMinutes,
+            usualStartMinutes: usual?.startMinutes ?? null,
+          }
+        }),
+        busy: busyBlocks,
         nowMinutes,
+        earliestMinutes,
       })
 
       setSuggestions(result.suggestions)
@@ -322,6 +411,106 @@ function CalendarContent() {
     } finally {
       setIsSuggesting(false)
     }
+  }
+
+  /** Everything a suggestion must stay clear of: the day, and the other suggestions. */
+  const takenAround = (taskId: string): Busy[] => [
+    ...busyBlocks,
+    ...(suggestions ?? [])
+      .filter((s) => s.taskId !== taskId)
+      .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes })),
+  ]
+
+  const slotsFor = (suggestion: Suggestion, duration: number) => {
+    const task = unscheduledTasks.find((t) => t.id === suggestion.taskId)
+    const category = taskCategories[suggestion.taskId] ?? null
+    const usual = task ? usualFor(task.title, category, history) : null
+    return rankSlots({
+      duration,
+      category,
+      usualStartMinutes: usual?.startMinutes ?? null,
+      taken: takenAround(suggestion.taskId),
+      from: searchFrom,
+    })
+  }
+
+  const replaceSuggestion = (taskId: string, next: Partial<Suggestion>) =>
+    setSuggestions((current) =>
+      (current ?? [])
+        .map((s) => (s.taskId === taskId ? { ...s, ...next } : s))
+        .sort((a, b) => a.startMinutes - b.startMinutes)
+    )
+
+  const placeAt = (start: number, duration: number) => ({
+    startMinutes: start,
+    endMinutes: start + duration,
+    startTime: minutesToTime(start),
+    endTime: minutesToTime(start + duration),
+    durationMinutes: duration,
+  })
+
+  /**
+   * Where the time sheet opens for a task with no time yet: your usual hour
+   * and length for it, or the best free place the research offers. It
+   * opened on 9–10am for everything, meetings or no meetings.
+   */
+  const sheetDefaults = (task: PlanTask): { defaultStart?: string; defaultEnd?: string } => {
+    if (task.committed_start) return {}
+    const category = taskCategories[task.id] ?? null
+    const usual = usualFor(task.title, category, history)
+    const duration = usual?.durationMinutes ?? defaultDuration(category)
+    const slot = rankSlots({
+      duration,
+      category,
+      usualStartMinutes: usual?.startMinutes ?? null,
+      taken: busyBlocks,
+      from: searchFrom,
+      limit: 1,
+    })[0]
+    if (!slot) return {}
+    return { defaultStart: minutesToTime(slot.start), defaultEnd: minutesToTime(slot.start + duration) }
+  }
+
+  /** "Another time": step to the next-best place this could go. */
+  const offerAnotherTime = (suggestion: Suggestion) => {
+    const slots = slotsFor(suggestion, suggestion.durationMinutes)
+    const others = slots.filter((slot) => slot.start !== suggestion.startMinutes)
+    if (others.length === 0) {
+      showToast('There is no other free time for that today')
+      return
+    }
+    // Step through in ranked order, coming back round to the best.
+    const index = slots.findIndex((slot) => slot.start === suggestion.startMinutes)
+    const next = slots[(index + 1) % slots.length] ?? others[0]
+    const slot = next.start === suggestion.startMinutes ? others[0] : next
+    replaceSuggestion(suggestion.taskId, {
+      ...placeAt(slot.start, suggestion.durationMinutes),
+      reason: slot.reason,
+      source: slot.source,
+      basis: slot.basis,
+    })
+  }
+
+  /** Change how long a suggestion is, moving it only if it no longer fits. */
+  const resizeSuggestion = (suggestion: Suggestion, duration: number) => {
+    const taken = takenAround(suggestion.taskId)
+    const end = suggestion.startMinutes + duration
+    const fits = end <= 22 * 60 && !taken.some((b) => suggestion.startMinutes < b.endMinutes && end > b.startMinutes)
+    if (fits) {
+      replaceSuggestion(suggestion.taskId, placeAt(suggestion.startMinutes, duration))
+      return
+    }
+    const slot = slotsFor(suggestion, duration)[0]
+    if (!slot) {
+      showToast('There is no room for that length today')
+      return
+    }
+    replaceSuggestion(suggestion.taskId, {
+      ...placeAt(slot.start, duration),
+      reason: slot.reason,
+      source: slot.source,
+      basis: slot.basis,
+    })
   }
 
   const acceptSuggestion = async (suggestion: Suggestion) => {
@@ -361,18 +550,44 @@ function CalendarContent() {
     fetchEntriesForDate()
   }
 
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const title = newTaskTitle.trim()
+  /** Take the time off a task: it goes back to the tray, unscheduled. */
+  const handleUnscheduleTask = async (planId: string) => {
+    await csrfFetch('/api/plans', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: planId, committed_start: null, committed_end: null }),
+    })
+    setSchedulingTask(null)
+    fetchEntriesForDate()
+  }
+
+  /** Remove a task from the day. Until this, only the goal page could. */
+  const handleDeleteTask = async (planId: string) => {
+    const res = await csrfFetch(`/api/plans?id=${planId}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Failed to delete task')
+    setSchedulingTask(null)
+    setSuggestions((current) => current?.filter((s) => s.taskId !== planId) ?? null)
+    fetchEntriesForDate()
+  }
+
+  /** Add a task to the day. A category already known from the log is kept, saving the model a call. */
+  const addTask = async (title: string, category?: TimeCategory) => {
     if (!title || isAddingTask) return
     setIsAddingTask(true)
     try {
-      await csrfFetch('/api/plans', {
+      const res = await csrfFetch('/api/plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: selectedDate, title }),
       })
+      if (category) {
+        const { plan } = (await res.json().catch(() => ({}))) as { plan?: { id: string } }
+        if (plan?.id) rememberCategories({ [plan.id]: category })
+      }
       setNewTaskTitle('')
+      // A new task changes what there is to place: any proposal is stale.
+      setSuggestions(null)
+      setUnplaced([])
       fetchEntriesForDate()
     } catch (err) {
       console.error('Failed to add task:', err)
@@ -380,6 +595,63 @@ function CalendarContent() {
       setIsAddingTask(false)
     }
   }
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault()
+    addTask(newTaskTitle.trim())
+  }
+
+  /**
+   * What you do often, offered for this day in one tap. The thesis of the
+   * app is that the gym and the call home have no owner; making you type
+   * them again every evening was not much of an answer to that.
+   */
+  const recurring = useMemo(
+    () =>
+      recurringActivities(history, {
+        forDate: selectedDate,
+        alreadyPlanned: [...unscheduledTasks, ...committedTasks].map((t) => t.title),
+      }),
+    [history, selectedDate, unscheduledTasks, committedTasks]
+  )
+
+  /**
+   * The plan on the app's one scale, before it is lived: what is logged,
+   * what the calendar holds, what is planned and what is proposed. It
+   * counts only what is on this page, which is the point — a plan with
+   * nothing for Heart shows a Heart of nothing while it can still be fixed.
+   */
+  const forecast = useMemo(() => {
+    if (isPastDay) return null
+    const rows: EntryRow[] = []
+    const add = (category: string, minutes: number, activity: string) =>
+      rows.push({ category, duration_minutes: minutes, date: selectedDate, activity })
+
+    for (const entry of entries) {
+      if (entry.category) add(entry.category, entry.duration_minutes, entry.activity)
+    }
+    for (const event of unconfirmedEvents(calendarEvents, entries)) {
+      add('meetings', timeToMinutes(event.endTime) - timeToMinutes(event.startTime), event.title)
+    }
+
+    let planned = 0
+    for (const task of committedTasks) {
+      const category = taskCategories[task.id]
+      // Already done and in the log: counted above as its entry.
+      if (!category || planOutcomes[task.id] === 'kept' || planOutcomes[task.id] === 'moved') continue
+      add(category, timeToMinutes(task.committed_end) - timeToMinutes(task.committed_start), task.title)
+      planned++
+    }
+    for (const suggestion of suggestions ?? []) {
+      const category = taskCategories[suggestion.taskId]
+      if (!category) continue
+      add(category, suggestion.durationMinutes, suggestion.title)
+      planned++
+    }
+
+    if (planned === 0) return null
+    return { body: calcBody(rows), focus: calcFocus(rows), social: calcSocial(rows) }
+  }, [isPastDay, entries, calendarEvents, committedTasks, suggestions, taskCategories, planOutcomes, selectedDate])
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -452,21 +724,26 @@ function CalendarContent() {
     }
   }, [fetchEntriesForDate, refreshKey, selectedDate, isDateInCache, fetchEventsForDate])
 
+  /**
+   * Every change of day goes through here. The day lives in the URL so that
+   * leaving the planner and coming Back returns to the day you were
+   * planning — it used to return to today — and proposals made for one day
+   * do not follow you to another.
+   */
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate)
+    setSuggestions(null)
+    setUnplaced([])
+    window.history.replaceState(
+      null,
+      '',
+      newDate === getLocalDateString() ? '/calendar' : `/calendar?date=${newDate}`
+    )
   }
 
-  const handlePrevDay = () => {
-    const date = new Date(selectedDate + 'T00:00:00')
-    date.setDate(date.getDate() - 1)
-    setSelectedDate(getLocalDateString(date))
-  }
+  const handlePrevDay = () => handleDateChange(shiftDateString(selectedDate, -1))
 
-  const handleNextDay = () => {
-    const date = new Date(selectedDate + 'T00:00:00')
-    date.setDate(date.getDate() + 1)
-    setSelectedDate(getLocalDateString(date))
-  }
+  const handleNextDay = () => handleDateChange(shiftDateString(selectedDate, 1))
 
   const showToast = (message: string) => {
     setToast({ message })
@@ -656,6 +933,26 @@ function CalendarContent() {
                 </Button>
               </form>
 
+              {recurring.length > 0 && (
+                <div className="mt-3">
+                  <p className="field-label mb-1.5">You often do</p>
+                  <div className="flex flex-wrap gap-2">
+                    {recurring.map((item) => (
+                      <button
+                        key={item.title}
+                        onClick={() => addTask(item.title, item.category)}
+                        disabled={isAddingTask}
+                        aria-label={`Add ${item.title}`}
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-dashed border-border px-3.5 text-sm text-muted-foreground transition-all duration-150 hover:border-foreground/25 hover:text-foreground active:scale-[0.97] disabled:opacity-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {item.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {unscheduledTasks.length > 0 && !suggestions && (
                 <button
                   onClick={handleSuggestTimes}
@@ -698,13 +995,42 @@ function CalendarContent() {
                         {suggestion.reason}
                         {suggestion.source && (
                           <button
-                            onClick={() => router.push(`/library#${suggestion.source}`)}
+                            onClick={() => setWhySource(suggestion.source ?? null)}
                             className="ml-1 underline hover:no-underline"
                           >
                             why?
                           </button>
                         )}
                       </p>
+                      {/* A proposal you can shape: how long, and — if this
+                          hour is wrong — the next-best place it could go. */}
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-1 gap-y-2">
+                        <div className="flex gap-1" role="group" aria-label={`Length of ${suggestion.title}`}>
+                          {[30, 60, 90, 120].map((minutes) => {
+                            const selected = suggestion.durationMinutes === minutes
+                            return (
+                              <button
+                                key={minutes}
+                                onClick={() => resizeSuggestion(suggestion, minutes)}
+                                aria-pressed={selected}
+                                className={`min-h-11 min-w-11 rounded-lg px-2 text-xs tabular-nums transition-colors ${
+                                  selected
+                                    ? 'bg-foreground text-background font-medium'
+                                    : 'border border-border text-muted-foreground hover:text-foreground'
+                                }`}
+                              >
+                                {minutes < 60 ? `${minutes}m` : `${minutes / 60}h`}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <button
+                          onClick={() => offerAnotherTime(suggestion)}
+                          className="min-h-11 whitespace-nowrap rounded-lg px-1 text-xs text-muted-foreground underline hover:text-foreground hover:no-underline"
+                        >
+                          Another time
+                        </button>
+                      </div>
                     </div>
                   ))}
 
@@ -723,6 +1049,22 @@ function CalendarContent() {
                       Dismiss
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {forecast && (
+                <div className="mt-3 rounded-lg bg-secondary/40 px-3 py-2.5">
+                  <p className="field-label">If the day goes to plan</p>
+                  <p className="mt-1 text-sm font-medium tabular-nums" aria-label={`Body ${forecast.body}, Mind ${forecast.focus}, Heart ${forecast.social}`}>
+                    <span style={{ color: METRIC_TEXT_HEX.body }}>Body {forecast.body}</span>
+                    <span className="text-muted-foreground"> · </span>
+                    <span style={{ color: METRIC_TEXT_HEX.focus }}>Mind {forecast.focus}</span>
+                    <span className="text-muted-foreground"> · </span>
+                    <span style={{ color: METRIC_TEXT_HEX.social }}>Heart {forecast.social}</span>
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Counting only what is on this page. Sleep, meals and anything unplanned add to it.
+                  </p>
                 </div>
               )}
 
@@ -837,8 +1179,14 @@ function CalendarContent() {
             planId={schedulingTask.id}
             existingStart={schedulingTask.committed_start}
             existingEnd={schedulingTask.committed_end}
+            onUnschedule={() => handleUnscheduleTask(schedulingTask.id)}
+            onDelete={() => handleDeleteTask(schedulingTask.id)}
+            hideCalendarLink
+            {...sheetDefaults(schedulingTask)}
           />
         )}
+
+        <SourceSheet sourceId={whySource} onClose={() => setWhySource(null)} />
 
         {editingEntry && (
           <TimeEntryModal

@@ -479,6 +479,26 @@ describe('DayReviewPage', () => {
       expect(screen.getByText('Connection')).toBeInTheDocument()
     })
   })
+  /**
+   * Joining the loop: a review now leads somewhere, can be paged by day,
+   * and does not spend a model call narrating a day with nothing in it.
+   */
+  it('ends by pointing at the planner', async () => {
+    routeFetch(createMockDaySummary())
+    render(<DayReviewPage />)
+    expect(await screen.findByText(/^Plan (tomorrow|the rest of today)$/)).toBeInTheDocument()
+  })
+
+  it('says so plainly when nothing was logged, and asks the model for nothing', async () => {
+    // Its own date: reviews are cached per day, and the other tests here
+    // have already filled the cache for the default one.
+    ;(useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams('date=2024-01-09'))
+    routeFetch(createMockDaySummary({ date: '2024-01-09', totalMinutesLogged: 0, wins: [], longestFocusSession: null }))
+    render(<DayReviewPage />)
+
+    expect(await screen.findByText('Nothing was logged on this day')).toBeInTheDocument()
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/api/day-commentary'))).toBe(false)
+  })
 })
 
 // Skipped with the rest of the breakdown assertions above: the score colors
@@ -539,4 +559,5 @@ describe.skip('DayReviewPage score colors', () => {
       expect(screen.getByText('25')).toBeInTheDocument()
     })
   })
+
 })

@@ -7,6 +7,8 @@ import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, 
 import { findRepeatCandidate, entriesForRepeat, type RepeatCandidate } from '@/lib/repeat-session'
 import { PERIOD_CLASSES } from '@/lib/palette'
 import { findUnaccountedGaps } from '@/lib/gaps'
+import { unconfirmedEvents } from '@/lib/calendar-match'
+import NextUp from '@/components/NextUp'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
 import { TimePeriod, TimeEntry, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
 import {
@@ -100,6 +102,15 @@ function LogPeriodContent() {
     return selectedDate !== today && selectedDate !== yesterday
   })()
 
+  // A session that has not begun cannot be finished. At 5:35pm the evening
+  // could be closed: "Evening Complete · 0m · Great evening! You stayed on
+  // track", a green tick on the dashboard, and an offer of a day review that
+  // was still locked.
+  const isClockToday = selectedDate === getUserToday() && getUserToday() === getRealToday()
+  const hasStarted = !isClockToday || getUserCurrentHour() >= range.start
+  // The day review opens at 9pm on the day itself, and is open for any day after.
+  const isReviewOpen = !isClockToday || getUserCurrentHour() >= 21
+
   // State — initialize from shared cache if available (instant render, no skeleton flash)
   const cachedEntries = selectedDate ? getCachedEntries(selectedDate) : null
   const [entries, setEntries] = useState<TimeEntry[]>(cachedEntries ?? [])
@@ -110,7 +121,8 @@ function LogPeriodContent() {
   const [toast, setToast] = useState<string | null>(null) // kept for legacy compat, not shown
   const [repeatCandidate, setRepeatCandidate] = useState<RepeatCandidate | null>(null)
   const [isRepeating, setIsRepeating] = useState(false)
-  const [isConfirmingAll, setIsConfirmingAll] = useState(false)
+  // 'all', or the id of the one event being confirmed
+  const [confirming, setConfirming] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   /** The time range a gap row hands to the quick-log sheet. */
@@ -252,22 +264,18 @@ function LogPeriodContent() {
     return hour >= flexRange.start && hour < flexRange.end
   })
 
-  // Filter out events that already have matching entries
-  const ghostEvents = calendarEvents.filter((event: CalendarEvent) => {
-    return !entries.some(entry => {
-      if (!entry.start_time || !entry.end_time) return false
-      const entryStart = timeToMinutes(entry.start_time)
-      const entryEnd = timeToMinutes(entry.end_time)
-      const eventStart = timeToMinutes(event.startTime)
-      const eventEnd = timeToMinutes(event.endTime)
-      const overlapStart = Math.max(entryStart, eventStart)
-      const overlapEnd = Math.min(entryEnd, eventEnd)
-      const overlap = Math.max(0, overlapEnd - overlapStart)
-      const eventDuration = eventEnd - eventStart
-      return eventDuration > 0 && overlap / eventDuration > 0.5
-    })
-  })
+  // Events nothing has answered yet (see lib/calendar-match.ts)
+  const ghostEvents = unconfirmedEvents(calendarEvents, entries)
 
+  // A meeting that has not finished cannot be confirmed: confirming
+  // categorises it and counts it towards the day, and it has not happened.
+  const hasEnded = (event: CalendarEvent) => {
+    if (selectedDate !== getUserToday()) return true
+    // Past midnight the app's "today" is still yesterday, and all of it is over.
+    if (getUserToday() !== getRealToday()) return true
+    return timeToMinutes(event.endTime) <= getUserCurrentHour() * 60 + new Date().getMinutes()
+  }
+  const confirmableGhosts = ghostEvents.filter(hasEnded)
 
   /**
    * Confirm every calendar event in this session at once.
@@ -278,15 +286,15 @@ function LogPeriodContent() {
    * both expensive and noise — the session and day commentary still cover
    * them.
    */
-  const handleConfirmAllGhosts = async () => {
-    if (ghostEvents.length === 0 || isConfirmingAll) return
-    setIsConfirmingAll(true)
+  const confirmGhosts = async (events: CalendarEvent[], marker: string) => {
+    if (events.length === 0 || confirming) return
+    setConfirming(marker)
     try {
-      const titles = ghostEvents.map((event) => event.title)
+      const titles = events.map((event) => event.title)
       const categories = await categorizeActivities(titles).catch(() => [])
 
       const created = await createEntries(
-        ghostEvents.map((event, i) => ({
+        events.map((event, i) => ({
           date: selectedDate,
           activity: event.title,
           category: categories[i] ?? null,
@@ -305,7 +313,7 @@ function LogPeriodContent() {
       console.error('Failed to confirm calendar events:', err)
       sonnerToast.error('Could not confirm those events')
     } finally {
-      setIsConfirmingAll(false)
+      setConfirming(null)
     }
   }
 
@@ -471,7 +479,7 @@ function LogPeriodContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-40">
       <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Header */}
         <header className="mb-6">
@@ -503,23 +511,21 @@ function LogPeriodContent() {
               <button
                 onClick={handleSyncCalendar}
                 disabled={isSyncing || syncDone}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-2 transition-all duration-300 ${
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
                   syncDone
                     ? 'bg-[#7D9B8A]/15 border border-[#7D9B8A]/30'
                     : 'bg-secondary hover:bg-accent disabled:opacity-50'
                 }`}
-                aria-label="Sync calendar"
+                aria-label={syncDone ? 'Calendar synced' : isSyncing ? 'Syncing calendar' : 'Sync calendar'}
+                title="Sync calendar"
               >
+                {/* An icon, not a labelled pill: at phone width the pill's
+                    two words wrapped and pushed the session title onto two
+                    lines as well. */}
                 {syncDone ? (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-[#7D9B8A]" />
-                    <span className="text-xs font-medium text-[#7D9B8A]">Synced!</span>
-                  </>
+                  <CheckCircle2 className="h-4 w-4 text-[#7D9B8A]" />
                 ) : (
-                  <>
-                    <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span className="text-xs font-medium text-muted-foreground">{isSyncing ? 'Syncing...' : 'Sync Calendar'}</span>
-                  </>
+                  <RefreshCw className={`h-4 w-4 text-muted-foreground ${isSyncing ? 'animate-spin' : ''}`} />
                 )}
               </button>
             )}
@@ -546,7 +552,7 @@ function LogPeriodContent() {
         </header>
 
         {/* One tap to re-log a day that looked the same */}
-        {!isLocked && repeatCandidate && (
+        {!isLocked && hasStarted && repeatCandidate && (
           <section className="mb-4 rounded-xl border border-border bg-card p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
@@ -576,19 +582,76 @@ function LogPeriodContent() {
           </section>
         )}
 
-        {/* Calendar events waiting to be confirmed, all at once */}
-        {!isLocked && ghostEvents.length > 1 && (
-          <section className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <CalendarCheck className="h-4 w-4 text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground truncate">
-                {ghostEvents.length} calendar events in this session
-              </p>
+        {/* Calendar events nothing has answered yet. This row used to appear
+            only for two or more, so a session with a single meeting — the
+            usual case — showed no sign of it except a gap that began at an
+            unexplained hour. */}
+        {!isLocked && ghostEvents.length > 0 && (
+          <section className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="eyebrow">From your calendar</h2>
+              {confirmableGhosts.length > 1 && (
+                <button
+                  onClick={() => confirmGhosts(confirmableGhosts, 'all')}
+                  disabled={confirming !== null}
+                  className="flex min-h-9 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {confirming === 'all' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                  Confirm all {confirmableGhosts.length}
+                </button>
+              )}
             </div>
-            <Button size="sm" variant="outline" onClick={handleConfirmAllGhosts} disabled={isConfirmingAll}>
-              {isConfirmingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" />Confirm all</>}
-            </Button>
+            <div className="space-y-2">
+              {ghostEvents.map((event) => {
+                const ended = hasEnded(event)
+                return (
+                  <div
+                    key={event.id}
+                    className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 px-4 py-3"
+                  >
+                    <CalendarCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {formatTimeDisplay(event.startTime)} – {formatTimeDisplay(event.endTime)}
+                      </p>
+                    </div>
+                    {ended ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => confirmGhosts([event], event.id)}
+                        disabled={confirming !== null}
+                        aria-label={`Confirm ${event.title}`}
+                      >
+                        {confirming === event.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Check className="h-4 w-4" />
+                            Confirm
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground shrink-0">Upcoming</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </section>
+        )}
+
+        {/* What was planned for this session. The session knew about the
+            plan only in the popup after "Done"; at 6pm it offered "Same as
+            yesterday" and said nothing of the run planned for six. */}
+        {!isLocked && selectedDate && (
+          <NextUp date={selectedDate} entries={entries} period={period} onChanged={fetchEntries} />
         )}
 
         {/* Unaccounted time — one tap each */}
@@ -652,25 +715,31 @@ function LogPeriodContent() {
           )}
         </section>
 
-        {/* Action buttons — hidden for locked dates */}
-        {!isLocked && (
-          <div className="space-y-3">
-            <Button
-              onClick={handleDone}
-              className="w-full"
-              size="lg"
-            >
-              <CheckCircle2 className="h-5 w-5" />
-              Done with {label}
-            </Button>
+        {/* Action buttons — hidden for locked dates, and until the session
+            has begun. "Done" needs something to be done with: an empty
+            session has one honest action, which is to say it was empty. */}
+        {!isLocked && !hasStarted && (
+          <p className="rounded-lg bg-secondary/50 border border-border px-4 py-3 text-center text-sm text-muted-foreground">
+            {label} starts at {formatTimeDisplay(`${String(range.start).padStart(2, '0')}:00`)}. You can
+            wrap it up once it has begun.
+          </p>
+        )}
 
-            {periodEntries.length === 0 && (
-              <button
-                onClick={handleSkip}
-                className="w-full text-center text-sm text-muted-foreground hover:text-foreground py-2"
+        {!isLocked && hasStarted && (
+          <div className="space-y-3">
+            {periodEntries.length > 0 ? (
+              <Button
+                onClick={handleDone}
+                className="w-full"
+                size="lg"
               >
+                <CheckCircle2 className="h-5 w-5" />
+                Done with {label}
+              </Button>
+            ) : (
+              <Button onClick={handleSkip} variant="outline" className="w-full" size="lg">
                 Nothing to log for this session
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -702,7 +771,7 @@ function LogPeriodContent() {
         entries={periodEntries}
         commentary={summaryCommentary}
         isLoading={isSummaryLoading}
-        isEvening={period === 'evening'}
+        isEvening={period === 'evening' && isReviewOpen}
         onViewDayReview={() => {
           // TODO: Navigate to day in review
           handleSummaryClose()

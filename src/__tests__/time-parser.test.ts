@@ -1114,10 +1114,11 @@ describe('Time Parser - Duration-Only Detection', () => {
     expect(rangeDetections.length).toBe(1)
     expect(rangeDetections[0].matchedText).toBe('dinner')
 
-    // The parseTimeFromText returns the dinner times because it doesn't know the "existing startTime"
-    // The UI component is responsible for prioritizing duration over activity-based times
+    // The parser keeps dinner's usual hour as the start — it does not know the
+    // "existing startTime" — but honours the stated length. It used to return
+    // 18:00–19:00 here, an hour for something the text says took thirty minutes.
     expect(result.startTime).toBe('18:00') // From dinner
-    expect(result.endTime).toBe('19:00') // From dinner
+    expect(result.endTime).toBe('18:30') // From "for 30 minutes"
 
     // But the UI should extract the duration and calculate: existingStartTime + 30 minutes
     // This is tested in the UI component, not here
@@ -1178,5 +1179,86 @@ describe('Time Parser - cleanedActivity', () => {
     const result = parseTimeFromText('meeting from 2pm to 3pm for team sync', '12:00')
     // "from 2pm to 3pm" is removed, but "meeting" and "for team sync" remain
     expect(result.cleanedActivity.trim()).toBe('meeting for team sync')
+  })
+})
+
+/**
+ * The phrases people actually type. Eight of twenty everyday inputs came back
+ * wrong in a walk-through of the app, including the input's own placeholder
+ * ("lunch 12-1pm" produced a zero-length entry at 1pm). One cause covered
+ * most of them: a range with am/pm on one side only lost its other side.
+ */
+describe('Time Parser - how people write a range', () => {
+  const parse = (text: string) => {
+    const r = parseTimeFromText(text, '17:30')
+    return { start: r.startTime, end: r.endTime, activity: r.cleanedActivity }
+  }
+
+  it.each([
+    ['gym 12 to 1pm', '12:00', '13:00', 'gym'],
+    ['lunch 12-1pm', '12:00', '13:00', 'lunch'],
+    ['run 6 to 7am', '06:00', '07:00', 'run'],
+    ['call mom 7-7:30pm', '19:00', '19:30', 'call mom'],
+    ['meeting from 10 to 11:30am', '10:00', '11:30', 'meeting'],
+    ['worked 9 to 5pm', '09:00', '17:00', 'worked'],
+    ['brunch 11 to 1pm', '11:00', '13:00', 'brunch'],
+    ['review 2pm to 3', '14:00', '15:00', 'review'],
+    ['class 11am to 1', '11:00', '13:00', 'class'],
+    ['shift 11 to 12am', '23:00', '00:00', 'shift'],
+  ])('%s', (text, start, end, activity) => {
+    expect(parse(text)).toEqual({ start, end, activity })
+  })
+
+  it('leaves ranges that say am or pm on both sides alone', () => {
+    expect(parse('slept 11pm to 7am')).toEqual({ start: '23:00', end: '07:00', activity: 'slept' })
+    expect(parse('meeting 2pm to 3pm')).toEqual({ start: '14:00', end: '15:00', activity: 'meeting' })
+  })
+
+  it('still infers the afternoon when neither side says', () => {
+    expect(parse('nap 1 to 2')).toEqual({ start: '13:00', end: '14:00', activity: 'nap' })
+    expect(parse('deep work 9-11')).toEqual({ start: '09:00', end: '11:00', activity: 'deep work' })
+  })
+})
+
+describe('Time Parser - meal words are a default, not a statement', () => {
+  const parse = (text: string) => {
+    const r = parseTimeFromText(text, '17:30')
+    return { start: r.startTime, end: r.endTime, activity: r.cleanedActivity }
+  }
+
+  it('gives a meal its usual hour when nothing else is said', () => {
+    expect(parse('lunch')).toEqual({ start: '12:00', end: '13:00', activity: 'lunch' })
+    expect(parse('dinner with Sam')).toEqual({ start: '18:00', end: '19:00', activity: 'dinner with Sam' })
+  })
+
+  it('lets a stated time win, with a real length', () => {
+    expect(parse('dinner 7pm')).toEqual({ start: '19:00', end: '20:00', activity: 'dinner' })
+    expect(parse('lunch at noon')).toEqual({ start: '12:00', end: '13:00', activity: 'lunch' })
+    expect(parse('breakfast at 9am')).toEqual({ start: '09:00', end: '10:00', activity: 'breakfast' })
+  })
+
+  it('lets a stated length win', () => {
+    expect(parse('lunch for 30 min')).toEqual({ start: '12:00', end: '12:30', activity: 'lunch' })
+  })
+})
+
+describe('Time Parser - durations in words', () => {
+  const parse = (text: string) => {
+    const r = parseTimeFromText(text, '17:30')
+    return { start: r.startTime, end: r.endTime, activity: r.cleanedActivity }
+  }
+
+  it.each([
+    ['studied for an hour', '16:30', '17:30', 'studied'],
+    ['read an hour', '16:30', '17:30', 'read'],
+    ['emails for half an hour', '17:00', '17:30', 'emails'],
+    ['walked for an hour and a half', '16:00', '17:30', 'walked'],
+    ['gardening for a couple of hours', '15:30', '17:30', 'gardening'],
+  ])('%s', (text, start, end, activity) => {
+    expect(parse(text)).toEqual({ start, end, activity })
+  })
+
+  it('takes "at" away with the time it introduces', () => {
+    expect(parse('meeting at 3pm').activity).toBe('meeting')
   })
 })

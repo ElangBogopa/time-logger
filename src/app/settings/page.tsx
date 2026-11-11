@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Calendar, ChevronRight, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, X } from 'lucide-react'
+import { BookOpen, Calendar, ChevronRight, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, X, ShieldCheck } from 'lucide-react'
 // ── Section label ──
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -289,6 +289,14 @@ export default function MorePage() {
             label="Send Feedback"
             description="Rate the app and share your thoughts"
             onClick={() => setShowFeedback(true)}
+          />
+          <RowItem
+            icon={ShieldCheck}
+            iconBg="bg-secondary"
+            iconColor="text-muted-foreground"
+            label="Privacy & Terms"
+            description="What is stored, and what is not"
+            onClick={() => router.push('/privacy')}
           />
         </div>
 

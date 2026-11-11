@@ -25,6 +25,8 @@ export interface GlanceBlock {
   colour: string
   /** Planned but not yet lived: drawn hollow. */
   outlined?: boolean
+  /** Proposed and not yet accepted: hollow, with a wash of its colour. */
+  proposed?: boolean
 }
 
 /** Entries, calendar events and planned tasks as one set of bands. */
@@ -108,7 +110,8 @@ export default function DayAtAGlance({
             style={{
               left: percent(block.startMinutes),
               width: `max(2px, ${(block.endMinutes - block.startMinutes) / DAY_MINUTES * 100}%)`,
-              backgroundColor: block.outlined ? 'transparent' : block.colour,
+              // 40 is a quarter alpha: enough to tell a proposal from a commitment.
+              backgroundColor: block.proposed ? `${block.colour}40` : block.outlined ? 'transparent' : block.colour,
               border: block.outlined ? `1px dashed ${block.colour}` : undefined,
             }}
           />

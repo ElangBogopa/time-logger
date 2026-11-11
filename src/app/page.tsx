@@ -4,7 +4,7 @@ import { Suspense, useMemo, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getUserToday, getRealToday, TimePeriod } from '@/lib/types'
+import { getUserToday, getRealToday, shiftDateString, TimePeriod } from '@/lib/types'
 import { buildSessionInfos } from '@/lib/session-utils'
 import { useSessionData } from '@/hooks/useSessionData'
 import { useGreeting } from '@/hooks/useGreeting'
@@ -15,6 +15,7 @@ import OnboardingModal from '@/components/OnboardingModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
 import YourPlan from '@/components/YourPlan'
+import NextUp from '@/components/NextUp'
 import { Sun, Cloud, Moon, Check, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
@@ -38,6 +39,8 @@ function HomeContent() {
   const dateFromUrl = searchParams.get('date')
   const [selectedDate, setSelectedDate] = useState(dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl) ? dateFromUrl : today)
   const isToday = selectedDate === today
+  const isFutureDate = selectedDate > today
+  const canWrapUp = isToday || selectedDate === shiftDateString(today, -1)
 
   // Update URL when date changes (without full navigation)
   const handleDateChange = useCallback((newDate: string) => {
@@ -52,8 +55,15 @@ function HomeContent() {
 
   // Custom hooks
   const { showOnboarding, setShowOnboarding, currentHour } = useDashboardState({ session, status })
+  const [planRefreshKey, setPlanRefreshKey] = useState(0)
   const { greeting, quotes, currentPeriod } = useGreeting(session?.user?.preferredName, currentHour)
-  const { entries, completions, isLoading } = useSessionData({ userId, today: selectedDate, currentHour: isToday ? currentHour : 23 })
+  const { entries, completions, isLoading, fetchData } = useSessionData({ userId, today: selectedDate, currentHour: isToday ? currentHour : 23 })
+  // Bumped when something is logged from Next up, so the rings move at once.
+  const [ringsKey, setRingsKey] = useState(0)
+  const handleNextUpChanged = useCallback(() => {
+    fetchData()
+    setRingsKey((key) => key + 1)
+  }, [fetchData])
 
   // Sprint 2: Metric detail sheet state
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null)
@@ -170,7 +180,15 @@ function HomeContent() {
             activeMetric={activeMetric}
             onTrendDataLoaded={handleTrendDataLoaded}
             date={selectedDate}
+            refreshKey={ringsKey}
           />
+
+          {/* What the day holds — the plan and the calendar, carried over
+              from the Plan tab to the screen the day is lived from. A day
+              that is over is the review's business, not this list's. */}
+          {(isToday || isFutureDate) && (
+            <NextUp date={selectedDate} entries={entries} onChanged={handleNextUpChanged} />
+          )}
 
           {/* 4. YOUR DAY section */}
           <div className="mt-4">
@@ -181,7 +199,8 @@ function HomeContent() {
             {/* Your Day In Review */}
             {(() => {
               const pastNine = (currentHour ?? 0) >= 21
-              const unlocked = !isToday || pastNine
+              // A day that has not happened has nothing to review.
+              const unlocked = isFutureDate ? false : !isToday || pastNine
 
               return (
                 <div className="relative mb-3">
@@ -209,7 +228,7 @@ function HomeContent() {
                       </span>
                       {!unlocked && (
                         <p className="text-[10px] text-muted-foreground/40 mt-0.5">
-                          Unlocks at 9:00 PM
+                          {isFutureDate ? 'Nothing to review yet' : 'Unlocks at 9:00 PM'}
                         </p>
                       )}
                     </div>
@@ -238,7 +257,10 @@ function HomeContent() {
                   // 3. Neutral: nothing logged
                   const isDone = info.hasCompletion
                   const hasEntries = info.hasEntries
-                  const isPartial = hasEntries && !isDone
+                  // "Not wrapped up" is a prompt, so it only shows while it
+                  // can be acted on: today and yesterday. On older days it
+                  // was a permanent amber mark against every session.
+                  const isPartial = hasEntries && !isDone && canWrapUp
 
                   // Done and partial take the status colours from the one
                   // palette — sage and dusty amber, not green-500 and
@@ -274,7 +296,7 @@ function HomeContent() {
                     ? `${info.entryCount} ${info.entryCount === 1 ? 'entry' : 'entries'}`
                     : isToday
                       ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
-                      : 'Not logged'
+                      : isFutureDate ? 'Upcoming' : 'Not logged'
 
                   return (
                     <button
@@ -308,7 +330,7 @@ function HomeContent() {
           </div>
 
           {/* 5. YOUR PLAN section */}
-          <YourPlan date={selectedDate} isToday={isToday} />
+          <YourPlan key={planRefreshKey} date={selectedDate} isToday={isToday} />
         </div>
 
         {/* MetricDetailSheet — rendered at page level */}
@@ -321,7 +343,14 @@ function HomeContent() {
 
         <OnboardingModal
           isOpen={showOnboarding}
-          onComplete={() => setShowOnboarding(false)}
+          onComplete={() => {
+            setShowOnboarding(false)
+            // Onboarding has just created a goal. The plan section fetched
+            // before it existed and nothing told it to look again, so the
+            // first screen a new user saw said "No goals set yet".
+            try { sessionStorage.removeItem('your-plan-cache') } catch { /* ignore */ }
+            setPlanRefreshKey((key) => key + 1)
+          }}
         />
       </div>
     </ErrorBoundary>

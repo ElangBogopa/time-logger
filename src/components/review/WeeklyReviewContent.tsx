@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
-import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight, Trophy, CalendarClock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getLocalDateString, getWeekStartForDate, shiftDateString, getUserToday } from '@/lib/types'
 import { MetricRingRow } from '@/components/MetricRings'
@@ -11,12 +11,12 @@ import type { MetricKey } from '@/lib/chart-colors'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
 import { STATUS_CLASSES } from '@/lib/palette'
+import { METRIC_THRESHOLDS } from '@/lib/metrics-calc'
 
 // ─── Types matching API route response ────────────────
 
 interface WeekHighlight {
   type: string
-  icon: string
   text: string
   subtext?: string
 }
@@ -62,8 +62,8 @@ interface CategoryBreakdownItem {
 interface WeeklyReviewData {
   weekStart: string
   weekEnd: string
-  weekScore: number
-  weekScoreLabel: string
+  /** The week's own averages; absent on responses cached before it existed. */
+  averages?: { body: number; focus: number; social: number } | null
   activeDays: number
   evaluatedDays?: number
   highlights: WeekHighlight[]
@@ -238,6 +238,33 @@ export default function WeeklyReviewContent() {
     )
   }
 
+  // The line under the rings, read off the rings. It was a label for a
+  // retired score built from active days and entries per day, which said
+  // "Exceptional week" with none of the three on target.
+  // The rings show this week, from the same per-day scores the summary is
+  // written from. They were fed by a separate request for the trailing
+  // seven days ending today — a different window — so the rings could read
+  // Body 57 while the paragraph beneath them praised a Body of 92.
+  const ringValues: Record<MetricKey, number> | null = reviewData.averages ?? metrics
+
+  const weekLabel = (() => {
+    if (!ringValues) return ''
+    const onTarget = (Object.values(ringValues) as number[]).filter((v) => v >= METRIC_THRESHOLDS.green).length
+    const phrase =
+      onTarget === 3
+        ? 'all three on target'
+        : onTarget === 2
+          ? 'two of three on target'
+          : onTarget === 1
+            ? 'one of three on target'
+            : 'none on target yet'
+    if (isCurrentWeek) return `So far: ${phrase}`
+    const finished = onTarget === 0 ? 'none on target' : phrase
+    return finished.charAt(0).toUpperCase() + finished.slice(1)
+  })()
+
+  const isRecentWeek = isCurrentWeek || weekStart === shiftDateString(getWeekStart(new Date()), -7)
+
   const weekChange = reviewData.previousWeekMinutes !== null
     ? Math.round(((reviewData.totalMinutes - reviewData.previousWeekMinutes) / reviewData.previousWeekMinutes) * 100)
     : null
@@ -260,16 +287,14 @@ export default function WeeklyReviewContent() {
 
       {/* The week on the app's one scale, averaged across its days */}
       <div className="mb-5">
-        {metrics ? (
+        {ringValues ? (
           <MetricRingRow
-            values={metrics}
+            values={ringValues}
             size={76}
             srLabel="Average scores for this week"
-            caption={reviewData.weekScoreLabel}
+            caption={weekLabel}
           />
-        ) : (
-          <p className="text-center text-sm text-muted-foreground">{reviewData.weekScoreLabel}</p>
-        )}
+        ) : null}
         {weekChange !== null && (
           <div className="flex items-center justify-center gap-1 mt-2 text-xs">
             {weekChange > 0 ? (
@@ -279,7 +304,9 @@ export default function WeeklyReviewContent() {
             ) : (
               <><Minus className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground">Same</span></>
             )}
-            <span className="text-muted-foreground">time logged vs last week</span>
+            <span className="text-muted-foreground">
+              time logged vs {isCurrentWeek ? 'the same days last week' : 'last week'}
+            </span>
           </div>
         )}
       </div>
@@ -289,7 +316,7 @@ export default function WeeklyReviewContent() {
         <div className="grid grid-cols-2 gap-2 mb-5">
           {reviewData.highlights.map((h, i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-3">
-              <span className="text-lg">{h.icon}</span>
+              <Trophy className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm font-medium mt-1">{h.text}</p>
               {h.subtext && <p className="text-[11px] text-muted-foreground">{h.subtext}</p>}
             </div>
@@ -306,6 +333,18 @@ export default function WeeklyReviewContent() {
               <p className="text-sm text-foreground leading-relaxed">{reviewData.coachSummary}</p>
             </div>
           </div>
+          {/* The summary ends on a suggestion for the days ahead. This is the
+              way to act on it: it used to be advice with nowhere to go. Only
+              on a recent week — a suggestion from a month ago is history. */}
+          {isRecentWeek && (
+            <button
+              onClick={() => router.push(`/calendar?date=${shiftDateString(getUserToday(), 1)}`)}
+              className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm text-foreground transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]"
+            >
+              <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              Plan tomorrow
+            </button>
+          )}
         </section>
       )}
 

@@ -46,8 +46,8 @@ export default function BottomTabBar() {
   const pathname = usePathname()
   const router = useRouter()
 
-  // Don't show on login page
-  if (pathname === '/login') {
+  // Don't show on the signed-out pages
+  if (pathname === '/login' || pathname === '/privacy' || pathname === '/terms') {
     return null
   }
 

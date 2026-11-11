@@ -8,7 +8,11 @@ import {
 
 const base: CommentaryInputs = {
   date: '2026-11-01',
-  score: 67,
+  // The prompt is written from the three scores and the plan outcome now,
+  // not the retired sessions-wrapped-up score, so those are what must
+  // invalidate the cache.
+  metrics: { body: 62, focus: 75, social: 40 },
+  planAdherence: { kept: 2, moved: 0, missed: 1 },
   totalMinutesLogged: 1080,
   wins: [{ id: 'longest-focus', text: '150 min focus session on "Coding"' }],
   mood: null,
@@ -27,7 +31,8 @@ describe('commentaryFingerprint', () => {
   })
 
   it.each([
-    ['score', { score: 68 }],
+    ['a score', { metrics: { body: 62, focus: 76, social: 40 } }],
+    ['the plan outcome', { planAdherence: { kept: 3, moved: 0, missed: 0 } }],
     ['minutes logged', { totalMinutesLogged: 1081 }],
     ['wins', { wins: [{ id: 'balance', text: 'Good balance of focus and rest' }] }],
     ['mood', { mood: 'great' }],
@@ -38,7 +43,7 @@ describe('commentaryFingerprint', () => {
 
   it('tolerates missing wins and a null focus session', () => {
     expect(() =>
-      commentaryFingerprint({ date: '2026-11-01', score: 0, totalMinutesLogged: 0, wins: [], longestFocusSession: null })
+      commentaryFingerprint({ date: '2026-11-01', totalMinutesLogged: 0, wins: [], longestFocusSession: null })
     ).not.toThrow()
   })
 })

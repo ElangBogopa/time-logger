@@ -45,6 +45,9 @@ jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),
   getUserToday: () => '2026-11-03',
   getRealToday: () => '2026-11-03',
+  // Late evening: every morning meeting below has finished, whatever time
+  // the suite is run at. Only a finished event can be confirmed.
+  getUserCurrentHour: () => 23,
 }))
 // The timeline and the modals are not what this is about.
 jest.mock('@/components/TimelineView', () => ({ __esModule: true, default: () => <div /> }))
@@ -65,8 +68,11 @@ beforeEach(() => {
 
 it('offers to confirm the whole set at once', async () => {
   render(<LogPeriodPage />)
-  expect(await screen.findByText('3 calendar events in this session')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /confirm all/i })).toBeInTheDocument()
+  // Each event is named, with its own Confirm, under one heading.
+  expect(await screen.findByText('From your calendar')).toBeInTheDocument()
+  expect(screen.getByText('Pricing review')).toBeInTheDocument()
+  expect(screen.getByText('Standup')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /confirm all 3/i })).toBeInTheDocument()
 })
 
 it('confirms them with one categorise call and one insert', async () => {
@@ -99,16 +105,24 @@ it('still saves the entries when categorising fails', async () => {
   expect(rows.every((row: { category: unknown }) => row.category === null)).toBe(true)
 })
 
-it('does not offer it for a single event', async () => {
-  // One event is one tap on the timeline already; a confirm-all row there
-  // would just be a second way to do the same thing.
+it('shows a single event, with its own confirm and no confirm-all', async () => {
+  // This used to assert the opposite: nothing at all for one event, because
+  // "one event is one tap on the timeline already". The timeline has since
+  // left this view, and a session with a single meeting — the usual case —
+  // showed no trace of it except a gap that started at an unexplained hour.
   const all = events
   events = [all[0]]
   try {
     render(<LogPeriodPage />)
-    await waitFor(() => expect(fetchEntries).toHaveBeenCalled())
-    expect(screen.queryByText(/calendar events in this session/)).not.toBeInTheDocument()
+    expect(await screen.findByText('Pricing review')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /confirm all/i })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Pricing review' }))
+    await waitFor(() => expect(createEntries).toHaveBeenCalledTimes(1))
+    expect(categorizeActivities).toHaveBeenCalledWith(['Pricing review'])
+    expect((createEntries as jest.Mock).mock.calls[0][0]).toEqual([
+      { date: '2026-11-03', activity: 'Pricing review', category: 'meetings', duration_minutes: 60, start_time: '09:00', end_time: '10:00' },
+    ])
   } finally {
     events = all
   }

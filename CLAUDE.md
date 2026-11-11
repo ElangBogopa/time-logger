@@ -160,7 +160,10 @@ actually happened. It never writes to Google: the sync is read-only by
 design.
 
 The four tabs are Today (capture), Review (what happened), Plan (what is
-next) and More. The research lives in More and is cited from the places it
+next) and More. They are one loop — plan, do, record, review, plan again —
+and each hands off to the next: Today leads with *Next up*, the day's plan
+and calendar with a line for now; Review opens on the last finished day,
+yesterday until 9pm; and both reviews end by pointing at the planner. The research lives in More and is cited from the places it
 explains — every scheduling suggestion carries the library entry that
 backs it.
 
@@ -228,7 +231,29 @@ backs it.
    ```
    This prevents the "spinner flash" when navigating back to previously-visited pages.
 9. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
-10. **Planning vs Execution separation**: The goal/productivity page is for PLANNING only (no interactive checkboxes). Task completion ONLY happens from session pages (post-session popup) where each completion is tagged with the session period (morning/afternoon/evening).
+10. **Plan, then do — and the two must meet**: Planning happens on the Plan
+    tab and the goal page, which stay free of checkboxes. A plan is settled
+    where the day is lived: the *Next up* list (`components/NextUp.tsx`,
+    logic in `lib/next-up.ts`) on Today and in each session. *Did it* writes
+    the entry at the planned time and marks the plan kept, tagged with the
+    session its time falls in; *Move* reschedules it; *Skip* sets it aside
+    on this device and leaves the plan untouched, so the review still
+    reports it as not done. A plan the log already shows needs no tick at
+    all — `comparePlanToActual` recognises it. This replaced "completion
+    ONLY from the post-session popup", which kept the invariant that every
+    completion carries its session but made the plan invisible everywhere
+    except a popup people skip. The popup can still tick tasks.
+11. **Your habit outranks the textbook**: The planner reads the last four
+    weeks of the log (`lib/habits.ts`) for your usual hour and length for a
+    thing, when you get up, and what you do often. `suggestTimes` proposes
+    your usual hour first and quotes the research only where it agrees; with
+    no habit it falls back to `IDEAL_DAY`. A habit needs three separate
+    days, and an hour that wanders more than 90 minutes is not a usual hour.
+    Nothing is proposed before half an hour after you usually wake. Plans
+    are stored without a category, so the categoriser's answer is kept per
+    session (`plan-task-categories`) — it is what colours a proposal and
+    lets "If the day goes to plan" score it with the ordinary `calcBody` /
+    `calcFocus` / `calcSocial`, never a new formula.
 
 ## Quick Commands
 

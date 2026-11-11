@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
 import { getUserToday, getRealToday, TimeEntry, PENDING_COMMENTARY, TimeCategory, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
-import { parseTimeFromText, ParseResult } from '@/lib/time-parser'
+import { parseTimeFromText, ParseResult, isMealWordDetection } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
 import {
@@ -148,8 +148,13 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       .filter(d => d.type === 'duration')
       .reduce((sum, d) => sum + (d.durationMinutes || 0), 0)
     const hasDuration = totalDuration > 0
+    // "gym at 6pm for 1 hour" names its own start; only a bare duration
+    // ("coded for 2 hours") should hang off the time already in the form.
+    const namesATime = parseResult.detections.some(
+      d => d.type !== 'duration' && !isMealWordDetection(d)
+    )
 
-    if (hasDuration) {
+    if (hasDuration && !namesATime) {
       // Has duration: use current startTime + duration
       const [hours, mins] = startTime.split(':').map(Number)
       const startMins = hours * 60 + mins

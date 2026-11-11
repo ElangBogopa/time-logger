@@ -121,3 +121,37 @@ it('still returns the week stats when generation is skipped', async () => {
   expect(second.body.entryCount).toBe(first.body.entryCount)
   expect(second.body.entryCount).toBeGreaterThan(0)
 })
+
+/**
+ * The week in progress. The route decided "is this the current week?" by
+ * comparing the requested start with a Sunday it computed itself, while
+ * the client asks for weeks starting on Monday — so the answer was always
+ * no, today was never left out, and a part-week was compared with a full
+ * one ("49% less time logged" on a Wednesday).
+ */
+describe('a week still in progress', () => {
+  const types = jest.requireActual('@/lib/types')
+  const today: string = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  const monday: string = types.getWeekStartForDate(today, 1)
+  const daysIntoWeek = Math.round(
+    (new Date(today + 'T12:00:00').getTime() - new Date(monday + 'T12:00:00').getTime()) / 86_400_000
+  )
+
+  it('covers only the days that have finished', async () => {
+    const res = (await POST(request({ weekStart: monday, timezone: 'America/Toronto' }))) as unknown as {
+      body: { evaluatedDays: number }
+    }
+    // Monday shows itself; any later day shows the days before it.
+    expect(res.body.evaluatedDays).toBe(Math.max(1, daysIntoWeek))
+    expect(res.body.evaluatedDays).toBeLessThan(7)
+  })
+
+  it('still treats a past week as all seven days', async () => {
+    const res = (await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))) as unknown as {
+      body: { evaluatedDays: number }
+    }
+    expect(res.body.evaluatedDays).toBe(7)
+  })
+})

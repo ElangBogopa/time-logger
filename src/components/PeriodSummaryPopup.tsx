@@ -347,24 +347,28 @@ export default function PeriodSummaryPopup({
                   onClick={handleShare}
                   className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
                   title="Share session"
+                  aria-label="Share session"
                 >
                   <Share2 className="h-5 w-5" />
                 </button>
                 <button
                   onClick={handleClose}
+                  aria-label="Close"
                   className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-4">
+            {/* Header. The right padding keeps the title clear of the share
+                and close buttons, which are positioned over this row: at
+                phone width the share icon sat on the title's last letter. */}
+            <div className="flex items-center gap-3 mb-4 pr-16">
               <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800 ${colors.border} border`}>
                 <Icon className={`h-6 w-6 ${colors.icon}`} />
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-white">{periodLabel} Complete</h2>
+                <h2 className="text-lg font-bold leading-tight text-white">{periodLabel} Complete</h2>
                 <p className="text-sm text-zinc-400">
                   {periodEntries.length} {periodEntries.length === 1 ? 'activity' : 'activities'} logged
                 </p>
@@ -437,7 +441,10 @@ export default function PeriodSummaryPopup({
                 ) : (
                   <div className="flex-1">
                     <p className="text-sm text-zinc-300 leading-relaxed italic">
-                      &ldquo;{commentary || `Great ${periodLabel.toLowerCase()}! You stayed on track.`}&rdquo;
+                      {/* If the line could not be written, say what is known.
+                          The fallback was "Great evening! You stayed on
+                          track", which is praise for nothing in particular. */}
+                      &ldquo;{commentary || `${periodLabel} wrapped up.`}&rdquo;
                     </p>
                     <CommentaryThread
                       subjectType="session"

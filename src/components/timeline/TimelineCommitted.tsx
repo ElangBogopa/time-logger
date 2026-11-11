@@ -23,6 +23,8 @@ interface TimelineCommittedProps {
    * same in both states.
    */
   outcome?: PlanOutcome
+  /** Draw in the left half: a calendar block occupies the right. */
+  narrow?: boolean
 }
 
 import { PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT } from './constants'
@@ -37,7 +39,7 @@ const COMMITTED_COLORS = {
   textDone: 'text-[#8B7E74]/50 dark:text-[#A89F96]/50',
 }
 
-export default function TimelineCommitted({ task, startHour, outcome }: TimelineCommittedProps) {
+export default function TimelineCommitted({ task, startHour, outcome, narrow = false }: TimelineCommittedProps) {
   const startMinutes = timeToMinutes(task.committed_start)
   const endMinutes = timeToMinutes(task.committed_end)
   const durationMinutes = endMinutes - startMinutes
@@ -57,7 +59,8 @@ export default function TimelineCommitted({ task, startHour, outcome }: Timeline
         top,
         height,
         left: '4px',
-        right: '4px',
+        // Shares the row with a calendar block that is drawn over the same hour
+        right: narrow ? 'calc(50% + 2px)' : '4px',
       }}
     >
       <div className={`flex h-full flex-col justify-center px-2.5 py-1 ${

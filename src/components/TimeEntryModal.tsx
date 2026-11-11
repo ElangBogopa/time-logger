@@ -15,7 +15,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Pencil, Trash2, Clock, CheckCircle2 } from 'lucide-react'
+import { Loader2, Pencil, Trash2, Clock, CheckCircle2, ChevronDown } from 'lucide-react'
+import CategoryPicker from '@/components/CategoryPicker'
 import { toast } from 'sonner'
 
 interface TimeEntryModalProps {
@@ -86,6 +87,9 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
   const [endTime, setEndTime] = useState(entry.end_time || '')
   const [duration, setDuration] = useState(String(entry.duration_minutes))
   const [description, setDescription] = useState(entry.description || '')
+  const [category, setCategory] = useState<TimeCategory | null>(entry.category)
+  const [isPickingCategory, setIsPickingCategory] = useState(false)
+  const [isSavingCategory, setIsSavingCategory] = useState(false)
 
   const isDurationAutoCalculated = startTime !== '' && endTime !== ''
 
@@ -110,6 +114,25 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
     }
   }, [startTime, endTime])
 
+  /** Correct the category from the detail view: one tap, saved at once. */
+  const handleChangeCategory = async (next: TimeCategory) => {
+    if (next === entry.category) {
+      setIsPickingCategory(false)
+      return
+    }
+    setError(null)
+    setIsSavingCategory(true)
+    try {
+      await updateEntry(entry.id, { category: next })
+      toast.success(`Now counted as ${CATEGORY_LABELS[next]}`)
+      onUpdate()
+    } catch {
+      setError('Could not change the category. Please try again.')
+    } finally {
+      setIsSavingCategory(false)
+    }
+  }
+
   const handleSave = async () => {
     setError(null)
     setIsSaving(true)
@@ -119,9 +142,13 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       const descriptionChanged = description !== (entry.description || '')
       const needsCommentaryUpdate = activityChanged || descriptionChanged
 
-      // If activity changed, get new category from AI
-      let newCategory = entry.category
-      if (activityChanged) {
+      // A category chosen by hand stands. Only when the wording changed and
+      // the category was left alone does the model get another look — it
+      // used to re-categorise on every reword, which was also the only way
+      // to change a category at all.
+      const categoryChosenByHand = category !== entry.category
+      let newCategory = category
+      if (activityChanged && !categoryChosenByHand) {
         try {
           const categoryResponse = await csrfFetch('/api/categorize', {
             method: 'POST',
@@ -426,6 +453,14 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                 />
               </div>
 
+              {/* Category — only once the entry has one */}
+              {!isPending && category && (
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <CategoryPicker value={category} onChange={setCategory} disabled={isSaving} />
+                </div>
+              )}
+
               {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="edit-notes">Notes</Label>
@@ -477,9 +512,28 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                   {entry.activity}
                 </h3>
                 {!isPending && entry.category && (
-                  <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium ${CATEGORY_COLORS[entry.category]}`}>
-                    {CATEGORY_LABELS[entry.category]}
-                  </span>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsPickingCategory((open) => !open)}
+                      aria-expanded={isPickingCategory}
+                      aria-label={`Category: ${CATEGORY_LABELS[entry.category]}. Change category`}
+                      className={`mt-2 inline-flex min-h-9 items-center gap-1 rounded-full px-3 py-1 text-sm font-medium transition-all duration-150 active:scale-[0.97] ${CATEGORY_COLORS[entry.category]}`}
+                    >
+                      {CATEGORY_LABELS[entry.category]}
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isPickingCategory ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </button>
+                    {isPickingCategory && (
+                      <div className="mt-3">
+                        <p className="field-label mb-2">Count this as</p>
+                        <CategoryPicker
+                          value={entry.category}
+                          onChange={handleChangeCategory}
+                          disabled={isSavingCategory}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
                 {(isPending || !entry.category) && (
                   <span className="mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium bg-zinc-500/20 text-zinc-400">

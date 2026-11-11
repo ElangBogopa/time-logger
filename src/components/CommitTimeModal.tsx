@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, ExternalLink } from 'lucide-react'
+import { Calendar, ExternalLink, X, Trash2, CalendarX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface CommitTimeModalProps {
@@ -13,6 +13,15 @@ interface CommitTimeModalProps {
   planId?: string
   existingStart?: string | null
   existingEnd?: string | null
+  /** Take the time off the task and return it to the tray. */
+  onUnschedule?: () => Promise<void>
+  /** Remove the task from the day altogether. */
+  onDelete?: () => Promise<void>
+  /** The planner is the calendar: a link to it from itself goes nowhere. */
+  hideCalendarLink?: boolean
+  /** Where to start a task that has no time yet, instead of 9–10am for everything. */
+  defaultStart?: string
+  defaultEnd?: string
 }
 
 export default function CommitTimeModal({
@@ -24,11 +33,40 @@ export default function CommitTimeModal({
   planId,
   existingStart,
   existingEnd,
+  onUnschedule,
+  onDelete,
+  hideCalendarLink = false,
+  defaultStart,
+  defaultEnd,
 }: CommitTimeModalProps) {
   const router = useRouter()
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('10:00')
+  const [startTime, setStartTime] = useState(defaultStart ?? '09:00')
+  const [endTime, setEndTime] = useState(defaultEnd ?? '10:00')
   const [isSaving, setIsSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  // A sheet with a drag handle and no other way out: Escape did nothing and
+  // there was no close button, only the backdrop.
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
+
+  const run = async (action: () => Promise<void>) => {
+    setIsSaving(true)
+    try {
+      await action()
+      onClose()
+    } catch (err) {
+      console.error('Failed to update task:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (existingStart) setStartTime(existingStart.slice(0, 5))
@@ -84,7 +122,7 @@ export default function CommitTimeModal({
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg animate-in slide-in-from-bottom duration-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div role="dialog" aria-modal="true" aria-label={`Set a time for ${taskTitle}`} className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg animate-in slide-in-from-bottom duration-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="rounded-t-2xl border border-border bg-card px-5 pt-3 pb-20 shadow-xl">
           {/* Drag handle */}
           <div className="flex justify-center mb-2">
@@ -97,14 +135,25 @@ export default function CommitTimeModal({
               <h3 className="text-sm font-semibold text-foreground">Commit to a time</h3>
               <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
             </div>
-            <button
-              onClick={handleViewCalendar}
-              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
-            >
-              <Calendar className="h-3 w-3" />
-              View calendar
-              <ExternalLink className="h-2.5 w-2.5 opacity-50" />
-            </button>
+            <div className="flex items-center gap-1">
+              {!hideCalendarLink && (
+                <button
+                  onClick={handleViewCalendar}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+                >
+                  <Calendar className="h-3 w-3" />
+                  View calendar
+                  <ExternalLink className="h-2.5 w-2.5 opacity-50" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* Task name */}
@@ -158,6 +207,58 @@ export default function CommitTimeModal({
           >
             {isSaving ? 'Saving...' : existingStart ? 'Update time block' : 'Commit to calendar'}
           </button>
+
+          {/* The ways back out of a plan. There were none: a task, once
+              added, could be given a new time and nothing else. */}
+          {(onDelete || (onUnschedule && existingStart)) && (
+            <div className="mt-2">
+              {confirmingDelete && onDelete ? (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-1.5">
+                  <p className="text-sm text-foreground truncate">Delete &ldquo;{taskTitle}&rdquo;?</p>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => run(onDelete)}
+                      disabled={isSaving}
+                      className="min-h-11 rounded-lg px-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDelete(false)}
+                      className="min-h-11 rounded-lg px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Keep
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  {onUnschedule && existingStart ? (
+                    <button
+                      onClick={() => run(onUnschedule)}
+                      disabled={isSaving}
+                      className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                    >
+                      <CalendarX className="h-4 w-4" />
+                      Remove the time
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  {onDelete && (
+                    <button
+                      onClick={() => setConfirmingDelete(true)}
+                      disabled={isSaving}
+                      className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete task
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

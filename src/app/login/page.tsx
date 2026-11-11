@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
+import Link from 'next/link'
 
 function LoginContent() {
   const { status } = useSession()
@@ -66,7 +67,12 @@ function LoginContent() {
         </Button>
 
         <p className="text-center text-xs text-muted-foreground">
-          By continuing, you agree to our Terms of Service and Privacy Policy.
+          Better reads your Google Calendar and never writes to it.
+        </p>
+        <p className="text-center text-xs text-muted-foreground">
+          By continuing, you agree to the{' '}
+          <Link href="/terms" className="underline hover:no-underline">Terms</Link> and the{' '}
+          <Link href="/privacy" className="underline hover:no-underline">Privacy</Link> page.
         </p>
       </div>
     </div>

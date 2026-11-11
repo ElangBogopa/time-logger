@@ -113,6 +113,19 @@ function parseTimeString(timeStr: string, inferPM: boolean = false): { hours: nu
   return null
 }
 
+type Meridiem = 'am' | 'pm'
+
+/**
+ * Read a time that carries no am/pm of its own as if it had the one given.
+ * A number past twelve is already on the 24-hour clock and is left alone.
+ */
+function parseWithBorrowedMeridiem(bare: string, meridiem: Meridiem) {
+  const hour = parseInt(bare, 10)
+  if (Number.isNaN(hour)) return null
+  if (hour > 12) return parseTimeString(/[:.]/.test(bare) ? bare : `${bare}:00`)
+  return parseTimeString(`${bare}${meridiem}`)
+}
+
 /**
  * Calculate end time given start time and duration in minutes
  */
@@ -397,6 +410,32 @@ export function detectTimePatterns(text: string): ParsedTime[] {
     let startParsed = parseTimeString(time1, !hasAnyExplicitMeridiem)
     let endParsed = parseTimeString(time2, !hasAnyExplicitMeridiem)
 
+    // One side says am or pm and the other does not: "12 to 1pm", "6 to 7am",
+    // "7-7:30pm", "2pm to 3". This is how most people write a range, and the
+    // bare side used to fail to parse — so the whole range was dropped and
+    // the lone "1pm" was read as a start time. The bare side borrows the
+    // other's half of the day, and takes the opposite half if that would end
+    // the range before it begins ("9 to 5pm", "11am to 1").
+    if (hasExplicitMeridiem1 !== hasExplicitMeridiem2) {
+      const meridiem: Meridiem = /pm/i.test(hasExplicitMeridiem1 ? time1 : time2) ? 'pm' : 'am'
+      const opposite: Meridiem = meridiem === 'pm' ? 'am' : 'pm'
+      const minutesOf = (t: { hours: number; minutes: number }) => t.hours * 60 + t.minutes
+
+      if (hasExplicitMeridiem2) {
+        endParsed = parseTimeString(time2)
+        startParsed = parseWithBorrowedMeridiem(time1, meridiem)
+        if (startParsed && endParsed && minutesOf(startParsed) >= minutesOf(endParsed)) {
+          startParsed = parseWithBorrowedMeridiem(time1, opposite)
+        }
+      } else {
+        startParsed = parseTimeString(time1)
+        endParsed = parseWithBorrowedMeridiem(time2, meridiem)
+        if (startParsed && endParsed && minutesOf(endParsed) <= minutesOf(startParsed)) {
+          endParsed = parseWithBorrowedMeridiem(time2, opposite)
+        }
+      }
+    }
+
     if (startParsed && endParsed) {
       // Smart range validation: if end < start and neither has explicit meridiem,
       // the times are likely in the wrong period. Adjust to make a sensible range.
@@ -476,7 +515,7 @@ export function detectTimePatterns(text: string): ParsedTime[] {
   }
 
   // "X and a half hours"
-  const andAHalfRegex = /(\d+)\s*(?:and\s*a\s*half)\s*(?:hr|hour|hours|h)/gi
+  const andAHalfRegex = /(?:\bfor\s+)?(\d+)\s*(?:and\s*a\s*half)\s*(?:hr|hour|hours|h)/gi
   while ((match = andAHalfRegex.exec(text)) !== null) {
     const hours = parseInt(match[1], 10)
     addDetection({
@@ -489,7 +528,7 @@ export function detectTimePatterns(text: string): ParsedTime[] {
   }
 
   // "half hour", "half an hour"
-  const halfHourRegex = /\bhalf\s*(?:an?\s*)?hour\b/gi
+  const halfHourRegex = /\b(?:for\s+)?half\s*(?:an?\s*)?hour\b/gi
   while ((match = halfHourRegex.exec(text)) !== null) {
     addDetection({
       matchedText: match[0],
@@ -501,7 +540,7 @@ export function detectTimePatterns(text: string): ParsedTime[] {
   }
 
   // "quarter hour"
-  const quarterHourRegex = /\bquarter\s*(?:of\s*)?(?:an?\s*)?hour\b/gi
+  const quarterHourRegex = /\b(?:for\s+)?(?:a\s+)?quarter\s*(?:of\s*)?(?:an?\s*)?hour\b/gi
   while ((match = quarterHourRegex.exec(text)) !== null) {
     addDetection({
       matchedText: match[0],
@@ -512,8 +551,21 @@ export function detectTimePatterns(text: string): ParsedTime[] {
     })
   }
 
+  // "an hour", "for an hour", "an hour and a half", "a couple of hours".
+  // Runs after the half- and quarter-hour patterns, which own "half an hour".
+  const wordHourRegex = /\b(?:for\s+)?(?:(an?\s+hour\s+and\s+a\s+half)|(a\s+couple\s+(?:of\s+)?hours)|(an?\s+hour))\b/gi
+  while ((match = wordHourRegex.exec(text)) !== null) {
+    addDetection({
+      matchedText: match[0],
+      startIndex: match.index,
+      endIndex: match.index + match[0].length,
+      type: 'duration',
+      durationMinutes: match[1] ? 90 : match[2] ? 120 : 60,
+    })
+  }
+
   // "about/around/~X hours/minutes"
-  const approxRegex = /(?:about|around|approximately|~|approx\.?)\s*(\d+(?:\.\d+)?)\s*(hr|hour|hours|h|min|mins|minute|minutes|m)\b/gi
+  const approxRegex = /(?:\bfor\s+)?(?:about|around|approximately|~|approx\.?)\s*(\d+(?:\.\d+)?)\s*(hr|hour|hours|h|min|mins|minute|minutes|m)\b/gi
   while ((match = approxRegex.exec(text)) !== null) {
     const value = parseFloat(match[1])
     const unit = match[2].toLowerCase()
@@ -585,7 +637,7 @@ export function detectTimePatterns(text: string): ParsedTime[] {
   }
 
   // Standalone time with meridiem: "2pm", "10am" (lower priority)
-  const standaloneTimeRegex = /\b(\d{1,2})[:\.]?(\d{2})?\s*(am|pm)\b/gi
+  const standaloneTimeRegex = /(?:\bat\s+|@\s*)?\b(\d{1,2})[:\.]?(\d{2})?\s*(am|pm)\b/gi
   while ((match = standaloneTimeRegex.exec(text)) !== null) {
     const hour = parseInt(match[1], 10)
     const minutes = match[2] ? parseInt(match[2], 10) : 0
@@ -663,6 +715,13 @@ function inferDefaultDuration(text: string): number {
   return 60
 }
 
+const MEAL_WORDS = ['dinner', 'lunch', 'breakfast']
+
+/** A meal named in the text: it implies an hour, and stays in the activity. */
+export function isMealWordDetection(detection: ParsedTime): boolean {
+  return MEAL_WORDS.includes(detection.matchedText.toLowerCase())
+}
+
 /**
  * Parse time expressions from text and return structured result
  */
@@ -684,14 +743,12 @@ export function parseTimeFromText(
 
   // Remove detected patterns from text to get clean activity
   // BUT keep activity-based words (dinner, lunch, breakfast, etc.) - only remove time expressions
-  const activityBasedWords = ['dinner', 'lunch', 'breakfast']
   let cleanedActivity = text
   // Process in reverse order to maintain correct indices
   const sortedDetections = [...detections].sort((a, b) => b.startIndex - a.startIndex)
   for (const detection of sortedDetections) {
     // Don't remove activity-based words - they're part of the activity description
-    const isActivityWord = activityBasedWords.includes(detection.matchedText.toLowerCase())
-    if (!isActivityWord) {
+    if (!isMealWordDetection(detection)) {
       cleanedActivity =
         cleanedActivity.slice(0, detection.startIndex) +
         cleanedActivity.slice(detection.endIndex)
@@ -706,6 +763,7 @@ export function parseTimeFromText(
   let totalDuration = 0
 
   for (const detection of detections) {
+    if (isMealWordDetection(detection)) continue
     if (detection.type === 'range') {
       startTime = detection.startTime || startTime
       endTime = detection.endTime || endTime
@@ -715,6 +773,16 @@ export function parseTimeFromText(
     } else if (detection.type === 'duration') {
       totalDuration += detection.durationMinutes || 0
     }
+  }
+
+  // "dinner" is a guess at the hour, not a statement of it, so it only fills
+  // in what the text left out. It used to be read first and then half
+  // overwritten: "dinner 7pm" started at seven and ended at seven, because
+  // seven replaced dinner's start and kept dinner's 7pm end.
+  const mealDefault = detections.find(isMealWordDetection)
+  if (mealDefault && !startTime && !endTime) {
+    startTime = mealDefault.startTime ?? null
+    if (totalDuration === 0) endTime = mealDefault.endTime ?? null
   }
 
   // If we have duration but no times, calculate based on current time

@@ -19,7 +19,8 @@ const NAMESPACE = 'day'
 
 export interface CommentaryInputs {
   date: string
-  score: number
+  metrics?: { body: number; focus: number; social: number } | null
+  planAdherence?: { kept: number; moved: number; missed: number } | null
   totalMinutesLogged: number
   wins: { id?: string; text?: string }[]
   mood?: string | null
@@ -33,7 +34,10 @@ export interface CommentaryInputs {
 export function commentaryFingerprint(inputs: CommentaryInputs): string {
   return stableHash(
     JSON.stringify([
-      inputs.score,
+      inputs.metrics ? [inputs.metrics.body, inputs.metrics.focus, inputs.metrics.social] : null,
+      inputs.planAdherence
+        ? [inputs.planAdherence.kept, inputs.planAdherence.moved, inputs.planAdherence.missed]
+        : null,
       inputs.totalMinutesLogged,
       (inputs.wins ?? []).map((w) => w.id ?? w.text ?? ''),
       inputs.mood ?? null,

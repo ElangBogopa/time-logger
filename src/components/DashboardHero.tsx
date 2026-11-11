@@ -27,6 +27,8 @@ interface DashboardHeroProps {
   activeMetric?: MetricKey | null
   onTrendDataLoaded?: (data: TrendAPIResponse) => void
   date?: string // YYYY-MM-DD, defaults to today
+  /** Bump to re-read the scores after something was logged from this screen. */
+  refreshKey?: number
 }
 
 /* ── Metric Circle ── */
@@ -109,7 +111,7 @@ function MetricCircle({
 const trendCache = new Map<string, TrendAPIResponse>()
 
 /* ── Main Component ── */
-export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLoaded, date }: DashboardHeroProps) {
+export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLoaded, date, refreshKey = 0 }: DashboardHeroProps) {
   const cacheKey = date || '__today__'
   const cached = trendCache.get(cacheKey)
   const [trendData, setTrendData] = useState<TrendAPIResponse | null>(cached || null)
@@ -149,7 +151,7 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
     }
     fetchTrendData()
     return () => controller.abort()
-  }, [cacheKey, date, onTrendDataLoaded])
+  }, [cacheKey, date, onTrendDataLoaded, refreshKey])
 
   if (isLoading) {
     return (

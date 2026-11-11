@@ -55,10 +55,25 @@ export async function GET(request: NextRequest) {
 
     const entries = (allEntries || []) as EntryRow[]
 
-    // Build date range
+    // The first day this person logged anything. Days before it are not
+    // zeros, they are days the app did not exist for them: a new user's
+    // chart was a flat line of six failed days and then today, with
+    // "▲ 11 vs last week" and a personal best on day one.
+    const { data: firstRows } = await supabase
+      .from('time_entries')
+      .select('date')
+      .eq('user_id', session.user.id)
+      .eq('status', 'confirmed')
+      .order('date', { ascending: true })
+      .limit(1)
+    const firstDate: string | null = (firstRows?.[0] as { date?: string } | undefined)?.date ?? null
+
+    // Build date range, starting no earlier than that first day
     const trendDates: string[] = []
     for (let i = days - 1; i >= 0; i--) {
-      trendDates.push(getDateNDaysAgo(today, i))
+      const date = getDateNDaysAgo(today, i)
+      if (firstDate && date < firstDate && date !== today) continue
+      trendDates.push(date)
     }
 
     // Calculate per-day metrics
@@ -99,24 +114,34 @@ export async function GET(request: NextRequest) {
     const focusDetails = calcFocusDetails(todayEntries)
     const socialDetails = calcSocialDetails(todayEntries)
 
-    // Personal bests
-    const bodyBest = trend.reduce((best, d) => d.body > (best?.value ?? 0) ? { value: d.body, date: d.date } : best, null as { value: number; date: string } | null)
-    const focusBest = trend.reduce((best, d) => d.focus > (best?.value ?? 0) ? { value: d.focus, date: d.date } : best, null as { value: number; date: string } | null)
-    const socialBest = trend.reduce((best, d) => d.social > (best?.value ?? 0) ? { value: d.social, date: d.date } : best, null as { value: number; date: string } | null)
+    // Personal bests — a best needs something to be better than
+    const hasHistory = trend.length >= 2
+    const bodyBest = !hasHistory ? null : trend.reduce((best, d) => d.body > (best?.value ?? 0) ? { value: d.body, date: d.date } : best, null as { value: number; date: string } | null)
+    const focusBest = !hasHistory ? null : trend.reduce((best, d) => d.focus > (best?.value ?? 0) ? { value: d.focus, date: d.date } : best, null as { value: number; date: string } | null)
+    const socialBest = !hasHistory ? null : trend.reduce((best, d) => d.social > (best?.value ?? 0) ? { value: d.social, date: d.date } : best, null as { value: number; date: string } | null)
 
     // vs Last Week
     let vsLastWeek: { body: number | null; focus: number | null; social: number | null }
 
-    if (days >= 14) {
-      const calcAvg = (metric: 'body' | 'focus' | 'social', startIdx: number, count: number) => {
-        const slice = trend.slice(startIdx, startIdx + count)
+    // Nothing to compare with until there is a week before this one.
+    const comparisonEnd = getDateNDaysAgo(today, 7)
+    const hasLastWeek = firstDate !== null && firstDate <= comparisonEnd
+
+    if (!hasLastWeek) {
+      vsLastWeek = { body: null, focus: null, social: null }
+    } else if (days >= 14) {
+      // By date, not by position: the trend no longer always holds `days` points.
+      const thisWeekFrom = getDateNDaysAgo(today, 6)
+      const lastWeekFrom = getDateNDaysAgo(today, 13)
+      const calcAvg = (metric: 'body' | 'focus' | 'social', from: string, to: string) => {
+        const slice = trend.filter((d) => d.date >= from && d.date <= to)
         if (slice.length === 0) return 0
         return Math.round(slice.reduce((s, d) => s + d[metric], 0) / slice.length)
       }
       vsLastWeek = {
-        body: calcAvg('body', days - 7, 7) - calcAvg('body', days - 14, 7),
-        focus: calcAvg('focus', days - 7, 7) - calcAvg('focus', days - 14, 7),
-        social: calcAvg('social', days - 7, 7) - calcAvg('social', days - 14, 7),
+        body: calcAvg('body', thisWeekFrom, today) - calcAvg('body', lastWeekFrom, comparisonEnd),
+        focus: calcAvg('focus', thisWeekFrom, today) - calcAvg('focus', lastWeekFrom, comparisonEnd),
+        social: calcAvg('social', thisWeekFrom, today) - calcAvg('social', lastWeekFrom, comparisonEnd),
       }
     } else {
       const lastWeekEnd = getDateNDaysAgo(today, 7)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { TimeEntry } from '@/lib/types'
 import { formatDuration, timeToMinutes } from '@/lib/time-utils'
 import TimeEntryModal from './TimeEntryModal'
@@ -17,7 +17,7 @@ import TimelineGhost, { type CalendarEvent } from './timeline/TimelineGhost'
 import TimelineCommitted, { type CommittedTask } from './timeline/TimelineCommitted'
 import type { PlanOutcome } from '@/lib/plan-adherence'
 import { CurrentTimeIndicator, DragPreview, PIXELS_PER_MINUTE } from './timeline'
-import { HOUR_HEIGHT } from './timeline/constants'
+import { HOUR_HEIGHT, MIN_BLOCK_HEIGHT } from './timeline/constants'
 import { yToTime as createYToTime } from './timeline/utils'
 
 export type { CalendarEvent, DragCreateData, PlacedEntry }
@@ -266,6 +266,40 @@ export default function TimelineView({
    */
   const updatedIsEmpty = timelineIsEmpty && committedTasks.length === 0
 
+  /**
+   * Calendar blocks and planned blocks that are drawn over each other.
+   *
+   * A block is never drawn shorter than MIN_BLOCK_HEIGHT, so a 15-minute
+   * standup takes 37 minutes of grid — and a task planned for the moment it
+   * ends was painted across its label, which read as struck through. Where
+   * the drawn boxes meet, the two share the row: plan left, calendar right.
+   */
+  const { crowdedGhostIds, crowdedTaskIds } = useMemo(() => {
+    const minMinutes = MIN_BLOCK_HEIGHT / PIXELS_PER_MINUTE
+    const drawn = (start: string, end: string) => {
+      const from = timeToMinutes(start)
+      return { from, to: Math.max(timeToMinutes(end), from + minMinutes) }
+    }
+    const ghostIds = new Set<string>()
+    const taskIds = new Set<string>()
+    for (const event of updatedGhostEvents) {
+      const ghost = drawn(event.startTime, event.endTime)
+      for (const task of committedTasks) {
+        const planned = drawn(task.committed_start, task.committed_end)
+        if (ghost.from < planned.to && planned.from < ghost.to) {
+          ghostIds.add(event.id)
+          taskIds.add(task.id)
+        }
+      }
+    }
+    return { crowdedGhostIds: ghostIds, crowdedTaskIds: taskIds }
+  }, [updatedGhostEvents, committedTasks])
+
+  const sideBySideGhostIds = useMemo(
+    () => new Set([...updatedOverlappingGhostIds, ...crowdedGhostIds]),
+    [updatedOverlappingGhostIds, crowdedGhostIds]
+  )
+
   // Scroll to appropriate position on load
   useEffect(() => {
     if (!scrollContainerRef.current) return
@@ -480,7 +514,7 @@ export default function TimelineView({
                 startHour={updatedStartHour}
                 isDismissed={dismissedEventIds.has(event.id)}
                 isToday={isToday}
-                overlappingGhostIds={updatedOverlappingGhostIds}
+                overlappingGhostIds={sideBySideGhostIds}
                 onMouseDown={(e, event) => {
                   const isCurrentlyDragging = mouseCreateHook.isDragging || touchCreateHook.isTouchDragging
                   if (isCurrentlyDragging) return
@@ -509,6 +543,7 @@ export default function TimelineView({
                   task={task}
                   startHour={updatedStartHour}
                   outcome={planOutcomes?.[task.id]}
+                  narrow={crowdedTaskIds.has(task.id)}
                 />
               ))}
 

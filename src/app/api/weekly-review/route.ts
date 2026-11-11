@@ -8,14 +8,16 @@ import {
   TimeCategory,
   CATEGORY_LABELS,
   shiftDateString,
+  getWeekStartForDate,
 } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 import { stableHash } from '@/lib/ai-text-cache'
+import { calcBody, calcFocus, calcSocial, METRIC_THRESHOLDS, type EntryRow } from '@/lib/metrics-calc'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 interface WeeklyReviewRequest {
-  weekStart: string // YYYY-MM-DD of the Sunday
+  weekStart: string // YYYY-MM-DD of the week's Monday
   timezone?: string // IANA timezone (e.g., 'America/New_York')
   // Fingerprint of the coach summary the caller already has. When it matches
   // this week's prompt inputs the summary is not regenerated.
@@ -32,7 +34,6 @@ interface CategoryBreakdown {
 
 interface WeekHighlight {
   type: 'streak' | 'improvement' | 'target_hit' | 'personal_best' | 'consistency'
-  icon: string
   text: string
   subtext?: string
 }
@@ -40,9 +41,12 @@ interface WeekHighlight {
 interface WeeklyReviewData {
   weekStart: string
   weekEnd: string
-  // New hero metrics
-  weekScore: number // 0-100
-  weekScoreLabel: string // "Strong week", "Good progress", etc.
+  /**
+   * Body / Mind / Heart averaged over the days of this week that have
+   * anything logged — the same numbers the coach summary is written from.
+   * Null when nothing is logged.
+   */
+  averages: { body: number; focus: number; social: number } | null
   activeDays: number // Days with entries
   evaluatedDays: number // Days included in review (excludes today for current week)
   highlights: WeekHighlight[]
@@ -76,20 +80,7 @@ function getTodayInTimezone(timezone: string): string {
   return formatter.format(new Date())
 }
 
-// Get Sunday (start) of a given week for a date in a timezone
-function getWeekStart(dateStr: string): string {
-  // Parse date as local date
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const date = new Date(year, month - 1, day)
-  const dayOfWeek = date.getDay() // 0 = Sunday
-  date.setDate(date.getDate() - dayOfWeek)
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-// Get Saturday (end) of a given week
+// Get the last day of a given week
 function getWeekEnd(weekStart: string): string {
   const [year, month, day] = weekStart.split('-').map(Number)
   const date = new Date(year, month - 1, day)
@@ -157,31 +148,25 @@ export async function POST(request: NextRequest) {
     }
 
     const today = getTodayInTimezone(timezone)
-    const weekStart = requestedWeekStart || getWeekStart(today)
+    // Weeks run Monday to Sunday, as they do everywhere else in the app.
+    const weekStart = requestedWeekStart || getWeekStartForDate(today, 1)
     const weekEnd = getWeekEnd(weekStart)
     const previousWeekStart = getPreviousWeekStart(weekStart)
     const previousWeekEnd = getWeekEnd(previousWeekStart)
 
-    // For the current week, exclude today since the day hasn't ended yet
-    // (daily review isn't ready). Use yesterday as the effective end date.
-    const currentWeekStart = getWeekStart(today)
-    const isCurrentWeek = weekStart === currentWeekStart
+    // For the week in progress, leave today out: the day has not ended.
+    //
+    // "In progress" means today falls inside the requested week. This used
+    // to compare the requested week's start with a Sunday computed here,
+    // while the client asks for weeks that start on Monday — so the two
+    // never matched, the week in progress was always treated as a finished
+    // one, and three days were set against last week's seven.
+    const isCurrentWeek = today >= weekStart && today <= weekEnd
     let effectiveEndDate = weekEnd
     if (isCurrentWeek) {
-      // Get yesterday's date in the user's timezone
-      const todayDate = new Date(today + 'T12:00:00') // noon to avoid DST edge cases
-      todayDate.setDate(todayDate.getDate() - 1)
-      const y = todayDate.getFullYear()
-      const m = String(todayDate.getMonth() + 1).padStart(2, '0')
-      const d = String(todayDate.getDate()).padStart(2, '0')
-      const yesterday = `${y}-${m}-${d}`
-      // Only exclude today if yesterday is still within or after the week start
-      // (handles edge case of viewing on the first day of the week)
-      if (yesterday >= weekStart) {
-        effectiveEndDate = yesterday
-      }
-      // If today IS the first day (Sunday), effectiveEndDate stays as weekEnd
-      // but there won't be prior-day data anyway — show what's available
+      const yesterday = shiftDateString(today, -1)
+      // On the week's first day there is no yesterday inside it: show today.
+      effectiveEndDate = yesterday >= weekStart ? yesterday : today
     }
 
     // Fetch current week entries (up to effectiveEndDate)
@@ -211,10 +196,22 @@ export async function POST(request: NextRequest) {
     const hasEnoughData = entryCount >= MIN_ENTRIES_FOR_REVIEW
     const hasPreviousWeekData = previousWeekEntryCount >= MIN_ENTRIES_FOR_REVIEW
 
+    // Like for like. A week in progress is compared with the same days of
+    // the week before: on a Wednesday this used to set three days against
+    // seven, report "49% less time logged", and hand the model a drop to
+    // explain — which it did, by praising the user for logging less.
+    const daysSoFar = Math.round(
+      (new Date(effectiveEndDate + 'T12:00:00').getTime() - new Date(weekStart + 'T12:00:00').getTime()) /
+        86_400_000
+    ) + 1
+    const isPartialWeek = daysSoFar < 7
+    const prevCompareEnd = shiftDateString(previousWeekStart, daysSoFar - 1)
+    const prevComparable = isPartialWeek ? prevEntries.filter((e) => e.date <= prevCompareEnd) : prevEntries
+
     // Calculate totals
     const totalMinutes = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
-    const previousWeekMinutes = hasPreviousWeekData
-      ? prevEntries.reduce((sum, e) => sum + e.duration_minutes, 0)
+    const previousWeekMinutes = hasPreviousWeekData && prevComparable.length > 0
+      ? prevComparable.reduce((sum, e) => sum + e.duration_minutes, 0)
       : null
 
     // Calculate category breakdown
@@ -241,7 +238,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate previous week category totals
     const prevCategoryMap = new Map<TimeCategory, number>()
-    prevEntries.forEach((entry) => {
+    prevComparable.forEach((entry) => {
       if (entry.category) {
         const current = prevCategoryMap.get(entry.category) || 0
         prevCategoryMap.set(entry.category, current + entry.duration_minutes)
@@ -266,14 +263,31 @@ export async function POST(request: NextRequest) {
     // Calculate evaluatedDays
     const evaluatedDays = entriesByDay.size
 
-    // Find best days (most productive)
+    // The days with the most focused work. This counted everything except
+    // entertainment, so a night's sleep was seven hours of "focus" and the
+    // best day was whichever one had the most written down.
+    const FOCUS_CATEGORIES: TimeCategory[] = ['deep_work', 'learning', 'creating']
     const dayMinutes = new Map<string, number>()
     Array.from(entriesByDay.entries()).forEach(([date, dayEntries]) => {
-      const productiveMinutes = dayEntries
-        .filter((e) => e.category && e.category !== 'entertainment')
+      const focusMinutes = dayEntries
+        .filter((e) => e.category && FOCUS_CATEGORIES.includes(e.category))
         .reduce((sum, e) => sum + e.duration_minutes, 0)
-      dayMinutes.set(date, productiveMinutes)
+      dayMinutes.set(date, focusMinutes)
     })
+
+    // Each day on the app's one scale.
+    const dayScores = Array.from(entriesByDay.entries())
+      .filter(([, dayEntries]) => dayEntries.length > 0)
+      .map(([date, dayEntries]) => {
+        const rows = dayEntries.filter((e) => e.category) as unknown as EntryRow[]
+        const body = calcBody(rows)
+        const mind = calcFocus(rows)
+        const heart = calcSocial(rows)
+        const onTarget = [body, mind, heart].filter((v) => v >= METRIC_THRESHOLDS.green).length
+        return { date, body, mind, heart, onTarget }
+      })
+    const average = (pick: (d: (typeof dayScores)[number]) => number) =>
+      dayScores.length > 0 ? Math.round(dayScores.reduce((sum, d) => sum + pick(d), 0) / dayScores.length) : 0
 
     const bestDays = Array.from(dayMinutes.entries())
       .filter(([, minutes]) => minutes > 0)
@@ -310,21 +324,25 @@ export async function POST(request: NextRequest) {
     const insights: string[] = []
 
     if (bestDays.length > 0 && bestHours.length > 0) {
-      insights.push(`Best focus: ${bestDays.join(' & ')}, ${bestHours.join('-')}`)
+      // The hours are the two busiest, not the ends of a range: joined with
+      // a dash, "9 AM" and "3 PM" read as nine to three.
+      insights.push(`Best focus: ${bestDays.join(' & ')}, around ${bestHours.join(' and ')}`)
     }
 
-    const topCategory = categoryBreakdown[0]
+    // Sleep wins this every week for anyone who logs it, which is not news.
+    const topCategory = categoryBreakdown.find((c) => c.category !== 'sleep')
     if (topCategory) {
       const hours = Math.round((topCategory.minutes / 60) * 10) / 10
-      insights.push(`Most time: ${topCategory.label} (${hours}h, ${topCategory.percentage}%)`)
+      insights.push(`Most waking time: ${topCategory.label} (${hours}h)`)
     }
 
     if (hasPreviousWeekData && previousWeekMinutes !== null) {
       const change = Math.round(((totalMinutes - previousWeekMinutes) / previousWeekMinutes) * 100)
+      const versus = isPartialWeek ? 'the same days last week' : 'last week'
       if (change > 10) {
-        insights.push(`Logged ${change}% more time than last week`)
+        insights.push(`Logged ${change}% more time than ${versus}`)
       } else if (change < -10) {
-        insights.push(`Logged ${Math.abs(change)}% less time than last week`)
+        insights.push(`Logged ${Math.abs(change)}% less time than ${versus}`)
       }
     }
 
@@ -332,61 +350,25 @@ export async function POST(request: NextRequest) {
     const activeDays = Array.from(entriesByDay.values()).filter(dayEntries => dayEntries.length > 0).length
     // evaluatedDays already calculated above (before scorecards)
 
-    // Calculate Week Score (0-100)
-    // Based on active days and activity volume
-    let weekScore = 0
+    // There was a Week Score here — 50 points for active days, 50 for
+    // averaging three entries a day — and the label under the rings came
+    // from it: "Exceptional week" over Body 63, Mind 51, Heart 47. It was
+    // the last of the showing-up scores. The label is now read off the
+    // rings themselves, by the client that draws them.
 
-    // Active days component (50 points max, scaled to evaluated days)
-    const activeDaysScore = evaluatedDays > 0 ? Math.round((activeDays / evaluatedDays) * 50) : 0
-    weekScore += activeDaysScore
-
-    // Activity volume component (50 points max, based on entries per active day)
-    if (activeDays > 0) {
-      const avgEntriesPerDay = entryCount / activeDays
-      // Scale: 3 entries/day = full marks
-      const volumeScore = Math.round(Math.min(avgEntriesPerDay / 3, 1) * 50)
-      weekScore += volumeScore
-    }
-
-    // Cap at 100
-    weekScore = Math.min(100, weekScore)
-
-    // Generate week score label
-    let weekScoreLabel = ''
-    if (weekScore >= 85) weekScoreLabel = 'Exceptional week'
-    else if (weekScore >= 70) weekScoreLabel = 'Strong week'
-    else if (weekScore >= 55) weekScoreLabel = 'Good progress'
-    else if (weekScore >= 40) weekScoreLabel = 'Building momentum'
-    else if (weekScore >= 25) weekScoreLabel = 'Getting started'
-    else weekScoreLabel = 'Room to grow'
-
-    // Generate highlights
     const highlights: WeekHighlight[] = []
 
-    // Highlight: Active days
-    if (activeDays >= 6) {
+    // Best day: the one that put most of the three on target, then the
+    // highest scores. It was the day with the most minutes logged.
+    const bestDay = [...dayScores].sort(
+      (a, b) => b.onTarget - a.onTarget || b.body + b.mind + b.heart - (a.body + a.mind + a.heart)
+    )[0]
+    if (bestDay) {
       highlights.push({
-        type: 'consistency',
-        icon: '🔥',
-        text: `${activeDays}/7 days active`,
-        subtext: activeDays === 7 ? 'Perfect week!' : 'Nearly perfect',
+        type: 'personal_best',
+        text: `Best day: ${getDayName(bestDay.date)}`,
+        subtext: `Body ${bestDay.body} · Mind ${bestDay.mind} · Heart ${bestDay.heart}`,
       })
-    }
-
-    // Highlight: Best day
-    if (bestDays.length > 0) {
-      const bestDayDate = Array.from(dayMinutes.entries())
-        .filter(([, minutes]) => minutes > 0)
-        .sort((a, b) => b[1] - a[1])[0]
-      if (bestDayDate) {
-        const hours = Math.round((bestDayDate[1] / 60) * 10) / 10
-        highlights.push({
-          type: 'personal_best',
-          icon: '⭐',
-          text: `Best day: ${getDayName(bestDayDate[0])}`,
-          subtext: `${hours}h of focused time`,
-        })
-      }
     }
 
     // Limit to top 4 highlights
@@ -404,15 +386,19 @@ export async function POST(request: NextRequest) {
     let coachSummaryUnchanged = false
 
     if (hasEnoughData && entries.length > 0) {
+      const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
       const context = `
 Weekly Review Data:
-- Total logged: ${Math.round((totalMinutes / 60) * 10) / 10} hours (${entryCount} entries)
-- Previous week: ${hasPreviousWeekData && previousWeekMinutes ? Math.round((previousWeekMinutes / 60) * 10) / 10 + ' hours' : 'Not enough data'}
-- Best days: ${bestDays.join(', ') || 'Not enough data'}
-- Best hours: ${bestHours.join(', ') || 'Not enough data'}
+- Days covered: ${isPartialWeek ? `${daysSoFar} of 7 — the week is still in progress` : 'all 7'}
+- Days with anything logged: ${dayScores.length}
+- Average Body: ${average((d) => d.body)}/100
+- Average Mind: ${average((d) => d.mind)}/100
+- Average Heart: ${average((d) => d.heart)}/100
+- Best focus days: ${bestDays.join(', ') || 'Not enough data'}
+- Best focus hours: ${bestHours.join(', ') || 'Not enough data'}
 
-Category breakdown:
-${categoryBreakdown.map((c) => `- ${c.label}: ${Math.round((c.minutes / 60) * 10) / 10}h (${c.percentage}%)`).join('\n')}
+Hours by category${isPartialWeek ? ' so far' : ''}:
+${categoryBreakdown.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
 
 `
 
@@ -429,15 +415,19 @@ ${categoryBreakdown.map((c) => `- ${c.label}: ${Math.round((c.minutes / 60) * 10
                 role: 'system',
                 content: `You are a supportive personal time coach. Write a brief weekly reflection (3-4 sentences max).
 
+The week is scored on Body, Mind and Heart, each out of 100. 80 means the daily target was met on average; 100 is not reachable; a low score is information, not a failing.
+
 Structure your response in 3 parts:
-1. What went well (acknowledge wins, even small ones)
-2. What to watch (a pattern or area needing attention, if any)
+1. What went well (something specific from the data)
+2. What to watch (a pattern or area needing attention, only if the data shows one)
 3. One specific, actionable suggestion for next week
 
 Be warm but direct. Use "you" language. Reference specific data from their week.
 Don't use bullet points - write in flowing prose.
 Keep it concise - no more than 4 sentences total.
-For limit targets like "leisure" or "meetings", celebrate decreases and gently note increases.`,
+The hours logged only say how much of the week was written down. Never praise or criticise the total, and never treat logging fewer hours as an achievement.
+Sleep is the largest category for anyone who logs it; do not present that as a finding.
+If the week is still in progress, say "so far" and do not compare it with a full week.`,
               },
               {
                 role: 'user',
@@ -458,9 +448,10 @@ For limit targets like "leisure" or "meetings", celebrate decreases and gently n
     const reviewData: WeeklyReviewData = {
       weekStart,
       weekEnd,
-      // New hero metrics
-      weekScore,
-      weekScoreLabel,
+      averages:
+        dayScores.length > 0
+          ? { body: average((d) => d.body), focus: average((d) => d.mind), social: average((d) => d.heart) }
+          : null,
       activeDays,
       evaluatedDays,
       highlights: topHighlights,
