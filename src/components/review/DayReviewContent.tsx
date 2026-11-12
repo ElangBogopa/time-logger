@@ -14,6 +14,7 @@ import { csrfFetch } from '@/lib/api'
 import CommentaryThread from '@/components/CommentaryThread'
 import { commentaryFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
 import { cacheGet, cacheSet, cacheDelete } from '@/lib/client-cache'
+import { markFirstRun } from '@/lib/first-run'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -719,6 +720,12 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
   const isTodayReview = clientToday !== null && (!dateParam || dateParam === clientToday)
   const isFutureReview = clientToday !== null && dateParam !== null && dateParam > clientToday
   const isLocked = (isTodayReview && currentHour !== null && currentHour < 21) || isFutureReview
+
+  // A review with something in it, on screen: the last step of a first run.
+  const hasReviewOnScreen = !isLocked && !isLoading && (summary?.totalMinutesLogged ?? 0) > 0
+  useEffect(() => {
+    if (hasReviewOnScreen) markFirstRun('reviewed')
+  }, [hasReviewOnScreen])
 
   useEffect(() => {
     if (status === 'authenticated' && !isLocked) {

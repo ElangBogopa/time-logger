@@ -16,6 +16,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import GreetingHeader from '@/components/dashboard/GreetingHeader'
 import YourPlan from '@/components/YourPlan'
 import NextUp from '@/components/NextUp'
+import FirstRunCard from '@/components/FirstRunCard'
 import { Sun, Cloud, Moon, Check, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
@@ -183,6 +184,9 @@ function HomeContent() {
             refreshKey={ringsKey}
           />
 
+          {/* For someone on their first day: the loop, as three things to do. */}
+          {isToday && <FirstRunCard key={`first-run-${planRefreshKey}`} hasLoggedToday={entries.length > 0} />}
+
           {/* What the day holds — the plan and the calendar, carried over
               from the Plan tab to the screen the day is lived from. A day
               that is over is the review's business, not this list's. */}
@@ -293,7 +297,7 @@ function HomeContent() {
           </div>
 
           {/* 5. YOUR PLAN section */}
-          <YourPlan key={planRefreshKey} date={selectedDate} isToday={isToday} />
+          <YourPlan key={`goals-${planRefreshKey}`} date={selectedDate} isToday={isToday} />
         </div>
 
         {/* MetricDetailSheet — rendered at page level */}
@@ -306,13 +310,16 @@ function HomeContent() {
 
         <OnboardingModal
           isOpen={showOnboarding}
-          onComplete={() => {
+          onComplete={(next) => {
             setShowOnboarding(false)
             // Onboarding has just created a goal. The plan section fetched
             // before it existed and nothing told it to look again, so the
             // first screen a new user saw said "No goals set yet".
             try { sessionStorage.removeItem('your-plan-cache') } catch { /* ignore */ }
             setPlanRefreshKey((key) => key + 1)
+            // They picked what matters: go and find it a time, which is the
+            // one thing this app does that the calendar does not.
+            if (next) router.push(`/calendar?date=${next.planDate}&suggest=1`)
           }}
         />
       </div>

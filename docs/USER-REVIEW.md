@@ -295,3 +295,9 @@ Not as written:
     "log your morning" nudges are the kind people switch off.
 22. **Onboarding** (already deferred): finish with a planned tomorrow, not a
     slider. Remove the unused 80% target.
+    **Built 12 November 2026:** four screens — name, what the app is for
+    (shown against the person's own calendar), the three scores, and a
+    first plan that opens the planner with times already proposed — then a
+    three-step "Getting started" list on Today until the loop has been
+    walked once. The slider is gone; the single default goal is still
+    created silently, because the goal page depends on it.

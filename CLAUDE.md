@@ -167,6 +167,15 @@ yesterday until 9pm; and both reviews end by pointing at the planner. The resear
 explains — every scheduling suggestion carries the library entry that
 backs it.
 
+A new account gets four screens (`OnboardingModal`): a name, what the app
+is for — argued from the person's own calendar — the three scores, and a
+first plan, which hands straight to the planner with the proposal already
+made (`/calendar?date=…&suggest=1`). After that Today shows a three-step
+"Getting started" list (`FirstRunCard`, state in `lib/first-run.ts`) until
+the loop has been walked once. `productivity_target` in preferences is no
+longer a setting: nothing reads the number, and it survives only as the
+flag that says an account has been onboarded.
+
 ## Design Principles
 
 1. **Mobile only**: Touch targets 44px+, hold-to-drag. The whole app renders

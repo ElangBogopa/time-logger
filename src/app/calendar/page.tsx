@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchEntries, csrfFetch } from '@/lib/api'
@@ -19,6 +19,7 @@ import { dayWindow, isWholeDay } from '@/lib/day-window'
 import { suggestTimes, rankSlots, defaultDuration, type Suggestion, type Busy } from '@/lib/suggest-times'
 import { usualFor, usualWakeMinutes, recurringActivities } from '@/lib/habits'
 import { useHabitHistory } from '@/hooks/useHabitHistory'
+import { markFirstRun } from '@/lib/first-run'
 import { calcBody, calcFocus, calcSocial, type EntryRow } from '@/lib/metrics-calc'
 import type { TimeCategory } from '@/lib/types'
 import { categorizeActivities } from '@/lib/api'
@@ -413,6 +414,26 @@ function CalendarContent() {
     }
   }
 
+  /**
+   * Arriving from onboarding (`?suggest=1`): make the proposal without being
+   * asked. A new person has just said what matters; the next thing they see
+   * should be it fitted around their calendar, not a button to find.
+   */
+  const [autoSuggest, setAutoSuggest] = useState(() => searchParams.get('suggest') === '1')
+  const suggestRef = useRef(handleSuggestTimes)
+  useEffect(() => {
+    suggestRef.current = handleSuggestTimes
+  })
+  useEffect(() => {
+    if (!autoSuggest || unscheduledTasks.length === 0) return
+    const run = setTimeout(() => {
+      setAutoSuggest(false)
+      window.history.replaceState(null, '', `/calendar?date=${selectedDate}`)
+      suggestRef.current()
+    }, 0)
+    return () => clearTimeout(run)
+  }, [autoSuggest, unscheduledTasks.length, selectedDate])
+
   /** Everything a suggestion must stay clear of: the day, and the other suggestions. */
   const takenAround = (taskId: string): Busy[] => [
     ...busyBlocks,
@@ -520,6 +541,7 @@ function CalendarContent() {
 
   const acceptAllSuggestions = async () => {
     if (!suggestions) return
+    markFirstRun('planned')
     for (const suggestion of suggestions) {
       await csrfFetch('/api/plans', {
         method: 'PATCH',
@@ -541,6 +563,7 @@ function CalendarContent() {
 
   /** Give a task a time. The grid draws it as soon as it has one. */
   const handleCommitTask = async (planId: string, start: string, end: string) => {
+    markFirstRun('planned')
     await csrfFetch('/api/plans', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

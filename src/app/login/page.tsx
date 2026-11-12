@@ -37,7 +37,7 @@ function LoginContent() {
             Better
           </h1>
           <p className="text-sm text-muted-foreground">
-            Track your time. Build better habits.
+            Your calendar holds what other people need from you. Better finds time for the rest.
           </p>
         </div>
 
