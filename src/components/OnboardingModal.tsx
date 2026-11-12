@@ -134,8 +134,7 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     <>
       <Dialog open={isOpen} onOpenChange={() => {}}>
         <DialogContent
-          className="max-h-[90vh] overflow-y-auto sm:max-w-xl"
-          showCloseButton={false}
+                    showCloseButton={false}
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >

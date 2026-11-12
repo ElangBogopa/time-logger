@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CalendarDays, Check, Circle, Loader2, Minus, ChevronRight } from 'lucide-react'
@@ -106,6 +106,16 @@ export default function NextUp({ date, entries, onChanged, period }: NextUpProps
       return item.kind === 'plan' && hour >= range.start && hour < range.end
     })
   }, [allItems, period])
+
+  // Which items have been seen waiting, so the tick can land with a little
+  // weight when one of them is done — and stay still for the ones that were
+  // already done when the screen opened.
+  const seenWaiting = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    for (const item of allItems) {
+      if (item.state !== 'done') seenWaiting.current.add(item.key)
+    }
+  }, [allItems])
 
   // Ticking a plan is only allowed on today and yesterday, as it always was.
   const canAct = isTaskCompletable(date)
@@ -215,6 +225,7 @@ export default function NextUp({ date, entries, onChanged, period }: NextUpProps
         isBusy={busy === item.key}
         disabled={busy !== null}
         canAct={canAct}
+        justDone={item.state === 'done' && seenWaiting.current.has(item.key)}
         onDidIt={() => handleDidIt(item)}
         onThatWasIt={() => handleThatWasIt(item)}
         onConfirm={() => handleConfirmEvent(item)}
@@ -261,12 +272,12 @@ export default function NextUp({ date, entries, onChanged, period }: NextUpProps
   }
 
   return (
-    <section className="mt-4">
+    <section className="mt-6">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="eyebrow">{isToday ? 'Next up' : 'Planned'}</h3>
         <button
           onClick={() => router.push(planHref)}
-          className="flex min-h-9 items-center gap-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex min-h-9 items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Open the plan
           <ChevronRight className="h-3.5 w-3.5" />
@@ -286,7 +297,7 @@ export default function NextUp({ date, entries, onChanged, period }: NextUpProps
           <p className="text-sm text-foreground">
             {isToday ? 'Nothing planned for today' : 'Nothing planned yet'}
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Give the things only you are waiting for a time, around your calendar.
           </p>
         </button>
@@ -295,7 +306,7 @@ export default function NextUp({ date, entries, onChanged, period }: NextUpProps
       {untimed.length > 0 && (
         <button
           onClick={() => router.push(planHref)}
-          className="mt-2 flex min-h-9 w-full items-center justify-between text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="mt-2 flex min-h-9 w-full items-center justify-between text-left text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <span className="truncate">
             {untimed.length === 1 ? '1 task' : `${untimed.length} tasks`} without a time:{' '}
@@ -315,7 +326,7 @@ function NowLine({ minutes }: { minutes: number }) {
   return (
     <div className="flex items-center gap-2 px-4 py-1.5" role="separator" aria-label={`Now, ${formatTimeDisplay(clock)}`}>
       <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-      <span className="text-[10px] font-medium uppercase tracking-wider text-foreground">
+      <span className="text-xs font-medium uppercase tracking-wider text-foreground">
         Now · {formatTimeDisplay(clock)}
       </span>
       <span className="h-px flex-1 bg-foreground/30" />
@@ -329,6 +340,8 @@ interface RowProps {
   isBusy: boolean
   disabled: boolean
   canAct: boolean
+  /** Became done while on screen: the tick animates in. */
+  justDone: boolean
   onDidIt: () => void
   onThatWasIt: () => void
   onConfirm: () => void
@@ -343,6 +356,7 @@ function Row({
   isBusy,
   disabled,
   canAct,
+  justDone,
   onDidIt,
   onThatWasIt,
   onConfirm,
@@ -355,9 +369,13 @@ function Row({
 
   const marker =
     item.state === 'done' ? (
-      <Check className={`h-4 w-4 ${STATUS_CLASSES.green.icon}`} aria-label="Done" />
+      <Check
+        className={`h-4 w-4 ${STATUS_CLASSES.green.icon} ${justDone ? 'animate-check-draw' : ''}`}
+        strokeWidth={2.5}
+        aria-label="Done"
+      />
     ) : item.state === 'skipped' ? (
-      <Minus className="h-4 w-4 text-muted-foreground/60" aria-label="Skipped" />
+      <Minus className="h-4 w-4 text-muted-foreground" aria-label="Skipped" />
     ) : item.state === 'now' ? (
       <span className="flex h-4 w-4 items-center justify-center" aria-label="Now">
         <span className="h-2 w-2 rounded-full bg-foreground" />
@@ -365,7 +383,7 @@ function Row({
     ) : !isPlan ? (
       <CalendarDays className="h-4 w-4 text-muted-foreground" aria-label="Calendar event" />
     ) : (
-      <Circle className="h-4 w-4 text-muted-foreground/60" aria-hidden="true" />
+      <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
     )
 
   const aside =
@@ -388,17 +406,17 @@ function Row({
         <span className={`block truncate text-sm ${quiet ? 'text-muted-foreground' : 'text-foreground'} ${item.state === 'now' ? 'font-medium' : ''}`}>
           {item.title}
         </span>
-        <span className="block text-[11px] tabular-nums text-muted-foreground">
+        <span className="block text-xs tabular-nums text-muted-foreground">
           {formatTimeDisplay(hhmm(item.startTime))} – {formatTimeDisplay(hhmm(item.endTime))}
           {!isPlan && ' · Calendar'}
         </span>
         {item.state === 'due' && isPlan && item.loggedActivity && (
-          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             You logged {item.loggedActivity} then
           </span>
         )}
       </span>
-      {aside && <span className="shrink-0 text-[11px] text-muted-foreground">{aside}</span>}
+      {aside && <span className="shrink-0 text-xs text-muted-foreground">{aside}</span>}
     </>
   )
 
@@ -457,7 +475,7 @@ function Row({
         <div className="pl-7">
           <button
             onClick={onUnskip}
-            className="min-h-9 text-[11px] text-muted-foreground underline hover:no-underline"
+            className="min-h-9 text-xs text-muted-foreground underline hover:no-underline"
           >
             Undo
           </button>

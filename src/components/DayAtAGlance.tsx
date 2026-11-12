@@ -95,7 +95,7 @@ export default function DayAtAGlance({
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm text-muted-foreground">{summary}</span>
-        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
           Open
           <ChevronDown className="h-3.5 w-3.5" />
         </span>
@@ -131,7 +131,7 @@ export default function DayAtAGlance({
         {TICKS.map((hour) => (
           <span
             key={hour}
-            className="absolute text-[10px] text-muted-foreground -translate-x-1/2"
+            className="absolute text-xs text-muted-foreground -translate-x-1/2"
             style={{ left: percent(hour * 60) }}
           >
             {hour === 12 ? 'noon' : `${hour % 12 || 12}${hour < 12 ? 'am' : 'pm'}`}

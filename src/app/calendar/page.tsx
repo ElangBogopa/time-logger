@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchEntries, csrfFetch } from '@/lib/api'
 import { unconfirmedEvents } from '@/lib/calendar-match'
 import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
-import { TimeEntry, getAggregatedCategory, getLocalDateString, shiftDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
+import { TimeEntry, getAggregatedCategory, getLocalDateString, isDateLoggable, VIEWING_PAST_MESSAGE } from '@/lib/types'
 import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
 import CommitTimeModal from '@/components/CommitTimeModal'
@@ -41,7 +41,7 @@ import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { Calendar, ChevronLeft, ChevronRight, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, CalendarClock, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, Sparkles, ChevronDown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
@@ -741,10 +741,6 @@ function CalendarContent() {
     )
   }
 
-  const handlePrevDay = () => handleDateChange(shiftDateString(selectedDate, -1))
-
-  const handleNextDay = () => handleDateChange(shiftDateString(selectedDate, 1))
-
   const showToast = (message: string) => {
     setToast({ message })
   }
@@ -772,15 +768,34 @@ function CalendarContent() {
     <ErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
         <div className="mx-auto max-w-2xl px-4 py-6">
-          {/* Header */}
+          {/* Header: the title, the day, and one way to change it — the week
+              strip below. There were two: a row of day arrows here and the
+              strip under it, a quarter of the screen spent on choosing a
+              date. Tapping the day opens the month for a longer jump. */}
           <header className="mb-4">
-            <div className="flex items-center justify-between mb-4">
-              {/* The screen has two jobs, and says which one it is doing:
-                  a future date is a plan, today and the past are a record. */}
-              <h1 className="page-title text-foreground flex items-center gap-2">
-                {isFutureDay ? <CalendarClock className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
-                {isFutureDay ? `Plan ${dateDisplay.label}` : 'Calendar'}
-              </h1>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {/* The screen has two jobs, and says which one it is doing:
+                    a future date is a plan, today and the past are a record. */}
+                <h1 className="page-title text-foreground">
+                  {isFutureDay ? `Plan ${dateDisplay.label}` : 'Plan'}
+                </h1>
+                {taskFromParam ? (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {dateDisplay.label} · {dateDisplay.date}
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => setShowCalendarPicker(!showCalendarPicker)}
+                    aria-expanded={showCalendarPicker}
+                    aria-label={`${dateDisplay.label}, ${dateDisplay.date}. Choose another date`}
+                    className="-ml-1 flex min-h-9 items-center gap-1 rounded-lg px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {isFutureDay ? dateDisplay.date : `${dateDisplay.label} · ${dateDisplay.date}`}
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showCalendarPicker ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
 
               {calendarStatus?.connected && (
                 <Button
@@ -792,44 +807,6 @@ function CalendarContent() {
                   <RefreshCw className={`h-4 w-4 ${isCalendarLoading ? 'animate-spin' : ''}`} />
                   {isCalendarLoading ? 'Syncing' : 'Sync'}
                 </Button>
-              )}
-            </div>
-
-            {/* Date navigation */}
-            <div className={`flex items-center ${taskFromParam ? 'justify-center' : 'justify-between'}`}>
-              {!taskFromParam && (
-                <button
-                  onClick={handlePrevDay}
-                  className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  aria-label="Previous day"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-              )}
-
-              {taskFromParam ? (
-                <div className="flex flex-col items-center px-4 py-1">
-                  <span className="text-lg font-semibold">{dateDisplay.label}</span>
-                  <span className="text-sm text-muted-foreground">{dateDisplay.date}</span>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowCalendarPicker(!showCalendarPicker)}
-                  className="flex flex-col items-center px-4 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  <span className="text-lg font-semibold">{dateDisplay.label}</span>
-                  <span className="text-sm text-muted-foreground">{dateDisplay.date}</span>
-                </button>
-              )}
-
-              {!taskFromParam && (
-                <button
-                  onClick={handleNextDay}
-                  className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  aria-label="Next day"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
               )}
             </div>
 
@@ -881,7 +858,7 @@ function CalendarContent() {
                 </div>
                 <button
                   onClick={() => setTaskFromParam(null)}
-                  className="shrink-0 ml-2 text-muted-foreground/40 hover:text-muted-foreground"
+                  className="shrink-0 ml-2 text-muted-foreground hover:text-muted-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -982,7 +959,7 @@ function CalendarContent() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm text-foreground truncate">{suggestion.title}</p>
-                          <p className="text-[11px] tabular-nums text-muted-foreground mt-0.5">
+                          <p className="text-xs tabular-nums text-muted-foreground mt-0.5">
                             {formatTimeDisplay(suggestion.startTime)} –{' '}
                             {formatTimeDisplay(suggestion.endTime)}
                           </p>
@@ -991,7 +968,7 @@ function CalendarContent() {
                           Accept
                         </Button>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         {suggestion.reason}
                         {suggestion.source && (
                           <button
@@ -1062,7 +1039,7 @@ function CalendarContent() {
                     <span className="text-muted-foreground"> · </span>
                     <span style={{ color: METRIC_TEXT_HEX.social }}>Heart {forecast.social}</span>
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     Counting only what is on this page. Sleep, meals and anything unplanned add to it.
                   </p>
                 </div>
@@ -1071,7 +1048,7 @@ function CalendarContent() {
               {unplaced.length > 0 && (
                 <div className="mt-3 space-y-1">
                   {unplaced.map((item) => (
-                    <p key={item.title} className="text-[11px] text-muted-foreground">
+                    <p key={item.title} className="text-xs text-muted-foreground">
                       <span className="text-foreground">{item.title}</span> — {item.reason}
                     </p>
                   ))}
@@ -1113,7 +1090,7 @@ function CalendarContent() {
                           border: item.kind === 'entry' ? undefined : `1px dashed ${item.colour}`,
                         }}
                       />
-                      <span className="text-[11px] tabular-nums text-muted-foreground w-[92px] shrink-0">
+                      <span className="text-xs tabular-nums text-muted-foreground w-[92px] shrink-0">
                         {formatTimeDisplay(item.start)}
                       </span>
                       <span className="flex-1 min-w-0 truncate text-sm text-foreground">{item.title}</span>
@@ -1132,7 +1109,7 @@ function CalendarContent() {
             <div className="flex items-center justify-between mb-2">
               <button
                 onClick={() => setShowWholeDay((v) => !v)}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showWholeDay || isWholeDay(gridWindow)
                   ? `Showing all 24 hours`
@@ -1140,7 +1117,7 @@ function CalendarContent() {
               </button>
               <button
                 onClick={() => setIsGridOpen(false)}
-                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Close
                 <ChevronUp className="h-3.5 w-3.5" />

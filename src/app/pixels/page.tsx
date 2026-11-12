@@ -245,7 +245,7 @@ export default function YearInPixelsPage() {
                   {WEEKDAYS.map((day, row) => (
                     <span
                       key={day}
-                      className="text-[10px] leading-none text-muted-foreground self-center"
+                      className="text-xs leading-none text-muted-foreground self-center"
                       style={{ gridRow: row + 2 }}
                     >
                       {/* every other day, so the labels do not crowd 12px rows */}
@@ -269,7 +269,7 @@ export default function YearInPixelsPage() {
                       return (
                         <span
                           key={label}
-                          className="text-[10px] leading-none text-muted-foreground"
+                          className="text-xs leading-none text-muted-foreground"
                           style={{ gridRow: 1, gridColumn: `${column + 1} / span ${next - column}` }}
                         >
                           {label}
@@ -330,7 +330,7 @@ export default function YearInPixelsPage() {
 
       {/* Day Detail Dialog */}
       <Dialog open={selectedDay !== null} onOpenChange={(open) => !open && setSelectedDay(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {selectedDay ? formatDate(selectedDay.date) : ''}
@@ -357,13 +357,13 @@ export default function YearInPixelsPage() {
 
               {/* Entries */}
               <div className="flex items-center justify-between">
-                <span className="text-sm text-zinc-500">Entries Logged</span>
+                <span className="text-sm text-zinc-400">Entries Logged</span>
                 <span className="font-medium text-foreground">{selectedDay.entryCount}</span>
               </div>
 
               {/* Total Time */}
               <div className="flex items-center justify-between">
-                <span className="text-sm text-zinc-500">Time Tracked</span>
+                <span className="text-sm text-zinc-400">Time Tracked</span>
                 <span className="font-medium text-foreground">
                   {selectedDay.totalMinutes > 0 ? formatMinutes(selectedDay.totalMinutes) : '—'}
                 </span>

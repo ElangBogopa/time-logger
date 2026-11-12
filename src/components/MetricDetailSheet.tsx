@@ -126,7 +126,7 @@ function FocusBreakdown({ details, metricColor }: { details: FocusDetails; metri
         {breakdown.map(item => (
           <div key={item.label} className="flex items-center gap-3 bg-secondary/50 rounded-lg px-3 py-2.5">
             <span className="text-sm text-foreground flex-1">{item.label}</span>
-            <span className="text-[10px] text-muted-foreground">{item.weight}x</span>
+            <span className="text-xs text-muted-foreground">{item.weight}x</span>
             <span className="text-sm font-medium text-foreground tabular-nums w-16 text-right">
               {formatMinutes(item.minutes)}
             </span>
@@ -176,7 +176,7 @@ function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricC
             {details.moderateEquivalentMinutes ?? 0} of {details.exerciseTarget ?? 45} moderate-equivalent
             minutes of exercise
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {details.exerciseScore === 0
               ? 'Looking after yourself gets Body into the high sixties; only exercise takes it past 70.'
               : 'Vigorous minutes count double, light ones half — as the activity guidelines count them.'}

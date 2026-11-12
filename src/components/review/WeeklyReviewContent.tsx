@@ -318,7 +318,7 @@ export default function WeeklyReviewContent() {
             <div key={i} className="rounded-xl border border-border bg-card p-3">
               <Trophy className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm font-medium mt-1">{h.text}</p>
-              {h.subtext && <p className="text-[11px] text-muted-foreground">{h.subtext}</p>}
+              {h.subtext && <p className="text-xs text-muted-foreground">{h.subtext}</p>}
             </div>
           ))}
         </div>
@@ -327,9 +327,9 @@ export default function WeeklyReviewContent() {
       {/* AI Coach Summary */}
       {reviewData.coachSummary && (
         <section className="mb-5">
-          <div className="rounded-xl bg-gradient-to-br from-[#8A7CA8] to-[#8A7CA8] dark:from-[#8A7CA8]/30 dark:to-[#8A7CA8]/30 border border-[#8A7CA8]/50 dark:border-[#8A7CA8]/50 p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-start gap-3">
-              <Sparkles className="h-5 w-5 text-[#8A7CA8] flex-shrink-0 mt-0.5" />
+              <Sparkles className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
               <p className="text-sm text-foreground leading-relaxed">{reviewData.coachSummary}</p>
             </div>
           </div>
@@ -351,15 +351,15 @@ export default function WeeklyReviewContent() {
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-2 mb-5">
         <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-[11px] text-muted-foreground">Logged</p>
+          <p className="text-xs text-muted-foreground">Logged</p>
           <p className="text-lg font-bold">{formatMinutes(reviewData.totalMinutes)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-[11px] text-muted-foreground">Active Days</p>
+          <p className="text-xs text-muted-foreground">Active Days</p>
           <p className="text-lg font-bold">{reviewData.activeDays}/{reviewData.evaluatedDays || 7}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-[11px] text-muted-foreground">Entries</p>
+          <p className="text-xs text-muted-foreground">Entries</p>
           <p className="text-lg font-bold">{reviewData.entryCount}</p>
         </div>
       </div>

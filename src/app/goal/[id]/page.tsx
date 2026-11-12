@@ -347,7 +347,7 @@ export default function GoalPage() {
             </h2>
             <button
               onClick={toggleCoachCard}
-              className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+              className="text-muted-foreground hover:text-muted-foreground transition-colors"
               aria-label="What goes here?"
             >
               <HelpCircle className="h-3.5 w-3.5" />
@@ -361,7 +361,7 @@ export default function GoalPage() {
                 <p className="text-sm font-medium text-foreground">Tasks vs Calendar — what goes where?</p>
                 <button
                   onClick={dismissCoachCard}
-                  className="text-muted-foreground/40 hover:text-muted-foreground shrink-0 ml-2"
+                  className="text-muted-foreground hover:text-muted-foreground shrink-0 ml-2"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -369,20 +369,20 @@ export default function GoalPage() {
 
               <div className="space-y-2.5">
                 <div className="flex gap-2.5">
-                  <span className="text-lg leading-none mt-0.5">✅</span>
+                  <CheckSquare className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <div>
                     <p className="text-sm font-medium text-foreground">Tasks</p>
                     <p className="text-xs text-muted-foreground">Things you want to accomplish — on your terms.</p>
-                    <p className="text-xs text-muted-foreground/60 italic mt-0.5">"Study 2 hours", "Code a feature", "Hit the gym"</p>
+                    <p className="text-xs text-muted-foreground italic mt-0.5">"Study 2 hours", "Code a feature", "Hit the gym"</p>
                   </div>
                 </div>
 
                 <div className="flex gap-2.5">
-                  <span className="text-lg leading-none mt-0.5">📅</span>
+                  <CalendarCheck className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <div>
                     <p className="text-sm font-medium text-foreground">Calendar</p>
                     <p className="text-xs text-muted-foreground">Things with a set time — the world expects you there.</p>
-                    <p className="text-xs text-muted-foreground/60 italic mt-0.5">"Class at 9am", "Meeting at 2pm", "Doctor at 4pm"</p>
+                    <p className="text-xs text-muted-foreground italic mt-0.5">"Class at 9am", "Meeting at 2pm", "Doctor at 4pm"</p>
                   </div>
                 </div>
               </div>
@@ -395,7 +395,7 @@ export default function GoalPage() {
             </div>
           )}
 
-          <p className="text-sm text-muted-foreground/70 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             {tomorrowLabel} — Set your priorities.
           </p>
 
@@ -403,7 +403,7 @@ export default function GoalPage() {
             {tasks.map((task, idx) => {
               const icon = idx === 0
                 ? <Star className="h-4 w-4 text-primary fill-primary" />
-                : <Plus className="h-4 w-4 text-muted-foreground/30" />
+                : <Plus className="h-4 w-4 text-muted-foreground" />
               const placeholder = idx === 0 ? 'Most important task'
                 : idx < 3 ? 'Another task (optional)'
                 : `Task ${idx + 1} (bonus)`
@@ -430,7 +430,7 @@ export default function GoalPage() {
                           className={`rounded-lg p-1.5 transition-colors ${
                             isCommitted
                               ? 'text-muted-foreground hover:bg-secondary'
-                              : 'text-muted-foreground/40 hover:text-muted-foreground/70 hover:bg-secondary/50'
+                              : 'text-muted-foreground hover:text-muted-foreground hover:bg-secondary/50'
                           }`}
                           title={isCommitted ? `${plan.committed_start?.slice(0,5)} – ${plan.committed_end?.slice(0,5)}` : 'Commit to a time'}
                         >
@@ -438,7 +438,7 @@ export default function GoalPage() {
                         </button>
                       )}
                       {task && (
-                        <button onClick={() => clearTask(idx)} className="rounded-lg p-1 text-muted-foreground/40 hover:text-muted-foreground">
+                        <button onClick={() => clearTask(idx)} className="rounded-lg p-1 text-muted-foreground hover:text-muted-foreground">
                           <X className="h-4 w-4" />
                         </button>
                       )}
@@ -453,7 +453,7 @@ export default function GoalPage() {
             {/* Import from Google Tasks button */}
             <button
               onClick={() => setShowGoogleTasksPicker(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground/50 hover:text-muted-foreground hover:border-muted-foreground/30 transition-all"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground hover:text-muted-foreground hover:border-muted-foreground/30 transition-all"
             >
               <CheckSquare className="h-4 w-4" />
               Import from Google Tasks
@@ -462,7 +462,7 @@ export default function GoalPage() {
             {/* Add task button */}
             <button
               onClick={() => { setTasks([...tasks, '']); if (saved) setSaved(false) }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground/50 hover:text-muted-foreground hover:border-muted-foreground/30 transition-all"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground hover:text-muted-foreground hover:border-muted-foreground/30 transition-all"
             >
               <Plus className="h-4 w-4" />
               Add another task
@@ -523,7 +523,7 @@ export default function GoalPage() {
                     <span className="text-sm flex-1 text-foreground">
                       {task.title}
                     </span>
-                    <span className="text-[10px] text-muted-foreground/40">
+                    <span className="text-xs text-muted-foreground">
                       {task.weight}pts
                     </span>
                   </div>
@@ -533,7 +533,7 @@ export default function GoalPage() {
                   <div className="mt-2 pt-2 border-t border-border/50">
                     <button
                       onClick={() => setShowCompleted(!showCompleted)}
-                      className="w-full text-[11px] text-muted-foreground/70 font-medium flex items-center gap-1.5 hover:text-muted-foreground transition-colors"
+                      className="w-full text-xs text-muted-foreground font-medium flex items-center gap-1.5 hover:text-muted-foreground transition-colors"
                     >
                       <Check className="h-3 w-3" />
                       {todayScore.tasks.filter(t => t.completed).length} task{todayScore.tasks.filter(t => t.completed).length !== 1 ? 's' : ''} completed
@@ -546,7 +546,7 @@ export default function GoalPage() {
                             <span className="text-sm flex-1 text-muted-foreground line-through">
                               {task.title}
                             </span>
-                            <span className="text-[10px] text-muted-foreground/40">
+                            <span className="text-xs text-muted-foreground">
                               {task.weight}pts
                             </span>
                           </div>
@@ -559,7 +559,7 @@ export default function GoalPage() {
 
               {/* Hint — how to complete tasks */}
               {todayScore.tasks.some(t => !t.completed) && (
-                <p className="mt-3 text-[11px] text-muted-foreground/50 text-center">
+                <p className="mt-3 text-xs text-muted-foreground text-center">
                   Completed a task? Log it after finishing a session.
                 </p>
               )}
@@ -621,7 +621,7 @@ export default function GoalPage() {
                           />
                         )}
                       </div>
-                      <span className={`text-[10px] ${isToday ? 'text-primary font-bold' : 'text-muted-foreground/50'}`}>
+                      <span className={`text-xs ${isToday ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
                         {dayLabel}
                       </span>
                     </div>
@@ -629,7 +629,7 @@ export default function GoalPage() {
                 })}
               </div>
 
-              <p className="mt-3 text-center text-[11px] text-muted-foreground/50">
+              <p className="mt-3 text-center text-xs text-muted-foreground">
                 {weeklyStats.plannedDays} of 7 days planned
               </p>
             </div>
@@ -656,7 +656,7 @@ export default function GoalPage() {
                     <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
                       planningUnlocked ? 'bg-secondary' : 'bg-secondary'
                     }`}>
-                      <CalendarCheck className={`h-4 w-4 ${planningUnlocked ? 'text-muted-foreground' : 'text-muted-foreground/50'}`} />
+                      <CalendarCheck className={`h-4 w-4 ${planningUnlocked ? 'text-muted-foreground' : 'text-muted-foreground'}`} />
                     </div>
                     <div>
                       {planningUnlocked ? (
@@ -665,14 +665,14 @@ export default function GoalPage() {
                             <span className="text-lg font-bold text-foreground">
                               {streaks.planning.current}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">days</span>
+                            <span className="text-xs text-muted-foreground">days</span>
                           </div>
-                          <p className="text-[10px] text-muted-foreground/70">Planning</p>
+                          <p className="text-xs text-muted-foreground">Planning</p>
                         </>
                       ) : (
                         <>
-                          <p className="text-xs font-medium text-muted-foreground/60">Planning</p>
-                          <p className="text-[10px] text-muted-foreground/40">
+                          <p className="text-xs font-medium text-muted-foreground">Planning</p>
+                          <p className="text-xs text-muted-foreground">
                             {planningRemaining} more day{planningRemaining !== 1 ? 's' : ''} to unlock
                           </p>
                         </>
@@ -685,7 +685,7 @@ export default function GoalPage() {
                     <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
                       executionUnlocked ? 'bg-secondary' : 'bg-secondary'
                     }`}>
-                      <Flame className={`h-4 w-4 ${executionUnlocked ? 'text-muted-foreground' : 'text-muted-foreground/50'}`} />
+                      <Flame className={`h-4 w-4 ${executionUnlocked ? 'text-muted-foreground' : 'text-muted-foreground'}`} />
                     </div>
                     <div>
                       {executionUnlocked ? (
@@ -694,14 +694,14 @@ export default function GoalPage() {
                             <span className="text-lg font-bold text-foreground">
                               {streaks.execution.current}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">days</span>
+                            <span className="text-xs text-muted-foreground">days</span>
                           </div>
-                          <p className="text-[10px] text-muted-foreground/70">Follow-through</p>
+                          <p className="text-xs text-muted-foreground">Follow-through</p>
                         </>
                       ) : (
                         <>
-                          <p className="text-xs font-medium text-muted-foreground/60">Follow-through</p>
-                          <p className="text-[10px] text-muted-foreground/40">
+                          <p className="text-xs font-medium text-muted-foreground">Follow-through</p>
+                          <p className="text-xs text-muted-foreground">
                             {executionRemaining} more day{executionRemaining !== 1 ? 's' : ''} to unlock
                           </p>
                         </>
@@ -710,7 +710,7 @@ export default function GoalPage() {
                   </div>
                 </div>
                 {(planningUnlocked || executionUnlocked) && (streaks.planning.best > 0 || streaks.execution.best > 0) && (
-                  <p className="mt-2.5 text-[11px] text-center text-muted-foreground/50 border-t border-border pt-2.5">
+                  <p className="mt-2.5 text-xs text-center text-muted-foreground border-t border-border pt-2.5">
                     Best: {streaks.planning.best} day{streaks.planning.best !== 1 ? 's' : ''} planning · {streaks.execution.best} day{streaks.execution.best !== 1 ? 's' : ''} follow-through
                   </p>
                 )}

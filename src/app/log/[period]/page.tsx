@@ -493,12 +493,14 @@ function LogPeriodContent() {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${colors.bg}`}>
-                <Icon className={`h-6 w-6 ${colors.text}`} />
-              </div>
+              {/* The same title every other page has. It was a 20px heading
+                  beside the session's icon in a tinted circle. */}
               <div>
-                <h1 className="text-xl font-bold">{label} Session</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="page-title flex items-center gap-2">
+                  <Icon className={`h-5 w-5 ${colors.text}`} aria-hidden="true" />
+                  {label}
+                </h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">
                   {getPeriodStartTime(period)} - {getPeriodEndTime(period)}
                   {selectedDate && selectedDate !== getUserToday() && (
                     <> · {isYesterday ? 'Yesterday' : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
@@ -511,11 +513,7 @@ function LogPeriodContent() {
               <button
                 onClick={handleSyncCalendar}
                 disabled={isSyncing || syncDone}
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
-                  syncDone
-                    ? 'bg-[#7D9B8A]/15 border border-[#7D9B8A]/30'
-                    : 'bg-secondary hover:bg-accent disabled:opacity-50'
-                }`}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors duration-300 hover:bg-accent disabled:opacity-60"
                 aria-label={syncDone ? 'Calendar synced' : isSyncing ? 'Syncing calendar' : 'Sync calendar'}
                 title="Sync calendar"
               >
@@ -533,21 +531,19 @@ function LogPeriodContent() {
 
           {/* Rollover indicator during 12-3AM */}
           {selectedDate === getUserToday() && getUserToday() !== getRealToday() && (
-            <p className="mt-2 text-[11px] text-muted-foreground/60">
+            <p className="mt-2 text-xs text-muted-foreground">
               Entries logged after midnight save to {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </p>
           )}
 
-          {/* Session stats */}
+          {/* Session stats — a line, not a tinted box of its own */}
           {stats.entryCount > 0 && (
-            <div className={`mt-4 rounded-lg ${colors.bg} p-3`}>
-              <p className="text-sm">
-                <span className="font-medium">{formatSessionDuration(stats.totalMinutes)}</span>
-                {' '}logged across{' '}
-                <span className="font-medium">{stats.entryCount}</span>
-                {' '}{stats.entryCount === 1 ? 'activity' : 'activities'}
-              </p>
-            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground tabular-nums">{formatSessionDuration(stats.totalMinutes)}</span>
+              {' '}logged across{' '}
+              <span className="font-medium text-foreground tabular-nums">{stats.entryCount}</span>
+              {' '}{stats.entryCount === 1 ? 'activity' : 'activities'}
+            </p>
           )}
         </header>
 
@@ -616,7 +612,7 @@ function LogPeriodContent() {
                     <CalendarCheck className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         {formatTimeDisplay(event.startTime)} – {formatTimeDisplay(event.endTime)}
                       </p>
                     </div>
@@ -638,7 +634,7 @@ function LogPeriodContent() {
                         )}
                       </Button>
                     ) : (
-                      <span className="text-[11px] text-muted-foreground shrink-0">Upcoming</span>
+                      <span className="text-xs text-muted-foreground shrink-0">Upcoming</span>
                     )}
                   </div>
                 )
@@ -670,7 +666,7 @@ function LogPeriodContent() {
                     <p className="text-sm font-medium text-foreground">
                       {formatTimeDisplay(gap.startTime)} – {formatTimeDisplay(gap.endTime)}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {formatSessionDuration(gap.durationMinutes)} unaccounted
                     </p>
                   </div>

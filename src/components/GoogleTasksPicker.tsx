@@ -98,7 +98,7 @@ export default function GoogleTasksPicker({ isOpen, onClose, onImport, existingT
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="flex flex-col">
         <DialogHeader>
           <DialogTitle>Import from Google Tasks</DialogTitle>
         </DialogHeader>
@@ -178,7 +178,7 @@ export default function GoogleTasksPicker({ isOpen, onClose, onImport, existingT
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-2">
                 <p className="text-sm text-muted-foreground">No tasks found in Google Tasks</p>
-                <p className="text-xs text-muted-foreground/60">Create some tasks in Google Tasks to import them here.</p>
+                <p className="text-xs text-muted-foreground">Create some tasks in Google Tasks to import them here.</p>
               </div>
             </div>
           )}
@@ -202,7 +202,7 @@ export default function GoogleTasksPicker({ isOpen, onClose, onImport, existingT
                             <p className="text-xs text-muted-foreground line-clamp-2">{task.notes}</p>
                           )}
                           {task.dueDate && (
-                            <p className="text-xs text-muted-foreground/60">
+                            <p className="text-xs text-muted-foreground">
                               Due: {new Date(task.dueDate).toLocaleDateString()}
                             </p>
                           )}

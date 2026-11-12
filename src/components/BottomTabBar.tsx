@@ -85,7 +85,7 @@ export default function BottomTabBar() {
               aria-current={active ? 'page' : undefined}
             >
               <Icon className={`h-5 w-5 ${active ? 'stroke-[2.5]' : ''}`} />
-              <span className={`text-[10px] ${active ? 'font-medium' : ''}`}>
+              <span className={`text-xs ${active ? 'font-medium' : ''}`}>
                 {tab.label}
               </span>
             </button>

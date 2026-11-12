@@ -26,7 +26,7 @@ export default function SourceSheet({ sourceId, onClose }: SourceSheetProps) {
   return (
     <Dialog open={Boolean(entry)} onOpenChange={(open) => !open && onClose()}>
       {entry && (
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent >
           <DialogHeader>
             <p className="eyebrow text-left">{entry.kind}</p>
             <DialogTitle className="text-left">{entry.title}</DialogTitle>

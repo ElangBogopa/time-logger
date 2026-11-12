@@ -1,6 +1,9 @@
 'use client'
 
-import { METRIC_LABELS } from '@/lib/metrics-calc'
+import { useEffect, useRef, useState } from 'react'
+import { Check } from 'lucide-react'
+import { METRIC_LABELS, METRIC_THRESHOLDS } from '@/lib/metrics-calc'
+import { useCountUp } from '@/hooks/useCountUp'
 import { METRIC_HEX, METRIC_TEXT_HEX } from '@/lib/palette'
 import type { MetricKey } from '@/lib/chart-colors'
 
@@ -19,16 +22,29 @@ import type { MetricKey } from '@/lib/chart-colors'
 
 export const METRIC_ORDER: MetricKey[] = ['body', 'focus', 'social']
 
+/**
+ * One ring. There were two — this one, and a private copy inside the
+ * dashboard hero — drawing the same thing with the same colours.
+ *
+ * A ring that has reached its target looks like it: a brighter stroke with a
+ * soft halo, and a tick beside the label so the state is not carried by
+ * colour alone. Before this a ring at 82 and a ring at 78 differed by four
+ * degrees of arc, which is not much of a reward for the day's work. The
+ * moment it crosses, a single ripple leaves the ring.
+ */
 export function MetricRing({
   metric,
   value,
   size = 72,
   strokeWidth = 6,
+  label,
 }: {
   metric: MetricKey
   value: number
   size?: number
   strokeWidth?: number
+  /** Overrides the metric's own name. */
+  label?: string
 }) {
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
@@ -36,11 +52,40 @@ export function MetricRing({
   const offset = circumference - (clamped / 100) * circumference
   const center = size / 2
   const hasProgress = value > 0
+  const onTarget = value >= METRIC_THRESHOLDS.green
+  const shown = useCountUp(value)
+
+  // Ripple once when the ring crosses its target while you are watching.
+  const previous = useRef(value)
+  const [ripple, setRipple] = useState(0)
+  useEffect(() => {
+    const crossed = previous.current < METRIC_THRESHOLDS.green && value >= METRIC_THRESHOLDS.green
+    previous.current = value
+    if (!crossed) return
+    const start = setTimeout(() => setRipple((n) => n + 1), 0)
+    return () => clearTimeout(start)
+  }, [value])
+
+  const stroke = onTarget ? METRIC_TEXT_HEX[metric] : METRIC_HEX[metric]
 
   return (
     <div className="flex flex-col items-center">
       <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="transform -rotate-90" aria-hidden="true">
+        {ripple > 0 && (
+          <span
+            key={ripple}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-full border-2 animate-ring-ripple"
+            style={{ borderColor: METRIC_TEXT_HEX[metric] }}
+          />
+        )}
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="transform -rotate-90 overflow-visible"
+          aria-hidden="true"
+        >
           <circle
             cx={center}
             cy={center}
@@ -55,30 +100,32 @@ export function MetricRing({
               cy={center}
               r={radius}
               fill="none"
-              stroke={METRIC_HEX[metric]}
+              stroke={stroke}
               strokeWidth={strokeWidth}
               strokeDasharray={circumference}
               strokeDashoffset={offset}
               strokeLinecap="round"
               className="transition-all duration-1000 ease-out"
+              style={onTarget ? { filter: `drop-shadow(0 0 5px ${METRIC_HEX[metric]})` } : undefined}
             />
           )}
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span
-            className="font-semibold tabular-nums"
+            className="ring-number"
             style={{
               color: hasProgress ? METRIC_TEXT_HEX[metric] : 'var(--muted-foreground)',
-              fontSize: Math.round(size * 0.28),
+              fontSize: Math.round(size * 0.36),
             }}
             aria-hidden="true"
           >
-            {value}
+            {shown}
           </span>
         </div>
       </div>
-      <span className="eyebrow mt-1.5" aria-hidden="true">
-        {METRIC_LABELS[metric]}
+      <span className="mt-2 flex items-center gap-1 text-sm font-medium text-foreground" aria-hidden="true">
+        {label ?? METRIC_LABELS[metric]}
+        {onTarget && <Check className="h-3.5 w-3.5" style={{ color: METRIC_TEXT_HEX[metric] }} strokeWidth={3} />}
       </span>
     </div>
   )

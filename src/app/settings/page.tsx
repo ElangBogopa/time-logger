@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Calendar, ChevronRight, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, X, ShieldCheck } from 'lucide-react'
+import { BookOpen, ChevronRight, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, X, ShieldCheck } from 'lucide-react'
 // ── Section label ──
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -18,7 +18,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ── Row item ──
 function RowItem({
   icon: Icon,
-  iconBg,
   iconColor,
   label,
   description,
@@ -26,7 +25,6 @@ function RowItem({
   trailing,
 }: {
   icon: React.ElementType
-  iconBg: string
   iconColor: string
   label: string
   description?: string
@@ -37,18 +35,17 @@ function RowItem({
   return (
     <Wrapper
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 ${
+      className={`w-full flex items-center gap-3 px-4 py-3.5 ${
         onClick ? 'hover:bg-accent/50 active:bg-accent transition-colors cursor-pointer' : ''
       }`}
     >
-      <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconBg}`}>
-        <Icon className={`h-4.5 w-4.5 ${iconColor}`} />
-      </div>
+      {/* A plain icon. Each row used to carry its own in a tinted square. */}
+      <Icon className={`h-5 w-5 shrink-0 ${iconColor}`} />
       <div className="flex-1 text-left">
         <p className="text-sm font-medium text-foreground">{label}</p>
-        {description && <p className="text-[11px] text-muted-foreground">{description}</p>}
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </div>
-      {trailing || (onClick && <ChevronRight className="h-4 w-4 text-muted-foreground/50" />)}
+      {trailing || (onClick && <ChevronRight className="h-4 w-4 text-muted-foreground" />)}
     </Wrapper>
   )
 }
@@ -131,7 +128,7 @@ function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
                     className={`h-8 w-8 transition-colors ${
                       star <= (hoverRating || rating)
                         ? 'fill-[#B5A07A] text-muted-foreground'
-                        : 'text-muted-foreground/30'
+                        : 'text-muted-foreground'
                     }`}
                   />
                 </button>
@@ -219,9 +216,7 @@ export default function MorePage() {
           onClick={() => router.push('/library')}
           className="mx-4 mb-6 flex w-[calc(100%-2rem)] items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all duration-150 hover:border-foreground/25 active:scale-[0.995]"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
-            <BookOpen className="h-5 w-5 text-muted-foreground" />
-          </div>
+          <BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
           <div className="min-w-0 flex-1">
             <p className="font-medium text-foreground">The Science</p>
             <p className="text-sm text-muted-foreground">
@@ -232,11 +227,10 @@ export default function MorePage() {
         </button>
 
         {/* Account & Settings */}
-        <SectionLabel>Account &amp; Settings</SectionLabel>
+        <SectionLabel>Account</SectionLabel>
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
             icon={Link2}
-            iconBg="bg-muted"
             iconColor="text-muted-foreground"
             label="Connected Accounts"
             description="Google Calendar integration"
@@ -249,7 +243,6 @@ export default function MorePage() {
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
             icon={Bell}
-            iconBg="bg-secondary"
             iconColor="text-muted-foreground"
             label="Push Notifications"
             description="Manage reminders and alerts"
@@ -258,25 +251,11 @@ export default function MorePage() {
         </div>
         */}
 
-        {/* Preferences */}
-        <SectionLabel>Preferences</SectionLabel>
-        <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
-          <RowItem
-            icon={Calendar}
-            iconBg="bg-secondary"
-            iconColor="text-muted-foreground"
-            label="Plan & calendar"
-            description="Give tomorrow's tasks a time"
-            onClick={() => router.push('/calendar')}
-          />
-        </div>
-
         {/* About */}
         <SectionLabel>About</SectionLabel>
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
           <RowItem
             icon={Lightbulb}
-            iconBg="bg-secondary"
             iconColor="text-muted-foreground"
             label="Your Ideal Day"
             description="Science-backed daily planning guide"
@@ -284,7 +263,6 @@ export default function MorePage() {
           />
           <RowItem
             icon={MessageSquare}
-            iconBg="bg-secondary"
             iconColor="text-muted-foreground"
             label="Send Feedback"
             description="Rate the app and share your thoughts"
@@ -292,7 +270,6 @@ export default function MorePage() {
           />
           <RowItem
             icon={ShieldCheck}
-            iconBg="bg-secondary"
             iconColor="text-muted-foreground"
             label="Privacy & Terms"
             description="What is stored, and what is not"
@@ -305,7 +282,7 @@ export default function MorePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-foreground">{session?.user?.name || session?.user?.email}</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {session?.user?.email}
                 {session?.authProvider === 'google' && ' · Google'}
               </p>

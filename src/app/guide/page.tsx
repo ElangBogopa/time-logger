@@ -228,7 +228,7 @@ function CitationCard({ citation }: { citation: Citation }) {
           </a>
         )}
       </div>
-      <p className="text-[10px] text-muted-foreground">{citation.authors} · {citation.year}</p>
+      <p className="text-xs text-muted-foreground">{citation.authors} · {citation.year}</p>
       <p className="text-xs text-foreground/70 leading-relaxed">{citation.finding}</p>
     </div>
   )
@@ -354,7 +354,7 @@ export default function GuidePage() {
 
         {/* Footer note */}
         <div className="text-center mt-8 mb-4">
-          <p className="text-[11px] text-muted-foreground/60 leading-relaxed max-w-xs mx-auto">
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
             These are research-backed guidelines, not rigid rules.
             Adapt to your chronotype, life phase, and goals.
             The best schedule is the one you actually follow.

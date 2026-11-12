@@ -197,7 +197,7 @@ function PlanNextCard({ reviewDate }: { reviewDate: string }) {
           <p className="text-sm font-medium text-foreground">
             {planToday ? 'Plan the rest of today' : 'Plan tomorrow'}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Give what matters a time, around your calendar
           </p>
         </div>
@@ -273,7 +273,7 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
               }
             >
               {/* Hour label on hover */}
-              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                 {block.hour}
               </div>
             </div>
@@ -281,7 +281,7 @@ function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: Ti
         })}
       </div>
       {/* Hour labels */}
-      <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+      <div className="flex justify-between text-xs text-muted-foreground px-1">
         <span>{startHour}:00</span>
         <span>12:00</span>
         <span>{endHour}:00</span>
@@ -352,7 +352,7 @@ function PlanVsActualCard({
                   {task.title}
                 </p>
                 {comparison && (
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {comparison.outcome === 'kept' &&
                       (comparison.inferred && comparison.matchedActivity
                         ? `Planned ${formatTimeDisplay(comparison.committedStart)} — you logged ${comparison.matchedActivity} then`
@@ -758,13 +758,13 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
 
           <div className="flex flex-col items-center justify-center py-20">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-secondary mb-6">
-              <Lock className="h-8 w-8 text-muted-foreground/50" />
+              <Lock className="h-8 w-8 text-muted-foreground" />
             </div>
             <h2 className="text-lg font-semibold text-foreground mb-2">Not available yet</h2>
             <p className="text-sm text-muted-foreground text-center max-w-xs mb-1">
               Your daily review unlocks at 9:00 PM once your day is wrapping up.
             </p>
-            <p className="text-xs text-muted-foreground/50">
+            <p className="text-xs text-muted-foreground">
               {currentHour !== null && currentHour < 21 && `${21 - currentHour} hour${21 - currentHour !== 1 ? 's' : ''} to go`}
             </p>
           </div>
@@ -814,7 +814,7 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
           )}
           <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
             <p className="text-sm text-foreground">Nothing was logged on this day</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">There is nothing to review until something is.</p>
+            <p className="mt-1 text-xs text-muted-foreground">There is nothing to review until something is.</p>
           </div>
           <PlanNextCard reviewDate={summary.date} />
         </div>
@@ -867,14 +867,14 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
             {/* Was an indigo→purple gradient with an indigo-500 icon, which
                 made the one piece of writing on the page shout. The muted
                 violet is the same hue, from the palette. */}
-            <div className={`rounded-xl ${AGGREGATED_CLASSES.faith.tint} border ${AGGREGATED_CLASSES.faith.border}/40 p-4`}>
+            <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start gap-3">
-                <Sparkles className={`h-5 w-5 ${AGGREGATED_CLASSES.faith.text} flex-shrink-0 mt-0.5`} />
+                <Sparkles className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   {isLoadingCommentary ? (
                     <div className="space-y-2 animate-pulse">
-                      <div className={`h-4 ${AGGREGATED_CLASSES.faith.tint} rounded w-full`} />
-                      <div className={`h-4 ${AGGREGATED_CLASSES.faith.tint} rounded w-3/4`} />
+                      <div className="h-4 bg-secondary rounded w-full" />
+                      <div className="h-4 bg-secondary rounded w-3/4" />
                     </div>
                   ) : (
                     <>
@@ -946,7 +946,7 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">Plan tomorrow</p>
-              <p className="text-[11px] text-muted-foreground">Give tomorrow&apos;s tasks a time</p>
+              <p className="text-xs text-muted-foreground">Give tomorrow&apos;s tasks a time</p>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>

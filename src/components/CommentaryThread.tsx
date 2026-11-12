@@ -160,7 +160,7 @@ export default function CommentaryThread({
       )}
 
       {atLimit ? (
-        <p className={`text-xs ${dark ? 'text-zinc-500' : 'text-muted-foreground'}`}>
+        <p className={`text-xs ${dark ? 'text-zinc-400' : 'text-muted-foreground'}`}>
           That&rsquo;s as far as this conversation goes.
         </p>
       ) : (

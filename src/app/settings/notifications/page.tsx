@@ -112,7 +112,7 @@ export default function NotificationsPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">Push Notifications</p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {!push.isSupported
                       ? 'Not supported in this browser'
                       : push.permission === 'denied'
@@ -147,7 +147,7 @@ export default function NotificationsPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">Reminder Times</p>
-                <p className="text-[11px] text-muted-foreground">When to remind you to log</p>
+                <p className="text-xs text-muted-foreground">When to remind you to log</p>
               </div>
             </div>
             <div className="space-y-3">

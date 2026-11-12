@@ -173,7 +173,7 @@ export default function CommitTimeModal({
                   className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                 />
               </div>
-              <span className="text-muted-foreground/30 mt-4 text-xs">–</span>
+              <span className="text-muted-foreground mt-4 text-xs">–</span>
               <div className="w-[120px]">
                 <label className="field-label">End</label>
                 <input

@@ -19,7 +19,7 @@ import NextUp from '@/components/NextUp'
 import { Sun, Cloud, Moon, Check, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
-import { AGGREGATED_CLASSES, STATUS_CLASSES } from '@/lib/palette'
+import { STATUS_CLASSES } from '@/lib/palette'
 
 // Dynamic import MetricDetailSheet to keep Recharts out of initial bundle
 const MetricDetailSheet = dynamic(
@@ -165,7 +165,7 @@ function HomeContent() {
 
           {/* Rollover indicator: show during 12-3AM when viewing yesterday */}
           {isToday && today !== getRealToday() && (
-            <p className="text-center text-[11px] text-muted-foreground/60 mb-1">
+            <p className="text-center text-xs text-muted-foreground mb-1">
               Entries logged after midnight save to {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </p>
           )}
@@ -190,142 +190,105 @@ function HomeContent() {
             <NextUp date={selectedDate} entries={entries} onChanged={handleNextUpChanged} />
           )}
 
-          {/* 4. YOUR DAY section */}
-          <div className="mt-4">
-            <h3 className="eyebrow mb-3">
-              Your Day
-            </h3>
+          {/* Your day: the three sessions and the review they add up to, as
+              one list. This was a heading, a card for the review, and a
+              titled card holding three more cards with an icon in a circle
+              each — six bordered boxes to say four things. */}
+          <div className="mt-6">
+            <h3 className="eyebrow mb-3">Your day</h3>
+            <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border">
+              {sessionInfos.map(info => {
+                const isActive = isToday && info.period === currentPeriod
+                const Icon = info.period === 'morning' ? Sun : info.period === 'afternoon' ? Cloud : Moon
+                const periodLabel = info.period === 'morning' ? 'Morning' : info.period === 'afternoon' ? 'Afternoon' : 'Evening'
 
-            {/* Your Day In Review */}
-            {(() => {
-              const pastNine = (currentHour ?? 0) >= 21
-              // A day that has not happened has nothing to review.
-              const unlocked = isFutureDate ? false : !isToday || pastNine
+                // Three states, each with a cue that is not colour:
+                // done has a tick, partial says so, and nothing logged is plain.
+                const isDone = info.hasCompletion
+                const hasEntries = info.hasEntries
+                // "Not wrapped up" is a prompt, so it only shows while it
+                // can be acted on: today and yesterday. On older days it
+                // was a permanent amber mark against every session.
+                const isPartial = hasEntries && !isDone && canWrapUp
 
-              return (
-                <div className="relative mb-3">
+                const rowTint = isDone
+                  ? STATUS_CLASSES.green.tintStrong
+                  : isPartial
+                    ? STATUS_CLASSES.yellow.tintStrong
+                    : isActive
+                      ? 'bg-accent/50'
+                      : ''
+
+                const iconColour = isDone
+                  ? STATUS_CLASSES.green.icon
+                  : isPartial
+                    ? STATUS_CLASSES.yellow.icon
+                    : isActive
+                      ? 'text-foreground'
+                      : 'text-muted-foreground'
+
+                const subtitle = (isDone || hasEntries)
+                  ? `${info.entryCount} ${info.entryCount === 1 ? 'entry' : 'entries'}`
+                  : isToday
+                    ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
+                    : isFutureDate ? 'Upcoming' : 'Not logged'
+
+                return (
+                  <button
+                    key={info.period}
+                    onClick={() => (isDone || hasEntries) ? handleViewClick(info.period) : handleLogClick(info.period)}
+                    className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 hover:bg-accent/40 active:bg-accent/60 ${rowTint}`}
+                  >
+                    <Icon className={`h-5 w-5 shrink-0 ${iconColour}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm ${isActive ? 'font-semibold text-foreground' : 'font-medium text-foreground'}`}>
+                        {periodLabel}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{subtitle}</p>
+                    </div>
+                    {isDone ? (
+                      <Check className={`h-4 w-4 shrink-0 ${STATUS_CLASSES.green.icon}`} aria-label="Done" />
+                    ) : isPartial ? (
+                      <span className={`shrink-0 text-xs ${STATUS_CLASSES.yellow.text}`}>Not wrapped up</span>
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                  </button>
+                )
+              })}
+
+              {(() => {
+                const pastNine = (currentHour ?? 0) >= 21
+                // A day that has not happened has nothing to review.
+                const unlocked = isFutureDate ? false : !isToday || pastNine
+
+                return (
                   <button
                     onClick={() => unlocked && router.push(`/day-review?date=${selectedDate}`)}
                     disabled={!unlocked}
-                    className={`w-full flex items-center gap-3 rounded-xl px-4 py-3.5 transition-all ${
-                      unlocked
-                        ? 'bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20 hover:from-primary/30 hover:to-primary/10 active:scale-[0.99]'
-                        : 'bg-secondary/30 border border-border cursor-default'
+                    className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 ${
+                      unlocked ? 'hover:bg-accent/40 active:bg-accent/60' : 'cursor-default'
                     }`}
                   >
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                      unlocked ? 'bg-primary/15' : 'bg-secondary'
-                    }`}>
-                      {unlocked ? (
-                        <ClipboardList className="h-4.5 w-4.5 text-primary" />
-                      ) : (
-                        <Lock className="h-4 w-4 text-muted-foreground/50" />
-                      )}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <span className={`text-sm font-medium ${unlocked ? 'text-foreground' : 'text-muted-foreground/60'}`}>
-                        Your Day In Review
-                      </span>
+                    {unlocked ? (
+                      <ClipboardList className="h-5 w-5 shrink-0 text-foreground" />
+                    ) : (
+                      <Lock className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-medium ${unlocked ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        Day in review
+                      </p>
                       {!unlocked && (
-                        <p className="text-[10px] text-muted-foreground/40 mt-0.5">
-                          {isFutureDate ? 'Nothing to review yet' : 'Unlocks at 9:00 PM'}
+                        <p className="text-xs text-muted-foreground">
+                          {isFutureDate ? 'Nothing to review yet' : 'Opens at 9:00 PM'}
                         </p>
                       )}
                     </div>
-                    {unlocked && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    {unlocked && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                   </button>
-                </div>
-              )
-            })()}
-
-            {/* Sessions card */}
-            <div className="rounded-xl bg-card border border-border p-4 mb-3">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="eyebrow">
-                  Sessions
-                </h3>
-              </div>
-              <div className="space-y-2">
-                {sessionInfos.map(info => {
-                  const isActive = isToday && info.period === currentPeriod
-                  const Icon = info.period === 'morning' ? Sun : info.period === 'afternoon' ? Cloud : Moon
-                  const periodLabel = info.period === 'morning' ? 'Morning' : info.period === 'afternoon' ? 'Afternoon' : 'Evening'
-
-                  // Three visual states:
-                  // 1. Green: user pressed "Done" (hasCompletion)
-                  // 2. Orange: entries exist but no "Done" (hasEntries && !hasCompletion)
-                  // 3. Neutral: nothing logged
-                  const isDone = info.hasCompletion
-                  const hasEntries = info.hasEntries
-                  // "Not wrapped up" is a prompt, so it only shows while it
-                  // can be acted on: today and yesterday. On older days it
-                  // was a permanent amber mark against every session.
-                  const isPartial = hasEntries && !isDone && canWrapUp
-
-                  // Done and partial take the status colours from the one
-                  // palette — sage and dusty amber, not green-500 and
-                  // amber-500, which were the loudest thing on the screen.
-                  const bgClass = isDone
-                    ? `${STATUS_CLASSES.green.tintStrong} border ${STATUS_CLASSES.green.borderStrong}`
-                    : isPartial
-                      ? `${STATUS_CLASSES.yellow.tintStrong} border ${STATUS_CLASSES.yellow.borderStrong}`
-                      : isActive
-                        ? 'bg-accent border border-primary/20'
-                        : 'bg-secondary/50 border border-transparent hover:bg-accent/50'
-
-                  // One hover and press response for all four states. A tinted
-                  // row has no spare background to shift, so the border does
-                  // the work.
-                  const interaction =
-                    'transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]'
-
-                  const iconBgClass = isDone
-                    ? STATUS_CLASSES.green.iconBg
-                    : isPartial
-                      ? STATUS_CLASSES.yellow.iconBg
-                      : isActive ? AGGREGATED_CLASSES.focus.tint : 'bg-secondary'
-
-                  const iconColorClass = isDone
-                    ? STATUS_CLASSES.green.icon
-                    : isPartial
-                      ? STATUS_CLASSES.yellow.icon
-                      : isActive ? AGGREGATED_CLASSES.focus.text : 'text-muted-foreground'
-
-                  // Subtitle text
-                  const subtitle = (isDone || hasEntries)
-                    ? `${info.entryCount} ${info.entryCount === 1 ? 'entry' : 'entries'}`
-                    : isToday
-                      ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
-                      : isFutureDate ? 'Upcoming' : 'Not logged'
-
-                  return (
-                    <button
-                      key={info.period}
-                      onClick={() => (isDone || hasEntries) ? handleViewClick(info.period) : handleLogClick(info.period)}
-                      className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 ${bgClass} ${interaction}`}
-                    >
-                      <div className={`flex h-9 w-9 items-center justify-center rounded-full ${iconBgClass}`}>
-                        <Icon className={`h-4 w-4 ${iconColorClass}`} />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className={`text-sm font-medium ${
-                          isActive ? 'text-foreground' : 'text-secondary-foreground'
-                        }`}>
-                          {periodLabel}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {subtitle}
-                        </p>
-                      </div>
-                      {isDone ? (
-                        <Check className={`h-4 w-4 ${STATUS_CLASSES.green.icon}`} aria-label="Done" />
-                      ) : isPartial ? (
-                        <span className={`text-[11px] ${STATUS_CLASSES.yellow.icon}`}>Not wrapped up</span>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
+                )
+              })()}
             </div>
           </div>
 

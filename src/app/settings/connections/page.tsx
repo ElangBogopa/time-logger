@@ -301,7 +301,7 @@ function ConnectionsContent() {
 
       {/* Conflict Modal */}
       <Dialog open={!!conflictModal} onOpenChange={(open) => !open && !isMerging && handleCancelConflict()}>
-        <DialogContent showCloseButton={false} className="max-w-sm">
+        <DialogContent showCloseButton={false} >
           <DialogHeader>
             <DialogTitle className="text-center">Looks like you&apos;re already signed up!</DialogTitle>
             <DialogDescription className="text-center">

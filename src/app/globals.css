@@ -194,38 +194,38 @@ body {
    own scale.
    ═══════════════════════════════════════════════════════════ */
 
-/* Section labels: YOUR DAY, SESSIONS, YOUR PLAN. They carry the page's
-   structure and were its least visible element — 11px semibold at
-   muted-foreground. Now 12px at full contrast. Add `opacity-70` where a
-   label is genuinely secondary, such as the date navigator. */
+/* Section headings: "Next up", "Your day", "Goals". Sentence case, at full
+   contrast. They were 12px capitals with wide tracking — five of them on
+   Today alone — which made every screen read like a settings page. The
+   structure is carried by weight and space now, not by shouting. */
 @utility eyebrow {
-  font-size: 0.75rem;
-  line-height: 1.2;
+  font-size: 0.9375rem;
+  line-height: 1.25;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: -0.005em;
   color: var(--foreground);
 }
 
-/* Field labels inside modals and pickers. Deliberately quieter than
-   `eyebrow`: these sit above the value they describe and should not compete
-   with it. Replaces four different 10–12px combinations. */
+/* Field labels inside sheets and cards, above the value they describe.
+   Small capitals are kept for these alone: one quiet register for "what is
+   this number", so it never competes with the number. */
 @utility field-label {
   font-size: 0.6875rem;
   line-height: 1.2;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--muted-foreground);
 }
 
 /* Any number the eye returns to: ring values, scores, totals. Tabular so
    digits do not shift as the value changes. */
 @utility metric-number {
-  font-size: 1.5rem;
+  font-family: var(--font-figures), var(--font-geist-sans), sans-serif;
+  font-size: 1.75rem;
   line-height: 1;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 
@@ -329,4 +329,23 @@ body {
 
 .animate-ring-pulse {
   animation: ring-pulse 0.8s ease-out forwards;
+}
+
+/* A ring reaching its target: one ripple outward, once. */
+@keyframes ring-ripple {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+
+.animate-ring-ripple {
+  animation: ring-ripple 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+/* The figure inside a ring. */
+@utility ring-number {
+  font-family: var(--font-figures), var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }

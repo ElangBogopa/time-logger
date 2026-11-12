@@ -5,21 +5,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
 import type { TrendAPIResponse } from '@/lib/trend-types'
 import { METRIC_LABELS } from '@/lib/metrics-calc'
-import { METRIC_HEX, METRIC_TEXT_HEX } from '@/lib/palette'
+import { MetricRing } from '@/components/MetricRings'
 
 export type { TrendAPIResponse }
-
-/**
- * Per-metric colour identity, from the one palette: each ring is the colour
- * of the bucket it is computed from, so the ring and the timeline blocks that
- * filled it match. These were saturated Tailwind 500s with a neon glow,
- * against CLAUDE.md's "no bright neons".
- */
-const METRIC_IDENTITY = {
-  body: { active: METRIC_HEX.body, text: METRIC_TEXT_HEX.body },
-  focus: { active: METRIC_HEX.focus, text: METRIC_TEXT_HEX.focus },
-  social: { active: METRIC_HEX.social, text: METRIC_TEXT_HEX.social },
-} as const
 
 /* ── Props ── */
 interface DashboardHeroProps {
@@ -29,82 +17,6 @@ interface DashboardHeroProps {
   date?: string // YYYY-MM-DD, defaults to today
   /** Bump to re-read the scores after something was logged from this screen. */
   refreshKey?: number
-}
-
-/* ── Metric Circle ── */
-function MetricCircle({
-  value,
-  label,
-  metricKey,
-  size = 96,
-  strokeWidth = 7,
-}: {
-  value: number
-  label: string
-  metricKey: MetricKey
-  size?: number
-  strokeWidth?: number
-}) {
-  const identity = METRIC_IDENTITY[metricKey]
-  const radius = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
-  const clamped = Math.max(0, Math.min(100, value))
-  const offset = circumference - (clamped / 100) * circumference
-  const center = size / 2
-  const hasProgress = value > 0
-
-  // One track colour: the ring reads as a dial, not as two states.
-  const activeColor = identity.active
-  const trackColor = 'var(--color-border)'
-  const textColor = hasProgress ? identity.text : 'var(--muted-foreground)'
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          width={size}
-          height={size}
-          className="transform -rotate-90"
-          viewBox={`0 0 ${size} ${size}`}
-          aria-hidden="true"
-        >
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke={trackColor}
-            strokeWidth={strokeWidth}
-          />
-          {hasProgress && (
-            <circle
-              cx={center}
-              cy={center}
-              r={radius}
-              fill="none"
-              stroke={activeColor}
-              strokeWidth={strokeWidth}
-              strokeDasharray={circumference}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              className="transition-all duration-1000 ease-out"
-            />
-          )}
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="metric-number" style={{ color: textColor }} aria-hidden="true">
-            {value}
-          </span>
-        </div>
-      </div>
-      {/* Full contrast whether or not there is progress: the number below
-          already says which metrics are empty, and three labels in three
-          different greys was the noisiest part of the hero. */}
-      <span className="eyebrow mt-1.5" aria-hidden="true">
-        {label}
-      </span>
-    </div>
-  )
 }
 
 /* ── Client-side cache for trend data per date ── */
@@ -208,13 +120,7 @@ export default function DashboardHero({ onMetricTap, activeMetric, onTrendDataLo
               aria-label={ariaLabel}
               className="appearance-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95 transition-transform rounded-full flex flex-col items-center"
             >
-              <MetricCircle
-                value={metricTrend.current}
-                label={label}
-                metricKey={key}
-                size={size}
-                strokeWidth={strokeWidth}
-              />
+              <MetricRing metric={key} value={metricTrend.current} label={label} size={size} strokeWidth={strokeWidth} />
             </button>
           )
         })}

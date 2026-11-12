@@ -320,7 +320,9 @@ export default function PeriodSummaryPopup({
     <>
       {/* Confetti animation styles */}
 
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* A sheet from the bottom, like every other one. It was the last
+          card still floating in the middle of the screen. */}
+      <div className="fixed inset-0 z-50 flex items-end justify-center">
         {/* Backdrop */}
         <div
           className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
@@ -331,21 +333,20 @@ export default function PeriodSummaryPopup({
 
         {/* Modal */}
         <div
-          className={`relative w-full max-w-sm transform transition-all duration-300 ease-out ${
-            isVisible && !isLeaving
-              ? 'translate-y-0 opacity-100 scale-100'
-              : 'translate-y-8 opacity-0 scale-95'
+          className={`relative w-full max-w-[430px] transform transition-all duration-300 ease-out ${
+            isVisible && !isLeaving ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
           }`}
         >
           {/* Was a 2px gradient frame — amber→orange, or indigo→purple→pink
               for the evening, which is the loudest thing in the app. */}
-          <div className="relative overflow-hidden rounded-2xl border border-zinc-700 shadow-2xl max-h-[85vh]">
-            <div className="relative rounded-2xl bg-zinc-900 p-6 overflow-y-auto max-h-[calc(85vh-4px)]">
+          <div className="relative overflow-hidden rounded-t-2xl border border-b-0 border-zinc-700 shadow-2xl max-h-[88vh]">
+            <div className="relative rounded-t-2xl bg-zinc-900 px-5 pt-7 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] overflow-y-auto max-h-[calc(88vh-2px)]">
+              <span aria-hidden="true" className="absolute top-2.5 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-zinc-600" />
               {/* Header buttons */}
               <div className="absolute right-4 top-4 flex items-center gap-2">
                 <button
                   onClick={handleShare}
-                  className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+                  className="rounded-full p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
                   title="Share session"
                   aria-label="Share session"
                 >
@@ -354,7 +355,7 @@ export default function PeriodSummaryPopup({
                 <button
                   onClick={handleClose}
                   aria-label="Close"
-                  className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+                  className="rounded-full p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -420,7 +421,7 @@ export default function PeriodSummaryPopup({
                       className="inline-flex items-center gap-1 rounded-full bg-zinc-700/50 px-2.5 py-1 text-xs text-zinc-300"
                     >
                       {CATEGORY_LABELS[cat as TimeCategory]}
-                      <span className="text-zinc-500">
+                      <span className="text-zinc-400">
                         {Math.floor(mins / 60) > 0 ? `${Math.floor(mins / 60)}h` : ''}{mins % 60 > 0 ? `${mins % 60}m` : ''}
                       </span>
                     </span>
@@ -432,7 +433,7 @@ export default function PeriodSummaryPopup({
             {/* AI Commentary */}
             <div className="mb-5 rounded-xl bg-zinc-800/30 p-4 space-y-3">
               <div className="flex items-start gap-2">
-                <Sparkles className="h-4 w-4 text-zinc-500 mt-0.5 shrink-0" />
+                <Sparkles className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
                 {isLoading ? (
                   <div className="flex-1">
                     <div className="h-4 bg-zinc-700 rounded animate-pulse mb-2 w-full" />
@@ -469,13 +470,13 @@ export default function PeriodSummaryPopup({
                   {/* Header */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-zinc-500" />
+                      <Check className="h-4 w-4 text-zinc-400" />
                       <p className="field-label">
                         Complete any tasks?
                       </p>
                     </div>
                     {completedCount > 0 && (
-                      <span className="text-[11px] text-[#7D9B8A] font-medium">
+                      <span className="text-xs text-[#7D9B8A] font-medium">
                         {completedCount}/{tasks.length}
                       </span>
                     )}
@@ -505,7 +506,7 @@ export default function PeriodSummaryPopup({
                           {task.title}
                         </span>
                         {i === 0 && incompleteTasks[0]?.sort_order === 0 && (
-                          <span className="text-[10px] text-[#CBB894]/70 font-medium">#1</span>
+                          <span className="text-xs text-[#CBB894]/70 font-medium">#1</span>
                         )}
                       </div>
                     ))}
@@ -536,7 +537,7 @@ export default function PeriodSummaryPopup({
                           completed={true}
                           onToggle={() => handleToggleTask(task.id, true)}
                         />
-                        <span className="text-sm flex-1 text-zinc-500 line-through">
+                        <span className="text-sm flex-1 text-zinc-400 line-through">
                           {task.title}
                         </span>
                       </div>
@@ -574,7 +575,7 @@ export default function PeriodSummaryPopup({
                 </Button>
                 <button
                   onClick={handleClose}
-                  className="w-full text-center text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="w-full text-center text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
                 >
                   Maybe later
                 </button>

@@ -209,7 +209,7 @@ export default function TimeRangePicker({
 
       {/* Picker modal using shadcn Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+        <DialogContent showCloseButton={false}>
           <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <DialogTitle className="text-sm font-semibold">
               Select Time Range

@@ -58,7 +58,7 @@ export default function GreetingHeader({
           onClick={() => !isToday && onDateChange(shiftDateString(selectedDate, 1))}
           className={`p-1 rounded-full transition-colors ${
             isToday
-              ? 'text-muted-foreground/30 cursor-default'
+              ? 'text-muted-foreground cursor-default'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           }`}
           aria-label="Next day"

@@ -190,12 +190,25 @@ backs it.
    `bg-[${hex}]` built at runtime emits no CSS. `palette.test.ts` checks the
    literals against the hexes and rejects anything as saturated as a Tailwind
    500.
-3. **Minimal UI**: shadcn/ui for consistency, no unnecessary chrome
+3. **Minimal UI**: shadcn/ui for consistency, no unnecessary chrome. Group
+   with space and dividers before reaching for another border: a list is
+   one card with `divide-y`, not a card of cards, and an icon is an icon,
+   not an icon in a tinted circle. One primary button (the default `Button`
+   variant, 44px tall) per decision. Everything modal is a sheet from the
+   bottom edge — `DialogContent` is one, lifted clear of the keyboard by
+   `--keyboard-inset` — and toasts appear at the top, because the bottom
+   belongs to the tab bar, the add button and the sheets. One ring
+   component (`MetricRing`): a ring on target gets a brighter stroke, a
+   halo and a tick, and ripples once as it crosses.
 4. **Progressive disclosure**: Quick log for speed, modal for details
-5. **One type scale**: `eyebrow` (section labels), `field-label` (quieter
-   labels inside modals), `metric-number` and `page-title`, all defined as
-   Tailwind utilities in `globals.css`. Reach for one of those before writing
-   another `text-[11px] uppercase tracking-wider`.
+5. **One type scale**: `eyebrow` (section headings — sentence case, 15px
+   semibold; they were small capitals, five to a screen), `field-label`
+   (the one small-capitals register, for a label above its value),
+   `metric-number` and `ring-number` (figures, set in Barlow Semi Condensed
+   via `--font-figures`) and `page-title`, all defined as Tailwind utilities
+   in `globals.css`. Nothing a person has to read is under 12px, and
+   secondary text is `text-muted-foreground` at full strength — not dimmed
+   further with an opacity suffix.
 6. **Body needs exercise**: upkeep earns its way up a curve that approaches
    69 and never reaches it; exercise closes the gap from there to 99.
    `body = upkeep + (99 − upkeep) × curve(exercise)`. So a flawless day of

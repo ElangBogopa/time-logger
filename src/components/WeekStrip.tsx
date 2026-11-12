@@ -176,7 +176,7 @@ export default function WeekStrip({ selectedDate, onDateSelect, datesWithEntries
                   }
                 `}
               >
-                <span className={`text-[10px] uppercase ${dayIsSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                <span className={`text-xs uppercase ${dayIsSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
                   {getDayName(dateStr)}
                 </span>
                 <span className={`text-base font-medium ${dayIsSelected ? '' : ''}`}>

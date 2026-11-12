@@ -94,15 +94,15 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
   const showStreaks = showProductive || showCrushing
 
   return (
-    <div className="mt-4">
+    <div className="mt-6">
       {/* Nothing in the app pointed at the planner: you set a task inside a
           goal, gave it a time in a modal there, and it appeared on a
           calendar reachable only from Settings. */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="eyebrow">Your Plan</h3>
+        <h3 className="eyebrow">Goals</h3>
         <button
           onClick={() => router.push(`/calendar?date=${shiftDateString(getUserToday(), 1)}`)}
-          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <CalendarClock className="h-3.5 w-3.5" />
           Plan tomorrow
@@ -125,11 +125,11 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
                     <span className="text-lg font-bold text-foreground">
                       {productiveStreak}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       days
                     </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground/70">
+                  <p className="text-xs text-muted-foreground">
                     Productive
                   </p>
                 </div>
@@ -152,11 +152,11 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
                     <span className="text-lg font-bold text-foreground">
                       {crushingStreak}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       days
                     </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground/70">
+                  <p className="text-xs text-muted-foreground">
                     Crushing It
                   </p>
                 </div>
@@ -166,42 +166,31 @@ export default function YourPlan({ date, isToday }: YourPlanProps) {
         </div>
       )}
 
-      {/* Goal pills card */}
+      {/* Goals, as plain rows. This was a titled card holding a row that
+          was itself a card, with the icon in a tinted circle. */}
       {goals.length > 0 ? (
-        <div className="rounded-xl bg-card border border-border p-4">
-          <h4 className="eyebrow mb-3">Goals</h4>
-          <div className="space-y-2">
-            {goals.map(goal => (
-              <button
-                key={goal.id}
-                onClick={() => router.push(`/goal/${goal.id}`)}
-                className="w-full flex items-center gap-3 rounded-lg px-3 py-3 transition-all bg-secondary/50 border border-transparent hover:bg-accent/50"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
-                  <Target className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-foreground">
-                    {goal.title}
-                  </p>
-                  {goal.description && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {goal.description}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
-              </button>
-            ))}
-          </div>
+        <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border">
+          {goals.map(goal => (
+            <button
+              key={goal.id}
+              onClick={() => router.push(`/goal/${goal.id}`)}
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 hover:bg-accent/40 active:bg-accent/60"
+            >
+              <Target className="h-5 w-5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">{goal.title}</p>
+                {goal.description && (
+                  <p className="text-xs text-muted-foreground">{goal.description}</p>
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          ))}
         </div>
       ) : (
-        <div className="rounded-xl bg-card border border-border p-4">
-          <h4 className="eyebrow mb-3">Goals</h4>
-          <p className="text-sm text-muted-foreground/60 text-center py-2">
-            No goals set yet
-          </p>
-        </div>
+        <p className="rounded-xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
+          No goals set yet
+        </p>
       )}
     </div>
   )

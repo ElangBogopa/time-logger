@@ -91,9 +91,6 @@ function ReviewContent() {
         {/* Header */}
         <header className="mb-4">
           <h1 className="page-title text-foreground">Review</h1>
-          <p className="text-sm text-muted-foreground">
-            Your progress and reflections
-          </p>
         </header>
 
         {/* Tab Bar */}

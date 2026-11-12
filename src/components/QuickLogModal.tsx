@@ -559,7 +559,6 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
       <DialogContent
-        className="sm:max-w-md"
         showCloseButton={!isSubmitting && !showPostSubmit}
         onOpenAutoFocus={(e) => {
           // Prevent Radix from auto-focusing the input when activity is pre-filled
@@ -641,7 +640,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                   </>
                 ) : isPastDay ? (
                   <>
-                    <Clock className="h-5 w-5 text-zinc-500" />
+                    <Clock className="h-5 w-5 text-zinc-400" />
                     Add Past Entry
                   </>
                 ) : (
@@ -845,15 +844,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           <Button
             type="submit"
             disabled={isSubmitting || !activity.trim() || duration <= 0}
-            className={`w-full text-white ${
-              isPlanningMode && initialActivity
-                ? 'bg-gradient-to-r from-[#7D9B8A] to-[#7D9B8A] hover:from-[#7D9B8A] hover:to-[#7D9B8A]'
-                : isPlanningMode
-                  ? 'bg-gradient-to-r from-[#6B8CAE] to-[#8A7CA8] hover:from-[#6B8CAE] hover:to-[#8A7CA8]'
-                  : isPastDay
-                    ? 'bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-600 hover:to-zinc-700'
-                    : 'bg-gradient-to-r from-[#B5A07A] to-[#B5A07A] hover:from-[#B5A07A] hover:to-[#B5A07A]'
-            }`}
+            // The one primary button. This was a tan gradient, a blue-to-violet
+            // one for planning and a grey one for past days: three colours
+            // deciding nothing, on the most-pressed button in the app.
+            className="w-full"
+            size="lg"
           >
             {isSubmitting ? (
               <>

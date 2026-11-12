@@ -206,7 +206,7 @@ export default function GhostEntryModal({
 
   return (
     <Dialog open={!!event} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting}>
+      <DialogContent showCloseButton={!isSubmitting}>
         <DialogHeader className="bg-[#6B8CAE]/10 -mx-6 -mt-6 px-6 pt-6 pb-4 border-b border-[#6B8CAE]/20 rounded-t-lg">
           <DialogTitle className="flex items-center gap-2 text-[#93AEC9]">
             <Calendar className="h-5 w-5" />

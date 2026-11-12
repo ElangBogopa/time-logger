@@ -348,7 +348,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isPending && <Clock className="h-5 w-5 text-[#B5A07A]" />}
