@@ -95,6 +95,29 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - 30-minute cache duration
 - Don't fetch calendar for each date change
 
+### A new table is also something to export and to delete
+- `lib/account-data.ts` lists every table that holds something about a
+  person (`ACCOUNT_TABLES`). **More → Export your data** reads the list and
+  **More → Delete account** clears it, so a table missing from it would be
+  left out of someone's file and would survive the deletion they were told
+  was complete. Add the table there in the same change that creates it;
+  `account-data.test.ts` fails if the code reads one the list does not know.
+- Delete order is the list's order, with the `users` row last and only if
+  everything before it went — there is no transaction available from the
+  API, so a failure must leave an account that can ask again.
+- Both routes live under `/api/account`, not `/api/user`: the service worker
+  caches `/api/user*` for offline use, and an export must not sit in a
+  browser cache.
+- Deleting revokes the app's Google grant (`revokeGoogleAccess`). That is
+  the one request to Google that is not a read; it changes nothing of the
+  person's and is not an exception to "never writes to Google".
+- Sessions are signed cookies, so a second device stays signed in to a
+  deleted account. `accountIsGone` in `lib/auth.ts` asks once an hour, when
+  the Google token is due for renewal, and ends the session if the `users`
+  row is clearly absent (`DeletedAccountGuard` in Providers signs out). A
+  failed lookup counts as "still there". Until that hour is up the other
+  device can still write under the old id, and nothing sweeps those rows.
+
 ## File Structure
 
 ```
@@ -103,6 +126,7 @@ src/
 │   ├── page.tsx              # Main dashboard (date picker, timeline, entries)
 │   ├── login/page.tsx        # Login screen
 │   └── api/
+│       ├── account/           # DELETE the account; export/ hands over its data
 │       ├── auth/[...nextauth]/ # NextAuth config
 │       ├── calendar/events/   # Google Calendar fetch (supports date ranges)
 │       ├── categorize/        # AI category classification
@@ -125,6 +149,7 @@ src/
 │   ├── time-utils.ts         # Time formatting, calculations
 │   ├── supabase-server.ts    # Supabase client (server-side; the only one)
 │   ├── auth.ts               # NextAuth options
+│   ├── account-data.ts       # Every table that holds a person's data; export + delete (server)
 │   ├── api.ts                # Client-side fetch wrappers (csrfFetch)
 │   └── rate-limit.ts         # API rate limiting
 └── supabase/

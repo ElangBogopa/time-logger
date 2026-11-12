@@ -3,6 +3,32 @@ import GoogleProvider from 'next-auth/providers/google'
 import { supabase } from './supabase-server'
 import { SupabaseAdapter } from './auth-adapter'
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Has the account this cookie names been deleted?
+ *
+ * Sessions are signed cookies, so deleting an account on one device cannot
+ * reach into another and sign it out: the laptop's cookie is still valid and
+ * still names the id. Left alone it would go on logging under an account
+ * nobody can sign in to again — and so nobody could ever delete what it
+ * wrote. This is asked once an hour, when the Google token is due for
+ * renewal anyway.
+ *
+ * Only a clear answer counts. An id that is not one of ours, or a lookup
+ * that fails, is treated as "still there": signing someone out by mistake
+ * is the worse error.
+ */
+async function accountIsGone(id: unknown): Promise<boolean> {
+  if (typeof id !== 'string' || !UUID.test(id)) return false
+  try {
+    const { data, error } = await supabase.from('users').select('id').eq('id', id).maybeSingle()
+    return !error && !data
+  } catch {
+    return false
+  }
+}
+
 /**
  * Refresh the Google access token using the refresh token
  */
@@ -167,10 +193,24 @@ export const authOptions: NextAuthOptions = {
 
       // Subsequent requests - handle token refresh for Google users
       if (token.authProvider === 'google') {
+        // Once an account is known to be gone, it stays gone for this cookie.
+        if (token.error === 'AccountDeleted') return token
+
         // Return previous token if the access token has not expired yet
         const bufferTime = 5 * 60 * 1000 // 5 minutes
         if (token.accessTokenExpires && Date.now() < token.accessTokenExpires - bufferTime) {
           return token
+        }
+
+        // Due for renewal. If the account was deleted from another device
+        // there is nothing to renew: drop the Google tokens and mark it.
+        if (await accountIsGone(token.id)) {
+          return {
+            ...token,
+            accessToken: undefined,
+            refreshToken: undefined,
+            error: 'AccountDeleted',
+          }
         }
 
         // Access token has expired, try to refresh
@@ -192,6 +232,15 @@ export const authOptions: NextAuthOptions = {
         tokenSub: token.sub,
         authProvider: token.authProvider,
       })
+      // A deleted account has no id to act under. Every route checks for
+      // one, so an empty id is a 401 everywhere; the screen signs out when
+      // it sees the error (DeletedAccountGuard in Providers).
+      if (token.error === 'AccountDeleted') {
+        session.user.id = ''
+        session.error = 'AccountDeleted'
+        return session
+      }
+
       // Send user ID and error state to the client (NO access token)
       session.user.id = token.id as string || token.sub as string
       session.user.preferredName = token.preferredName as string | undefined

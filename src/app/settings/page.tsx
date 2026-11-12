@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { BookOpen, ChevronRight, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, X, ShieldCheck } from 'lucide-react'
+import { BookOpen, ChevronRight, Download, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, Trash2, X, ShieldCheck } from 'lucide-react'
+import { ExportDataSheet, DeleteAccountSheet } from '@/components/AccountSheets'
 // ── Section label ──
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -185,7 +186,8 @@ export default function MorePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [showFeedback, setShowFeedback] = useState(false)
-
+  const [showExport, setShowExport] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -235,6 +237,22 @@ export default function MorePage() {
             label="Connected Accounts"
             description="Google Calendar integration"
             onClick={() => router.push('/settings/connections')}
+          />
+          {/* Your data is yours to take and yours to remove. Both lived
+              behind "ask through Send Feedback" until they were built. */}
+          <RowItem
+            icon={Download}
+            iconColor="text-muted-foreground"
+            label="Export your data"
+            description="A copy of everything, as a file you keep"
+            onClick={() => setShowExport(true)}
+          />
+          <RowItem
+            icon={Trash2}
+            iconColor="text-muted-foreground"
+            label="Delete account"
+            description="Remove your account and everything in it"
+            onClick={() => setShowDelete(true)}
           />
         </div>
 
@@ -301,6 +319,16 @@ export default function MorePage() {
       </div>
 
       <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+      <ExportDataSheet open={showExport} onOpenChange={setShowExport} />
+      <DeleteAccountSheet
+        open={showDelete}
+        onOpenChange={setShowDelete}
+        email={session?.user?.email}
+        onExportFirst={() => {
+          setShowDelete(false)
+          setShowExport(true)
+        }}
+      />
     </div>
   )
 }

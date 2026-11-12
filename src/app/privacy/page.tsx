@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Privacy — Better' }
  */
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy" updated="11 November 2026">
+    <LegalPage title="Privacy" updated="12 November 2026">
       <section>
         <h2>The short version</h2>
         <p>
@@ -90,9 +90,18 @@ export default function PrivacyPage() {
       <section>
         <h2>Leaving</h2>
         <p>
-          You can remove Better&rsquo;s access to your Google account at any time from your Google
-          account&rsquo;s security settings. Self-serve export and deletion are not built yet: to have
-          your account and everything in it removed, ask through <strong>More → Send Feedback</strong>.
+          <strong>More → Export your data</strong> gives you a copy of what Better holds about you:
+          everything as one file, or your log alone as a spreadsheet.
+        </p>
+        <p>
+          <strong>More → Delete account</strong> removes your account and everything in it from
+          Better&rsquo;s database, there and then, and ends Better&rsquo;s access to your Google
+          account. It cannot be undone. Backups kept by the database host may hold a copy for a
+          short time after that, until they expire.
+        </p>
+        <p>
+          You can also remove Better&rsquo;s access to your Google account yourself at any time, from
+          your Google account&rsquo;s security settings.
         </p>
       </section>
 

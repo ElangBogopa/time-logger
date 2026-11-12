@@ -1,6 +1,6 @@
 'use client'
 
-import { SessionProvider } from 'next-auth/react'
+import { SessionProvider, signOut, useSession } from 'next-auth/react'
 import { ThemeProvider } from 'next-themes'
 import { CalendarProvider } from '@/contexts/CalendarContext'
 import { OfflineIndicator } from '@/components/OfflineIndicator'
@@ -9,10 +9,27 @@ import BottomTabBar from '@/components/BottomTabBar'
 import FocusSessionBar from '@/components/FocusSessionBar'
 import { Toaster } from '@/components/ui/sonner'
 import { useTimezoneSync } from '@/hooks/useTimezoneSync'
+import { forgetThisDevice } from '@/lib/account-client'
 import { ReactNode, useEffect } from 'react'
 
 function TimezoneSync() {
   useTimezoneSync()
+  return null
+}
+
+/**
+ * The account was deleted somewhere else. The server has already stopped
+ * answering for it (see `accountIsGone` in lib/auth.ts); this clears what
+ * this device kept and leaves, so the person is not looking at a screen
+ * that fails at everything it tries.
+ */
+function DeletedAccountGuard() {
+  const { data: session } = useSession()
+  const gone = session?.error === 'AccountDeleted'
+  useEffect(() => {
+    if (!gone) return
+    forgetThisDevice().finally(() => signOut({ callbackUrl: '/login' }))
+  }, [gone])
   return null
 }
 
@@ -46,6 +63,7 @@ export default function Providers({ children }: { children: ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
       <SessionProvider>
         <TimezoneSync />
+        <DeletedAccountGuard />
         <CalendarProvider>
           {/* The phone column. Everything lives inside it, including the
               fixed nav, the floating button and the modals — see .app-frame
