@@ -15,8 +15,11 @@ import CommentaryThread from '@/components/CommentaryThread'
 import { commentaryFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
 import { cacheGet, cacheSet, cacheDelete } from '@/lib/client-cache'
 import { markFirstRun } from '@/lib/first-run'
+import { useMyWindows } from '@/hooks/useMyWindows'
+import { windowAlignment } from '@/lib/window-alignment'
+import WindowAlignmentCard from '@/components/WindowAlignmentCard'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
@@ -508,6 +511,17 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
   const [error, setError] = useState<string | null>(null)
   const [commentary, setCommentary] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<Record<MetricKey, number> | null>(null)
+
+  // How much of the day landed in the hours that suit it. A live review
+  // carries its entries; a saved one does not, so the last four weeks of
+  // the log stand in for it.
+  const { windows: myWindows, history: habitHistory } = useMyWindows(status === 'authenticated')
+  const alignment = useMemo(() => {
+    if (!summary) return []
+    const own = summary.entries ?? []
+    const dayEntries = own.length > 0 ? own : habitHistory.filter((entry) => entry.date === summary.date)
+    return windowAlignment(dayEntries, myWindows)
+  }, [summary, habitHistory, myWindows])
   const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
 
   // Generate AI commentary from summary data (with cache)
@@ -910,6 +924,13 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
         <div className="mb-6">
           <TimelineStrip timeline={summary.timeline} />
         </div>
+
+        {/* Whether things landed where they go best */}
+        {alignment.length > 0 && (
+          <div className="mb-6">
+            <WindowAlignmentCard facts={alignment} />
+          </div>
+        )}
 
         {/* What you planned, against what happened */}
         {summary.productivityScore?.hasPlans && (

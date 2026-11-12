@@ -17,7 +17,9 @@ import TimeEntryModal from '@/components/TimeEntryModal'
 import { AGGREGATED_HEX, METRIC_TEXT_HEX } from '@/lib/palette'
 import { dayWindow, isWholeDay } from '@/lib/day-window'
 import { suggestTimes, rankSlots, defaultDuration, type Suggestion, type Busy } from '@/lib/suggest-times'
-import { usualFor, usualWakeMinutes, recurringActivities } from '@/lib/habits'
+import { usualFor, recurringActivities } from '@/lib/habits'
+import { windowsForWake } from '@/lib/ideal-day'
+import { useWakeTime } from '@/hooks/useWakeTime'
 import { useHabitHistory } from '@/hooks/useHabitHistory'
 import { markFirstRun } from '@/lib/first-run'
 import { calcBody, calcFocus, calcSocial, type EntryRow } from '@/lib/metrics-calc'
@@ -363,10 +365,11 @@ function CalendarContent() {
    * The day starts when you do. Half an hour after you usually get up, and
    * never before five; six, as before, until the log has a few mornings in it.
    */
-  const earliestMinutes = useMemo(() => {
-    const wake = usualWakeMinutes(history)
-    return wake === null ? 6 * 60 : Math.max(5 * 60, wake + 30)
-  }, [history])
+  const { wakeMinutes } = useWakeTime(history)
+  const earliestMinutes = wakeMinutes === null ? 6 * 60 : Math.max(5 * 60, wakeMinutes + 30)
+  // The day's windows, moved to when this person wakes: what "peak focus"
+  // and "physical peak" mean for them, not for the reference day.
+  const dayWindows = useMemo(() => windowsForWake(wakeMinutes), [wakeMinutes])
   const searchFrom = Math.max(earliestMinutes, nowMinutes ?? earliestMinutes)
 
   const handleSuggestTimes = async () => {
@@ -403,6 +406,7 @@ function CalendarContent() {
         busy: busyBlocks,
         nowMinutes,
         earliestMinutes,
+        windows: dayWindows,
       })
 
       setSuggestions(result.suggestions)
@@ -452,6 +456,7 @@ function CalendarContent() {
       usualStartMinutes: usual?.startMinutes ?? null,
       taken: takenAround(suggestion.taskId),
       from: searchFrom,
+      windows: dayWindows,
     })
   }
 
@@ -487,6 +492,7 @@ function CalendarContent() {
       taken: busyBlocks,
       from: searchFrom,
       limit: 1,
+      windows: dayWindows,
     })[0]
     if (!slot) return {}
     return { defaultStart: minutesToTime(slot.start), defaultEnd: minutesToTime(slot.start + duration) }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { csrfFetch } from '@/lib/api'
 import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight, Trophy, CalendarClock } from 'lucide-react'
@@ -12,6 +12,10 @@ import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
 import { STATUS_CLASSES } from '@/lib/palette'
 import { METRIC_THRESHOLDS } from '@/lib/metrics-calc'
+import { useMyWindows } from '@/hooks/useMyWindows'
+import { useWeekEntries } from '@/hooks/useWeekEntries'
+import { windowAlignment, alignmentShare } from '@/lib/window-alignment'
+import WindowAlignmentCard from '@/components/WindowAlignmentCard'
 
 // ─── Types matching API route response ────────────────
 
@@ -120,6 +124,13 @@ export default function WeeklyReviewContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))
   const [metrics, setMetrics] = useState<Record<MetricKey, number> | null>(null)
+
+  // The week against the person's own windows. The week's entries are asked
+  // for by themselves: the habit history stops at yesterday and at four
+  // weeks back, and a week is neither.
+  const { windows: myWindows } = useMyWindows(status === 'authenticated')
+  const weekEntries = useWeekEntries(weekStart, status === 'authenticated')
+  const alignment = useMemo(() => windowAlignment(weekEntries, myWindows), [weekEntries, myWindows])
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -321,6 +332,22 @@ export default function WeeklyReviewContent() {
               {h.subtext && <p className="text-xs text-muted-foreground">{h.subtext}</p>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Whether the week's work landed where it goes best */}
+      {alignment.length > 0 && (
+        <div className="mb-5">
+          <WindowAlignmentCard
+            facts={alignment}
+            heading="In your windows this week"
+            lead={(() => {
+              const focus = alignment.find((fact) => fact.key === 'focus')
+              return focus
+                ? `${alignmentShare(focus)}% of your focused work fell inside your focus windows.`
+                : undefined
+            })()}
+          />
         </div>
       )}
 

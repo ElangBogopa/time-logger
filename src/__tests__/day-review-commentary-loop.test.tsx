@@ -34,7 +34,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => stableRouter,
   useSearchParams: () => stableParams,
 }))
-jest.mock('@/lib/api', () => ({ csrfFetch: jest.fn() }))
+jest.mock('@/lib/api', () => ({ csrfFetch: jest.fn(), fetchEntries: jest.fn(async () => []) }))
 jest.mock('@/lib/client-cache', () => ({ cacheGet: jest.fn(() => null), cacheSet: jest.fn() }))
 jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),

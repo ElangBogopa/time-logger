@@ -31,7 +31,11 @@ export function useHabitHistory(enabled = true): HabitEntry[] {
   useEffect(() => {
     if (!enabled || readCache(through)) return
     let cancelled = false
-    fetchEntries({ dateFrom: shiftDateString(through, -(DAYS - 1)), dateTo: through, status: 'confirmed' })
+    // Inside a promise from the first line: the history is a nicety, and
+    // nothing about fetching it — not even a failure to start — should be
+    // able to take down the screen that asked.
+    Promise.resolve()
+      .then(() => fetchEntries({ dateFrom: shiftDateString(through, -(DAYS - 1)), dateTo: through, status: 'confirmed' }))
       .then((rows) => {
         const slim: HabitEntry[] = rows.map((row) => ({
           activity: row.activity,

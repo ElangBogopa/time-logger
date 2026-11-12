@@ -24,7 +24,7 @@
  */
 
 import type { TimeCategory } from './types'
-import { fitAtHour, windowsFor, type IdealWindow } from './ideal-day'
+import { fitAt, windowAt, type DayWindow } from './ideal-day'
 import { minutesToTime } from './time-utils'
 
 export interface Busy {
@@ -119,9 +119,12 @@ export function suggestTimes({
   nowMinutes = null,
   earliestMinutes = EARLIEST,
   latestMinutes = LATEST,
+  windows,
 }: {
   tasks: TaskToPlace[]
   busy: Busy[]
+  /** The day's windows for this person (see windowsForWake). The reference day if omitted. */
+  windows?: DayWindow[]
   /** On today, nothing is proposed in the past. */
   nowMinutes?: number | null
   earliestMinutes?: number
@@ -160,6 +163,7 @@ export function suggestTimes({
       from: Math.max(earliestMinutes, nowMinutes ?? earliestMinutes),
       to: latestMinutes,
       limit: 1,
+      windows,
     })[0]
 
     if (!placement) {
@@ -203,7 +207,9 @@ export function rankSlots({
   from = EARLIEST,
   to = LATEST,
   limit = 4,
+  windows,
 }: {
+  windows?: DayWindow[]
   duration: number
   category: TimeCategory | null
   usualStartMinutes?: number | null
@@ -216,7 +222,7 @@ export function rankSlots({
 
   for (let start = roundUp(from); start + duration <= to; start += SLOT) {
     if (overlaps(start, start + duration, taken)) continue
-    const fit = category ? fitAtHour(category, Math.floor(start / 60)) : 0.5
+    const fit = category ? fitAt(category, start, windows) : 0.5
     const habit =
       usualStartMinutes === null ? 0 : Math.max(0, 1 - Math.abs(start - usualStartMinutes) / HABIT_REACH)
     candidates.push({ start, score: fit + HABIT_WEIGHT * habit })
@@ -232,16 +238,17 @@ export function rankSlots({
     picked.push(candidate)
   }
 
-  return picked.map(({ start, score }) => ({ start, score, ...explain(start, category, usualStartMinutes) }))
+  return picked.map(({ start, score }) => ({ start, score, ...explain(start, category, usualStartMinutes, windows) }))
 }
 
 /** Why this hour, in the words the suggestion will carry. */
 function explain(
   start: number,
   category: TimeCategory | null,
-  usualStartMinutes: number | null
+  usualStartMinutes: number | null,
+  windows?: DayWindow[]
 ): { reason: string; source: string | null; basis: SlotBasis } {
-  const window = category ? windowFor(category, start) : null
+  const window = category ? windowAt(category, start, windows) : null
   const offHabit = usualStartMinutes === null ? null : Math.abs(start - usualStartMinutes)
 
   if (offHabit !== null && offHabit <= HABIT_REACH) {
@@ -260,11 +267,6 @@ function explain(
 
 function lowerFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1)
-}
-
-function windowFor(category: TimeCategory, startMinutes: number): IdealWindow | null {
-  const hour = Math.floor(startMinutes / 60)
-  return windowsFor(category).find((w) => hour >= w.startHour && hour < w.endHour) ?? null
 }
 
 function overlaps(start: number, end: number, taken: Busy[]): boolean {

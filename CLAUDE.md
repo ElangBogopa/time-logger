@@ -152,6 +152,12 @@ time_entries (
 
 ## What the app is for
 
+**Who it is for:** people who want their life to have a structure, and who
+care more than most about *when* is the best time to do each thing — the
+right hour for focus, for training, for people. Not exam candidates, not
+teams, not general time-trackers. Decisions about features, copy and
+defaults should be made for that person. See `docs/GO-TO-MARKET.md`.
+
 Google Calendar holds commitments with other people, at times other people
 chose. Everything else — deep work, the gym, the call home — has no owner
 and no time, which is most of why it does not happen. Better fits those
@@ -276,6 +282,23 @@ flag that says an account has been onboarded.
     session (`plan-task-categories`) — it is what colours a proposal and
     lets "If the day goes to plan" score it with the ordinary `calcBody` /
     `calcFocus` / `calcSocial`, never a new formula.
+12. **The windows follow the person**: `IDEAL_DAY` is written in clock time
+    for someone who wakes at 6:30. `windowsForWake` moves the body's
+    windows (focus, the dip, the physical peak, wind-down) to when this
+    person wakes — a time they state (`useWakeTime`, kept on the device) or
+    that the log shows — and leaves the two about other people (midday,
+    evening) on the clock. The shift is capped at two hours earlier and
+    four later: the findings are averages and should not be stretched to a
+    3am riser. Anything that reasons about "the right hour" must take the
+    shifted windows, never `IDEAL_DAY` directly. Today shows them as "Your
+    windows" (`DayWindowsCard`), every one with its reason and source. Both
+    reviews then say how much landed in them (`WindowAlignmentCard`, sums
+    in `lib/window-alignment.ts`): time inside out of time done, for
+    focused work, exercise and time with people. It is a fact and a bar,
+    never a percentage ring or a fourth score — principle 7 — and it says
+    under itself that a person's own log is the better authority. The
+    weekly one asks for its own seven days (`useWeekEntries`); the habit
+    history stops at yesterday.
 
 ## Quick Commands
 

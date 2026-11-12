@@ -315,7 +315,10 @@ export default function GuidePage() {
         {/* Section 2: When to Do What */}
         <section className="mb-10">
           <h2 className="text-lg font-bold text-foreground mb-1">When to Do What</h2>
-          <p className="text-xs text-muted-foreground mb-5">Aligned with your circadian rhythm and energy cycles</p>
+          <p className="text-xs text-muted-foreground mb-5">
+            The times below are for someone who wakes around 6:30 AM. Yours, moved to when you wake, are
+            under Your windows on Today.
+          </p>
 
           <div className="space-y-6">
             <ScheduleSection title="Morning" icon={Sun} iconColor="text-[#CBB894]" blocks={MORNING_BLOCKS} />

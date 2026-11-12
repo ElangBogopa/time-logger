@@ -17,6 +17,8 @@ import GreetingHeader from '@/components/dashboard/GreetingHeader'
 import YourPlan from '@/components/YourPlan'
 import NextUp from '@/components/NextUp'
 import FirstRunCard from '@/components/FirstRunCard'
+import DayWindowsCard from '@/components/DayWindowsCard'
+import { useHabitHistory } from '@/hooks/useHabitHistory'
 import { Sun, Cloud, Moon, Check, ChevronRight, ClipboardList, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MetricKey } from '@/lib/chart-colors'
@@ -57,6 +59,8 @@ function HomeContent() {
   // Custom hooks
   const { showOnboarding, setShowOnboarding, currentHour } = useDashboardState({ session, status })
   const [planRefreshKey, setPlanRefreshKey] = useState(0)
+  // The last four weeks of the log: where "when you usually wake" comes from.
+  const habitHistory = useHabitHistory(status === 'authenticated')
   const { greeting, quotes, currentPeriod } = useGreeting(session?.user?.preferredName, currentHour)
   const { entries, completions, isLoading, fetchData } = useSessionData({ userId, today: selectedDate, currentHour: isToday ? currentHour : 23 })
   // Bumped when something is logged from Next up, so the rings move at once.
@@ -183,6 +187,10 @@ function HomeContent() {
             date={selectedDate}
             refreshKey={ringsKey}
           />
+
+          {/* What this hour is best for. The front door for someone who cares
+              about the right time for each thing. */}
+          {isToday && <DayWindowsCard history={habitHistory} />}
 
           {/* For someone on their first day: the loop, as three things to do. */}
           {isToday && <FirstRunCard key={`first-run-${planRefreshKey}`} hasLoggedToday={entries.length > 0} />}
