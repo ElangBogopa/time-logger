@@ -1,5 +1,5 @@
 ---
-description: Build exactly what a saved plan says, on dev, and check it.
+description: Build exactly what a saved plan says, on dev, check it, and commit it there.
 argument-hint: <plan file, e.g. docs/plans/short-name.md>
 ---
 
@@ -14,6 +14,20 @@ Build the plan in $ARGUMENTS.
 3. Do the steps in order. Stay inside the plan: if it is wrong or something
    is missing, stop and say what, instead of improvising.
 4. Run every check under "Done when". Fix what fails.
-5. Do not commit or push unless the owner asks.
-6. Reply with: what changed, the result of each check, anything that was
-   not done or not verified, and anything you noticed outside the plan.
+5. When every check passes, commit to `dev` without being asked. The
+   owner has said so in advance: a build that passes is always committed,
+   because that is what gets reviewed.
+   - Commit only on `dev`. Check the branch again right before committing.
+   - Stage the files this build changed, by name. Never `git add -A`, and
+     never anything the plan did not call for.
+   - Write the message the way the project's history does: what changed
+     and why, then what was and was not checked.
+   - If a check still fails after you have tried to fix it, do not commit.
+     Leave the work in place and say what fails.
+6. Do not push, and do not ask whether to. Pushing happens when the owner
+   says "push".
+7. Reply with: what changed, the commit (its short id) or why there is
+   none, the result of each check, anything that was not done or not
+   verified, and anything you noticed outside the plan. End with the next
+   step: "Start a new session, switch to <the plan's review model>, and run
+   `/review`."

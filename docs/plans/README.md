@@ -8,7 +8,8 @@ only when it matters.
 
 1. **Plan** — strongest model, new session, **Auto mode**: `/plan <what you want>`.
    It saves a brief here and stops.
-2. **Build** — Sonnet, new session, Auto mode: `/build docs/plans/<name>.md`
+2. **Build** — Sonnet, new session, Auto mode: `/build docs/plans/<name>.md`.
+   It commits to `dev` when its checks pass, and does not push.
 3. **Review** — strongest model, new session, before a merge: `/review`.
    It covers committed and uncommitted work on `dev`, and sorts what it
    finds into must fix, should fix and optional. Only must-fix findings

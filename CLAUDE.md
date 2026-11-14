@@ -9,7 +9,10 @@ This comes before everything else in this file.
 - **`dev` is where every change goes.** Check which branch you are on
   before editing (`git branch --show-current`). If it is `main`, switch to
   `dev` first (`git switch dev`). Commit to `dev` and push to `origin dev`,
-  and only when asked to commit or push at all.
+  and only when asked to commit or push at all. One standing exception,
+  given by the owner: `/build` commits to `dev` by itself once its checks
+  pass, because a build is only reviewed once committed. It still does not
+  push.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
   a one-line fix, not for a docs change, not because the tests pass, and
   not because an earlier message approved an earlier merge.
