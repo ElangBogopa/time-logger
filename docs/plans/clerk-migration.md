@@ -1,7 +1,7 @@
 # Move sign-in to Clerk, and fix onboarding on the way
 
 > **PARKED - do not build.** Nothing in this plan's Steps is to be run,
-> and `/build` must not be pointed at this file, unless the owner names
+> and `/do-build` must not be pointed at this file, unless the owner names
 > this plan and asks for it in that conversation.
 
 Status: **Parked on 2026-11-14.** Phase A is done and committed

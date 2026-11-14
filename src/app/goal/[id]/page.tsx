@@ -373,7 +373,7 @@ export default function GoalPage() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Tasks</p>
                     <p className="text-xs text-muted-foreground">Things you want to accomplish — on your terms.</p>
-                    <p className="text-xs text-muted-foreground italic mt-0.5">"Study 2 hours", "Code a feature", "Hit the gym"</p>
+                    <p className="text-xs text-muted-foreground italic mt-0.5">&quot;Study 2 hours&quot;, &quot;Code a feature&quot;, &quot;Hit the gym&quot;</p>
                   </div>
                 </div>
 
@@ -382,14 +382,14 @@ export default function GoalPage() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Calendar</p>
                     <p className="text-xs text-muted-foreground">Things with a set time — the world expects you there.</p>
-                    <p className="text-xs text-muted-foreground italic mt-0.5">"Class at 9am", "Meeting at 2pm", "Doctor at 4pm"</p>
+                    <p className="text-xs text-muted-foreground italic mt-0.5">&quot;Class at 9am&quot;, &quot;Meeting at 2pm&quot;, &quot;Doctor at 4pm&quot;</p>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-lg bg-background/60 px-3 py-2">
                 <p className="text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Rule of thumb:</span> If someone else is expecting you at a specific time → calendar. If it's your call when to do it → task.
+                  <span className="font-medium text-foreground">Rule of thumb:</span> If someone else is expecting you at a specific time → calendar. If it&apos;s your call when to do it → task.
                 </p>
               </div>
             </div>

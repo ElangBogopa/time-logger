@@ -3,12 +3,19 @@
  */
 
 // Mock dependencies BEFORE importing the route
+interface MockInit {
+  method?: string
+  status?: number
+  headers?: Record<string, string>
+  body?: unknown
+}
+
 jest.mock('next/server', () => ({
   NextRequest: class MockNextRequest {
     _url: URL
-    _options: any
+    _options: MockInit
     
-    constructor(url: string, options: any = {}) {
+    constructor(url: string, options: MockInit = {}) {
       this._url = new URL(url)
       this._options = options
     }
@@ -29,7 +36,7 @@ jest.mock('next/server', () => ({
       }
     }
     
-    async json(): Promise<any> {
+    async json(): Promise<unknown> {
       if (!this._options.body) return {}
       return typeof this._options.body === 'string' 
         ? JSON.parse(this._options.body) 
@@ -37,11 +44,11 @@ jest.mock('next/server', () => ({
     }
   },
   NextResponse: class MockNextResponse {
-    body: any
+    body: unknown
     status: number
     headers: Map<string, string>
     
-    constructor(body: any, options: any = {}) {
+    constructor(body: unknown, options: MockInit = {}) {
       this.body = body
       this.status = options.status || 200
       this.headers = new Map()
@@ -53,11 +60,11 @@ jest.mock('next/server', () => ({
       }
     }
     
-    async json(): Promise<any> {
+    async json(): Promise<unknown> {
       return typeof this.body === 'string' ? JSON.parse(this.body) : this.body
     }
     
-    static json(data: any, init: any = {}) {
+    static json(data: unknown, init: MockInit = {}) {
       return new this(JSON.stringify(data), {
         ...init,
         headers: {
@@ -93,7 +100,7 @@ import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 
 const mockGetServerSession = getAppSession as jest.MockedFunction<typeof getAppSession>
-const mockSupabase = supabase as any
+const mockSupabase = supabase as unknown as { from: jest.Mock }
 
 describe('/api/entries', () => {
   beforeEach(() => {
@@ -124,7 +131,7 @@ describe('/api/entries', () => {
     })
 
     it('returns 401 when session has no user ID', async () => {
-      mockGetServerSession.mockResolvedValue({ user: {} } as any)
+      mockGetServerSession.mockResolvedValue({ user: {} } as never)
       
       const req = new NextRequest('http://localhost:3000/api/entries', { method: 'GET' })
       const res = await GET(req)
@@ -140,7 +147,7 @@ describe('/api/entries', () => {
         { id: '2', user_id: 'user-123', activity: 'Exercise', duration_minutes: 60 },
       ]
       
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       const mockQuery = {
         select: jest.fn().mockReturnThis(),
@@ -161,7 +168,7 @@ describe('/api/entries', () => {
     })
 
     it('filters by date when date param provided', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       const mockQuery = {
         select: jest.fn().mockReturnThis(),
@@ -181,7 +188,7 @@ describe('/api/entries', () => {
     })
 
     it('handles supabase errors gracefully', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       const mockQuery = {
         select: jest.fn().mockReturnThis(),
@@ -219,7 +226,7 @@ describe('/api/entries', () => {
     })
 
     it('returns 400 when missing required fields', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       // Missing activity
       const req = new NextRequest('http://localhost:3000/api/entries', {
@@ -237,7 +244,7 @@ describe('/api/entries', () => {
     })
 
     it('returns 400 when missing date', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       const req = new NextRequest('http://localhost:3000/api/entries', {
         method: 'POST',
@@ -254,7 +261,7 @@ describe('/api/entries', () => {
     })
 
     it('returns 400 when missing duration_minutes', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       const req = new NextRequest('http://localhost:3000/api/entries', {
         method: 'POST',
@@ -280,7 +287,7 @@ describe('/api/entries', () => {
         status: 'confirmed',
       }
       
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       const mockQuery = {
         insert: jest.fn().mockReturnThis(),
@@ -320,7 +327,7 @@ describe('/api/entries', () => {
     })
 
     it('scopes entry to authenticated user ID', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-456' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-456' } })
       
       const mockQuery = {
         insert: jest.fn().mockReturnThis(),
@@ -354,7 +361,7 @@ describe('/api/entries', () => {
     })
 
     it('handles supabase errors gracefully', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } } as any)
+      mockGetServerSession.mockResolvedValue({ user: { id: 'user-123' } })
       
       const mockQuery = {
         insert: jest.fn().mockReturnThis(),

@@ -305,6 +305,11 @@ export function useGhostEvents({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
+    // A ref does not re-render, so this effect only notices a ghost
+    // interaction if something else happens to render while one is under
+    // way; Escape may therefore do nothing. Left as it was: fixing it means
+    // moving the interaction into state, which changes the drag code.
+    // eslint-disable-next-line react-hooks/refs, react-hooks/exhaustive-deps
   }, [ghostInteractionRef.current !== null, cancelGhostInteraction])
 
   return {

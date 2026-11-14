@@ -151,6 +151,18 @@ For display, these roll up into six `AggregatedCategory` buckets —
   any schedule. It is out of step with how the app talks and is left
   unscheduled rather than rewritten.
 
+### Who is signed in
+- A route asks `getAppSession()` (`lib/session.ts`); a screen asks
+  `useAccount()` and signs out or reconnects through `signOutTo()` and
+  `reconnectGoogle()` (`hooks/useAccount.ts`); a Google token for the
+  calendar or tasks comes from `getGoogleAccessToken()`
+  (`lib/google-token.ts`). All three wrap NextAuth.
+- **Nothing else imports `next-auth`.** The sign-in itself does (`lib/auth.ts`,
+  `lib/auth-adapter.ts`, the `[...nextauth]` route, the login page and
+  `Providers.tsx`), and `session-discipline.test.ts` fails if any other
+  file does. That is what lets the provider change without touching every
+  route and screen again.
+
 ### A new table is also something to export and to delete
 - `lib/account-data.ts` lists every table that holds something about a
   person (`ACCOUNT_TABLES`). **More → Export your data** reads the list and
@@ -201,12 +213,15 @@ src/
 ├── contexts/
 │   └── CalendarContext.tsx   # Calendar event caching
 ├── hooks/                    # Data fetching + timeline interaction hooks
+│   └── useAccount.ts         # useAccount(), signOutTo(), reconnectGoogle(): who is signed in, for every screen
 ├── lib/
 │   ├── types.ts              # TimeEntry, TimeCategory, date + domain helpers
 │   ├── palette.ts            # Every data colour, defined once
 │   ├── time-utils.ts         # Time formatting, calculations
 │   ├── supabase-server.ts    # Supabase client (server-side; the only one)
 │   ├── auth.ts               # NextAuth options
+│   ├── session.ts            # getAppSession(): who is asking, for every API route
+│   ├── google-token.ts       # The Google access token for calendar + tasks, from either source
 │   ├── account-data.ts       # Every table that holds a person's data; export + delete (server)
 │   ├── api.ts                # Client-side fetch wrappers (csrfFetch)
 │   └── rate-limit.ts         # API rate limiting
