@@ -27,6 +27,14 @@ This comes before everything else in this file.
   commit**: rename `docs/reviews/open.md` to
   `docs/reviews/merged-YYYY-MM-DD.md`. `docs/reviews/README.md` says what
   the log is for.
+- **And bring `docs/BUSINESS-CONTEXT.md` up to date in that same merge.**
+  It tells the non-coding conversations (naming, branding, pricing,
+  launch) what people using the app have today. Change the date and the
+  release id; rewrite "What a person can do in the app today" and "Where
+  it stands" for what this merge released; leave the decisions and the
+  voice alone unless the owner changed them. Plain language, no file
+  names, nothing private. If the merge changed nothing a user or a
+  customer would notice, change only the date and the release id.
 - A push to `dev` gets a Vercel preview deployment, which is where a
   change is tried on a phone before it reaches `main`.
 
