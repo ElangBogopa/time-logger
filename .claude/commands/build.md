@@ -7,7 +7,10 @@ Build the plan in $ARGUMENTS.
 
 1. Run `git branch --show-current`. If it is not `dev`, run `git switch dev`.
    Never commit to or push `main`.
-2. Read CLAUDE.md and the plan. Read only the files the plan names.
+2. Read CLAUDE.md and the plan. Read only the files the plan names. If the
+   plan recommends a model for the build and you are a different one, say
+   so in one line before starting, so the owner can switch; then carry on
+   unless told to stop.
 3. Do the steps in order. Stay inside the plan: if it is wrong or something
    is missing, stop and say what, instead of improvising.
 4. Run every check under "Done when". Fix what fails.

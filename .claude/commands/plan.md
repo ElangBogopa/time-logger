@@ -32,9 +32,27 @@ in a separate session, on a cheaper model. So:
      `npx tsc --noEmit`, `npm test`, `npm run lint` staying at its current
      count, `npm run build`), and what to look at in the app.
    - **Not decided**: anything left open, or "nothing".
-4. Reply with the file's path, a five-line summary, and the exact next
-   step: "Start a new session, switch to Sonnet, and run
-   `/build docs/plans/<short-name>.md`." Then stop.
+   - **Who should build and review this**: a recommendation, with one line
+     of reason each.
+     - *Build with* **Sonnet** by default. Say **Opus** only when the work
+       needs judgment the brief cannot pin down — a design with several
+       reasonable shapes, a tangled bug, a change spread across code you
+       could not fully specify. Say **Haiku** only for mechanical edits
+       with no decisions in them.
+     - *Review with* **Opus** by default. Say **Fable** when a mistake
+       would be costly or hard to see: sign-in, deleting or exporting data,
+       payments, reminders, anything touching the database's shape. Say
+       "no review needed" for a change a person can fully judge by looking
+       at the screen.
+     - *Effort*: medium unless there is a reason, which you state.
+     Recommend the cheapest that will do the job well. A precise brief is
+     what lets the cheaper model succeed, so if you are recommending a
+     costlier builder, first ask whether the brief could be made specific
+     enough not to need one.
+4. Reply with the file's path, a five-line summary, the model you
+   recommend for the build and for the review with the reason for each,
+   and the exact next step: "Start a new session, switch to <model>, and
+   run `/build docs/plans/<short-name>.md`." Then stop.
 
 The brief will be built by a cheaper model with none of this conversation,
 so it must stand on its own: name files and functions, not "the component
