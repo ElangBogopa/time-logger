@@ -1,0 +1,57 @@
+# Sends the hour's reminders.
+#
+# The app decides who is due (src/app/api/cron/reminders); this only rings
+# the bell once an hour. It lives here because Vercel's free plan runs a
+# scheduled job once a day at most, and a reminder that can only go out at
+# one hour of the day reaches almost nobody.
+#
+# It needs two things in the repository's settings (Settings → Secrets and
+# variables → Actions):
+#   secret    CRON_SECRET  the same value as CRON_SECRET in Vercel
+#   variable  APP_URL      the app's address, e.g. https://example.com
+#
+# This repository is public, so this log is too. Only the status code is
+# printed, never the response.
+
+name: Reminders
+
+on:
+  schedule:
+    # Five past, not on the hour: GitHub's scheduler is busiest at :00 and
+    # runs late there. A late run still lands in the right hour.
+    - cron: '5 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ask the app to send this hour's reminders
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          # Not set up yet is a warning, not a failure: a red run every hour
+          # is an email every hour. A set-up job that the app refuses is a
+          # failure, below.
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::warning::Reminders are not being sent: set the APP_URL variable and the CRON_SECRET secret."
+            exit 0
+          fi
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${APP_URL%/}/api/cron/reminders")
+          echo "The app answered $status"
+          case "$status" in
+            200) ;;
+            401) echo "::error::The app refused the secret. CRON_SECRET here and in Vercel must match."; exit 1 ;;
+            503) echo "::error::The app has no notification keys. Set the VAPID keys in Vercel."; exit 1 ;;
+            *)   echo "::error::The reminders job failed with $status."; exit 1 ;;
+          esac

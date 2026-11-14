@@ -9,8 +9,9 @@ self.addEventListener('push', (event) => {
 
     const options = {
       body: data.body,
-      icon: data.icon || '/icon-192.png',
-      badge: data.badge || '/icon-192.png',
+      // These pointed at /icon-192.png, which has never existed.
+      icon: data.icon || '/icons/icon-192x192.png',
+      badge: data.badge || '/icons/icon-192x192.png',
       tag: data.tag || 'default',
       data: {
         url: data.url || '/',

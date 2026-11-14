@@ -95,6 +95,36 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - 30-minute cache duration
 - Don't fetch calendar for each date change
 
+### Reminders
+- Three a day — log your morning at 12, your afternoon at 6, your evening
+  at 9, in the person's own timezone — each skipped when that part of the
+  day is already logged. The rules are in `lib/reminders.ts`; the job is
+  `/api/cron/reminders`.
+- **It must be called every hour.** It matches people by their local hour,
+  so a daily schedule reaches nobody. Vercel's free plan only runs daily
+  jobs, which is why the caller is `.github/workflows/reminders.yml` and
+  there is no `vercel.json`. It needs the `CRON_SECRET` secret and the
+  `APP_URL` variable set in the GitHub repository. A second schedule
+  calling the same job would send that hour twice.
+- **Who gets them is the push subscription, nothing else.** Turning
+  reminders on subscribes the device; turning them off removes the row.
+  `reminder_enabled` still exists in `user_preferences` and is read by
+  nothing that runs: the job used to require it, nothing ever set it, and
+  for most of a year the reminders had nobody to go to.
+- Dates and hours come from `localClock(now, timezone)`, never the server's
+  clock — at nine in the evening in Toronto it is tomorrow in UTC.
+- The job answers with counts and never with who. The repository is
+  public, so the workflow's log is too; the workflow prints only the
+  status code.
+- On an iPhone a browser tab cannot receive notifications at all; the Home
+  Screen app can. The Reminders screen says so and opens the install sheet.
+- **More → Reminders → Send a test** (`/api/push/test`) sends one
+  notification through the same keys and service worker as a real one. Use
+  it before believing reminders work.
+- `/api/cron/engagement` (streak and "we miss you" nudges) is no longer on
+  any schedule. It is out of step with how the app talks and is left
+  unscheduled rather than rewritten.
+
 ### A new table is also something to export and to delete
 - `lib/account-data.ts` lists every table that holds something about a
   person (`ACCOUNT_TABLES`). **More → Export your data** reads the list and
@@ -130,6 +160,8 @@ src/
 │       ├── auth/[...nextauth]/ # NextAuth config
 │       ├── calendar/events/   # Google Calendar fetch (supports date ranges)
 │       ├── categorize/        # AI category classification
+│       ├── cron/reminders/    # The hour's reminders; called hourly by a GitHub workflow
+│       ├── push/              # subscribe/ a device to reminders; test/ sends one now
 │       └── commentary/        # AI witty remarks
 ├── components/
 │   ├── TimelineView.tsx      # 24hr timeline with drag-to-create
@@ -206,6 +238,16 @@ made (`/calendar?date=…&suggest=1`). After that Today shows a three-step
 the loop has been walked once. `productivity_target` in preferences is no
 longer a setting: nothing reads the number, and it survives only as the
 flag that says an account has been onboarded.
+
+The app is a web app, and on an iPhone nothing offers to install one: the
+person has to know to open Share and choose Add to Home Screen. So it says
+so (`components/InstallHint.tsx`, state in `lib/install.ts`): a line under
+the sign-in button, a row on Today that can be put away, and a row under
+More that stays. The login page asks *first* on purpose — an iPhone's Home
+Screen app keeps its own storage, so the sign-in may not come across and
+anything kept on the device (the wake time, the getting-started list) does
+not. Nothing is shown on a desktop or once the app is running standalone.
+Android gets the browser's own install prompt where it has offered one.
 
 ## Design Principles
 

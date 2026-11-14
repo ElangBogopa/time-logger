@@ -5,8 +5,11 @@ import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { BookOpen, ChevronRight, Download, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, Trash2, X, ShieldCheck } from 'lucide-react'
+import { Bell, BookOpen, ChevronRight, Download, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, Smartphone, Trash2, X, ShieldCheck } from 'lucide-react'
 import { ExportDataSheet, DeleteAccountSheet } from '@/components/AccountSheets'
+import { InstallSheet } from '@/components/InstallHint'
+import { useInstall } from '@/hooks/useInstall'
+import { canOfferInstall } from '@/lib/install'
 // ── Section label ──
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -188,6 +191,8 @@ export default function MorePage() {
   const [showFeedback, setShowFeedback] = useState(false)
   const [showExport, setShowExport] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showInstall, setShowInstall] = useState(false)
+  const install = useInstall()
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -238,6 +243,15 @@ export default function MorePage() {
             description="Google Calendar integration"
             onClick={() => router.push('/settings/connections')}
           />
+          {/* Back after most of a year commented out, "until cron infra is
+              ready". It is ready: see .github/workflows/reminders.yml. */}
+          <RowItem
+            icon={Bell}
+            iconColor="text-muted-foreground"
+            label="Reminders"
+            description="A nudge to log each part of your day"
+            onClick={() => router.push('/settings/notifications')}
+          />
           {/* Your data is yours to take and yours to remove. Both lived
               behind "ask through Send Feedback" until they were built. */}
           <RowItem
@@ -256,22 +270,20 @@ export default function MorePage() {
           />
         </div>
 
-        {/* Notifications — commented out until cron infrastructure is ready
-        <SectionLabel>Notifications</SectionLabel>
-        <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
-          <RowItem
-            icon={Bell}
-            iconColor="text-muted-foreground"
-            label="Push Notifications"
-            description="Manage reminders and alerts"
-            onClick={() => router.push('/settings/notifications')}
-          />
-        </div>
-        */}
-
         {/* About */}
         <SectionLabel>About</SectionLabel>
         <div className="rounded-xl border border-border bg-card mx-4 overflow-hidden divide-y divide-border">
+          {/* Here for good, for whoever put the hint on Today away. Gone
+              once the app is running from the Home Screen. */}
+          {canOfferInstall(install) && (
+            <RowItem
+              icon={Smartphone}
+              iconColor="text-muted-foreground"
+              label="Add to Home Screen"
+              description="Open Better like any other app"
+              onClick={() => setShowInstall(true)}
+            />
+          )}
           <RowItem
             icon={Lightbulb}
             iconColor="text-muted-foreground"
@@ -319,6 +331,7 @@ export default function MorePage() {
       </div>
 
       <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+      <InstallSheet open={showInstall} onOpenChange={setShowInstall} />
       <ExportDataSheet open={showExport} onOpenChange={setShowExport} />
       <DeleteAccountSheet
         open={showDelete}

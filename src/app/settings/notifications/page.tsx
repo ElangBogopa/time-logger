@@ -1,79 +1,110 @@
 'use client'
 
-import { csrfFetch } from '@/lib/api'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { csrfFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Bell, BellOff, Clock, Loader2 } from 'lucide-react'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { useInstall } from '@/hooks/useInstall'
+import { InstallSheet } from '@/components/InstallHint'
 import { ReminderTime, DEFAULT_REMINDER_TIMES } from '@/lib/types'
+import { formatHour, reminderHour, reminderLabel } from '@/lib/reminders'
 
+const CACHE_KEY = 'reminder-times'
+const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
+
+function cachedTimes(): ReminderTime[] | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return JSON.parse(sessionStorage.getItem(CACHE_KEY) || '').times ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Reminders: three a day, each asking for the part of the day just gone.
+ *
+ * This screen was unreachable for most of a year — its row under More was
+ * commented out — and turning reminders on here never enrolled anybody.
+ * The switch is now the subscription itself, there is a way to send a test,
+ * and where a device cannot receive notifications the screen says why
+ * instead of "not supported".
+ */
 export default function NotificationsPage() {
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const router = useRouter()
   const push = usePushNotifications()
+  const install = useInstall()
 
-  const [isLoadingPrefs, setIsLoadingPrefs] = useState(true)
+  const [reminderTimes, setReminderTimes] = useState<ReminderTime[]>(() => cachedTimes() ?? DEFAULT_REMINDER_TIMES)
   const [isSaving, setIsSaving] = useState(false)
-  const [reminderTimes, setReminderTimes] = useState<ReminderTime[]>(DEFAULT_REMINDER_TIMES)
-
-  useEffect(() => {
-    if (session?.user?.id) fetchPreferences()
-  }, [session?.user?.id])
-
-  const fetchPreferences = async () => {
-    try {
-      const response = await fetch('/api/preferences')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.preferences?.reminder_times) {
-          setReminderTimes(data.preferences.reminder_times)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch preferences:', error)
-    } finally {
-      setIsLoadingPrefs(false)
-    }
-  }
-
-  const saveReminderTimes = async (newTimes: ReminderTime[]) => {
-    setIsSaving(true)
-    try {
-      await csrfFetch('/api/preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reminder_times: newTimes }),
-      })
-      setReminderTimes(newTimes)
-    } catch (error) {
-      console.error('Failed to save preferences:', error)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const toggleReminder = (id: string) => {
-    const newTimes = reminderTimes.map(rt =>
-      rt.id === id ? { ...rt, enabled: !rt.enabled } : rt
-    )
-    saveReminderTimes(newTimes)
-  }
-
-  const updateReminderTime = (id: string, time: string) => {
-    const newTimes = reminderTimes.map(rt =>
-      rt.id === id ? { ...rt, time } : rt
-    )
-    saveReminderTimes(newTimes)
-  }
+  const [isTesting, setIsTesting] = useState(false)
+  const [showInstall, setShowInstall] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
-  if (status === 'loading' || isLoadingPrefs) {
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    let cancelled = false
+    fetch('/api/preferences')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        const times: ReminderTime[] | undefined = data?.preferences?.reminder_times
+        if (cancelled || !times) return
+        setReminderTimes(times)
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ times }))
+        } catch {
+          /* storage is a convenience */
+        }
+      })
+      .catch((error) => console.error('Failed to fetch preferences:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [status])
+
+  const save = async (next: ReminderTime[]) => {
+    const previous = reminderTimes
+    setReminderTimes(next)
+    setIsSaving(true)
+    try {
+      const response = await csrfFetch('/api/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminder_times: next }),
+      })
+      if (!response.ok) throw new Error('save failed')
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ times: next }))
+      } catch {
+        /* storage is a convenience */
+      }
+    } catch {
+      // Put the screen back to what the server still has.
+      setReminderTimes(previous)
+      toast.error('That change could not be saved')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const sendTest = async () => {
+    setIsTesting(true)
+    const problem = await push.sendTest()
+    setIsTesting(false)
+    if (problem) toast.error(problem)
+    else toast.success('Sent. It should arrive in a moment.')
+  }
+
+  if (status !== 'authenticated') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -81,99 +112,133 @@ export default function NotificationsPage() {
     )
   }
 
+  // An iPhone in a browser tab has no way to receive a notification at all;
+  // from the Home Screen it does. "Not supported" was true and no help.
+  const needsHomeScreen = !push.isSupported && install.platform === 'ios' && !install.standalone
+
+  const state = !push.isSupported
+    ? needsHomeScreen
+      ? 'On an iPhone, reminders work once Better is on your Home Screen.'
+      : 'This browser cannot receive notifications.'
+    : push.permission === 'denied'
+      ? 'Notifications are blocked for Better. Allow them in your device’s settings, then come back.'
+      : push.isSubscribed
+        ? 'On for this device.'
+        : 'Off. Turn them on for a nudge to log each part of your day.'
+
+  const canSwitch = push.isSupported && push.permission !== 'denied'
+  const locked = !push.isSubscribed
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="mx-auto max-w-2xl px-4 py-6">
         <header className="mb-6">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+            className="mb-4 flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <h1 className="page-title text-foreground">Notifications</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage push notifications and reminders</p>
+          <h1 className="page-title text-foreground">Reminders</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Three a day, each asking for the part of the day that has just gone.
+          </p>
         </header>
 
-        <div className="space-y-4">
-          {/* Push Toggle */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                  push.isSubscribed ? 'bg-secondary' : 'bg-muted'
-                }`}>
-                  {push.isSubscribed ? (
-                    <Bell className="h-5 w-5 text-muted-foreground" />
-                  ) : (
-                    <BellOff className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">Push Notifications</p>
-                  <p className="text-xs text-muted-foreground">
-                    {!push.isSupported
-                      ? 'Not supported in this browser'
-                      : push.permission === 'denied'
-                        ? 'Blocked — enable in browser settings'
-                        : push.isSubscribed
-                          ? 'Enabled'
-                          : 'Get reminders to log your time'}
-                  </p>
-                </div>
-              </div>
-              {push.isSupported && push.permission !== 'denied' && (
-                <Button
-                  variant={push.isSubscribed ? 'outline' : 'default'}
-                  size="sm"
-                  onClick={async () => {
-                    if (push.isSubscribed) await push.unsubscribe()
-                    else await push.subscribe()
-                  }}
-                  disabled={push.isLoading}
-                >
-                  {push.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : push.isSubscribed ? 'Disable' : 'Enable'}
-                </Button>
-              )}
+        <section className="rounded-xl border border-border bg-card p-4" aria-label="Reminders on this device">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Reminders</p>
+              <p className="mt-0.5 text-sm text-muted-foreground" role="status">
+                {state}
+              </p>
             </div>
+            {canSwitch && (
+              <Button
+                variant={push.isSubscribed ? 'outline' : 'default'}
+                size="sm"
+                className="shrink-0"
+                disabled={push.isLoading}
+                onClick={() => (push.isSubscribed ? push.unsubscribe() : push.subscribe())}
+              >
+                {push.isLoading && <Loader2 className="animate-spin" />}
+                {push.isSubscribed ? 'Turn off' : 'Turn on'}
+              </Button>
+            )}
+            {needsHomeScreen && (
+              <Button size="sm" className="shrink-0" onClick={() => setShowInstall(true)}>
+                Show me how
+              </Button>
+            )}
           </div>
 
-          {/* Reminder Times */}
-          <div className={`rounded-xl border border-border bg-card p-4 ${!push.isSubscribed ? 'opacity-50 pointer-events-none' : ''}`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">Reminder Times</p>
-                <p className="text-xs text-muted-foreground">When to remind you to log</p>
-              </div>
+          {push.error && (
+            <p className="mt-3 text-sm text-destructive" role="alert">
+              {push.error}
+            </p>
+          )}
+
+          {push.isSubscribed && (
+            <div className="mt-4 border-t border-border pt-3">
+              <Button variant="outline" size="sm" disabled={isTesting} onClick={sendTest}>
+                {isTesting && <Loader2 className="animate-spin" />}
+                Send a test
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Sends one notification to your devices now, so you can see it arrive.
+              </p>
             </div>
-            <div className="space-y-3">
-              {reminderTimes.map((reminder) => (
-                <div key={reminder.id} className="flex items-center justify-between py-1">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={push.isSubscribed && reminder.enabled}
-                      onCheckedChange={() => toggleReminder(reminder.id)}
-                      disabled={!push.isSubscribed || isSaving}
-                    />
-                    <p className="text-sm font-medium">{reminder.label}</p>
-                  </div>
-                  <input
-                    type="time"
-                    value={reminder.time}
-                    onChange={(e) => updateReminderTime(reminder.id, e.target.value)}
-                    disabled={!push.isSubscribed || !reminder.enabled || isSaving}
-                    className="rounded-md border border-input bg-background px-2 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+        </section>
+
+        <h2 className="eyebrow mt-6 mb-2">When</h2>
+        <section
+          className={`overflow-hidden rounded-xl border border-border bg-card divide-y divide-border ${locked ? 'opacity-60' : ''}`}
+          aria-label="When"
+        >
+          {reminderTimes.map((reminder) => {
+            const label = reminderLabel(reminder)
+            const hour = reminderHour(reminder.time)
+            return (
+              <div key={reminder.id} className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
+                <label className="flex min-w-0 flex-1 items-center gap-3">
+                  <Switch
+                    checked={!locked && reminder.enabled}
+                    disabled={locked || isSaving}
+                    aria-label={label}
+                    onCheckedChange={(enabled) =>
+                      save(reminderTimes.map((rt) => (rt.id === reminder.id ? { ...rt, enabled } : rt)))
+                    }
                   />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+                  <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                </label>
+                <select
+                  value={hour}
+                  disabled={locked || !reminder.enabled || isSaving}
+                  aria-label={`${label}: time`}
+                  onChange={(event) => {
+                    const time = `${String(event.target.value).padStart(2, '0')}:00`
+                    save(reminderTimes.map((rt) => (rt.id === reminder.id ? { ...rt, time } : rt)))
+                  }}
+                  className="h-11 shrink-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {HOURS.map((option) => (
+                    <option key={option} value={option}>
+                      {formatHour(option)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
+          })}
+        </section>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Sent on the hour, give or take a few minutes, and skipped when you have already logged that part of the day.
+        </p>
       </div>
+
+      <InstallSheet open={showInstall} onOpenChange={setShowInstall} />
     </div>
   )
 }
