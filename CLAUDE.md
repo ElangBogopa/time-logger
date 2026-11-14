@@ -12,7 +12,7 @@ This comes before everything else in this file.
   and only when asked to commit or push at all. One standing exception,
   given by the owner: `/do-build` commits to `dev` by itself once its checks
   pass, because a build is only reviewed once committed. It still does not
-  push.
+  push. `/do-fix` does the same for the fixes it makes.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
   a one-line fix, not for a docs change, not because the tests pass, and
   not because an earlier message approved an earlier merge.
@@ -23,6 +23,10 @@ This comes before everything else in this file.
   the full diff against `main` (`git diff main...dev`), and run
   `npx tsc --noEmit`, `npm test`, `npm run test:tz`, `npm run lint` and
   `npm run build`. Say what was checked and what was not, then wait.
+- **When `dev` is merged into `main`, close the review log in the same
+  commit**: rename `docs/reviews/open.md` to
+  `docs/reviews/merged-YYYY-MM-DD.md`. `docs/reviews/README.md` says what
+  the log is for.
 - A push to `dev` gets a Vercel preview deployment, which is where a
   change is tried on a phone before it reaches `main`.
 

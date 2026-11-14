@@ -13,8 +13,13 @@ only when it matters.
 3. **Review** — strongest model, new session, before a merge: `/do-review`.
    It covers committed and uncommitted work on `dev`, and sorts what it
    finds into must fix, should fix and optional. Only must-fix findings
-   decide "ready to merge"; fix those, and stay in the same session to do
-   it (switch to Sonnet and say "fix the must-fix findings").
+   decide "ready to merge". It keeps a log in `docs/reviews/open.md`, so a
+   later review knows what was found and what was tried.
+4. **Fix** — the model the review names, any session: `/do-fix`. It fixes
+   the must-fix findings (or `/do-fix must and should`), records the
+   attempt in the log, and commits to `dev`. If a problem comes back after
+   a fix, the next review says so and names a stronger model; after two
+   failed attempts it says to stop and re-plan.
 
 Do not use Plan mode for step 1. Its Approve button starts building at
 once, in the same session and on the same expensive model, and no brief
@@ -28,7 +33,7 @@ Once a brief has been built, a line at the top marks it **BUILT - do not
 run again**, with the commit. It stays as the record of what was asked;
 do not point `/do-build` at it.
 
-The commands are named `/do-plan`, `/do-build` and `/do-review` on purpose.
+The commands are named `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
 Claude Code has commands of its own called `/plan` and `/review`; typing
 those runs the built-in ones, which know nothing of this routine — no
 saved brief, no recommended model, no must-fix sorting.
