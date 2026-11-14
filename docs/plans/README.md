@@ -6,6 +6,8 @@ The split is about cost: the strongest model writes a short plan, a cheaper
 model does the typing from it, and the strongest model reads the result
 only when it matters.
 
+0. **Think** (optional) — `/do-think <a rough idea>`. A conversation that
+   ends with a `/do-plan` line to paste in the same session.
 1. **Plan** — strongest model, new session, **Auto mode**: `/do-plan <what you want>`.
    It saves a brief here and stops.
 2. **Build** — Sonnet, new session, Auto mode: `/do-build docs/plans/<name>.md`.
@@ -33,7 +35,7 @@ Once a brief has been built, a line at the top marks it **BUILT - do not
 run again**, with the commit. It stays as the record of what was asked;
 do not point `/do-build` at it.
 
-The commands are named `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
+The commands are named `/do-think`, `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
 Claude Code has commands of its own called `/plan` and `/review`; typing
 those runs the built-in ones, which know nothing of this routine — no
 saved brief, no recommended model, no must-fix sorting.

@@ -1,15 +1,26 @@
 # The flow
 
-Every change follows the same five steps. All in **Auto** mode. Start a
+Every change follows the same five steps, with an optional one before them. All in **Auto** mode. Start a
 **new chat** (the + button) wherever it says so.
 
 | # | Step | Model | Type this | It ends by |
 |---|------|-------|-----------|------------|
+| 0 | Think · optional | Opus (Fable if risky) | `/do-think <a rough idea>` | handing you a `/do-plan` line to paste |
 | 1 | Plan | Opus (Fable if risky) | `/do-plan <what you want>` | saving a brief in `docs/plans/` and naming the models to use |
 | 2 | Build · new chat | the one the plan named, usually Sonnet | `/do-build docs/plans/<name>.md` | committing to `dev` |
 | 3 | Review · new chat | the one the plan named, usually Opus | `/do-review` | a verdict, and a log entry |
 | 4 | Fix · any chat | the one the review named | `/do-fix` | committing to `dev` |
 | 5 | Release | any | `push`, test on your phone, then `merge dev into main` | the live app changing |
+
+## When to think first
+
+Use `/do-think` when the idea is still rough: you know what bothers you
+but not what you want instead. It says your idea back, waits for you to
+confirm, asks one question at a time, and ends with a ready `/do-plan`
+line. It writes nothing. Paste that line **in the same chat**: the
+conversation is exactly what the planner should know.
+
+Skip it when you can already say what you want in a sentence or two.
 
 ## What to do after a review
 
@@ -32,6 +43,7 @@ New chat when the next step does not need to remember the last one.
 
 | From → to | New chat? |
 |---|---|
+| Think → Plan | No |
 | Plan → Build | Yes |
 | Build → Review | Yes |
 | Review → Fix | Either |
