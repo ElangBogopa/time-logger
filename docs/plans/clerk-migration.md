@@ -9,16 +9,24 @@ Status: **Parked on 2026-11-14.** Phase A is done and committed
 owner's decision to work on the app itself; do not build it unless
 the owner asks for it by name. The problems that do not need Clerk
 will be planned and built separately, on NextAuth, each in its own
-brief. They are numbered by the **"Why" list below**, not by the Phase C
-steps, which use the same numbers for different things:
+brief. They are numbered by the **"Why" list below**. (The steps under
+"Steps" are numbered B1–B7 and C1–C5 so the two cannot be confused.)
 
-- Sign-in: 5 (pages protected only in the browser), 6 (auth callbacks
+- Sign-in: 3 (the `users` row is created in two places, and the session
+  id can fall back to the Google account id, so rows can be written under
+  it), 5 (pages protected only in the browser), 6 (auth callbacks
   in `src/lib/auth.ts` and `src/lib/auth-adapter.ts` still log emails
   and user ids; Phase A removed such lines from the API routes only),
   7 (login loses the deep link).
 - Onboarding: 8 (Today flashes before the sheet), 9 ("Nothing yet"
-  while the calendar loads), 11 (no wake time asked), 12 (plans saved
-  one at a time, failures ignored).
+  while the calendar loads), 10 (the name step asks for a name Google
+  already gave; the `signIn` callback already stores it as
+  `preferred_name`), 11 (no wake time asked), 12 (plans saved one at a
+  time, failures ignored).
+
+Items 3 and 10 were left out of this list when the plan was parked, with
+no reason given; neither needs Clerk, and they were added back on
+2026-11-14. Item 3 is a data-integrity bug and should be planned first.
 
 Item 8 needs `user_preferences.onboarded_at`, which the migration under
 "Files (Phases B and C)" creates together with `users.clerk_id`. Built
@@ -115,6 +123,9 @@ Checked: `npx tsc --noEmit` clean; `npm test` 1063 passed / 13 skipped (same
 as before); `npm run test:tz` passes in all 7 zones; `npm run build`
 succeeds; `npm run lint` 47 errors / 143 warnings, identical to before the
 change (all pre-existing). Not checked: running the app, the preview, a phone.
+(Note, 2026-11-14: that count included about 87 warnings from the service
+worker next-pwa writes into `public/`, which is now neither tracked nor
+linted. The same code now lints at 47 errors / 56 warnings.)
 
 ### Phase A — what I am not sure about
 
@@ -277,28 +288,31 @@ never a Clerk or Google id.
 > items are built from their own briefs, not from the steps below.
 
 **Phase B — PARKED - do not build**
-1. Run the non-uuid `user_id` check (owner, in Supabase). Write the migration.
-2. Install `@clerk/nextjs`; read its types for `getUserOauthAccessToken` and
+
+- B1. Run the non-uuid `user_id` check (owner, in Supabase). Write the migration.
+- B2. Install `@clerk/nextjs`; read its types for `getUserOauthAccessToken` and
    `reauthorize`.
-3. Rewrite `session.ts`, `google-token.ts`, `useAccount.ts` on Clerk; add tests
+- B3. Rewrite `session.ts`, `google-token.ts`, `useAccount.ts` on Clerk; add tests
    for `getAppSession` (claim present; claim missing → links by email; creates
    a row; never returns a non-uuid).
-4. `Providers.tsx`, `middleware.ts` (test: `/api/cron/reminders` passes with no
+- B4. `Providers.tsx`, `middleware.ts` (test: `/api/cron/reminders` passes with no
    session; CSRF still enforced), `login/page.tsx`.
-5. Account deletion order and its test (rows → revoke → Clerk delete; Clerk
+- B5. Account deletion order and its test (rows → revoke → Clerk delete; Clerk
    delete not called if rows failed).
-6. Remove NextAuth files, per-page login redirects, `next-auth` dependency.
-7. Import script; Privacy page; `.env.example`; `CLAUDE.md`.
+- B6. Remove NextAuth files, per-page login redirects, `next-auth` dependency.
+- B7. Import script; Privacy page; `.env.example`; `CLAUDE.md`.
 
-Phase C
-8. `onboarded_at`: `finish()` sets it, `useDashboardState` reads it, Today shows
+**Phase C — PARKED - do not build.** Items 8–12 of the "Why" list are
+built on NextAuth from their own briefs, not from these steps.
+
+- C1. `onboarded_at`: `finish()` sets it, `useDashboardState` reads it, Today shows
    its skeleton until known; stop writing `productivity_target`.
-9. Skip the name step when Clerk has a first name (still save `preferred_name`).
-10. Calendar step: if no Google calendar scope, explain and offer
+- C2. Skip the name step when Clerk has a first name (still save `preferred_name`).
+- C3. Calendar step: if no Google calendar scope, explain and offer
     **Connect Google Calendar** (`reconnectGoogle`); show a loading row while
     `isLoading`. Tasks scope only where Tasks are imported.
-11. Wake time row on the plan step via `useWakeTime` (`src/hooks/useWakeTime.ts`).
-12. `/api/plans` POST accepts `{ plans: [{ date, title }] }` in one insert;
+- C4. Wake time row on the plan step via `useWakeTime` (`src/hooks/useWakeTime.ts`).
+- C5. `/api/plans` POST accepts `{ plans: [{ date, title }] }` in one insert;
     `finish()` uses it and shows errors; add a test.
 
 ## Rules that apply
@@ -326,8 +340,10 @@ Phase C
 ## Done when
 
 - `npx tsc --noEmit` clean; `npm test` passes with the new tests;
-  `npm run test:tz` passes; `npm run lint` stays at 47 errors / 143 warnings
-  or fewer; `npm run build` succeeds.
+  `npm run test:tz` passes; `npm run lint` stays at 47 errors / 56 warnings
+  or fewer (taken on 2026-11-14, with the generated service worker
+  excluded from lint; the count is the same before and after a build);
+  `npm run build` succeeds, including its `postbuild` service-worker check.
 - On the Vercel preview, on an iPhone in Safari and as a Home Screen app: a new
   Google user goes through onboarding, connects the calendar, sees real
   events, and is handed to `/calendar?…&suggest=1`; an email-code user

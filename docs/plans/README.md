@@ -18,3 +18,7 @@ planner.
 
 Start a new session for each step and for each change. A long session
 re-reads its whole history on every message, and that is where credits go.
+
+Once a brief has been built, a line at the top marks it **BUILT - do not
+run again**, with the commit. It stays as the record of what was asked;
+do not point `/build` at it.

@@ -1,5 +1,11 @@
 # Park the Clerk switch; keep the tidy-up that is already in
 
+> **BUILT - do not run again.** Built in `0c0d1e8` and corrected in
+> `8e4890d` (2026-11-14). The status paragraph the Steps below replace no
+> longer exists, and `clerk-migration.md` has moved on since; running this
+> brief again would overwrite its current status. Kept as the record of
+> what was asked. See "What was built beyond this brief" at the end.
+
 ## Goal
 
 Stop the move to Clerk where it stands, without undoing anything, so the
@@ -122,3 +128,34 @@ built still works.
   asked so the first plan assumes 6:30 (11), and plans saved one at a time
   with failures ignored (12).
 - Whether to merge `dev` into `main` once the phone walk-through passes.
+
+## What was built beyond this brief
+
+Added 2026-11-14, after a review. The Steps above are left as they were
+asked; this is what the two commits did that they do not describe.
+
+- `8e4890d` edited more than `clerk-migration.md`, so "`git diff --stat`
+  shows only `docs/plans/clerk-migration.md`" was not true of it:
+  - `.gitignore`: the six service-worker patterns next-pwa writes into
+    `public/` (`sw.js`, `workbox-*.js`, `swe-worker-*.js` and their maps),
+    and editor swap files.
+  - Six files under `public/` removed from git: `sw.js`, `sw.js.map`,
+    `workbox-c18c662b.js`, `workbox-c18c662b.js.map`,
+    `swe-worker-5c72df51bb1f6ee0.js` and its map.
+  - In `clerk-migration.md`, beyond the status paragraph: two notes about
+    not committing `public/sw.js` deleted; a caveat added that the auth
+    callbacks still log emails and user ids; the Phase A file count changed
+    from 77 to 80 under `src/` (81 in the commit); the Steps heading and
+    Phase B marked PARKED.
+- The list of Clerk-free items here (under "Why" and "Not decided") is 5,
+  6, 7, 8, 9, 11 and 12. It left out items 3 (the `users` row created in
+  two places, and the session id falling back to the Google account id)
+  and 10 (the name step asking for a name Google already gave). Neither
+  needs Clerk; `clerk-migration.md` now lists them, and item 3 should come
+  first.
+- The pass mark "47 errors / 143 warnings" under "Done when" was counted
+  with the generated service worker linted. It is no longer linted; the
+  same code is 47 errors / 56 warnings, before or after a build.
+- `clerk-migration.md` now numbers its steps B1–B7 and C1–C5, and marks
+  Phase C PARKED, so "the Phase C steps reuse the same numbers" no longer
+  applies.

@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/service-worker.mjs clean",
     "build": "next build --webpack",
+    "postbuild": "node scripts/service-worker.mjs check",
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
