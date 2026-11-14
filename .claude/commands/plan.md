@@ -3,9 +3,20 @@ description: Plan a change and save it as a brief another session can build from
 argument-hint: <what you want changed>
 ---
 
-Plan this change. Do not edit any code.
+Plan this change, save the plan as a file, and stop. Do not edit any code.
 
 The request: $ARGUMENTS
+
+**This command ends when the brief is saved.** Building is a separate step,
+in a separate session, on a cheaper model. So:
+- Do not start building, whatever the reply to the plan is. "Looks good",
+  "approved" or "go ahead" mean the plan is accepted — answer that the
+  brief is saved and that `/build <path>` in a new session builds it.
+- Run this in Auto mode, not Plan mode. Plan mode cannot save the file, and
+  its Approve button starts the build in this session on this model. If you
+  find you are in Plan mode, say so, present the plan, and ask the owner to
+  switch to Auto and say "save it" — then write the file and stop.
+- The only file you may create or change is the brief itself.
 
 1. Read CLAUDE.md, then only the files this change touches. Do not explore
    the whole project.
@@ -21,7 +32,9 @@ The request: $ARGUMENTS
      `npx tsc --noEmit`, `npm test`, `npm run lint` staying at its current
      count, `npm run build`), and what to look at in the app.
    - **Not decided**: anything left open, or "nothing".
-4. Reply with the file's path and a five-line summary. Nothing else.
+4. Reply with the file's path, a five-line summary, and the exact next
+   step: "Start a new session, switch to Sonnet, and run
+   `/build docs/plans/<short-name>.md`." Then stop.
 
 The brief will be built by a cheaper model with none of this conversation,
 so it must stand on its own: name files and functions, not "the component
