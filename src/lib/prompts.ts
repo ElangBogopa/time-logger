@@ -11,7 +11,9 @@ import { formatDurationLong } from '@/lib/time-utils'
 
 /**
  * The voice of the day and week reviews: facts, no praise, no consolation.
- * Raise PROMPT_VERSION in commentary-cache.ts when this changes.
+ * Raise PROMPT_VERSION in commentary-cache.ts (day line) and
+ * COACH_PROMPT_VERSION in api/weekly-review/route.ts (week line) when this
+ * changes, or lines written in the old voice keep being shown.
  */
 export const REVIEW_VOICE = `VOICE: plain, calm, specific. Short sentences that state what happened, using the numbers and activity names from the data.
 - State facts. Do not evaluate the person or the day. No praise, no encouragement, no consolation.

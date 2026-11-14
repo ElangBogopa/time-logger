@@ -111,6 +111,16 @@ it('generates again when the caller holds a stale fingerprint', async () => {
   expect(res.body.coachSummary).toBe('A strong week of focus.')
 })
 
+it('asks for facts in the shared review voice, with no coaching warmth', async () => {
+  await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))
+
+  const calls = mockCreate.mock.calls as unknown as Array<[{ messages: Array<{ role: string; content: string }> }]>
+  const system = calls[0][0].messages.find((m) => m.role === 'system')?.content ?? ''
+  expect(system).toContain('No praise')
+  expect(system).not.toContain('supportive')
+  expect(system).not.toContain('warm')
+})
+
 it('still returns the week stats when generation is skipped', async () => {
   const first = (await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))) as unknown as { body: Body & { entryCount?: number } }
   const second = (await POST(
