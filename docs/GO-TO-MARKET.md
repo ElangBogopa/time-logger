@@ -136,7 +136,10 @@ Do not charge until the retention number below holds.
 4. **The name.**
 5. **iPhone install.** As a web app it has to be added to the Home Screen
    by hand from Safari's Share menu, and notifications only work once it
-   is. Put the instruction in onboarding.
+   is. Built (November 2026): the instruction is under the sign-in button,
+   on Today and under More. It is asked before sign-in because an iPhone's
+   Home Screen app keeps its own storage — the sign-in may not carry over
+   and device settings do not. Not yet seen on a real iPhone.
 
 ## Sequence
 

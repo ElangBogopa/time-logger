@@ -4,6 +4,7 @@ import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
+import { InstallHintLink } from '@/components/InstallHint'
 import { Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -65,6 +66,8 @@ function LoginContent() {
           </svg>
           Sign in with Google
         </Button>
+
+        <InstallHintLink />
 
         <p className="text-center text-xs text-muted-foreground">
           Better reads your Google Calendar and never writes to it.

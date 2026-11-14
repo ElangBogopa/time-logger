@@ -17,6 +17,7 @@ import GreetingHeader from '@/components/dashboard/GreetingHeader'
 import YourPlan from '@/components/YourPlan'
 import NextUp from '@/components/NextUp'
 import FirstRunCard from '@/components/FirstRunCard'
+import { InstallHintCard } from '@/components/InstallHint'
 import DayWindowsCard from '@/components/DayWindowsCard'
 import { useHabitHistory } from '@/hooks/useHabitHistory'
 import { Sun, Cloud, Moon, Check, ChevronRight, ClipboardList, Lock } from 'lucide-react'
@@ -194,6 +195,7 @@ function HomeContent() {
 
           {/* For someone on their first day: the loop, as three things to do. */}
           {isToday && <FirstRunCard key={`first-run-${planRefreshKey}`} hasLoggedToday={entries.length > 0} />}
+          {isToday && <InstallHintCard />}
 
           {/* What the day holds — the plan and the calendar, carried over
               from the Plan tab to the screen the day is lived from. A day
