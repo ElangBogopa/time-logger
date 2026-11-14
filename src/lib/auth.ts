@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import { supabase } from './supabase-server'
 import { SupabaseAdapter } from './auth-adapter'
+import { refreshGoogleAccessToken } from './google-refresh'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -30,7 +31,11 @@ async function accountIsGone(id: unknown): Promise<boolean> {
 }
 
 /**
- * Refresh the Google access token using the refresh token
+ * Refresh the Google access token using the refresh token.
+ *
+ * Only a refusal by Google marks the session as needing a new sign-in. If
+ * Google could not be reached the token is returned as it was, so the next
+ * call tries again and no banner shows in the meantime.
  */
 async function refreshAccessToken(token: {
   accessToken?: string
@@ -39,40 +44,22 @@ async function refreshAccessToken(token: {
   id?: string
   error?: string
 }) {
-  try {
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        grant_type: 'refresh_token',
-        refresh_token: token.refreshToken!,
-      }),
-    })
+  const result = await refreshGoogleAccessToken(token.refreshToken!)
 
-    const refreshedTokens = await response.json()
-
-    if (!response.ok) {
-      throw new Error(refreshedTokens.error || 'Failed to refresh token')
-    }
-
+  if (result.ok) {
     return {
       ...token,
-      accessToken: refreshedTokens.access_token,
-      accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
+      accessToken: result.accessToken,
+      accessTokenExpires: result.expiresAt ?? 0,
       // Google doesn't always return a new refresh token, keep the old one
-      refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+      refreshToken: result.refreshToken ?? token.refreshToken,
       error: undefined,
     }
-  } catch {
-    return {
-      ...token,
-      error: 'RefreshAccessTokenError',
-    }
   }
+  if (result.reason === 'refused') {
+    return { ...token, error: 'RefreshAccessTokenError' }
+  }
+  return token
 }
 
 export const authOptions: NextAuthOptions = {

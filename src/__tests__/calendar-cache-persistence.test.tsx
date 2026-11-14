@@ -8,7 +8,7 @@
  * covering a 22-day range from Google.
  */
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useAccount } from '@/hooks/useAccount'
 import { CalendarProvider, useCalendar } from '@/contexts/CalendarContext'
 
@@ -113,4 +113,35 @@ it('clears both caches on logout', async () => {
 
   await waitFor(() => expect(window.sessionStorage.getItem(EVENTS_KEY)).toBeNull())
   expect(window.sessionStorage.getItem(STATUS_KEY)).toBeNull()
+})
+
+it('clears the sign-in-again flag once the events come back', async () => {
+  let eventsCalls = 0
+  global.fetch = jest.fn(async (url: string) => {
+    if (String(url).includes('/api/calendar/status')) {
+      return { ok: true, json: async () => ({ connected: true, source: 'google_oauth', googleEmail: 'a@b.c' }) }
+    }
+    eventsCalls += 1
+    if (eventsCalls === 1) {
+      return { ok: false, status: 401, json: async () => ({ code: 'TOKEN_EXPIRED' }) }
+    }
+    return { ok: true, json: async () => ({ events }) }
+  }) as unknown as typeof fetch
+
+  function ExpiredProbe() {
+    const { googleTokenExpired, refreshCalendar } = useCalendar()
+    return (
+      <>
+        <div data-testid="expired">{String(googleTokenExpired)}</div>
+        <button onClick={() => refreshCalendar()}>refresh</button>
+      </>
+    )
+  }
+
+  render(<CalendarProvider><ExpiredProbe /></CalendarProvider>)
+  await waitFor(() => expect(screen.getByTestId('expired')).toHaveTextContent('true'))
+
+  fireEvent.click(screen.getByText('refresh'))
+
+  await waitFor(() => expect(screen.getByTestId('expired')).toHaveTextContent('false'))
 })

@@ -181,6 +181,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       throw new Error('Failed to fetch calendar events')
     }
 
+    setGoogleTokenExpired(false)
     const data = await response.json()
     return data.events || []
   }, [])
