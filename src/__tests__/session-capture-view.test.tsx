@@ -62,11 +62,18 @@ const entry = (id: string, activity: string, start: string, end: string, minutes
 
 beforeEach(() => {
   jest.clearAllMocks()
+  // The hour is pinned to 11 above; the screen reads the minute from the
+  // real clock. From a quarter past the hour the stretch since the 10:45
+  // entry is itself "30m unaccounted", a second match, and this suite
+  // failed for part of every hour. Pin the minute too.
+  jest.spyOn(Date.prototype, 'getMinutes').mockReturnValue(0)
   ;(fetchEntries as jest.Mock).mockResolvedValue([
     entry('1', 'Deep work on the model', '08:30', '10:00', 90),
     entry('2', 'Standup', '10:30', '10:45', 15),
   ])
 })
+
+afterEach(() => jest.restoreAllMocks())
 
 it('lists the session as cards rather than a canvas', async () => {
   render(<LogPeriodPage />)
