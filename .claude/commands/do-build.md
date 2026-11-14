@@ -30,4 +30,4 @@ Build the plan in $ARGUMENTS.
    none, the result of each check, anything that was not done or not
    verified, and anything you noticed outside the plan. End with the next
    step: "Start a new session, switch to <the plan's review model>, and run
-   `/review`."
+   `/do-review`."

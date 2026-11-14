@@ -11,7 +11,7 @@ The request: $ARGUMENTS
 in a separate session, on a cheaper model. So:
 - Do not start building, whatever the reply to the plan is. "Looks good",
   "approved" or "go ahead" mean the plan is accepted — answer that the
-  brief is saved and that `/build <path>` in a new session builds it.
+  brief is saved and that `/do-build <path>` in a new session builds it.
 - Run this in Auto mode, not Plan mode. Plan mode cannot save the file, and
   its Approve button starts the build in this session on this model. If you
   find you are in Plan mode, say so, present the plan, and ask the owner to
@@ -52,7 +52,7 @@ in a separate session, on a cheaper model. So:
 4. Reply with the file's path, a five-line summary, the model you
    recommend for the build and for the review with the reason for each,
    and the exact next step: "Start a new session, switch to <model>, and
-   run `/build docs/plans/<short-name>.md`." Then stop.
+   run `/do-build docs/plans/<short-name>.md`." Then stop.
 
 The brief will be built by a cheaper model with none of this conversation,
 so it must stand on its own: name files and functions, not "the component

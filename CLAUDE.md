@@ -10,7 +10,7 @@ This comes before everything else in this file.
   before editing (`git branch --show-current`). If it is `main`, switch to
   `dev` first (`git switch dev`). Commit to `dev` and push to `origin dev`,
   and only when asked to commit or push at all. One standing exception,
-  given by the owner: `/build` commits to `dev` by itself once its checks
+  given by the owner: `/do-build` commits to `dev` by itself once its checks
   pass, because a build is only reviewed once committed. It still does not
   push.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
