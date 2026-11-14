@@ -165,3 +165,19 @@ describe('a week still in progress', () => {
     expect(res.body.evaluatedDays).toBe(7)
   })
 })
+
+it('says which one sentence may be a suggestion, with no evaluation and no scores', async () => {
+  await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))
+
+  const calls = mockCreate.mock.calls as unknown as Array<
+    [{ temperature: number; messages: Array<{ role: string; content: string }> }]
+  >
+  const args = calls[0][0]
+  const system = args.messages.find((m) => m.role === 'system')?.content ?? ''
+  const user = args.messages.find((m) => m.role === 'user')?.content ?? ''
+  expect(system).toContain('only sentence that is not a statement')
+  expect(system).not.toContain('What to watch')
+  expect(system).not.toContain('needing attention')
+  expect(user).not.toContain('/100')
+  expect(args.temperature).toBe(0.4)
+})

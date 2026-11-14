@@ -89,6 +89,48 @@ it('asks for facts in a plain voice, with no warmth', async () => {
   expect(lastPrompt).not.toContain('warm')
 })
 
+it('is told what was logged, not how the day scored', async () => {
+  await POST(
+    request({
+      ...realPayload,
+      metrics: { body: 52, focus: 84, social: 20 },
+      hours: [
+        { label: 'Meals', minutes: 60 },
+        { label: 'Deep Work', minutes: 240 },
+      ],
+    })
+  )
+
+  expect(lastPrompt).toContain('Deep Work: ')
+  expect(lastPrompt.indexOf('Deep Work: ')).toBeLessThan(lastPrompt.indexOf('Meals: '))
+  for (const gone of ['judge the day', 'strong day', '/100', 'No targets set']) {
+    expect(lastPrompt).not.toContain(gone)
+  }
+})
+
+it('leaves malformed hours out of the prompt and still answers', async () => {
+  const stringHours = (await POST(request({ ...realPayload, hours: 'Deep Work' }))) as { status: number }
+  expect(stringHours.status).toBe(200)
+
+  const res = (await POST(
+    request({
+      ...realPayload,
+      hours: [
+        { label: 'Bad Negative', minutes: -30 },
+        { label: 42, minutes: 30 },
+        { label: 'Bad Text', minutes: 'lots' },
+        null,
+        { label: 'Meals', minutes: 60 },
+      ],
+    })
+  )) as { status: number }
+
+  expect(res.status).toBe(200)
+  expect(lastPrompt).toContain('Meals: ')
+  expect(lastPrompt).not.toContain('Bad Negative')
+  expect(lastPrompt).not.toContain('Bad Text')
+})
+
 it('survives a payload with neither wins nor targetProgress', async () => {
   const res = (await POST(request({ score: 40, totalMinutesLogged: 120 }))) as { status: number }
 

@@ -11,13 +11,17 @@ import {
 } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 import { stableHash } from '@/lib/ai-text-cache'
-import { REVIEW_VOICE } from '@/lib/prompts'
+import {
+  buildWeekReviewContext,
+  buildWeekReviewSystemPrompt,
+  WEEK_REVIEW_PARAMS,
+} from '@/lib/prompts'
 import { calcBody, calcFocus, calcSocial, METRIC_THRESHOLDS, type EntryRow } from '@/lib/metrics-calc'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 // Raise this when the coach prompt's voice changes, so old lines are not reused.
-const COACH_PROMPT_VERSION = 2
+const COACH_PROMPT_VERSION = 3
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday
@@ -389,21 +393,14 @@ export async function POST(request: NextRequest) {
     let coachSummaryUnchanged = false
 
     if (hasEnoughData && entries.length > 0) {
-      const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
-      const context = `
-Weekly Review Data:
-- Days covered: ${isPartialWeek ? `${daysSoFar} of 7 — the week is still in progress` : 'all 7'}
-- Days with anything logged: ${dayScores.length}
-- Average Body: ${average((d) => d.body)}/100
-- Average Mind: ${average((d) => d.mind)}/100
-- Average Heart: ${average((d) => d.heart)}/100
-- Best focus days: ${bestDays.join(', ') || 'Not enough data'}
-- Best focus hours: ${bestHours.join(', ') || 'Not enough data'}
-
-Hours by category${isPartialWeek ? ' so far' : ''}:
-${categoryBreakdown.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
-
-`
+      const context = buildWeekReviewContext({
+        isPartialWeek,
+        daysSoFar,
+        daysLogged: dayScores.length,
+        bestDays,
+        bestHours,
+        categories: categoryBreakdown,
+      })
 
       coachFingerprint = stableHash(`${COACH_PROMPT_VERSION}\n${context}`)
       coachSummaryUnchanged = knownCoachFingerprint === coachFingerprint
@@ -412,36 +409,11 @@ ${categoryBreakdown.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n'
         try {
           const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
           const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            ...WEEK_REVIEW_PARAMS,
             messages: [
-              {
-                role: 'system',
-                content: `You are writing a brief weekly reflection from someone's time log (3-4 sentences max).
-
-The week is scored on Body, Mind and Heart, each out of 100. 80 means the daily target was met on average; 100 is not reachable; a low score is information, not a failing.
-
-Structure your response in 3 parts:
-1. What the week held (something specific from the data)
-2. What to watch (a pattern or area needing attention, only if the data shows one)
-3. One specific, actionable suggestion for next week
-
-Use "you" language. Reference specific data from their week.
-
-${REVIEW_VOICE}
-
-Don't use bullet points - write in flowing prose.
-Keep it concise - no more than 4 sentences total.
-The hours logged only say how much of the week was written down. Never praise or criticise the total, and never treat logging fewer hours as an achievement.
-Sleep is the largest category for anyone who logs it; do not present that as a finding.
-If the week is still in progress, say "so far" and do not compare it with a full week.`,
-              },
-              {
-                role: 'user',
-                content: context,
-              },
+              { role: 'system', content: buildWeekReviewSystemPrompt() },
+              { role: 'user', content: context },
             ],
-            temperature: 0.7,
-            max_tokens: 200,
           })
 
           coachSummary = completion.choices[0]?.message?.content?.trim() || null

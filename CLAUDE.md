@@ -121,6 +121,7 @@ For display, these roll up into six `AggregatedCategory` buckets —
   takes `{ entries: [...] }` and inserts in one statement. Confirming four
   calendar events one at a time was four prompts and four inserts.
 - **DON'T**: Generate per-entry commentary for a bulk action
+- **DO**: Run `npm run eval:voice` after changing what the day or week review is told (`REVIEW_VOICE` and the builders beside it in `lib/prompts.ts`). It asks the real model for lines and checks each against the voice; the last run is in `docs/voice-lines/after.md`. Raise `PROMPT_VERSION` and `COACH_PROMPT_VERSION` in the same change.
 - Pending entries use static `PENDING_COMMENTARY.planned` message
 
 ### Timeline Component

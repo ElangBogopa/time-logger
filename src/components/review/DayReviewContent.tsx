@@ -531,6 +531,7 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
           wins: summaryData.wins,
           mood: summaryData.todayMood?.mood || null,
           longestFocusSession: summaryData.longestFocusSession,
+          hours: (summaryData.categoryBreakdown ?? []).map((c) => ({ label: c.label, minutes: c.minutes })),
         }),
       })
       if (response.ok) {

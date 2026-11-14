@@ -14,13 +14,160 @@ import { formatDurationLong } from '@/lib/time-utils'
  * Raise PROMPT_VERSION in commentary-cache.ts (day line) and
  * COACH_PROMPT_VERSION in api/weekly-review/route.ts (week line) when this
  * changes, or lines written in the old voice keep being shown.
+ * `npm run eval:voice` is how a wording change is checked: it asks the real
+ * model for lines and reads each against this voice.
  */
+export const REVIEW_BANNED_WORDS = [
+  'impressive',
+  'amazing',
+  'great',
+  'fantastic',
+  'incredible',
+  'solid',
+  'commitment',
+  'dedication',
+  'showcasing',
+  'crushed',
+  'nailed',
+  'well done',
+  'kudos',
+  'keep it up',
+  'proud',
+  'journey',
+] as const
+
 export const REVIEW_VOICE = `VOICE: plain, calm, specific. Short sentences that state what happened, using the numbers and activity names from the data.
 - State facts. Do not evaluate the person or the day. No praise, no encouragement, no consolation.
-- Never use these words or anything like them: impressive, amazing, great, fantastic, incredible, solid, commitment, dedication, showcasing, crushed, nailed, well done, kudos, keep it up, proud, journey.
+- Never use these words or anything like them: ${REVIEW_BANNED_WORDS.join(', ')}.
 - No exclamation marks, no emoji, no questions.
 - An area that got no time is stated once, flatly, as what was logged: "No time with people was logged." It is not a failing.
 Example of the register: "Four hours of focused work, most of it in one block on the essay. A 30-minute walk. No time with people was logged."`
+
+export const DAY_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 150, temperature: 0.4 } as const
+export const WEEK_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 200, temperature: 0.4 } as const
+
+export interface DayReviewPromptInput {
+  /** Body / Mind / Heart, each 0–99. */
+  metrics?: { body: number; focus: number; social: number } | null
+  /** Planned blocks with a time: how many were kept, moved or missed. */
+  plan?: { kept: number; moved: number; missed: number } | null
+  totalMinutesLogged: number
+  // Optional: /api/day-summary stopped returning targetProgress when the
+  // weekly targets system was removed, so the client omits it entirely.
+  wins?: { text: string }[]
+  targetProgress?: {
+    label: string
+    todayMinutes: number
+    dailyTarget: number
+    progress: number
+    direction: 'at_least' | 'at_most'
+    trend: 'up' | 'down' | 'same'
+  }[]
+  mood?: 'low' | 'okay' | 'great' | null
+  longestFocusSession?: { activity: string; minutes: number } | null
+  hours?: { label: string; minutes: number }[]
+}
+
+export function buildDayReviewPrompt(dayData: DayReviewPromptInput): string {
+  // `metrics` and `targetProgress` are accepted and deliberately not put in
+  // the prompt: the scores are on screen beside the line, and a model that
+  // sees them can only turn them into a verdict.
+  const wins = dayData.wins ?? []
+  const winsText = wins.length > 0 ? `Noted: ${wins.map((w) => w.text).join(', ')}.` : ''
+  const moodText = dayData.mood ? `Evening mood: ${dayData.mood}.` : ''
+  const focusText = dayData.longestFocusSession
+    ? `Longest focus session: ${dayData.longestFocusSession.minutes} minutes on "${dayData.longestFocusSession.activity}".`
+    : ''
+
+  const plan = dayData.plan
+  const planned = plan ? plan.kept + plan.moved + plan.missed : 0
+  const planText = plan && planned > 0
+    ? `Plan: ${planned} timed ${planned === 1 ? 'block' : 'blocks'} — ${plan.kept} kept, ${plan.moved} done at another time, ${plan.missed} not done.`
+    : ''
+
+  const hours = Math.floor(dayData.totalMinutesLogged / 60)
+  const minutes = dayData.totalMinutesLogged % 60
+
+  const hoursList = (dayData.hours ?? [])
+    .filter((c) => c.minutes > 0)
+    .sort((a, b) => b.minutes - a.minutes)
+    .map((c) => `- ${c.label}: ${formatDurationLong(c.minutes)}`)
+  const hoursText = hoursList.length > 0 ? hoursList.join('\n') : 'Nothing was broken down by category.'
+
+  const logged = [
+    'Time by category:',
+    hoursText,
+    `Time tracked: ${hours}h ${minutes}m (this only says how much was written down — do not praise or criticise it)`,
+    planText,
+    winsText,
+    moodText,
+    focusText,
+  ]
+    .filter((l) => l !== '')
+    .join('\n')
+
+  // What the model is told is what the person can see. It used to get a
+  // "Day Score" that was sessions wrapped up ÷ sessions passed — not shown
+  // anywhere — plus "if it was a tough day, acknowledge that", and so it
+  // consoled people for days that had gone well. It was then given the three
+  // scores and told to grade the day by them while forbidden to grade it; the
+  // scores are now left out and the model is given facts to state instead.
+  return `You are reviewing someone's day from their time log. Write 2 sentences, 3 at most. Name what actually happened. Never describe the day as hard, tough or challenging unless their mood says so.
+
+${REVIEW_VOICE}
+
+This may be read on the day itself or days later, so never write "today", "yesterday" or "tomorrow": say "the day". You know nothing about any other day, so make no comparisons such as "lower than usual". Give no advice and suggest nothing. The person's scores are on screen above your words: do not mention scores or targets, and do not sum the day up with a verdict. Three sentences is the limit: join the smaller facts into one sentence instead of adding a fourth.
+
+WHAT WAS LOGGED. Write only from this:
+${logged}
+
+Write the 2-3 sentences now:`
+}
+
+export interface WeekReviewContextInput {
+  isPartialWeek: boolean
+  daysSoFar: number
+  daysLogged: number
+  bestDays: string[]
+  bestHours: string[]
+  categories: { label: string; minutes: number }[]
+}
+
+export function buildWeekReviewContext(input: WeekReviewContextInput): string {
+  const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
+  return `
+Weekly Review Data:
+- Days covered: ${input.isPartialWeek ? `${input.daysSoFar} of 7 — the week is still in progress` : 'all 7'}
+- Days with anything logged: ${input.daysLogged}
+- Best focus days: ${input.bestDays.join(', ') || 'Not enough data'}
+- Best focus hours: ${input.bestHours.join(', ') || 'Not enough data'}
+
+Hours by category${input.isPartialWeek ? ' so far' : ''}:
+${input.categories.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
+
+`
+}
+
+export function buildWeekReviewSystemPrompt(): string {
+  return `You are writing a brief weekly reflection from someone's time log (3-4 sentences max).
+
+Write it in this order:
+1. What the week held: two or three specific things from the data, with their hours.
+2. One pattern in the data, stated as a fact, such as the days or hours where the focused work fell. Leave this out if the data shows none.
+3. One option for next week, in a single plain sentence that starts from a fact in the data and names a day, an hour or an activity. This is the only sentence that is not a statement of what happened. It is an option, not a correction: no "should", no "need to", no "must".
+
+Use "you" language. Reference specific data from their week.
+
+${REVIEW_VOICE}
+
+Don't use bullet points - write in flowing prose.
+Keep it concise - no more than 4 sentences total.
+The person's scores are on screen above your words: do not mention scores or targets, and do not sum the week up with a verdict.
+The hours logged only say how much of the week was written down. Never praise or criticise the total, and never treat logging fewer hours as an achievement.
+Sleep is the largest category for anyone who logs it; do not present that as a finding.
+If the week is still in progress, say "so far" and do not compare it with a full week.
+Call the days and hours in the data "best focus" days and hours, as the data does; never call them productive.`
+}
 
 /** One line per activity, with the category the classifier assigned. */
 export function describeEntries(entries: TimeEntry[]): string {

@@ -18,7 +18,7 @@ import { readCachedText, writeCachedText, clearCachedText, stableHash } from './
 const NAMESPACE = 'day'
 
 // Raise this when the prompt's voice changes, so lines written by the old prompt are not reused.
-const PROMPT_VERSION = 2
+const PROMPT_VERSION = 3
 
 export interface CommentaryInputs {
   date: string
@@ -28,6 +28,7 @@ export interface CommentaryInputs {
   wins: { id?: string; text?: string }[]
   mood?: string | null
   longestFocusSession?: { activity: string; minutes: number } | null
+  categoryBreakdown?: { category: string; minutes: number }[]
 }
 
 /**
@@ -48,6 +49,7 @@ export function commentaryFingerprint(inputs: CommentaryInputs): string {
       inputs.longestFocusSession
         ? [inputs.longestFocusSession.activity, inputs.longestFocusSession.minutes]
         : null,
+      (inputs.categoryBreakdown ?? []).map((c) => [c.category, c.minutes]),
     ])
   )
 }
