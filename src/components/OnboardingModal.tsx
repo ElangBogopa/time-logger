@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
 import {
   Dialog,
@@ -53,7 +53,7 @@ const SCORES: { key: keyof typeof METRIC_TEXT_HEX; name: string; what: string }[
 ]
 
 export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
-  const { data: session } = useSession()
+  const { data: session } = useAccount()
   const { getEventsForDate } = useCalendar()
   const [step, setStep] = useState(0)
   const [preferredName, setPreferredName] = useState('')

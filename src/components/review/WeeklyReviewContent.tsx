@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
 import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight, Trophy, CalendarClock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -119,7 +119,7 @@ const RATING_ICONS = { good: '✓', neutral: '~', rough: '✗', no_data: '—' }
 // ─── Component ────────────────
 
 export default function WeeklyReviewContent() {
-  const { status } = useSession()
+  const { status } = useAccount()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))

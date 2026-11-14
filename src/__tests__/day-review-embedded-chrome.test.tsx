@@ -11,10 +11,10 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
 
-jest.mock('next-auth/react', () => ({ useSession: jest.fn() }))
+jest.mock('@/hooks/useAccount', () => ({ useAccount: jest.fn() }))
 const stableRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() }
 const stableParams = new URLSearchParams('')
 jest.mock('next/navigation', () => ({
@@ -49,7 +49,7 @@ const summary = {
 beforeEach(() => {
   jest.clearAllMocks()
   window.localStorage.clear()
-  ;(useSession as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
+  ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
   global.fetch = jest.fn(async (url: string) =>
     String(url).includes('/api/day-review')
       ? { ok: true, json: async () => ({ source: 'live', review: null }) }

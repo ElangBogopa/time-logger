@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Session } from 'next-auth'
+import type { AppSession } from '@/lib/session'
 import { getUserCurrentHour } from '@/lib/types'
 import { fetchGoals } from '@/lib/goals'
 
@@ -14,7 +14,7 @@ interface UseDashboardStateReturn {
 }
 
 interface UseDashboardStateProps {
-  session: Session | null
+  session: AppSession | null
   status: string
 }
 

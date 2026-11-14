@@ -30,7 +30,7 @@ jest.mock('next/server', () => ({
     }),
   },
 }))
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 jest.mock('@/lib/rate-limit', () => ({
   checkRateLimit: () => ({ success: true, remaining: 9, resetTime: Date.now() + 60000 }),
@@ -48,7 +48,7 @@ jest.mock('openai', () => {
   return { __esModule: true, default: FakeOpenAI }
 })
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { POST } from '@/app/api/categorize/route'
 
@@ -65,7 +65,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   lastPrompt = ''
   nextAnswer = 'shallow_work'
-  ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
+  ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
 })
 
 type Res = { status: number; body: { category?: string; error?: string } }
@@ -122,7 +122,7 @@ it('serves a repeated activity from cache without asking again', async () => {
 })
 
 it('rejects an unauthenticated caller', async () => {
-  ;(getServerSession as jest.Mock).mockResolvedValue(null)
+  ;(getAppSession as jest.Mock).mockResolvedValue(null)
 
   const res = (await POST(request('Work'))) as unknown as Res
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { getToken } from 'next-auth/jwt'
-import { authOptions } from '@/lib/auth'
+import { getAppSession } from '@/lib/session'
+import { getSignInGoogleTokens } from '@/lib/google-token'
 import { deleteAccountData, revokeGoogleAccess, storedGoogleToken } from '@/lib/account-data'
 import { DELETE_CONFIRMATION } from '@/lib/account-shared'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
@@ -17,7 +16,7 @@ const SESSION_COOKIE = /^(__Secure-)?next-auth\.session-token(\.\d+)?$/
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -39,12 +38,8 @@ export async function DELETE(request: NextRequest) {
     // Read the Google tokens before the rows that hold one are gone, and
     // use them only after: if the delete fails the person is still a user,
     // and should still have a calendar.
-    const jwt = await getToken({ req: request }).catch(() => null)
-    const tokens = [
-      jwt?.refreshToken as string | undefined,
-      await storedGoogleToken(userId),
-      jwt?.accessToken as string | undefined,
-    ]
+    const signIn = await getSignInGoogleTokens(request)
+    const tokens = [signIn.refreshToken, await storedGoogleToken(userId), signIn.accessToken]
 
     const result = await deleteAccountData(userId, session.user.email ?? null)
     if (!result.ok) {

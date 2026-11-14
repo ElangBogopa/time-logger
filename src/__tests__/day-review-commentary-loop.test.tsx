@@ -18,12 +18,12 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-jest.mock('next-auth/react', () => ({ useSession: jest.fn() }))
+jest.mock('@/hooks/useAccount', () => ({ useAccount: jest.fn() }))
 // The surviving implementation reads ?date= and can redirect to /login.
 // Both must be stable across renders. Next's own useRouter is; a mock that
 // returns a fresh object each render re-fires every effect that depends on
@@ -63,7 +63,7 @@ const summary = {
 beforeEach(() => {
   jest.clearAllMocks()
   window.localStorage.clear()
-  ;(useSession as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
+  ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
   // It asks /api/day-review first (is this day saved?), then /api/day-summary.
   global.fetch = jest.fn(async (url: string) =>
     String(url).includes('/api/day-review')

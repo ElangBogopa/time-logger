@@ -2,7 +2,7 @@
 
 import { csrfFetch } from '@/lib/api'
 import { useEffect, useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useAccount, signOutTo } from '@/hooks/useAccount'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Bell, BookOpen, ChevronRight, Download, LogOut, Loader2, Star, MessageSquare, Link2, Lightbulb, Smartphone, Trash2, X, ShieldCheck } from 'lucide-react'
@@ -186,7 +186,7 @@ function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
 
 // ── Main Page ──
 export default function MorePage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   const router = useRouter()
   const [showFeedback, setShowFeedback] = useState(false)
   const [showExport, setShowExport] = useState(false)
@@ -321,7 +321,7 @@ export default function MorePage() {
               variant="ghost"
               size="sm"
               className="text-muted-foreground hover:text-muted-foreground hover:bg-secondary"
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => signOutTo('/login')}
             >
               <LogOut className="h-4 w-4 mr-1.5" />
               Sign out

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Loader2, Star, Plus, X, Flame, CalendarCheck, TrendingUp, Check, HelpCircle, Clock, ChevronDown, CheckSquare, Trash2 } from 'lucide-react'
 import { csrfFetch } from '@/lib/api'
@@ -55,7 +55,7 @@ interface StreakData {
 }
 
 export default function GoalPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   const router = useRouter()
   const params = useParams()
   const goalId = params.id as string

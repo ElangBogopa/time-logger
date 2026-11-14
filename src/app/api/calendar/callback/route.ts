@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 
 interface StateData {
@@ -46,7 +45,7 @@ export async function GET(request: Request) {
     redirectPath = stateData.redirect || '/settings/connections'
 
     // Verify user is still logged in
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
     console.log('[Calendar Callback] Session user.id:', session?.user?.id, 'State userId:', stateData.userId, 'Match:', session?.user?.id === stateData.userId)
 
     if (!session?.user?.id || session.user.id !== stateData.userId) {

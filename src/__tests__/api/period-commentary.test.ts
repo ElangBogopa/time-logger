@@ -35,7 +35,7 @@ jest.mock('next/server', () => ({
     }),
   },
 }))
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 jest.mock('openai', () => {
   // The route's catch does `error instanceof OpenAI.APIError`, so the fake
@@ -50,7 +50,7 @@ jest.mock('openai', () => {
   return { __esModule: true, default: FakeOpenAI }
 })
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { POST } from '@/app/api/period-commentary/route'
 
@@ -76,7 +76,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   started = 0
   shouldFail = false
-  ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
+  ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
 })
 
 type Body = { commentary: string; insight?: unknown; prediction?: unknown }
@@ -105,7 +105,7 @@ it('fails the request when the generation fails', async () => {
 })
 
 it('rejects an unauthenticated caller before generating anything', async () => {
-  ;(getServerSession as jest.Mock).mockResolvedValue(null)
+  ;(getAppSession as jest.Mock).mockResolvedValue(null)
 
   const res = (await POST(request())) as unknown as { status: number }
 

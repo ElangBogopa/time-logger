@@ -17,8 +17,8 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
   useSearchParams: () => new URLSearchParams('date=2026-11-03'),
 }))
-jest.mock('next-auth/react', () => ({
-  useSession: () => ({ status: 'authenticated', data: { user: { id: 'u1' } } }),
+jest.mock('@/hooks/useAccount', () => ({
+  useAccount: () => ({ status: 'authenticated', data: { user: { id: 'u1' } } }),
 }))
 jest.mock('@/contexts/CalendarContext', () => ({
   useCalendar: () => ({ getEventsForDate: () => [], refreshCalendar: jest.fn(), isLoading: false }),

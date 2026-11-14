@@ -1,91 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { getToken } from 'next-auth/jwt'
-import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase-server'
+import { getAppSession } from '@/lib/session'
+import { getGoogleAccessToken } from '@/lib/google-token'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
-
-// Helper to get access token - either from JWT token (Google OAuth) or calendar_connections (email users)
-async function getCalendarAccessToken(
-  token: { accessToken?: string } | null,
-  session: {
-    user?: { id?: string }
-    authProvider?: string
-  }
-): Promise<{ accessToken: string | null; source: 'session' | 'connection' | null }> {
-  // Google OAuth users have token in JWT
-  if (session.authProvider === 'google' && token?.accessToken) {
-    console.log('[Google Tasks] Using JWT token for Google OAuth user')
-    return { accessToken: token.accessToken, source: 'session' }
-  }
-
-  // Email users - check calendar_connections
-  if (session.user?.id) {
-    console.log('[Google Tasks] Checking calendar_connections for user:', session.user.id)
-    const { data: connection, error: connError } = await supabase
-      .from('calendar_connections')
-      .select('google_access_token, google_refresh_token, token_expires_at, google_email')
-      .eq('user_id', session.user.id)
-      .single()
-
-    if (connError) {
-      console.log('[Google Tasks] No calendar connection found:', connError.message)
-    }
-
-    if (connection) {
-      console.log('[Google Tasks] Found connection for:', connection.google_email, 'Expires:', connection.token_expires_at)
-
-      // Check if token is expired
-      const isExpired = connection.token_expires_at &&
-        new Date(connection.token_expires_at) < new Date()
-
-      if (isExpired && connection.google_refresh_token) {
-        console.log('[Google Tasks] Token expired, refreshing...')
-        // Refresh the token
-        try {
-          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              client_id: process.env.GOOGLE_CLIENT_ID!,
-              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-              grant_type: 'refresh_token',
-              refresh_token: connection.google_refresh_token,
-            }),
-          })
-
-          const refreshedTokens = await refreshResponse.json()
-          console.log('[Google Tasks] Refresh response:', refreshResponse.ok, 'Has token:', !!refreshedTokens.access_token)
-
-          if (refreshResponse.ok && refreshedTokens.access_token) {
-            // Update the stored token
-            const expiresAt = refreshedTokens.expires_in
-              ? new Date(Date.now() + refreshedTokens.expires_in * 1000).toISOString()
-              : null
-
-            await supabase
-              .from('calendar_connections')
-              .update({
-                google_access_token: refreshedTokens.access_token,
-                token_expires_at: expiresAt,
-              })
-              .eq('user_id', session.user.id)
-
-            return { accessToken: refreshedTokens.access_token, source: 'connection' }
-          } else {
-            console.error('[Google Tasks] Token refresh failed:', refreshedTokens)
-          }
-        } catch (error) {
-          console.error('[Google Tasks] Failed to refresh calendar token:', error)
-        }
-      }
-
-      return { accessToken: connection.google_access_token, source: 'connection' }
-    }
-  }
-
-  return { accessToken: null, source: null }
-}
 
 interface GoogleTaskList {
   id: string
@@ -117,7 +33,7 @@ interface TaskItem {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
 
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -127,9 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get access token from JWT or calendar_connections
-    console.log('[Google Tasks] User ID:', session.user.id, 'Auth provider:', session.authProvider)
-    const token = await getToken({ req: request })
-    const { accessToken, source } = await getCalendarAccessToken(token, session)
+    const { accessToken, source } = await getGoogleAccessToken(request, session)
     console.log('[Google Tasks] Access token source:', source, 'Has token:', !!accessToken)
 
     if (!accessToken) {

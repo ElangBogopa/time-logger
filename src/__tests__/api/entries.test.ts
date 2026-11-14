@@ -69,8 +69,8 @@ jest.mock('next/server', () => ({
   },
 }))
 
-jest.mock('next-auth', () => ({
-  getServerSession: jest.fn(),
+jest.mock('@/lib/session', () => ({
+  getAppSession: jest.fn(),
 }))
 
 jest.mock('@/lib/supabase-server', () => ({
@@ -89,10 +89,10 @@ jest.mock('@/lib/supabase-server', () => ({
 
 import { GET, POST } from '@/app/api/entries/route'
 import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 
-const mockGetServerSession = getServerSession as jest.MockedFunction<typeof getServerSession>
+const mockGetServerSession = getAppSession as jest.MockedFunction<typeof getAppSession>
 const mockSupabase = supabase as any
 
 describe('/api/entries', () => {

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 import { isTaskCompletable } from '@/lib/types'
 
 // GET /api/plans?date=YYYY-MM-DD - Fetch user's plan items for a date
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -39,7 +38,7 @@ export async function GET(request: NextRequest) {
 // POST /api/plans - Create a plan item
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -92,7 +91,7 @@ export async function POST(request: NextRequest) {
 // PATCH /api/plans - Update a plan item (toggle completed, edit title)
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -172,7 +171,7 @@ export async function PATCH(request: NextRequest) {
 // DELETE /api/plans?id=xxx - Delete a plan item
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }

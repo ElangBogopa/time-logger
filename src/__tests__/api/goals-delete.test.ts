@@ -36,11 +36,11 @@ jest.mock('next/server', () => ({
     }),
   },
 }))
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 jest.mock('@/lib/supabase-server', () => ({ supabase: { from: (t: string) => makeBuilder(t) } }))
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { DELETE } from '@/app/api/goals/route'
 
@@ -56,11 +56,11 @@ beforeEach(() => {
   captured.patch = undefined
   captured.filters = []
   nextResult = { data: [{ id: 'goal-1' }], error: null }
-  ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
+  ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
 })
 
 it('rejects an unauthenticated caller', async () => {
-  ;(getServerSession as jest.Mock).mockResolvedValue(null)
+  ;(getAppSession as jest.Mock).mockResolvedValue(null)
 
   const res = (await DELETE(request(URL_WITH_ID))) as { status: number }
 

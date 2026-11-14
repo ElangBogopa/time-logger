@@ -27,7 +27,7 @@ jest.mock('next/server', () => ({
     }),
   },
 }))
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 // This route builds its OpenAI client at module scope, so the class is
 // constructed during import — before this file's consts initialise. The arrow
@@ -39,7 +39,7 @@ jest.mock('openai', () => ({
   },
 }))
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { POST } from '@/app/api/day-commentary/route'
 
@@ -55,7 +55,7 @@ function request(body: unknown): NextRequest {
 beforeEach(() => {
   jest.clearAllMocks()
   lastPrompt = ''
-  ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'u1' } })
+  ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'u1' } })
 })
 
 // Exactly what DayReviewContent posts: day-summary has no targetProgress field,

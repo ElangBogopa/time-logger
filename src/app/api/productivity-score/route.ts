@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 import { calculateDailyScore, calculateWeeklyScore, PlanItem } from '@/lib/productivity-score'
 
@@ -13,7 +12,7 @@ import { calculateDailyScore, calculateWeeklyScore, PlanItem } from '@/lib/produ
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }

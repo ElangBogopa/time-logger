@@ -21,7 +21,7 @@ import WindowAlignmentCard from '@/components/WindowAlignmentCard'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import {
   ArrowLeft,
   CalendarClock,
@@ -497,7 +497,7 @@ interface DayReviewContentProps {
 }
 
 export default function DayReviewContent({ embedded = false, date: dateProp }: DayReviewContentProps) {
-  const { status } = useSession()
+  const { status } = useAccount()
   const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = dateProp ?? searchParams.get('date')

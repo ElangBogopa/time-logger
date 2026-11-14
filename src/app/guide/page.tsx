@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter } from 'next/navigation'
 import { LIBRARY } from '@/lib/library'
 import {
@@ -237,7 +237,7 @@ function CitationCard({ citation }: { citation: Citation }) {
 // ── Page ──
 
 export default function GuidePage() {
-  const { status } = useSession()
+  const { status } = useAccount()
   const router = useRouter()
 
   useEffect(() => {
