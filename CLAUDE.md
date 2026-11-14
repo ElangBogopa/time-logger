@@ -1,5 +1,28 @@
 # CLAUDE.md - Time Logger Project Guide
 
+## Branches: work on `dev`, never push to `main`
+
+This comes before everything else in this file.
+
+- **`main` is what people use.** Vercel deploys it to production on every
+  push, and the hourly reminders workflow runs from it.
+- **`dev` is where every change goes.** Check which branch you are on
+  before editing (`git branch --show-current`). If it is `main`, switch to
+  `dev` first (`git switch dev`). Commit to `dev` and push to `origin dev`,
+  and only when asked to commit or push at all.
+- **Never commit to, push to, or merge into `main` on your own.** Not for
+  a one-line fix, not for a docs change, not because the tests pass, and
+  not because an earlier message approved an earlier merge.
+- **`main` changes only by merging `dev`, and only when the owner says so
+  in that conversation**, in words that name the merge ("merge dev into
+  main"). "Commit and push" means `dev`. If it is unclear, ask.
+- **Before asking for a merge, the change is reviewed thoroughly**: read
+  the full diff against `main` (`git diff main...dev`), and run
+  `npx tsc --noEmit`, `npm test`, `npm run test:tz`, `npm run lint` and
+  `npm run build`. Say what was checked and what was not, then wait.
+- A push to `dev` gets a Vercel preview deployment, which is where a
+  change is tried on a phone before it reaches `main`.
+
 ## Project Overview
 
 Time tracking app with AI-powered activity categorization. Users log activities manually or import from Google Calendar. AI categorizes and provides witty commentary on confirmed entries only.
