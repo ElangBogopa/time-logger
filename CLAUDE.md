@@ -175,9 +175,11 @@ For display, these roll up into six `AggregatedCategory` buckets —
   `reconnectGoogle()` (`hooks/useAccount.ts`); a Google token for the
   calendar or tasks comes from `getGoogleAccessToken()`
   (`lib/google-token.ts`). All three wrap NextAuth.
-- `getGoogleAccessToken` never returns a token past its expiry — it renews
-  it or returns none with a `problem` (`'reconnect'` or `'unavailable'`),
-  and only `'reconnect'` shows the sign-in-again banner.
+- `getGoogleAccessToken` does not hand over a token it knows is past its
+  expiry (60-second margin on the sign-in token; a token with no recorded
+  expiry is trusted as it is) — it renews it or returns none with a
+  `problem` (`'reconnect'` or `'unavailable'`), and only `'reconnect'` shows
+  the sign-in-again banner.
 - **Nothing else imports `next-auth`.** The sign-in itself does (`lib/auth.ts`,
   `lib/auth-adapter.ts`, the `[...nextauth]` route, the login page and
   `Providers.tsx`), and `session-discipline.test.ts` fails if any other

@@ -95,5 +95,3 @@ lead on sleep and wearable data. Chronotype planners and auto-schedulers
 sit either side. Better's ground is the whole day, the evidence, and the
 loop — not wearables. Prices were checked in November 2026; check again
 before quoting them.
-
-More detail: `docs/GO-TO-MARKET.md`.
