@@ -1,11 +1,31 @@
 # Move sign-in to Clerk, and fix onboarding on the way
 
+> **PARKED - do not build.** Nothing in this plan's Steps is to be run,
+> and `/build` must not be pointed at this file, unless the owner names
+> this plan and asks for it in that conversation.
+
 Status: **Parked on 2026-11-14.** Phase A is done and committed
 (`8b733af`, on `dev`). Phase B is not started and is parked by the
 owner's decision to work on the app itself; do not build it unless
-the owner asks for it by name. Phase C's items that do not need
-Clerk (8, 9, 11, 12 below) will be planned and built separately, on
-NextAuth. See `docs/plans/park-clerk.md`.
+the owner asks for it by name. The problems that do not need Clerk
+will be planned and built separately, on NextAuth, each in its own
+brief. They are numbered by the **"Why" list below**, not by the Phase C
+steps, which use the same numbers for different things:
+
+- Sign-in: 5 (pages protected only in the browser), 6 (auth callbacks
+  in `src/lib/auth.ts` and `src/lib/auth-adapter.ts` still log emails
+  and user ids; Phase A removed such lines from the API routes only),
+  7 (login loses the deep link).
+- Onboarding: 8 (Today flashes before the sheet), 9 ("Nothing yet"
+  while the calendar loads), 11 (no wake time asked), 12 (plans saved
+  one at a time, failures ignored).
+
+Item 8 needs `user_preferences.onboarded_at`, which the migration under
+"Files (Phases B and C)" creates together with `users.clerk_id`. Built
+on NextAuth, it needs its own migration that adds only `onboarded_at`
+(with the backfill); do not add `users.clerk_id`.
+
+See `docs/plans/park-clerk.md`.
 
 Pick this up again when people ask for a way in other than Google,
 or when Google's consent screen on every sign-in is visibly losing
@@ -96,9 +116,6 @@ as before); `npm run test:tz` passes in all 7 zones; `npm run build`
 succeeds; `npm run lint` 47 errors / 143 warnings, identical to before the
 change (all pre-existing). Not checked: running the app, the preview, a phone.
 
-`npm run build` rewrites `public/sw.js` and `public/sw.js.map`; they show as
-modified and must not be committed with this work.
-
 ### Phase A — what I am not sure about
 
 - **A small behaviour change in errors.** `getSignInGoogleTokens` catches a
@@ -109,13 +126,16 @@ modified and must not be committed with this work.
 - **Logs changed.** Lines that printed user ids, emails and token-refresh
   responses are gone; the refresh failure now logs only Google's error code.
   If anyone relies on those lines in Vercel logs, they will miss them.
+  This covers the API routes only: the callbacks in `src/lib/auth.ts` and
+  `src/lib/auth-adapter.ts` still log emails and user ids ("Why" item 6).
 - **`useAccount` returns a fresh object each render.** Every caller
   destructures it, and `data`/`status` themselves are stable, so no effect
   should re-run — but I did not test every screen in a browser.
 - **No new tests for the three helpers.** They are covered only through the
   existing route and screen tests.
 - **The rename was done by script.** Typecheck, tests and build pass, but I
-  have not read all 77 changed files line by line after it.
+  have not read all 80 changed files under `src/` (81 in the commit)
+  line by line after it.
 - My earlier count of "33 client files" was wrong: it is 17 source files plus
   13 tests and one hook.
 
@@ -251,9 +271,12 @@ never a Clerk or Google id.
 - Phase C: `src/components/OnboardingModal.tsx`, `src/hooks/useDashboardState.ts`,
   `src/app/api/plans/route.ts`, `src/app/api/preferences/route.ts`.
 
-## Steps
+## Steps — PARKED - do not build
 
-Phase B
+> **PARKED - do not build.** See the status at the top. The Clerk-free
+> items are built from their own briefs, not from the steps below.
+
+**Phase B — PARKED - do not build**
 1. Run the non-uuid `user_id` check (owner, in Supabase). Write the migration.
 2. Install `@clerk/nextjs`; read its types for `getUserOauthAccessToken` and
    `reauthorize`.
@@ -297,7 +320,6 @@ Phase C
 - Do not change `users.id` or any `user_id` column type.
 - Do not touch `calendar_connections` / `pending_calendar_connections` flows
   or `src/app/api/auth/merge-accounts` beyond what removing NextAuth forces.
-- Do not commit `public/sw.js` or `public/sw.js.map` build output.
 - Do not log emails, user ids or tokens.
 - Do not push Phase B to `dev` before the Clerk keys are set in Vercel Preview.
 
