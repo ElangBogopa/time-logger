@@ -72,4 +72,14 @@ describe('checkReviewLine', () => {
       expect(rules(`The work was ${w} in the morning.`, { kind: 'week' })).toContain('verdict')
     }
   })
+
+  it('catches "no time with people" on a day that has some, and only then', () => {
+    const line = 'Two hours of social time and one hour of exercise. No time with people was logged.'
+    expect(rules(line, { kind: 'day', peopleMinutes: 120 })).toEqual(['false-absence'])
+    expect(rules('Three hours of deep work. No social time was logged.', { kind: 'week', peopleMinutes: 45 })).toEqual([
+      'false-absence',
+    ])
+    expect(rules('Four hours of deep work. No time with people was logged.', { kind: 'day', peopleMinutes: 0 })).toEqual([])
+    expect(rules('Two hours of social time. No exercise was logged.', { kind: 'day', peopleMinutes: 120 })).toEqual([])
+  })
 })

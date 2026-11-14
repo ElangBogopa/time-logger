@@ -19,6 +19,7 @@ import {
   buildDayReviewPrompt,
   buildWeekReviewContext,
   buildWeekReviewSystemPrompt,
+  peopleMinutes,
   DAY_REVIEW_PARAMS,
   WEEK_REVIEW_PARAMS,
   type DayReviewPromptInput,
@@ -221,7 +222,10 @@ async function run(): Promise<Line[]> {
         (await openai.chat.completions.create({ ...params, messages })).choices[0]?.message?.content?.trim() || ''
 
       const mood = scenario.kind === 'day' ? scenario.input.mood ?? null : null
-      const breaches = checkReviewLine(line, { kind: scenario.kind, mood })
+      const withPeople = peopleMinutes(
+        scenario.kind === 'day' ? scenario.input.hours ?? [] : scenario.input.categories
+      )
+      const breaches = checkReviewLine(line, { kind: scenario.kind, mood, peopleMinutes: withPeople })
 
       const rules = judgeRules(scenario.kind)
       const judge = await openai.chat.completions.create({
@@ -262,7 +266,7 @@ Respond with JSON only: {${rules.map(([k]) => `"${k}": bool`).join(', ')}, "note
 
 const CHECKER_RULES = [
   'banned-word', 'verdict', 'exclamation', 'question', 'emoji', 'score-talk',
-  'relative-day', 'advice', 'correction', 'hard-day', 'too-long', 'list', 'empty',
+  'relative-day', 'advice', 'correction', 'hard-day', 'false-absence', 'too-long', 'list', 'empty',
 ]
 const JUDGE_RULES = [...JUDGE_BOTH, ...JUDGE_DAY, ...JUDGE_WEEK].map(([k]) => k as string)
 

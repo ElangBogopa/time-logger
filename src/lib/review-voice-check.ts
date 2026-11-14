@@ -47,10 +47,18 @@ const ADVICE = wordRegex(['should', 'try', 'consider', 'aim', 'next time', 'need
 const CORRECTION = wordRegex(['should', 'need to', 'must'])
 const HARD_DAY = wordRegex(['tough', 'challenging', 'difficult', 'rough'])
 const EMOJI = /\p{Extended_Pictographic}/gu
+// "No time with people was logged", "no social time", "no calls were logged".
+const NO_PEOPLE =
+  /\bno (?:time |hours? )?(?:with (?:people|others|friends|family)|social(?: time| activit(?:y|ies))?|calls?)\b|\b(?:time with people|social time) was not\b/gi
 
 export function checkReviewLine(
   text: string,
-  opts: { kind: 'day' | 'week'; mood?: 'low' | 'okay' | 'great' | null }
+  opts: {
+    kind: 'day' | 'week'
+    mood?: 'low' | 'okay' | 'great' | null
+    /** Minutes of Social and Calls in the input, when known. */
+    peopleMinutes?: number
+  }
 ): VoiceBreach[] {
   const breaches: VoiceBreach[] = []
   const add = (rule: string, found: string[]) => {
@@ -65,6 +73,10 @@ export function checkReviewLine(
   add('question', findAll(text, /\?/g))
   add('emoji', findAll(text, EMOJI))
   add('score-talk', findAll(text, SCORE_TALK))
+
+  // Only checkable when the caller knows the input: a line that says nobody
+  // was seen on a day that has time with people in it.
+  if ((opts.peopleMinutes ?? 0) > 0) add('false-absence', findAll(text, NO_PEOPLE))
 
   if (opts.kind === 'day') {
     add('relative-day', findAll(text, RELATIVE_DAY))

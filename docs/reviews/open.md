@@ -57,3 +57,38 @@ Verdict: Ready to merge (0 must fix)
 - weekly-voice-unpinned · the REVIEW_VOICE comment now names both PROMPT_VERSION and COACH_PROMPT_VERSION; new test in weekly-review-cache.test.ts that the weekly system prompt carries "No praise" and no "supportive" or "warm" · believes: partly fixed (nothing tests that either version is in its fingerprint)
 - voice-prompt-contradicts-itself · not attempted (not asked for; changes what the model is told, better after real lines are read)
 - checks: tsc clean; npm test 1114 passed, 13 skipped; test:tz 42 passed; lint 0 errors, 54 warnings; build succeeded
+
+## Review 4 — 2026-11-14 — Fable 5.2 — reviewed ab830c2
+Verdict: Ready to merge (0 must fix)
+- fourth pass; looked only for must-fix and for harm done by fix attempt 3 (one comment, one test, one line in a plan). Trying it on a phone is now the better test
+- resolved: brand-voice-plan-not-marked-built (the plan is tracked and its third line says BUILT, naming cfa9b5e); weekly-voice-unpinned (the REVIEW_VOICE comment names both version constants, and weekly-review-cache.test.ts checks the weekly system prompt carries the voice; what is left, no test that either version is in its fingerprint, drops to optional)
+- recurring: (none)
+- still open · should · voice-prompt-contradicts-itself · src/app/api/day-commentary/route.ts:99-100, src/app/api/weekly-review/route.ts:425 and :443 · nobody has attempted it; "use the scores to judge the day", "70 or more is a strong day", "what to watch" and temperature 0.7 still sit beside "do not evaluate the person or the day"; needs real generated lines read before the wording is changed
+- new: (none)
+- uncommitted work: none besides this entry
+- checks: tsc clean; npm test 1114 passed, 13 skipped; test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: any generated day or week line against the voice rules (needs the live model); the review screens, the guide and The Science on a phone; an hour-old sign-in on a real deployment (calendar loads, no banner); Google actually refusing a grant; the tasks picker on a phone
+
+## Review 5 — 2026-11-14 — Fable 5.2 — reviewed fc8affe
+Verdict: Not ready (1 must fix)
+- fifth pass over the branch, first pass over 164f48e (/do-think) and fc8affe (voice eval, prompts moved to lib/prompts.ts, new day and week wording), which no earlier review had seen and were read in full. For the older work, trying it on a phone is the better test
+- resolved: voice-prompt-contradicts-itself (the scores, "judge the day", "strong day", "What to watch" and temperature 0.7 are gone from both prompts; tests pin it; checker breaches in the saved lines went 21 → 0)
+- recurring: (none)
+- still open: (none at must or should)
+- must · false-no-people-line · src/lib/prompts.ts:43-44 · the review says "No time with people was logged" on days and weeks where time with people was logged: in docs/voice-lines/after.md, 13 of the 15 lines whose input has Social or Calls hours say it, some in the sentence after "one hour of social time"; 44 of 48 lines end on it (29 of 48 before this change). It is copied from the example in REVIEW_VOICE, which the plan forbade changing; neither the checker nor a test can see it
+- should · voice-eval-plan-not-marked-built · docs/plans/review-voice-eval.md · uncommitted: the plan built in fc8affe is untracked and has no "BUILT - do not run again" line; third time a built plan was left this way
+- should · judge-target-missed · docs/voice-lines/after.md · 19 of 48 lines still fail a judge rule against a target of 3, and the two allowed rounds are spent: 17 are the week line passing comment on how much was logged ("only two days had any time logged, indicating limited activity"), 5 are wrong or invented figures. The commit says so; the owner has not yet read the lines, which is what the plan says closes this
+- should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · the backfill asks for a day line without hours, so the new prompt has only "Nothing was broken down by category" to write from, and the line is saved for good. Nothing in the app calls the route today, which is why this is not higher
+- optional · week-suggestion-says-consider · src/lib/review-voice-check.ts:47 · most week suggestions read "You might consider…" or "You could aim…"; the week checker only catches should, need to and must
+- checked by hand: the move to lib/prompts.ts against the old route text; hours from the request are filtered, capped at 19 and 40 characters before reaching the prompt; the day fingerprint takes the category minutes and PROMPT_VERSION and COACH_PROMPT_VERSION are both 3; the eval is outside `npm test`, reads the key from the environment and writes only lines to its report; the saved lines are invented scenarios
+- uncommitted work: the untracked plan above, the review 4 entry, and this entry
+- checks: tsc clean; npm test 1131 passed, 13 skipped (72 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: `npm run eval:voice` was not run again (it calls the live model; the saved reports were read instead); the judge's own accuracy; the review screens on a phone, including that a day or week line is fetched once and not on every return to the tab; everything listed as not checked in review 4
+
+## Fix attempt 4 — 2026-11-14 — Fable 5.2 — commit "fix: the review no longer says nobody was seen when somebody was"
+- false-no-people-line · first attempt. src/lib/prompts.ts: the sentence "No time with people was logged." is gone from REVIEW_VOICE (the rule and the example), which the earlier plan had forbidden touching; the day and week builders now work out from the Social and Calls hours whether there was any, and add the data line "Time with people: none logged." only when there was none; the voice allows the statement only when that line is present. A day with no category breakdown gets no line. PROMPT_VERSION and COACH_PROMPT_VERSION raised to 4. New checker rule false-absence (needs the input's people minutes, which the eval now passes) and new tests in review-people-line.test.ts and review-voice-check.test.ts · believes: fixed, as far as 48 sampled lines can show: `npm run eval:voice` run twice, 0 of the 15 lines whose input has Social or Calls say it (13 of 15 before); docs/voice-lines/after.md is the second run
+- tried and dropped: always stating the amount ("Time with people (Social and Calls): 45 minutes, already counted…"). It also gave 0 false lines, but the model read it back as a second total ("Time with people totaled 45 minutes, already included in the calls")
+- seen in the new run, not touched: 1 banned-word breach, "The evening mood was great", which is the mood value read back; the week line still comments on how much was logged (judge-target-missed: 19 of 48 lines fail a judge rule, 16 of them total_not_judged)
+- not attempted (not asked for): voice-eval-plan-not-marked-built, judge-target-missed, backfill-sends-no-hours, week-suggestion-says-consider
+- checks: tsc clean; npm test 1138 passed, 13 skipped (73 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: the review screens on a phone; saved day and week lines being replaced after the version change on a real account

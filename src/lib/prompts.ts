@@ -40,8 +40,30 @@ export const REVIEW_VOICE = `VOICE: plain, calm, specific. Short sentences that 
 - State facts. Do not evaluate the person or the day. No praise, no encouragement, no consolation.
 - Never use these words or anything like them: ${REVIEW_BANNED_WORDS.join(', ')}.
 - No exclamation marks, no emoji, no questions.
-- An area that got no time is stated once, flatly, as what was logged: "No time with people was logged." It is not a failing.
-Example of the register: "Four hours of focused work, most of it in one block on the essay. A 30-minute walk. No time with people was logged."`
+- Say there was no time with people only if the data carries the line "Time with people: none logged", and then once and flatly: it is what was logged, not a failing. Without that line, never say it.
+- Say nothing about any other area that is missing from the data.
+Example of the register, from someone else's day (its facts are not this person's; never reuse its sentences): "Four hours of focused work, most of it in one block on the essay. A 30-minute walk."`
+
+/**
+ * The line that tells the model whether time with people was logged.
+ *
+ * The voice used to carry the sentence "No time with people was logged." as
+ * its example, and the model closed almost every line with it, including on
+ * days with two hours of Social. The absence is now a fact in the data,
+ * worked out here, instead of a sentence to copy.
+ */
+const PEOPLE_LABELS: readonly string[] = [CATEGORY_LABELS.social, CATEGORY_LABELS.calls]
+
+export function peopleMinutes(categories: { label: string; minutes: number }[]): number {
+  return categories
+    .filter((c) => PEOPLE_LABELS.includes(c.label) && c.minutes > 0)
+    .reduce((n, c) => n + c.minutes, 0)
+}
+
+/** Present only when there was none: an amount here was read back as a second total. */
+function peopleLine(categories: { label: string; minutes: number }[]): string {
+  return peopleMinutes(categories) > 0 ? '' : 'Time with people: none logged.'
+}
 
 export const DAY_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 150, temperature: 0.4 } as const
 export const WEEK_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 200, temperature: 0.4 } as const
@@ -94,9 +116,13 @@ export function buildDayReviewPrompt(dayData: DayReviewPromptInput): string {
     .map((c) => `- ${c.label}: ${formatDurationLong(c.minutes)}`)
   const hoursText = hoursList.length > 0 ? hoursList.join('\n') : 'Nothing was broken down by category.'
 
+  // No breakdown means nothing is known either way, so nothing is said.
+  const peopleText = hoursList.length > 0 ? peopleLine(dayData.hours ?? []) : ''
+
   const logged = [
     'Time by category:',
     hoursText,
+    peopleText,
     `Time tracked: ${hours}h ${minutes}m (this only says how much was written down — do not praise or criticise it)`,
     planText,
     winsText,
@@ -144,6 +170,7 @@ Weekly Review Data:
 
 Hours by category${input.isPartialWeek ? ' so far' : ''}:
 ${input.categories.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
+${input.categories.length > 0 ? peopleLine(input.categories) : ''}
 
 `
 }
