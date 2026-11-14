@@ -1,8 +1,15 @@
 # Move sign-in to Clerk, and fix onboarding on the way
 
-Status: **Phase A done (uncommitted, on `dev`). Phases B and C not started.**
-Phase B cannot be built or checked until the owner has done the setup in
-"What the owner must do" below.
+Status: **Parked on 2026-11-14.** Phase A is done and committed
+(`8b733af`, on `dev`). Phase B is not started and is parked by the
+owner's decision to work on the app itself; do not build it unless
+the owner asks for it by name. Phase C's items that do not need
+Clerk (8, 9, 11, 12 below) will be planned and built separately, on
+NextAuth. See `docs/plans/park-clerk.md`.
+
+Pick this up again when people ask for a way in other than Google,
+or when Google's consent screen on every sign-in is visibly losing
+sign-ups.
 
 ## Goal
 
@@ -310,5 +317,4 @@ Phase C
 
 - Whether to offer Apple sign-in (needs a paid Apple Developer account).
 - Which domain the Clerk production instance uses.
-- Whether Phase A is committed and pushed to `dev` before Phase B.
 - Whether any data is stored under Google account ids (needs the check above).
