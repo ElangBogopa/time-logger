@@ -11,9 +11,13 @@ import {
 } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 import { stableHash } from '@/lib/ai-text-cache'
+import { REVIEW_VOICE } from '@/lib/prompts'
 import { calcBody, calcFocus, calcSocial, METRIC_THRESHOLDS, type EntryRow } from '@/lib/metrics-calc'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
+
+// Raise this when the coach prompt's voice changes, so old lines are not reused.
+const COACH_PROMPT_VERSION = 2
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday
@@ -401,7 +405,7 @@ ${categoryBreakdown.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n'
 
 `
 
-      coachFingerprint = stableHash(context)
+      coachFingerprint = stableHash(`${COACH_PROMPT_VERSION}\n${context}`)
       coachSummaryUnchanged = knownCoachFingerprint === coachFingerprint
 
       if (!coachSummaryUnchanged) {
@@ -412,16 +416,19 @@ ${categoryBreakdown.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n'
             messages: [
               {
                 role: 'system',
-                content: `You are a supportive personal time coach. Write a brief weekly reflection (3-4 sentences max).
+                content: `You are writing a brief weekly reflection from someone's time log (3-4 sentences max).
 
 The week is scored on Body, Mind and Heart, each out of 100. 80 means the daily target was met on average; 100 is not reachable; a low score is information, not a failing.
 
 Structure your response in 3 parts:
-1. What went well (something specific from the data)
+1. What the week held (something specific from the data)
 2. What to watch (a pattern or area needing attention, only if the data shows one)
 3. One specific, actionable suggestion for next week
 
-Be warm but direct. Use "you" language. Reference specific data from their week.
+Use "you" language. Reference specific data from their week.
+
+${REVIEW_VOICE}
+
 Don't use bullet points - write in flowing prose.
 Keep it concise - no more than 4 sentences total.
 The hours logged only say how much of the week was written down. Never praise or criticise the total, and never treat logging fewer hours as an achievement.

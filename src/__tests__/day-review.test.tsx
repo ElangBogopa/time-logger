@@ -259,7 +259,7 @@ describe('DayReviewPage', () => {
     render(<DayReviewPage />)
 
     await waitFor(() => {
-      expect(screen.getByText("Today's Wins")).toBeInTheDocument()
+      expect(screen.getByText("What stood out")).toBeInTheDocument()
     })
 
     expect(screen.getByText('Hit your deep work goal')).toBeInTheDocument()

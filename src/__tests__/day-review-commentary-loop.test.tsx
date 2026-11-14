@@ -12,7 +12,7 @@
  * guard became true again the moment isLoadingCommentary flipped back to
  * false, so the effect re-fired immediately and forever. Because the section
  * renders only while (commentary || isLoadingCommentary), it mounted and
- * unmounted on every pass: a non-stop flicker, with Today's Wins jumping as
+ * unmounted on every pass: a non-stop flicker, with the wins block jumping as
  * the block above it appeared and vanished, plus an unbounded stream of POSTs
  * to /api/day-commentary.
  */
@@ -73,7 +73,7 @@ beforeEach(() => {
 })
 
 async function settle() {
-  await waitFor(() => expect(screen.getByText("Today's Wins")).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText("What stood out")).toBeInTheDocument())
   // Long enough for many cycles of a 30ms request: the pre-fix component reached
   // ~20 calls in this window.
   for (let i = 0; i < 8; i++) await delay(100)
@@ -125,7 +125,7 @@ it('renders each win from the summary', async () => {
   })
 
   render(<DayReviewContent />)
-  await waitFor(() => expect(screen.getByText("Today's Wins")).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText("What stood out")).toBeInTheDocument())
 
   expect(screen.getByText('150 min focus session on "Coding"')).toBeInTheDocument()
 })

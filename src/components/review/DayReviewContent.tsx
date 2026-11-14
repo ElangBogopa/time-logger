@@ -5,7 +5,7 @@
  *
  * This is the only implementation. It used to exist twice — here and as a
  * leaner copy behind /review?tab=day — which is how the same bug kept needing
- * two fixes, and how one copy ended up rendering Today's Wins as blank rows
+ * two fixes, and how one copy ended up rendering the wins block as blank rows
  * while the other did not. /day-review is now a thin page around this
  * component, and the review tab renders the same thing.
  */
@@ -28,12 +28,8 @@ import {
   Check,
   ChevronRight,
   Circle,
-  Trophy,
-  TrendingUp,
   Clock,
   Sparkles,
-  Target,
-  Zap,
   Calendar,
   Lock,
   Loader2,
@@ -211,34 +207,16 @@ function PlanNextCard({ reviewDate }: { reviewDate: string }) {
   )
 }
 
-function WinsSection({ wins, isToday }: { wins: Win[]; isToday: boolean }) {
+function WinsSection({ wins }: { wins: Win[] }) {
   if (wins.length === 0) return null
-
-  const winIcons: Record<Win['type'], React.ReactNode> = {
-    // Five hues, all from the palette: body, recovery, focus, faith,
-    // connection. They were green-500 through pink-500, which made the wins
-    // list the brightest thing in the review.
-    goal_met: <Target className={`h-4 w-4 ${AGGREGATED_CLASSES.body.text}`} />,
-    streak: <Zap className={`h-4 w-4 ${AGGREGATED_CLASSES.recovery.text}`} />,
-    focus: <Clock className={`h-4 w-4 ${AGGREGATED_CLASSES.focus.text}`} />,
-    improvement: <TrendingUp className={`h-4 w-4 ${AGGREGATED_CLASSES.faith.text}`} />,
-    balance: <Sparkles className={`h-4 w-4 ${AGGREGATED_CLASSES.connection.text}`} />,
-  }
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Trophy className={`h-5 w-5 ${AGGREGATED_CLASSES.recovery.text}`} />
-        <h2 className="font-semibold text-foreground">{isToday ? "Today's Wins" : 'Wins'}</h2>
-      </div>
-      <div className="space-y-2">
+      <h2 className="eyebrow">What stood out</h2>
+      <div className="rounded-xl border border-border bg-card divide-y divide-border">
         {wins.map(win => (
-          <div
-            key={win.id}
-            className={`flex items-center gap-3 rounded-lg ${STATUS_CLASSES.green.tint} border ${STATUS_CLASSES.green.border} px-3 py-2`}
-          >
-            {winIcons[win.type]}
-            <span className="text-sm text-foreground">{win.text}</span>
+          <div key={win.id} className="px-4 py-3 text-sm text-foreground">
+            {win.text}
           </div>
         ))}
       </div>
@@ -916,7 +894,7 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
         {/* Wins */}
         {summary.wins.length > 0 && (
           <div className="mb-6">
-            <WinsSection wins={summary.wins} isToday={isTodayReview} />
+            <WinsSection wins={summary.wins} />
           </div>
         )}
 

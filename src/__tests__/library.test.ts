@@ -100,3 +100,16 @@ describe('where the links go', () => {
     expect(linkHost('not a url')).toBe('the source')
   })
 })
+
+describe('the first source', () => {
+  it('credits no entry to Zimbardo', () => {
+    for (const entry of LIBRARY) expect(entry.author).not.toContain('Zimbardo')
+  })
+
+  it('is the progress-monitoring meta-analysis, linked by DOI', () => {
+    const entry = LIBRARY.find((e) => e.id === 'progress-monitoring')
+    expect(entry).toBeDefined()
+    expect(entry?.metrics).toEqual([])
+    expect(entry?.link).toContain('doi.org')
+  })
+})

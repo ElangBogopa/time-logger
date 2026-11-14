@@ -82,6 +82,13 @@ it('includes the wins text in the prompt', async () => {
   expect(lastPrompt).not.toContain('undefined')
 })
 
+it('asks for facts in a plain voice, with no warmth', async () => {
+  await POST(request(realPayload))
+
+  expect(lastPrompt).toContain('No praise')
+  expect(lastPrompt).not.toContain('warm')
+})
+
 it('survives a payload with neither wins nor targetProgress', async () => {
   const res = (await POST(request({ score: 40, totalMinutesLogged: 120 }))) as { status: number }
 

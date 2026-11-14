@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import OpenAI from 'openai'
+import { REVIEW_VOICE } from '@/lib/prompts'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
 const openai = new OpenAI({
@@ -54,8 +55,8 @@ export async function POST(request: NextRequest) {
     const targetProgress = dayData.targetProgress ?? []
 
     const winsText = wins.length > 0
-      ? `Wins today: ${wins.map(w => w.text).join(', ')}.`
-      : 'No specific wins detected.'
+      ? `Noted: ${wins.map(w => w.text).join(', ')}.`
+      : ''
 
     const targetsText = targetProgress.length > 0
       ? targetProgress.map(t => {
@@ -91,7 +92,9 @@ export async function POST(request: NextRequest) {
     // "Day Score" that was sessions wrapped up ÷ sessions passed — not shown
     // anywhere — plus "if it was a tough day, acknowledge that", and so it
     // consoled people for days that had gone well.
-    const prompt = `You are reviewing someone's day from their time log. Write 2-3 sentences: warm, specific, a little dry. Name what actually happened. Never be preachy or guilt-inducing, and never describe the day as hard, tough or challenging unless their mood says so.
+    const prompt = `You are reviewing someone's day from their time log. Write 2 sentences, 3 at most. Name what actually happened. Never describe the day as hard, tough or challenging unless their mood says so.
+
+${REVIEW_VOICE}
 
 The day is scored on three things, each out of 100. 80 means the target for that area was met, 70 or more is a strong day for it, and 100 is not reachable. A low number is often a choice rather than a failure.
 Use the scores to judge the day, but do not recite them: they are on screen above your words.
@@ -104,13 +107,13 @@ ${targetsText}
 ${moodText}
 ${focusText}
 
-Write your commentary now (2-3 sentences, warm and specific):`
+Write the 2-3 sentences now:`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 150,
-      temperature: 0.7,
+      temperature: 0.4,
     })
 
     const commentary = completion.choices[0]?.message?.content?.trim() || ''

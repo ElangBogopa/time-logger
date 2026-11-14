@@ -138,7 +138,7 @@ describe('the day review', () => {
     serveDay(daySummary({ entries: [entry('meals', '12:00', '12:30'), entry('sleep', '00:00', '07:00')] }))
     render(<DayReviewContent embedded />)
 
-    await waitFor(() => expect(screen.getByText("Today's Wins")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText("What stood out")).toBeInTheDocument())
     expect(screen.queryByRole('region', { name: 'In your windows' })).not.toBeInTheDocument()
   })
 

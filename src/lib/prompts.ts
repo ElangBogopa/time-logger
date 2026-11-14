@@ -9,6 +9,17 @@ import { formatDurationLong } from '@/lib/time-utils'
  * passing eval against stale wording is worse than no eval.
  */
 
+/**
+ * The voice of the day and week reviews: facts, no praise, no consolation.
+ * Raise PROMPT_VERSION in commentary-cache.ts when this changes.
+ */
+export const REVIEW_VOICE = `VOICE: plain, calm, specific. Short sentences that state what happened, using the numbers and activity names from the data.
+- State facts. Do not evaluate the person or the day. No praise, no encouragement, no consolation.
+- Never use these words or anything like them: impressive, amazing, great, fantastic, incredible, solid, commitment, dedication, showcasing, crushed, nailed, well done, kudos, keep it up, proud, journey.
+- No exclamation marks, no emoji, no questions.
+- An area that got no time is stated once, flatly, as what was logged: "No time with people was logged." It is not a failing.
+Example of the register: "Four hours of focused work, most of it in one block on the essay. A 30-minute walk. No time with people was logged."`
+
 /** One line per activity, with the category the classifier assigned. */
 export function describeEntries(entries: TimeEntry[]): string {
   if (entries.length === 0) return 'No activities logged.'

@@ -163,7 +163,7 @@ describe('a usual hour from the log', () => {
       busy: [],
     })
     expect(suggestions[0].reason).toBe(
-      'When you usually do this — body temperature peaks — your best window for physical effort'
+      'When you usually do this — body temperature peaks — for most people, the best window for physical effort'
     )
     expect(suggestions[0].source).toBe('exercise-cognition')
   })

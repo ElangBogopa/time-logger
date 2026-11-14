@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
-import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight, Trophy, CalendarClock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight, CalendarClock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getLocalDateString, getWeekStartForDate, shiftDateString, getUserToday } from '@/lib/types'
 import { MetricRingRow } from '@/components/MetricRings'
@@ -327,8 +327,7 @@ export default function WeeklyReviewContent() {
         <div className="grid grid-cols-2 gap-2 mb-5">
           {reviewData.highlights.map((h, i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-3">
-              <Trophy className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <p className="text-sm font-medium mt-1">{h.text}</p>
+              <p className="text-sm font-medium">{h.text}</p>
               {h.subtext && <p className="text-xs text-muted-foreground">{h.subtext}</p>}
             </div>
           ))}
