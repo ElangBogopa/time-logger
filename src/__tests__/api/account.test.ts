@@ -84,7 +84,7 @@ jest.mock('next/server', () => {
   }
   return { NextRequest: class {}, NextResponse: FakeResponse }
 })
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('next-auth/jwt', () => ({ getToken: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 jest.mock('@/lib/supabase-server', () => ({ supabase: { from: (table: string) => makeBuilder(table) } }))
@@ -94,7 +94,7 @@ jest.mock('@/lib/rate-limit', () => ({
   RATE_LIMITS: { auth: { limit: 5, windowMs: 60000 } },
 }))
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import { getToken } from 'next-auth/jwt'
 import type { NextRequest } from 'next/server'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -176,7 +176,7 @@ beforeEach(() => {
     { identifier: 'me@example.com', token: 't1' },
     { identifier: 'other@example.com', token: 't2' },
   ]
-  ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: ME, email: 'Me@Example.com' } })
+  ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: ME, email: 'Me@Example.com' } })
   ;(getToken as jest.Mock).mockResolvedValue({ refreshToken: 'jwt-refresh', accessToken: 'jwt-access' })
   ;(checkRateLimit as jest.Mock).mockReturnValue({ success: true, remaining: 4, resetTime: 0 })
   fetchMock.mockResolvedValue({ ok: true })
@@ -222,7 +222,7 @@ describe('the list of tables', () => {
 
 describe('DELETE /api/account', () => {
   it('rejects a caller who is not signed in, and deletes nothing', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue(null)
+    ;(getAppSession as jest.Mock).mockResolvedValue(null)
 
     const res = (await DELETE(confirmed())) as unknown as FakeResponse
 
@@ -379,7 +379,7 @@ describe('DELETE /api/account', () => {
   })
 
   it('handles an old sign-in whose id is a Google account id, not a uuid', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'g-me', email: 'me@example.com' } })
+    ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'g-me', email: 'me@example.com' } })
     db.time_entries.push(entry('g-me', 'legacy'))
 
     const res = (await DELETE(confirmed())) as unknown as FakeResponse
@@ -399,7 +399,7 @@ describe('GET /api/account/export', () => {
     ({ url: `http://localhost/api/account/export${query}`, method: 'GET', headers: { get: () => null } }) as unknown as NextRequest
 
   it('rejects a caller who is not signed in', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue(null)
+    ;(getAppSession as jest.Mock).mockResolvedValue(null)
 
     const res = (await EXPORT(exportRequest())) as unknown as FakeResponse
 

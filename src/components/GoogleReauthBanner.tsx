@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useAccount, reconnectGoogle } from '@/hooks/useAccount'
 import { X } from 'lucide-react'
 import { useCalendar } from '@/contexts/CalendarContext'
 
 export default function GoogleReauthBanner() {
-  const { data: session } = useSession()
+  const { data: session } = useAccount()
   const { googleTokenExpired } = useCalendar()
   const [dismissed, setDismissed] = useState(false)
 
@@ -24,7 +24,7 @@ export default function GoogleReauthBanner() {
       </p>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
-          onClick={() => signIn('google')}
+          onClick={() => reconnectGoogle()}
           className="text-sm font-medium text-[#CBB894] hover:text-[#CBB894] transition-colors"
         >
           Sign in again

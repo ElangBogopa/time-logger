@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 import { calculateDailyScore, DailyProductivityScore, PlanItem } from '@/lib/productivity-score'
 import { calcBody, calcFocus, calcSocial, type EntryRow } from '@/lib/metrics-calc'
@@ -232,7 +231,7 @@ function buildAggregatedBreakdown(
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = await getAppSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

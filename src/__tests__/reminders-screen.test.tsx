@@ -8,13 +8,13 @@
  */
 
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { toast } from 'sonner'
 import { csrfFetch } from '@/lib/api'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { useInstall } from '@/hooks/useInstall'
 
-jest.mock('next-auth/react', () => ({ useSession: jest.fn(), signOut: jest.fn() }))
+jest.mock('@/hooks/useAccount', () => ({ useAccount: jest.fn(), signOutTo: jest.fn() }))
 const stableRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() }
 jest.mock('next/navigation', () => ({ useRouter: () => stableRouter }))
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }))
@@ -58,7 +58,7 @@ async function setup(pushState = push(), install: Record<string, unknown> = {}) 
 beforeEach(() => {
   jest.clearAllMocks()
   window.sessionStorage.clear()
-  ;(useSession as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1', email: 'me@example.com' } } })
+  ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1', email: 'me@example.com' } } })
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ preferences: { reminder_times: STORED } }) })) as unknown as typeof fetch
   ;(csrfFetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) })
 })

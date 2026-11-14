@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
 
 /**
@@ -10,7 +10,7 @@ import { csrfFetch } from '@/lib/api'
  * duplicate PUTs on every page navigation.
  */
 export function useTimezoneSync() {
-  const { data: session } = useSession()
+  const { data: session } = useAccount()
 
   useEffect(() => {
     if (!session?.user?.id) return

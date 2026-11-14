@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities } from '@/lib/api'
 import { findRepeatCandidate, entriesForRepeat, type RepeatCandidate } from '@/lib/repeat-session'
 import { PERIOD_CLASSES } from '@/lib/palette'
@@ -61,7 +61,7 @@ function LogPeriodContent() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   const period = params.period as TimePeriod
 
   // Validate period - use fallback for hooks (redirect happens after hooks)

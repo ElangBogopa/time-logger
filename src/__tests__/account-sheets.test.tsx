@@ -8,10 +8,10 @@
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { signOut, useSession } from 'next-auth/react'
+import { signOutTo, useAccount } from '@/hooks/useAccount'
 import { downloadExport, deleteAccount, forgetThisDevice } from '@/lib/account-client'
 
-jest.mock('next-auth/react', () => ({ signOut: jest.fn(), useSession: jest.fn() }))
+jest.mock('@/hooks/useAccount', () => ({ signOutTo: jest.fn(), useAccount: jest.fn() }))
 const stableRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() }
 jest.mock('next/navigation', () => ({ useRouter: () => stableRouter }))
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }))
@@ -27,7 +27,7 @@ import MorePage from '@/app/settings/page'
 
 beforeEach(() => {
   jest.clearAllMocks()
-  ;(useSession as jest.Mock).mockReturnValue({
+  ;(useAccount as jest.Mock).mockReturnValue({
     status: 'authenticated',
     data: { user: { name: 'Naledi', email: 'naledi@example.com' }, authProvider: 'google' },
   })
@@ -116,9 +116,9 @@ describe('deleting the account', () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
     expect(onOpenChange).not.toHaveBeenCalled()
 
-    expect(signOut).not.toHaveBeenCalled()
+    expect(signOutTo).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(signOut).toHaveBeenCalledWith({ callbackUrl: '/login' })
+    expect(signOutTo).toHaveBeenCalledWith('/login')
   })
 
   it('cannot be asked twice while it is working', async () => {
@@ -169,7 +169,7 @@ describe('deleting the account', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('your account is still here')
     expect(screen.queryByText('Your account has been deleted')).not.toBeInTheDocument()
     expect(forgetThisDevice).not.toHaveBeenCalled()
-    expect(signOut).not.toHaveBeenCalled()
+    expect(signOutTo).not.toHaveBeenCalled()
     // And it can be tried again.
     expect(deleteButton()).toBeEnabled()
   })

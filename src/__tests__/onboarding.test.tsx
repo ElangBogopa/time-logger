@@ -12,8 +12,8 @@ import { readFirstRun } from '@/lib/first-run'
 let mockHour = 19
 let mockEvents: { id: string; title: string; startTime: string; endTime: string; date: string; isAllDay: boolean }[] = []
 
-jest.mock('next-auth/react', () => ({
-  useSession: () => ({ status: 'authenticated', data: { user: { id: 'u1', name: 'Alex Morgan' } } }),
+jest.mock('@/hooks/useAccount', () => ({
+  useAccount: () => ({ status: 'authenticated', data: { user: { id: 'u1', name: 'Alex Morgan' } } }),
 }))
 jest.mock('@/contexts/CalendarContext', () => ({
   useCalendar: () => ({ getEventsForDate: () => mockEvents }),

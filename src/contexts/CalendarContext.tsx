@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { getLocalDateString } from '@/lib/types'
 import { readSession, writeSession, clearSession } from '@/lib/session-store'
 
@@ -87,7 +87,7 @@ function getDateRange(centerDate: string, daysBefore: number, daysAfter: number)
 }
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   // Seeded from sessionStorage, so a reload reuses the range it already has
   // instead of calling Google again. Freshness comes from the cache's own
   // lastFetched, not the envelope: the effect below rewrites the entry on

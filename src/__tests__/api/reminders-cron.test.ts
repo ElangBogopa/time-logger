@@ -49,7 +49,7 @@ jest.mock('next/server', () => ({
     json: (body: unknown, init: { status?: number } = {}) => ({ body, status: init.status ?? 200, json: async () => body }),
   },
 }))
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 jest.mock('@/lib/supabase-server', () => ({ supabase: { from: (table: string) => makeBuilder(table) } }))
 jest.mock('@/lib/push-server', () => ({ pushConfigured: jest.fn(() => true), sendPush: jest.fn(async () => 'sent') }))
@@ -59,7 +59,7 @@ jest.mock('@/lib/rate-limit', () => ({
   RATE_LIMITS: { auth: { limit: 5, windowMs: 60000 } },
 }))
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { pushConfigured, sendPush } from '@/lib/push-server'
 import { GET } from '@/app/api/cron/reminders/route'
@@ -310,12 +310,12 @@ describe('the schedule', () => {
 
 describe('POST /api/push/test', () => {
   beforeEach(() => {
-    ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: TORONTO } })
+    ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: TORONTO } })
   })
   const test = () => TEST() as unknown as Promise<Res>
 
   it('rejects a caller who is not signed in', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue(null)
+    ;(getAppSession as jest.Mock).mockResolvedValue(null)
     expect((await test()).status).toBe(401)
     expect(sendPush).not.toHaveBeenCalled()
   })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { signOut } from 'next-auth/react'
+import { signOutTo } from '@/hooks/useAccount'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -158,7 +158,7 @@ export function DeleteAccountSheet({
                 Google account, under Security → Your connections to third-party apps.
               </p>
             )}
-            <Button className="w-full" onClick={() => signOut({ callbackUrl: '/login' })}>
+            <Button className="w-full" onClick={() => signOutTo('/login')}>
               Done
             </Button>
           </>

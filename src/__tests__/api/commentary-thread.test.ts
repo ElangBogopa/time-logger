@@ -56,7 +56,7 @@ jest.mock('next/server', () => ({
     }),
   },
 }))
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 // The real limiter is a module-level Map keyed by user, so every POST in this
 // file shares one bucket and the eleventh would 429 regardless of what it is
@@ -78,7 +78,7 @@ jest.mock('openai', () => {
   return { __esModule: true, default: FakeOpenAI }
 })
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { GET, POST } from '@/app/api/commentary/thread/route'
 
@@ -120,7 +120,7 @@ beforeEach(() => {
       status: 'confirmed',
     },
   ]
-  ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
+  ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
 })
 
 type Body = {
@@ -133,7 +133,7 @@ type Res = { status: number; body: Body }
 
 describe('GET', () => {
   it('rejects an unauthenticated caller', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue(null)
+    ;(getAppSession as jest.Mock).mockResolvedValue(null)
     const res = (await GET(get('subject_type=day&subject_key=2026-11-02'))) as unknown as Res
     expect(res.status).toBe(401)
   })
@@ -179,7 +179,7 @@ describe('GET', () => {
 
 describe('POST', () => {
   it('rejects an unauthenticated caller before generating', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue(null)
+    ;(getAppSession as jest.Mock).mockResolvedValue(null)
     const res = (await POST(post({ ...DAY, message: 'why?' }))) as unknown as Res
     expect(res.status).toBe(401)
     expect(mockCreate).not.toHaveBeenCalled()

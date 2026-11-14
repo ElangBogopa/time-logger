@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -36,7 +36,7 @@ function cachedTimes(): ReminderTime[] | null {
  * instead of "not supported".
  */
 export default function NotificationsPage() {
-  const { status } = useSession()
+  const { status } = useAccount()
   const router = useRouter()
   const push = usePushNotifications()
   const install = useInstall()

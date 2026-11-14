@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, BookOpen, ExternalLink, FlaskConical, Brain } from 'lucide-react'
 import { LIBRARY, entriesForMetric, foundationalEntries, linkHost, type LibraryEntry } from '@/lib/library'
@@ -74,7 +74,7 @@ function EntryCard({ entry }: { entry: LibraryEntry }) {
 }
 
 function LibraryContent() {
-  const { status } = useSession()
+  const { status } = useAccount()
   const router = useRouter()
   const highlighted = useSearchParams().get('metric') as MetricKey | null
 

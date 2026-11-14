@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -77,7 +77,7 @@ function formatDate(dateStr: string): string {
 }
 
 export default function YearInPixelsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())

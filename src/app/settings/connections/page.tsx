@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useAccount, signOutTo } from '@/hooks/useAccount'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -24,7 +24,7 @@ interface ConflictData {
 }
 
 function ConnectionsContent() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -144,7 +144,7 @@ function ConnectionsContent() {
 
       if (response.ok) {
         setConflictModal(null)
-        signOut({ callbackUrl: '/login?merged=true' })
+        signOutTo('/login?merged=true')
       } else {
         setToast({ message: data.error || 'Failed to merge accounts', variant: 'error' })
         setIsMerging(false)

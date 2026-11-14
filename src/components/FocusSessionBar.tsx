@@ -96,6 +96,7 @@ export default function FocusSessionBar() {
     const data = loadSession()
     if (!data) return 0
     const total = data.durationMinutes * 60
+    // eslint-disable-next-line react-hooks/purity -- a clock: the tick above re-renders this every second
     const elapsed = (Date.now() - data.startTime) / 1000
     return Math.min(100, (elapsed / total) * 100)
   })()

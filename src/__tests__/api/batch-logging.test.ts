@@ -26,7 +26,7 @@ jest.mock('next/server', () => ({
     }),
   },
 }))
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 jest.mock('@/lib/rate-limit', () => ({
   checkRateLimit: () => ({ success: true, remaining: 9, resetTime: Date.now() + 60000 }),
@@ -49,7 +49,7 @@ jest.mock('@/lib/supabase-server', () => ({
   supabase: { from: () => ({ insert: (...args: unknown[]) => insert(...args) }) },
 }))
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { POST as categorize } from '@/app/api/categorize/route'
 import { POST as createEntries } from '@/app/api/entries/route'
@@ -73,7 +73,7 @@ const row = (activity: string) => ({
 beforeEach(() => {
   jest.clearAllMocks()
   lastUserMessage = ''
-  ;(getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
+  ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
   insert.mockReturnValue({ select: async () => ({ data: [{ id: 'a' }, { id: 'b' }], error: null }) })
 })
 
@@ -119,7 +119,7 @@ describe('creating a set of entries', () => {
   })
 
   it('requires a session', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue(null)
+    ;(getAppSession as jest.Mock).mockResolvedValue(null)
     expect((await createEntries(request({ entries: [row('Work')] }))).status).toBe(401)
   })
 })

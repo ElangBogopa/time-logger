@@ -1,10 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 // Mock next-auth
-jest.mock('next-auth/react', () => ({
-  useSession: jest.fn(),
+jest.mock('@/hooks/useAccount', () => ({
+  useAccount: jest.fn(),
 }))
 
 // Mock next/navigation
@@ -118,7 +118,7 @@ describe('DayReviewPage', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(useRouter as jest.Mock).mockReturnValue(mockRouter)
-    ;(useSession as jest.Mock).mockReturnValue({
+    ;(useAccount as jest.Mock).mockReturnValue({
       status: 'authenticated',
       data: { user: { id: 'user1', email: 'test@test.com' } },
     })
@@ -129,7 +129,7 @@ describe('DayReviewPage', () => {
 
   it('renders loading state initially', () => {
     mockFetch.mockImplementation(() => new Promise(() => {}))
-    ;(useSession as jest.Mock).mockReturnValue({ status: 'loading' })
+    ;(useAccount as jest.Mock).mockReturnValue({ status: 'loading' })
 
     render(<DayReviewPage />)
 
@@ -138,7 +138,7 @@ describe('DayReviewPage', () => {
   })
 
   it('redirects to login if not authenticated', () => {
-    ;(useSession as jest.Mock).mockReturnValue({ status: 'unauthenticated' })
+    ;(useAccount as jest.Mock).mockReturnValue({ status: 'unauthenticated' })
     mockFetch.mockImplementation(() => new Promise(() => {}))
 
     render(<DayReviewPage />)
@@ -509,7 +509,7 @@ describe.skip('DayReviewPage score colors', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(useRouter as jest.Mock).mockReturnValue(mockRouter)
-    ;(useSession as jest.Mock).mockReturnValue({
+    ;(useAccount as jest.Mock).mockReturnValue({
       status: 'authenticated',
       data: { user: { id: 'user1' } },
     })

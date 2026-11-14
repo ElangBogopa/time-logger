@@ -9,10 +9,10 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { CalendarProvider, useCalendar } from '@/contexts/CalendarContext'
 
-jest.mock('next-auth/react', () => ({ useSession: jest.fn() }))
+jest.mock('@/hooks/useAccount', () => ({ useAccount: jest.fn() }))
 
 const EVENTS_KEY = 'calendar-events-cache-v1'
 const STATUS_KEY = 'calendar-status-cache-v1'
@@ -37,7 +37,7 @@ function apiCalls() {
 beforeEach(() => {
   jest.clearAllMocks()
   window.sessionStorage.clear()
-  ;(useSession as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
+  ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
   global.fetch = jest.fn(async (url: string) => {
     if (String(url).includes('/api/calendar/status')) {
       return { ok: true, json: async () => ({ connected: true, source: 'google_oauth', googleEmail: 'a@b.c' }) }
@@ -107,7 +107,7 @@ it('does not renew the cache life just by mounting again', async () => {
 it('clears both caches on logout', async () => {
   seed(STATUS_KEY, { connected: true, source: 'google_oauth', googleEmail: 'a@b.c' })
   seed(EVENTS_KEY, { events, startDate: '2026-10-26', endDate: '2026-11-16', lastFetched: Date.now() })
-  ;(useSession as jest.Mock).mockReturnValue({ status: 'unauthenticated', data: null })
+  ;(useAccount as jest.Mock).mockReturnValue({ status: 'unauthenticated', data: null })
 
   render(<CalendarProvider><Probe /></CalendarProvider>)
 

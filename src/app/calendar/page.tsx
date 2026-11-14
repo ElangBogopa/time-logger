@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchEntries, csrfFetch } from '@/lib/api'
 import { unconfirmedEvents } from '@/lib/calendar-match'
@@ -74,7 +74,7 @@ function formatDateDisplay(dateStr: string): { label: string; date: string; isFu
 }
 
 function CalendarContent() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   const router = useRouter()
   const searchParams = useSearchParams()
   // Initialize date eagerly so cache lookups work on first render (no skeleton flash)

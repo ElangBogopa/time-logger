@@ -1,5 +1,35 @@
 # CLAUDE.md - Time Logger Project Guide
 
+## Branches: work on `dev`, never push to `main`
+
+This comes before everything else in this file.
+
+- **`main` is what people use.** Vercel deploys it to production on every
+  push, and the hourly reminders workflow runs from it.
+- **`dev` is where every change goes.** Check which branch you are on
+  before editing (`git branch --show-current`). If it is `main`, switch to
+  `dev` first (`git switch dev`). Commit to `dev` and push to `origin dev`,
+  and only when asked to commit or push at all. One standing exception,
+  given by the owner: `/do-build` commits to `dev` by itself once its checks
+  pass, because a build is only reviewed once committed. It still does not
+  push. `/do-fix` does the same for the fixes it makes.
+- **Never commit to, push to, or merge into `main` on your own.** Not for
+  a one-line fix, not for a docs change, not because the tests pass, and
+  not because an earlier message approved an earlier merge.
+- **`main` changes only by merging `dev`, and only when the owner says so
+  in that conversation**, in words that name the merge ("merge dev into
+  main"). "Commit and push" means `dev`. If it is unclear, ask.
+- **Before asking for a merge, the change is reviewed thoroughly**: read
+  the full diff against `main` (`git diff main...dev`), and run
+  `npx tsc --noEmit`, `npm test`, `npm run test:tz`, `npm run lint` and
+  `npm run build`. Say what was checked and what was not, then wait.
+- **When `dev` is merged into `main`, close the review log in the same
+  commit**: rename `docs/reviews/open.md` to
+  `docs/reviews/merged-YYYY-MM-DD.md`. `docs/reviews/README.md` says what
+  the log is for.
+- A push to `dev` gets a Vercel preview deployment, which is where a
+  change is tried on a phone before it reaches `main`.
+
 ## Project Overview
 
 Time tracking app with AI-powered activity categorization. Users log activities manually or import from Google Calendar. AI categorizes and provides witty commentary on confirmed entries only.
@@ -89,6 +119,12 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - Must always show full 24 hours (0-24) with `h-[500px] overflow-y-scroll`
 - Touch drag-to-create: 150ms hold delay to distinguish from scroll
 - Current time indicator only shown on today
+- **Known bug, not fixed:** Escape may not cancel a ghost-entry drag. The
+  Escape listener in `hooks/useGhostEvents.ts` depends on
+  `ghostInteractionRef.current`, and a ref change does not re-render, so
+  the listener is only attached if something else renders mid-drag. The
+  lint rule that flags it is silenced there with a comment. Fixing it means
+  holding the interaction in state, which touches the drag code.
 
 ### Calendar API Caching
 - CalendarContext caches events for ±7/14 days from today
@@ -124,6 +160,18 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - `/api/cron/engagement` (streak and "we miss you" nudges) is no longer on
   any schedule. It is out of step with how the app talks and is left
   unscheduled rather than rewritten.
+
+### Who is signed in
+- A route asks `getAppSession()` (`lib/session.ts`); a screen asks
+  `useAccount()` and signs out or reconnects through `signOutTo()` and
+  `reconnectGoogle()` (`hooks/useAccount.ts`); a Google token for the
+  calendar or tasks comes from `getGoogleAccessToken()`
+  (`lib/google-token.ts`). All three wrap NextAuth.
+- **Nothing else imports `next-auth`.** The sign-in itself does (`lib/auth.ts`,
+  `lib/auth-adapter.ts`, the `[...nextauth]` route, the login page and
+  `Providers.tsx`), and `session-discipline.test.ts` fails if any other
+  file does. That is what lets the provider change without touching every
+  route and screen again.
 
 ### A new table is also something to export and to delete
 - `lib/account-data.ts` lists every table that holds something about a
@@ -175,12 +223,15 @@ src/
 ├── contexts/
 │   └── CalendarContext.tsx   # Calendar event caching
 ├── hooks/                    # Data fetching + timeline interaction hooks
+│   └── useAccount.ts         # useAccount(), signOutTo(), reconnectGoogle(): who is signed in, for every screen
 ├── lib/
 │   ├── types.ts              # TimeEntry, TimeCategory, date + domain helpers
 │   ├── palette.ts            # Every data colour, defined once
 │   ├── time-utils.ts         # Time formatting, calculations
 │   ├── supabase-server.ts    # Supabase client (server-side; the only one)
 │   ├── auth.ts               # NextAuth options
+│   ├── session.ts            # getAppSession(): who is asking, for every API route
+│   ├── google-token.ts       # The Google access token for calendar + tasks, from either source
 │   ├── account-data.ts       # Every table that holds a person's data; export + delete (server)
 │   ├── api.ts                # Client-side fetch wrappers (csrfFetch)
 │   └── rate-limit.ts         # API rate limiting

@@ -22,6 +22,7 @@ export default function AnimatedCheckbox({ completed, onToggle, size = 'md', rea
 
   useEffect(() => {
     if (completed && !wasCompleted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state driven by prop changes
       setJustCompleted(true)
       const timer = setTimeout(() => setJustCompleted(false), 1000)
       return () => clearTimeout(timer)

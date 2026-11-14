@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sun, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getUserToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
@@ -43,7 +43,7 @@ const tabs: { id: ReviewTab; label: string; icon: React.ElementType }[] = [
 ]
 
 function ReviewContent() {
-  const { status } = useSession()
+  const { status } = useAccount()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<ReviewTab>(

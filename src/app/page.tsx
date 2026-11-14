@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getUserToday, getRealToday, shiftDateString, TimePeriod } from '@/lib/types'
 import { buildSessionInfos } from '@/lib/session-utils'
@@ -32,7 +32,7 @@ const MetricDetailSheet = dynamic(
 )
 
 function HomeContent() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAccount()
   const router = useRouter()
   const searchParams = useSearchParams()
 

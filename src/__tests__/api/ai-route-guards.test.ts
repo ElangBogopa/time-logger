@@ -25,7 +25,7 @@ jest.mock('next/server', () => ({
   },
 }))
 
-jest.mock('next-auth', () => ({ getServerSession: jest.fn() }))
+jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
 jest.mock('@/lib/supabase-server', () => ({
   supabase: { from: jest.fn(() => ({ select: jest.fn() })) },
@@ -37,7 +37,7 @@ jest.mock('openai', () => ({
   },
 }))
 
-import { getServerSession } from 'next-auth'
+import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 
 type AiRoute = { POST: (request: NextRequest) => Promise<unknown> }
@@ -90,7 +90,7 @@ describe('AI routes reject unauthenticated callers', () => {
   })
 
   it.each(ROUTES)('$name returns 401 with no session', async ({ load, body }) => {
-    ;(getServerSession as jest.Mock).mockResolvedValue(null)
+    ;(getAppSession as jest.Mock).mockResolvedValue(null)
 
     const { POST } = await load()
     const response = (await POST(mockRequest(body))) as { status: number; body: { error?: string } }
@@ -102,7 +102,7 @@ describe('AI routes reject unauthenticated callers', () => {
 
   it.each(ROUTES)('$name returns 401 for a session with no user id', async ({ load, body }) => {
     // A session object can exist without a usable user id; that must not pass.
-    ;(getServerSession as jest.Mock).mockResolvedValue({ user: { email: 'nobody@example.com' } })
+    ;(getAppSession as jest.Mock).mockResolvedValue({ user: { email: 'nobody@example.com' } })
 
     const { POST } = await load()
     const response = (await POST(mockRequest(body))) as { status: number }

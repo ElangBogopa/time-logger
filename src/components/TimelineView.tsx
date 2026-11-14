@@ -73,6 +73,7 @@ export default function TimelineView({
   useEffect(() => {
     const hasSeenHint = localStorage.getItem('timeline-touch-hint-seen')
     if (!hasSeenHint) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is read after mount so the first render matches the server's
       setShowTouchHint(true)
     }
   }, [])
@@ -158,6 +159,7 @@ export default function TimelineView({
     if (typeof window === 'undefined') return
     try {
       const stored = localStorage.getItem(dismissedStorageKey)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-reading localStorage when the date changes
       setDismissedEventIds(stored ? new Set(JSON.parse(stored) as string[]) : new Set())
     } catch {
       setDismissedEventIds(new Set())

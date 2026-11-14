@@ -13,11 +13,11 @@
  */
 
 import { render, screen, waitFor, within } from '@testing-library/react'
-import { useSession } from 'next-auth/react'
+import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch, fetchEntries } from '@/lib/api'
 import { getUserToday, getWeekStartForDate, shiftDateString } from '@/lib/types'
 
-jest.mock('next-auth/react', () => ({ useSession: jest.fn() }))
+jest.mock('@/hooks/useAccount', () => ({ useAccount: jest.fn() }))
 const stableRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() }
 const stableParams = new URLSearchParams('')
 jest.mock('next/navigation', () => ({
@@ -79,7 +79,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   window.localStorage.clear()
   window.sessionStorage.clear()
-  ;(useSession as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
+  ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
   ;(fetchEntries as jest.Mock).mockResolvedValue([])
   ;(csrfFetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ commentary: 'A steady day.' }) })
 })

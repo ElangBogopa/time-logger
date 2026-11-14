@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { getToken } from 'next-auth/jwt'
-import { authOptions } from '@/lib/auth'
+import { getAppSession } from '@/lib/session'
+import { getSignInGoogleTokens } from '@/lib/google-token'
 import { supabase } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
 
     if (!session?.user?.id) {
       console.log('[Calendar Status] No session.user.id')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('[Calendar Status] User ID:', session.user.id, 'Auth provider:', session.authProvider)
-
     // Google OAuth users have calendar access built-in
     if (session.authProvider === 'google') {
-      const token = await getToken({ req: request })
-      if (token?.accessToken) {
+      const { accessToken } = await getSignInGoogleTokens(request)
+      if (accessToken) {
         return NextResponse.json({
           connected: true,
           source: 'google_oauth',
@@ -28,7 +25,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Email users need to check calendar_connections table
-    console.log('[Calendar Status] Checking calendar_connections for user_id:', session.user.id)
     const { data: connection, error: connectionError } = await supabase
       .from('calendar_connections')
       .select('google_email, connected_at, token_expires_at')
@@ -63,7 +59,7 @@ export async function GET(request: NextRequest) {
 // DELETE to disconnect calendar
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppSession()
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
