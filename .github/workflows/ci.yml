@@ -67,10 +67,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Not blocking yet: the repo currently has 64 pre-existing lint errors,
-      # mostly React 19 compiler rules (set-state-in-effect, purity). Findings
-      # still show in the log. Drop continue-on-error once that backlog is
-      # cleared, so lint regressions start failing the build.
+      # Blocking: lint is at 0 errors, so any new error fails the run.
+      # Warnings do not fail it.
       - name: Lint
         run: npm run lint
-        continue-on-error: true

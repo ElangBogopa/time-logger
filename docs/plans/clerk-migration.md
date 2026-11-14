@@ -16,7 +16,11 @@ brief. They are numbered by the **"Why" list below**. (The steps under
   id can fall back to the Google account id, so rows can be written under
   it), 5 (pages protected only in the browser), 6 (auth callbacks
   in `src/lib/auth.ts` and `src/lib/auth-adapter.ts` still log emails
-  and user ids; Phase A removed such lines from the API routes only),
+  and user ids, and so do `src/app/api/calendar/callback/route.ts` (three
+  lines: user ids and the Google email) and
+  `src/app/api/calendar/connect/route.ts` (one line: the user id); Phase A
+  removed such lines only from `calendar/events`, `tasks/google` and
+  `calendar/status`),
   7 (login loses the deep link).
 - Onboarding: 8 (Today flashes before the sheet), 9 ("Nothing yet"
   while the calendar loads), 10 (the name step asks for a name Google
@@ -125,7 +129,8 @@ succeeds; `npm run lint` 47 errors / 143 warnings, identical to before the
 change (all pre-existing). Not checked: running the app, the preview, a phone.
 (Note, 2026-11-14: that count included about 87 warnings from the service
 worker next-pwa writes into `public/`, which is now neither tracked nor
-linted. The same code now lints at 47 errors / 56 warnings.)
+linted. The same code now lints at 47 errors / 56 warnings. Later the
+same day `1a40caa` cleared the errors: 0 errors / 54 warnings.)
 
 ### Phase A — what I am not sure about
 
@@ -137,12 +142,19 @@ linted. The same code now lints at 47 errors / 56 warnings.)
 - **Logs changed.** Lines that printed user ids, emails and token-refresh
   responses are gone; the refresh failure now logs only Google's error code.
   If anyone relies on those lines in Vercel logs, they will miss them.
-  This covers the API routes only: the callbacks in `src/lib/auth.ts` and
-  `src/lib/auth-adapter.ts` still log emails and user ids ("Why" item 6).
+  This covers `calendar/events`, `tasks/google` and `calendar/status`
+  only. The callbacks in `src/lib/auth.ts` and `src/lib/auth-adapter.ts`
+  still log emails and user ids, and so do `calendar/callback` and
+  `calendar/connect` ("Why" item 6).
 - **`useAccount` returns a fresh object each render.** Every caller
   destructures it, and `data`/`status` themselves are stable, so no effect
   should re-run — but I did not test every screen in a browser.
-- **No new tests for the three helpers.** They are covered only through the
+- **Tests for the helpers.** (Updated 2026-11-14: `1a40caa` added
+  `google-token.test.ts`, which covers `getGoogleAccessToken` and
+  `getSignInGoogleTokens`, and `session-discipline.test.ts`, which fails if
+  anything else imports `next-auth`. `getAppSession` and `useAccount` still
+  have no test of their own.) As first written: no new tests for the three
+  helpers. They are covered only through the
   existing route and screen tests.
 - **The rename was done by script.** Typecheck, tests and build pass, but I
   have not read all 80 changed files under `src/` (81 in the commit)
@@ -340,9 +352,9 @@ built on NextAuth from their own briefs, not from these steps.
 ## Done when
 
 - `npx tsc --noEmit` clean; `npm test` passes with the new tests;
-  `npm run test:tz` passes; `npm run lint` stays at 47 errors / 56 warnings
-  or fewer (taken on 2026-11-14, with the generated service worker
-  excluded from lint; the count is the same before and after a build);
+  `npm run test:tz` passes; `npm run lint` has 0 errors and no more than
+  54 warnings (taken on 2026-11-14 after `1a40caa` cleared the errors; CI
+  now fails on any lint error);
   `npm run build` succeeds, including its `postbuild` service-worker check.
 - On the Vercel preview, on an iPhone in Safari and as a Home Screen app: a new
   Google user goes through onboarding, connects the calendar, sees real

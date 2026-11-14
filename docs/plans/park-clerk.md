@@ -155,7 +155,15 @@ asked; this is what the two commits did that they do not describe.
   first.
 - The pass mark "47 errors / 143 warnings" under "Done when" was counted
   with the generated service worker linted. It is no longer linted; the
-  same code is 47 errors / 56 warnings, before or after a build.
+  same code is 47 errors / 56 warnings, before or after a build. Since
+  `1a40caa` it is 0 errors / 54 warnings, and CI fails on any lint error.
+- "Why" says Phase A removed the log lines that printed emails and user
+  ids "from the API routes". It removed them from `calendar/events`,
+  `tasks/google` and `calendar/status` only. Four remain:
+  `src/app/api/calendar/callback/route.ts` (three: user ids and the Google
+  email) and `src/app/api/calendar/connect/route.ts` (one: the user id).
+  They belong with "Why" item 6 of `clerk-migration.md`, which now names
+  them.
 - `clerk-migration.md` now numbers its steps B1–B7 and C1–C5, and marks
   Phase C PARKED, so "the Phase C steps reuse the same numbers" no longer
   applies.
