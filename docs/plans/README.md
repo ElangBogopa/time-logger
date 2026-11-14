@@ -9,7 +9,11 @@ only when it matters.
 1. **Plan** — strongest model, new session, **Auto mode**: `/plan <what you want>`.
    It saves a brief here and stops.
 2. **Build** — Sonnet, new session, Auto mode: `/build docs/plans/<name>.md`
-3. **Review** — strongest model, new session, before a merge: `/review`
+3. **Review** — strongest model, new session, before a merge: `/review`.
+   It covers committed and uncommitted work on `dev`, and sorts what it
+   finds into must fix, should fix and optional. Only must-fix findings
+   decide "ready to merge"; fix those, and stay in the same session to do
+   it (switch to Sonnet and say "fix the must-fix findings").
 
 Do not use Plan mode for step 1. Its Approve button starts building at
 once, in the same session and on the same expensive model, and no brief
