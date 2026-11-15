@@ -130,8 +130,6 @@ function week(
     id,
     input: {
       isPartialWeek: false,
-      daysSoFar: 7,
-      daysLogged: 7,
       bestDays: ['Tuesday', 'Thursday'],
       bestHours: ['9 AM', '10 AM'],
       categories: cats.map(([label, hours]) => ({ label, minutes: h(hours) })),
@@ -147,8 +145,6 @@ const WEEK_SCENARIOS: WeekScenario[] = [
   }),
   week('partial', [['Deep Work', 9], ['Sleep', 22], ['Exercise', 1]], {
     isPartialWeek: true,
-    daysSoFar: 3,
-    daysLogged: 3,
     bestDays: ['Monday'],
   }),
   week('leisure-week', [['Entertainment', 30], ['Sleep', 60], ['Meals', 10], ['Shallow Work', 6]], {
@@ -156,7 +152,6 @@ const WEEK_SCENARIOS: WeekScenario[] = [
     bestHours: ['2 PM'],
   }),
   week('thin-week', [['Deep Work', 3], ['Meals', 1]], {
-    daysLogged: 2,
     bestDays: ['Monday'],
     bestHours: ['10 AM'],
   }),
@@ -294,7 +289,7 @@ function describeInput(s: Scenario): string[] {
   }
   const i = s.input
   return [
-    `days covered: ${i.isPartialWeek ? `${i.daysSoFar} of 7 (in progress)` : 'all 7'}; days with anything logged: ${i.daysLogged}`,
+    `week: ${i.isPartialWeek ? 'in progress' : 'finished'}`,
     `hours: ${i.categories.map((c) => `${c.label} ${c.minutes / 60}h`).join(', ')}`,
     `best days: ${i.bestDays.join(', ') || 'none'}; best hours: ${i.bestHours.join(', ') || 'none'}`,
   ]

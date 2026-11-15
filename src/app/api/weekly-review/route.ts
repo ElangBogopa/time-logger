@@ -21,7 +21,7 @@ import { calcBody, calcFocus, calcSocial, METRIC_THRESHOLDS, type EntryRow } fro
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 // Raise this when the coach prompt's voice changes, so old lines are not reused.
-const COACH_PROMPT_VERSION = 5
+const COACH_PROMPT_VERSION = 6
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday
@@ -395,8 +395,6 @@ export async function POST(request: NextRequest) {
     if (hasEnoughData && entries.length > 0) {
       const context = buildWeekReviewContext({
         isPartialWeek,
-        daysSoFar,
-        daysLogged: dayScores.length,
         bestDays,
         bestHours,
         categories: categoryBreakdown,
