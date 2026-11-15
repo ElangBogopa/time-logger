@@ -32,8 +32,11 @@ Start a new session for each step and for each change. A long session
 re-reads its whole history on every message, and that is where credits go.
 
 Once a brief has been built, a line at the top marks it **BUILT - do not
-run again**, with the commit. It stays as the record of what was asked;
-do not point `/do-build` at it.
+run again**, with the date and the title of the commit that built it.
+`/do-build` writes that line itself and commits the brief with the
+build, so a built brief is never left unmarked or untracked. It stays
+as the record of what was asked; `/do-build` refuses a brief marked
+BUILT or PARKED.
 
 The commands are named `/do-think`, `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
 Claude Code has commands of its own called `/plan` and `/review`; typing

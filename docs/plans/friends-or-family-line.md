@@ -1,5 +1,7 @@
 # Friends or family: what the reviews say about time with people
 
+> **BUILT - do not run again.** Built in `dac322b` (2026-11-14). It stays as the record of what was asked.
+
 Closes two findings from review 6 in `docs/reviews/open.md`:
 `meetings-read-as-no-people` (must) and `data-label-read-back` (should).
 
