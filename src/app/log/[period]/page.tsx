@@ -130,7 +130,7 @@ function LogPeriodContent() {
   /** The time range a gap row hands to the quick-log sheet. */
   const [quickLogRange, setQuickLogRange] = useState<{ startTime: string; endTime: string } | null>(null)
   /** A "Same as" row handed to the quick-log sheet: its name, and the category it already has. */
-  const [quickLogPrefill, setQuickLogPrefill] = useState<{ name: string; category: TimeCategory | null } | null>(null)
+  const [quickLogPrefill, setQuickLogPrefill] = useState<{ name: string; category: TimeCategory | null; blankTimes: boolean } | null>(null)
 
   // Soft-delete: track entry IDs pending deletion (hidden from UI, deleted after toast expires)
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
@@ -229,8 +229,11 @@ function LogPeriodContent() {
 
   const handlePickRepeatTime = (row: RepeatRow) => {
     setIsRepeatSheetOpen(false)
-    setQuickLogRange(retimeAfterClash(row, period)) // null: nowhere in this session to put it, the person picks
-    setQuickLogPrefill({ name: row.entry.activity, category: row.entry.category })
+    const range = retimeAfterClash(row, period)
+    setQuickLogRange(range)
+    // No range: nowhere in this session to put it. The add screen opens with empty times,
+    // not its defaults (which can fall in another session), and the person chooses.
+    setQuickLogPrefill({ name: row.entry.activity, category: row.entry.category, blankTimes: !range })
     setIsQuickLogOpen(true)
   }
 
@@ -792,6 +795,7 @@ function LogPeriodContent() {
         initialEndTime={quickLogRange?.endTime}
         initialName={quickLogPrefill?.name}
         knownCategory={quickLogPrefill?.category}
+        blankTimes={quickLogPrefill?.blankTimes}
         onShowToast={setToast}
         userId={userId}
         calendarEvents={calendarEvents}

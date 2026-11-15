@@ -47,4 +47,14 @@ describe('QuickLogModal with a known category', () => {
     expect(categorizeCalls()).toHaveLength(1)
     expect((createEntry as jest.Mock).mock.calls[0][0].category).toBe('chores')
   })
+
+  it('opens with no times, not the day defaults, when told blankTimes, and will not save until they are chosen', () => {
+    render(
+      <QuickLogModal isOpen onClose={jest.fn()} onEntryAdded={jest.fn()} selectedDate="2026-11-03" isPastDay userId="u1" lastEntryEndTime={null}
+        disablePostSubmit initialName="Dentist" knownCategory="self_care" blankTimes />
+    )
+    expect(screen.queryByText(/9:00\s?AM/)).toBeNull()
+    expect(screen.queryByText(/10:00\s?AM/)).toBeNull()
+    expect(screen.getByRole('button', { name: /^(log|add|save)/i })).toBeDisabled()
+  })
 })

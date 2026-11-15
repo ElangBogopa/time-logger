@@ -53,9 +53,11 @@ interface QuickLogModalProps {
   initialName?: string
   /** Category to use instead of /api/categorize while the name is unchanged from initialName */
   knownCategory?: TimeCategory | null
+  /** Open with both times empty, for the person to choose, instead of the day's defaults */
+  blankTimes?: boolean
 }
 
-export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false, onPeriodComplete, disablePostSubmit = false, initialActivity, initialName, knownCategory }: QuickLogModalProps) {
+export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false, onPeriodComplete, disablePostSubmit = false, initialActivity, initialName, knownCategory, blankTimes = false }: QuickLogModalProps) {
   const [activity, setActivity] = useState(initialActivity || '')
   const [notes, setNotes] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -305,6 +307,14 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     if (!isOpen) return
     if (timesInitialized.current) return // Don't re-initialize once set
 
+    // The caller has no time to suggest: leave both empty rather than fall to a default
+    if (blankTimes && !initialStartTime && !initialEndTime) {
+      setStartTime('')
+      setEndTime('')
+      timesInitialized.current = true
+      return
+    }
+
     // If we have drag-created times, use them
     if (initialStartTime && initialEndTime) {
       setStartTime(initialStartTime)
@@ -342,7 +352,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }
     // If initialStartTime/initialEndTime are undefined but might arrive later,
     // don't mark as initialized yet - wait for them
-  }, [isOpen, initialStartTime, initialEndTime, lastEntryEndTime, isFutureDay, isPastDay, calendarEvents])
+  }, [isOpen, initialStartTime, initialEndTime, lastEntryEndTime, isFutureDay, isPastDay, calendarEvents, blankTimes])
 
   const handleSuggestionClick = () => {
     if (suggestedEvent) {

@@ -126,7 +126,9 @@ export function repeatRowsLeft(candidate: RepeatCandidate, dayEntries: TimeEntry
  * offered: the entry would be logged there and this session would keep
  * offering the row. The copied times are no use either, since the clash
  * already holds them and saving would be refused. So there is no suggestion
- * and the add screen opens without times, for the person to choose.
+ * and the add screen is told to open with empty times (`blankTimes`), for the
+ * person to choose. Without that it would fall to its own defaults, which can
+ * sit in another session.
  */
 export function retimeAfterClash(row: RepeatRow, period: TimePeriod): { startTime: string; endTime: string } | null {
   const { entry, clash } = row

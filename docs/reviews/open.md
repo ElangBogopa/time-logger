@@ -21,3 +21,11 @@ Verdict: Ready to merge (no must fix)
 - heading-inside-button · the h2 in the "Same as" button is now a block span with the same eyebrow style · believes: fixed
 - repeat-rows-memo-deps · visibleEntries is memoised on entries and pendingDeletes, and repeatRows depends on it; the eslint-disable is gone · believes: fixed
 - clash-fallback-opens-on-clash · when the move would leave the session or pass midnight, retimeAfterClash returns null and the add screen opens with no times, instead of the copied times the clash already holds; tests updated · believes: fixed
+
+## Review 3 — 2026-11-15 — Opus 5.5 — reviewed 92a044c
+Verdict: Ready to merge (no must fix)
+- resolved: heading-inside-button, repeat-rows-memo-deps, clash-fallback-opens-on-clash (saving is no longer refused for the copied times)
+- should · clash-fallback-default-times · src/lib/repeat-session.ts:125-130, src/components/QuickLogModal.tsx:313-340 · caused by the fix: "opens without times" is untrue. A null range gets the add screen's defaults, 09:00–10:00 on a past day and last entry's end to now today, so these times can fall in another session. Saved unchanged, the activity is logged there and this session keeps offering the row. The comment and the fix log say otherwise
+
+## Fix attempt 3 — 2026-11-15 — Sonnet 5.5 — commit pending
+- clash-fallback-default-times · the add screen gets a `blankTimes` prop; when `retimeAfterClash` returns null the page passes it, so the screen opens with both times empty (save stays disabled until chosen) instead of its 09:00–10:00 or last-entry-to-now defaults; comment corrected; test added · believes: fixed
