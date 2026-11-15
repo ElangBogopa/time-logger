@@ -17,7 +17,10 @@ This comes before everything else in this file.
   itself when its run ends with nothing left that must or should be
   fixed, after at least one review
   (a brief that says no review is needed is still reviewed), so the preview
-  is ready to try. A run that stopped early does
+  is ready to try. It does not stop to ask
+  about a choice the plan made; its report lists those, the ones the
+  owner would notice under "Decided for you", to reverse after trying the
+  preview. A run that stopped early does
   not push. It never touches `main`.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
   a one-line fix, not for a docs change, not because the tests pass, and

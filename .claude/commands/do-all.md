@@ -60,15 +60,26 @@ exporting data, payments, reminders, or the shape of the database.
 Command: `do-plan`, with the request above as its arguments. Add to the
 prompt:
 
-> You cannot ask the owner anything. If step 2 of the command would have
-> you ask, do not write the brief: reply with `QUESTIONS:` and the
-> questions, in plain language. Otherwise save the brief, and end your
-> reply with every choice you made that the request did not settle,
-> sorted into two lists:
+> You cannot ask the owner anything, and the run does not stop for a
+> guess. Ask a question only when no sensible brief can be written
+> without the answer: the request is too vague to plan, it breaks a
+> rule in `CLAUDE.md`, or it rests on something that is not true of the
+> code. Then do not write the brief: reply with `QUESTIONS:` and the
+> questions, in plain language. In every other case, where step 2 of
+> the command would have you ask, make the choice you would recommend,
+> write it into the brief as decided, and carry on. The brief's "Not
+> decided" part says "nothing": a choice you made goes in the brief and
+> in the lists below, not there.
+>
+> Save the brief, and end your reply with every choice you made that
+> the request did not settle, sorted into two lists. A choice the
+> request states, allows or directly implies is not a guess: list it in
+> neither.
 >
 > `GUESSES THE OWNER WOULD NOTICE:` choices about what a person sees or
 > reads in the app, a person's data, a rule in `CLAUDE.md`, or what is
-> in or out of the change.
+> in or out of the change. One plain line each: what you chose, and the
+> other choice.
 >
 > `GUESSES THE OWNER WOULD NOT NOTICE:` everything else — the name of a
 > test, where a file goes, which model or effort, wording inside code
@@ -79,19 +90,19 @@ prompt:
 
 When it returns, read the brief it saved.
 
-**Stop and ask the owner** if the helper returned questions, if it
-listed anything under `GUESSES THE OWNER WOULD NOTICE`, or if the brief's
-"Not decided" part says anything other than "nothing". Read the other
-list too: a guess there that plainly falls under one of the first list's
-kinds counts as the first kind. Put the questions to the owner in plain
-language, one message, and wait. When they are answered, start a new plan
-helper with the original request followed by "The owner has since
-settled: <the answers>. Replace the brief at <path>." Repeat until a
-brief comes back with no questions, nothing the owner would notice
-guessed, and nothing undecided.
+**Stop and ask the owner** only if the helper returned `QUESTIONS:`,
+or if the brief's "Not decided" part says anything other than
+"nothing". Put the questions, or what is undecided, to the owner in
+plain language, one message, and wait. When they are answered, start
+a new plan helper with the original request followed by "The owner
+has since settled: <the answers>. Replace the brief at <path>."
+Repeat until a brief comes back with no questions and nothing
+undecided.
 
-Do not stop for `GUESSES THE OWNER WOULD NOT NOTICE`. Keep that list,
-from the plan helper whose brief is built, for the report.
+Never stop for a guess, in either list. Keep both lists, from the plan
+helper whose brief is built, for the report. A guess under
+`GUESSES THE OWNER WOULD NOT NOTICE` that plainly falls under one of
+the first list's kinds goes in the report with the first list.
 
 Then read the brief's "Who should build and review this" part and note
 the build model, the review model and the effort.
@@ -182,6 +193,10 @@ model to switch to: `/do-plan` again when a finding says stop fixing,
 ## The report
 
 Short, plain language, in this order:
+- **Decided for you**: the plan's `GUESSES THE OWNER WOULD NOTICE`,
+  one plain line each saying what was chosen and what the other choice
+  was, so the owner can reverse one after trying the `dev` preview; or
+  "nothing".
 - **Built**: what the change is, in two lines, and the brief's path.
 - **Rounds**: how many reviews and how many fixes.
 - **Fixed**: each finding fixed, one line, and the model that fixed it.

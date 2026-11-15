@@ -31,11 +31,17 @@ whether to carry on with the optional findings. There is always
 at least one review before it pushes, even when the plan said none
 was needed.
 
-It stops and asks you only if the plan had a question, left something
-undecided, or had to guess at something you would notice — what the
-app shows or says, your data, a rule in `CLAUDE.md`, or what the
-change includes. Guesses you would never notice, like a test's name
-or where a file goes, it makes and lists in its report. It stops and
+It does not stop for choices the plan had to make. The planner makes
+the one it would recommend and carries on, and the report lists them:
+the ones you would notice — what the app shows or says, your data, a
+rule in `CLAUDE.md`, or what the change includes — first, under
+**Decided for you**, each with the other choice, so you can reverse
+one after trying the `dev` preview; the rest, like a test's name or
+where a file goes, under **Guessed without asking**. A choice your
+request already made is not listed at all. It stops and asks you only
+when the plan could not be written — the request is too vague, breaks
+a rule in `CLAUDE.md`, or rests on something not true of the code —
+or when the plan left something undecided. It stops and
 does not push if a finding comes back after a stronger
 model has tried it, or after five rounds, and tells you which command
 to run by hand next.
