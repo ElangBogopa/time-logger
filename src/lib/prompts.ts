@@ -164,39 +164,73 @@ Write the 2-3 sentences now:`
 
 export interface WeekReviewContextInput {
   isPartialWeek: boolean
-  daysSoFar: number
-  daysLogged: number
   bestDays: string[]
   bestHours: string[]
   categories: { label: string; minutes: number }[]
 }
 
+// No day counts are sent: the model turned them into remarks about how much was logged.
 export function buildWeekReviewContext(input: WeekReviewContextInput): string {
   const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
   // Only a finished week can have had none: one still in progress has not.
   const noneThisWeek =
     !input.isPartialWeek && input.categories.length > 0 && peopleMinutes(input.categories) === 0
+  // Sleep last: it is the largest category for anyone who logs it, and a
+  // line that opens with it presents it as the week's finding.
+  const sleep = CATEGORY_LABELS.sleep
+  const ordered = [...input.categories].sort(
+    (a, b) => Number(a.label === sleep) - Number(b.label === sleep) || b.minutes - a.minutes
+  )
+  // A week with no best focus days or hours gets the largest activity apart
+  // from sleep stated for it. Asked to find it, the model named the wrong
+  // one twice: rest was 10h, and it said chores (6h) took the most.
+  const noFocus = input.bestDays.length === 0 && input.bestHours.length === 0
+  const waking = input.categories.filter((c) => c.label !== sleep && c.minutes > 0)
+  const topMinutes = Math.max(0, ...waking.map((c) => c.minutes))
+  const top = waking.filter((c) => c.minutes === topMinutes)
+  const most =
+    noFocus && top.length > 0
+      ? `- Most hours apart from sleep: ${top.map((c) => c.label).join(' and ')} (${hoursOf(topMinutes)}h${top.length > 1 ? ' each' : ''})`
+      : ''
+  const head = [
+    'Weekly Review Data:',
+    input.isPartialWeek ? 'The week is still in progress.' : '',
+    input.bestDays.length > 0 ? `- Best focus days: ${input.bestDays.join(', ')}` : '',
+    input.bestHours.length > 0 ? `- Best focus hours: ${input.bestHours.join(', ')}` : '',
+    most,
+  ].filter((l) => l !== '')
   return `
-Weekly Review Data:
-- Days covered: ${input.isPartialWeek ? `${input.daysSoFar} of 7 — the week is still in progress` : 'all 7'}
-- Days with anything logged: ${input.daysLogged}
-- Best focus days: ${input.bestDays.join(', ') || 'Not enough data'}
-- Best focus hours: ${input.bestHours.join(', ') || 'Not enough data'}
+${head.join('\n')}
 
 Hours by category${input.isPartialWeek ? ' so far' : ''}:
-${input.categories.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
+${ordered.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
 ${noneThisWeek ? `\n${NO_FRIENDS_OR_FAMILY}` : ''}
 
 `
 }
 
-export function buildWeekReviewSystemPrompt(): string {
-  return `You are writing a brief weekly reflection from someone's time log (3-4 sentences max).
+// A week with no best focus days or hours is told nothing about them: told
+// to call them "best focus", the model wrote that there was no focused work
+// and suggested using best focus hours that did not exist. Its pattern points
+// at the stated "Most hours apart from sleep" fact, so nothing is ranked here.
+export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 'bestDays' | 'bestHours'>): string {
+  const days = focus.bestDays.length > 0
+  const hours = focus.bestHours.length > 0
+  const named = days && hours ? 'days and hours' : days ? 'days' : 'hours'
+  const pattern =
+    days || hours
+      ? `such as the ${named} where the focused work fell`
+      : 'such as the activity the data gives as taking the most hours apart from sleep, named as the data names it'
+  const bestFocus =
+    days || hours
+      ? `\nCall the ${named} in the data "best focus" ${named}, as the data does; never call them productive.`
+      : ''
+  return `You are writing a brief weekly reflection from the week's hours (3-4 sentences max).
 
 Write it in this order:
 1. What the week held: two or three specific things from the data, with their hours.
-2. One pattern in the data, stated as a fact, such as the days or hours where the focused work fell. Leave this out if the data shows none.
-3. One option for next week, in a single plain sentence that starts from a fact in the data and names a day, an hour or an activity. This is the only sentence that is not a statement of what happened. It is an option, not a correction: no "should", no "need to", no "must".
+2. One pattern in the data, stated as a fact, ${pattern}. Leave this out if the data shows none.
+3. One option for next week, in a single plain sentence that starts from a fact in the data and names a day, an hour or an activity. It is about something to do, not about something to record. This is the only sentence that is not a statement of what happened. It is an option, not a correction: no "should", no "need to", no "must".
 
 Use "you" language. Reference specific data from their week.
 
@@ -205,10 +239,8 @@ ${REVIEW_VOICE}
 Don't use bullet points - write in flowing prose.
 Keep it concise - no more than 4 sentences total.
 The person's scores are on screen above your words: do not mention scores or targets, and do not sum the week up with a verdict.
-The hours logged only say how much of the week was written down. Never praise or criticise the total, and never treat logging fewer hours as an achievement.
-Sleep is the largest category for anyone who logs it; do not present that as a finding.
-If the week is still in progress, say "so far" and do not compare it with a full week.
-Call the days and hours in the data "best focus" days and hours, as the data does; never call them productive.`
+Write about what the time went to, never about the record of it. Say "you spent" or name the activity and its hours. Say nothing about how many days or hours the data covers, and do not suggest writing more down. Sleep is listed last and is not a finding.
+If the week is still in progress, say "so far" and do not compare it with a full week.${bestFocus}`
 }
 
 /** One line per activity, with the category the classifier assigned. */

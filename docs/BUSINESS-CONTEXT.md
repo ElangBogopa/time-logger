@@ -5,7 +5,7 @@ positioning, pricing, launch, users. Read this before advising. It is
 rewritten whenever `dev` is merged into `main`, so it describes what
 people using the app have today.
 
-Last updated: 15 November 2026, at release `b43abcc`.
+Last updated: 15 November 2026, at release `510ada2`.
 
 ## The product in one paragraph
 
@@ -35,8 +35,9 @@ performance. Not exam candidates, not teams, not general time-trackers.
   how much focused work, exercise and time with people fell inside their
   windows — stated as time, never as a fourth score. Each comes with a few
   written lines that state what happened, with the hours, and neither
-  praise nor console. A finished week with no time with friends or family
-  is told so, once; a single day never is.
+  praise nor console. The weekly lines say what the time held and no longer
+  remark on how much was logged. A finished week with no time with friends
+  or family is told so, once; a single day never is.
 - **Reminders:** log your morning at 12, afternoon at 6, evening at 9, in
   their own timezone, skipped when already logged. The Reminders screen
   says what to do while they are off, and says plainly that nothing will be
@@ -57,8 +58,10 @@ performance. Not exam candidates, not teams, not general time-trackers.
   Google has actually withdrawn access, not when Google was briefly
   unreachable.
 - **The written reviews** are now in the voice below. They are checked
-  against it with real examples; the weekly lines still sometimes remark on
-  how much was logged, which is being read through before more is changed.
+  against it with real examples. The weekly lines have stopped remarking on
+  how much was logged. Still rough: a week with no focused work can name
+  its biggest activity twice, and a weekly line sometimes suggests time
+  with friends unprompted.
 - **Name:** "Better" is a placeholder. No name, no domain yet. This is the
   next decision and it blocks the three items below.
 - **Homepage:** none. Needs the name and domain.

@@ -23,8 +23,6 @@ type Hours = { label: string; minutes: number }[]
 const week = (categories: Hours, extra: Partial<WeekReviewContextInput> = {}) =>
   buildWeekReviewContext({
     isPartialWeek: false,
-    daysSoFar: 7,
-    daysLogged: 7,
     bestDays: [],
     bestHours: [],
     categories,
@@ -57,7 +55,7 @@ describe('time with friends or family in the review prompts', () => {
   })
 
   it('gives the model no wording about it to copy', () => {
-    for (const text of [REVIEW_VOICE, buildWeekReviewSystemPrompt(), ...DAY_PROMPTS]) {
+    for (const text of [REVIEW_VOICE, buildWeekReviewSystemPrompt({ bestDays: ['Tuesday'], bestHours: ['9 AM'] }), buildWeekReviewSystemPrompt({ bestDays: [], bestHours: [] }), ...DAY_PROMPTS]) {
       expect(text).not.toMatch(/time with people/i)
       expect(text).not.toMatch(/friends or family/i)
     }
@@ -82,7 +80,7 @@ describe('time with friends or family in the review prompts', () => {
   it('says nothing when the week had some, is still in progress, or has no breakdown', () => {
     expect(week([{ label: 'Faith', minutes: 300 }])).not.toContain(NO_FRIENDS_OR_FAMILY)
     expect(week([{ label: 'Calls', minutes: 180 }, { label: 'Sleep', minutes: 3000 }])).not.toContain(NO_FRIENDS_OR_FAMILY)
-    expect(week([{ label: 'Sleep', minutes: 1300 }], { isPartialWeek: true, daysSoFar: 3 })).not.toContain(
+    expect(week([{ label: 'Sleep', minutes: 1300 }], { isPartialWeek: true })).not.toContain(
       NO_FRIENDS_OR_FAMILY
     )
     expect(week([])).not.toContain(NO_FRIENDS_OR_FAMILY)
@@ -91,7 +89,7 @@ describe('time with friends or family in the review prompts', () => {
   it('nowhere uses the old label', () => {
     expect(week([{ label: 'Sleep', minutes: 3000 }])).not.toContain('Time with people')
     expect(week([{ label: 'Social', minutes: 300 }])).not.toContain('Time with people')
-    expect(week([{ label: 'Sleep', minutes: 1300 }], { isPartialWeek: true, daysSoFar: 3 })).not.toContain(
+    expect(week([{ label: 'Sleep', minutes: 1300 }], { isPartialWeek: true })).not.toContain(
       'Time with people'
     )
   })
@@ -128,12 +126,12 @@ describe('time with friends or family in the review prompts', () => {
     const extra = { bestDays: ['Tuesday'], bestHours: ['9 AM'] }
     const weekLabels = [
       ...labelsIn(week(cats, extra).split('\n')),
-      ...labelsIn(week(cats, { ...extra, isPartialWeek: true, daysSoFar: 3 }).split('\n')),
+      ...labelsIn(week(cats, { ...extra, isPartialWeek: true }).split('\n')),
     ]
 
     // The test is worth nothing if the pattern stops finding labels.
     expect(dayLabels).toEqual(expect.arrayContaining(['Time by category', 'Time tracked', 'Plan', 'Noted', 'Evening mood', 'Longest focus session', 'Deep Work']))
-    expect(weekLabels).toEqual(expect.arrayContaining(['Weekly Review Data', 'Days covered', 'Hours by category', 'Sleep']))
+    expect(weekLabels).toEqual(expect.arrayContaining(['Weekly Review Data', 'Best focus days', 'Best focus hours', 'Hours by category', 'Sleep']))
     for (const label of [...dayLabels, ...weekLabels]) expect(known).toContain(label)
   })
 })
