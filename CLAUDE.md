@@ -135,12 +135,7 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - Must always show full 24 hours (0-24) with `h-[500px] overflow-y-scroll`
 - Touch drag-to-create: 150ms hold delay to distinguish from scroll
 - Current time indicator only shown on today
-- **Known bug, not fixed:** Escape may not cancel a ghost-entry drag. The
-  Escape listener in `hooks/useGhostEvents.ts` depends on
-  `ghostInteractionRef.current`, and a ref change does not re-render, so
-  the listener is only attached if something else renders mid-drag. The
-  lint rule that flags it is silenced there with a comment. Fixing it means
-  holding the interaction in state, which touches the drag code.
+- A calendar block opens its confirm sheet on a tap or click and cannot be dragged.
 
 ### Calendar API Caching
 - CalendarContext caches events for ±7/14 days from today
