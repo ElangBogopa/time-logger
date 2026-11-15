@@ -275,3 +275,32 @@ Verdict: Ready to merge (0 must fix)
 - flow-understates-do-all-stops · FLOW.md sentence rewritten without "only", listing every stop: unwritable plan, data or rule question, undecided part, dirty working tree, build or fix with no commit, stop-fixing finding, five rounds, wrong branch · believes: fixed
 - checks: tsc clean; npm test 1151 passed, 13 skipped; test:tz 42 passed; lint 0 errors; build succeeded
 - not checked: /do-all actually run with the new rules
+
+## Review 17 — 2026-11-15 — Opus 5.5 — reviewed 9e0926a
+Verdict: Ready to merge (0 must fix)
+- seventeenth pass over the branch, narrow pass over fix 9e0926a: text in do-all.md, FLOW.md, plans/README.md and the /do-all exception in CLAUDE.md, nothing under src, scripts or supabase. Third pass or more: trying the change on a phone, and a real /do-all run, are the better tests
+- resolved: data-choices-no-longer-stop (do-all.md:67-70 sends an unsettled choice about a person's data or a CLAUDE.md rule to QUESTIONS, and the would-notice list no longer holds them; FLOW.md, plans/README.md and CLAUDE.md say the same); not-decided-stop-unreachable (do-all.md:98-100 and FLOW.md now call it a backstop, which is true); moved-guess-lacks-other-choice (do-all.md:110-112 carries the other choice or says "other choice not given"); flow-understates-do-all-stops (FLOW.md:41-52 drops "only" and names the dirty tree, the no-commit build or fix, the stop-fixing finding, five rounds and the wrong branch; only the Plan mode refusal is left out, which happens before a run starts)
+- recurring: (none)
+- still open · should · judge-target-missed, backfill-sends-no-hours, week-suggestion-proposes-friends · unchanged, from before the /do-all work
+- harm from the fix: no must or should. The four /do-all descriptions agree with each other
+- optional · data-stop-reverses-owner-plan · .claude/commands/do-all.md:67-69, CLAUDE.md:21-23 · caused by the fix: brings back a stop the owner's plan (docs/plans/do-all-decide-guesses.md:70) took out on purpose, and "what is stored" covers almost any change that saves a setting, so runs may stop about as often as before 2a810ef. The owner should say which way they want it; optional because nobody using the app sees it and the documents are consistent
+- optional · ask-only-then-also · .claude/commands/do-all.md:64-67 · caused by the fix: "Ask a question only when…" is followed by "Also ask when…", so the "only" sentence no longer lists every case
+- optional · built-plan-grep-now-fails, ghost-future-drag-comment, flow-wording-counted-unnoticed · unchanged; the BUILT plan now also disagrees with the command about data choices
+- uncommitted work: the review 16 entry, and this entry
+- checks: tsc clean; npm test 1151 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: /do-all actually run with the new rules (whether a planner asks about data choices rather than deciding them, and how often that stops a run); `npm run eval:voice` (live model); the app on a phone
+
+## Review 18 — 2026-11-15 — Opus 5.5 — reviewed 1723f8f
+Verdict: Ready to merge (0 must fix)
+- eighteenth pass over the branch, full first pass over 1723f8f (Reminders screen line when all three times are off; built from docs/plans/reminders-all-off-line.md): one constant and one ternary branch in notifications/page.tsx, four tests, the plan. Third pass or more: trying it on a phone is the better test
+- resolved: (none new)
+- recurring: (none)
+- still open · should · judge-target-missed, backfill-sends-no-hours, week-suggestion-proposes-friends · unchanged
+- checked by hand: the sentence is true, since dueReminder (src/lib/reminders.ts:89) sends only an enabled time; it shows only when subscribed; the off-device line still wins; the edit matches the plan word for word; the plan is tracked and marked BUILT; nothing stored or sent changed
+- should: (none)
+- optional · empty-times-reads-as-sent · src/app/settings/notifications/page.tsx:133 · a stored reminder_times of [] sends nothing (the cron's `??` only replaces null) yet the line says "Sent on the hour"; no screen writes an empty list, so only a hand-edited row reaches it
+- optional · all-three-assumes-three · src/app/settings/notifications/page.tsx:243 · "All three" is hard-coded while the list is whatever was stored; true for every list the app writes today
+- optional · data-stop-reverses-owner-plan, ask-only-then-also, built-plan-grep-now-fails, ghost-future-drag-comment, flow-wording-counted-unnoticed · unchanged
+- uncommitted work: the review 17 entry, and this entry
+- checks: tsc clean; npm test 1155 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: the screen on a phone or browser; `npm run eval:voice` (live model); /do-all run with its new rules
