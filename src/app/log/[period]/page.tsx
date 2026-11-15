@@ -385,13 +385,14 @@ function LogPeriodContent() {
   const handleDone = async () => {
     // Save session completion
     try {
-      await upsertSessionCompletion({
+      const row = await upsertSessionCompletion({
         date: selectedDate,
         period,
         entry_count: stats.entryCount,
         total_minutes: stats.totalMinutes,
         skipped: false,
       })
+      setCachedCompletion(selectedDate, row as unknown as SessionCompletion)
     } catch (err) {
       console.error('Failed to save session completion:', err)
     }

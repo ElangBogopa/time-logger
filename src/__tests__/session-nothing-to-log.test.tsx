@@ -3,9 +3,10 @@
  * and a failed save no longer sends the person home as if it had worked.
  */
 
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, renderHook, screen, waitFor, fireEvent } from '@testing-library/react'
 import { fetchEntries, fetchSessionCompletions, deleteSessionCompletion, upsertSessionCompletion } from '@/lib/api'
 import { toast as sonnerToast } from 'sonner'
+import { getCachedCompletions, useSessionData } from '@/hooks/useSessionData'
 
 const mockPush = jest.fn()
 
@@ -101,4 +102,22 @@ it('a failed save shows the error and stays on the screen', async () => {
 
   await waitFor(() => expect(sonnerToast.error).toHaveBeenCalledWith('Could not save that. Try again.'))
   expect(mockPush).not.toHaveBeenCalled()
+})
+
+it('Done hands its row to the cache so Today does not flash "Not wrapped up"', async () => {
+  const doneRow = { ...skippedRow, id: 'c2', entry_count: 1, total_minutes: 60, skipped: false }
+  ;(fetchEntries as jest.Mock).mockResolvedValue([eveningEntry])
+  ;(upsertSessionCompletion as jest.Mock).mockResolvedValue(doneRow)
+  // Today has fetched this date's completions, so the cache holds them.
+  const today = renderHook(() => useSessionData({ userId: 'u1', today: '2026-11-03', currentHour: 19 }))
+  await waitFor(() => expect(getCachedCompletions('2026-11-03')).not.toBeNull())
+  today.unmount()
+  render(<LogPeriodPage />)
+
+  fireEvent.click(await screen.findByRole('button', { name: /done with evening/i }))
+
+  await waitFor(() => expect(upsertSessionCompletion).toHaveBeenCalled())
+  await waitFor(() =>
+    expect(getCachedCompletions('2026-11-03')?.find(c => c.period === 'evening')?.skipped).toBe(false)
+  )
 })

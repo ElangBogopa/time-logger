@@ -45,3 +45,13 @@ Verdict: Ready to merge (no must fix)
 ## Fix attempt 4 — 2026-11-15 — Sonnet 5.5 — commit pending
 - answered-row-untested · two test files: the Today page row for a skipped, empty session says "Nothing to log" with the Done tick (and an unanswered row has neither); setCachedCompletion / removeCachedCompletion are checked through the real hook, including that Today re-mounts with the answer and no spinner · believes: fixed
 - done-skips-cache · not attempted (optional, not asked for)
+
+## Review 6 — 2026-11-15 — Opus 5.5 — reviewed e80f068
+Verdict: Ready to merge (no must fix)
+- resolved: answered-row-untested (the Today test renders the real page and fails if the "Nothing to log" words or the tick go; the cache test goes through the real hook and checks the re-mount shows the answer with no spinner)
+- no harm from the fix: e80f068 adds only tests and the log; no app code changed
+- done-skips-cache stays optional and open
+- sixth review of this branch: trying it on a phone is now the better test
+
+## Fix attempt 5 — 2026-11-15 — Sonnet 5.5 — commit pending
+- done-skips-cache · handleDone now hands its saved row to the completion cache as handleSkip does, only after the save succeeds; test added (seeds the cache through the real hook, fails without the change) · believes: fixed
