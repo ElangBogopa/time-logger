@@ -229,7 +229,7 @@ function LogPeriodContent() {
 
   const handlePickRepeatTime = (row: RepeatRow) => {
     setIsRepeatSheetOpen(false)
-    setQuickLogRange(retimeAfterClash(row))
+    setQuickLogRange(retimeAfterClash(row, period))
     setQuickLogPrefill({ name: row.entry.activity, category: row.entry.category })
     setIsQuickLogOpen(true)
   }

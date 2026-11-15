@@ -11,7 +11,7 @@
  * database or a calendar.
  */
 
-import { TimeEntry, TimePeriod, shiftDateString } from './types'
+import { TimeEntry, TimePeriod, PERIOD_TIME_RANGES, shiftDateString } from './types'
 import { getEntriesForPeriod } from './session-utils'
 import { findMostlyOverlapping, timeToMinutes, minutesToTime } from './time-utils'
 
@@ -119,8 +119,14 @@ export function repeatRowsLeft(candidate: RepeatCandidate, dayEntries: TimeEntry
     }))
 }
 
-/** Where the add screen should start a clashing row: after the entry it overlaps, keeping its length. */
-export function retimeAfterClash(row: RepeatRow): { startTime: string; endTime: string } {
+/**
+ * Where the add screen should start a clashing row: after the entry it
+ * overlaps, keeping its length. A row belongs to the session its start falls
+ * in, so a start that would land in a later session is not offered: the
+ * entry would be logged there and this session would keep offering the row.
+ * It keeps its copied times instead.
+ */
+export function retimeAfterClash(row: RepeatRow, period: TimePeriod): { startTime: string; endTime: string } {
   const { entry, clash } = row
   const ownStart = entry.start_time ?? ''
   const ownEnd =
@@ -128,7 +134,7 @@ export function retimeAfterClash(row: RepeatRow): { startTime: string; endTime: 
   if (clash?.end_time) {
     const start = timeToMinutes(clash.end_time)
     const end = start + entry.duration_minutes
-    if (end <= 1439) return { startTime: minutesToTime(start), endTime: minutesToTime(end) }
+    if (end <= 1439 && start < PERIOD_TIME_RANGES[period].end * 60) return { startTime: minutesToTime(start), endTime: minutesToTime(end) }
   }
   return { startTime: ownStart, endTime: ownEnd }
 }

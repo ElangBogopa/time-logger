@@ -236,11 +236,16 @@ describe('same name and retiming', () => {
 
   it('starts a clashing row after the entry it overlaps, keeping its length', () => {
     const row = { entry: span('2026-11-02', 'Dentist', '09:00', '10:00', 60), clash: span(TODAY, 'Gym', '08:00', '09:45', 105) }
-    expect(retimeAfterClash(row)).toEqual({ startTime: '09:45', endTime: '10:45' })
+    expect(retimeAfterClash(row, 'morning')).toEqual({ startTime: '09:45', endTime: '10:45' })
   })
 
   it('falls back to the copied times when it would run past midnight', () => {
     const row = { entry: span('2026-11-02', 'Late', '22:00', '23:00', 60), clash: span(TODAY, 'Out', '22:00', '23:30', 90) }
-    expect(retimeAfterClash(row)).toEqual({ startTime: '22:00', endTime: '23:00' })
+    expect(retimeAfterClash(row, 'evening')).toEqual({ startTime: '22:00', endTime: '23:00' })
+  })
+
+  it('keeps the copied times when the move would start in the next session', () => {
+    const row = { entry: span('2026-11-02', 'Dentist', '11:00', '11:30', 30), clash: span(TODAY, 'Gym', '10:30', '12:15', 105) }
+    expect(retimeAfterClash(row, 'morning')).toEqual({ startTime: '11:00', endTime: '11:30' })
   })
 })
