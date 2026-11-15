@@ -29,3 +29,19 @@ Verdict: Ready to merge (no must fix)
 
 ## Fix attempt 3 — 2026-11-15 — Sonnet 5.5 — commit pending
 - clash-fallback-default-times · the add screen gets a `blankTimes` prop; when `retimeAfterClash` returns null the page passes it, so the screen opens with both times empty (save stays disabled until chosen) instead of its 09:00–10:00 or last-entry-to-now defaults; comment corrected; test added · believes: fixed
+
+## Review 4 — 2026-11-15 — Opus 5.5 — reviewed fbffa0e
+Verdict: Ready to merge (no must fix)
+- resolved: clash-fallback-default-times (blankTimes is set only when retimeAfterClash returns null, is cleared with the prefill when the sheet closes, and the add screen opens on "Set time" with save disabled until a range is confirmed; no harm found to the drag, gap-row or add-button paths)
+- fourth pass: trying it on a phone is now the better test
+
+## Review 5 — 2026-11-15 — Opus 5.5 — reviewed d222814
+Verdict: Ready to merge (no must fix)
+- first pass on d222814 ("Nothing to log" answer and Undo); earlier findings all resolved, none reopened
+- should · answered-row-untested · src/app/page.tsx:243-267, src/hooks/useSessionData.ts:44-64 · nothing tests the Today row's "Nothing to log" words and tick, nor setCachedCompletion / removeCachedCompletion handing the answer to Today without a flash; only buildSessionInfos and the session screen are tested
+- optional · done-skips-cache · src/app/log/[period]/page.tsx:386-396 · handleDone does not write its row to the cache as handleSkip now does, so Today briefly shows "Not wrapped up" after Done until its refetch lands
+- fifth review of this branch: trying it on a phone is now the better test
+
+## Fix attempt 4 — 2026-11-15 — Sonnet 5.5 — commit pending
+- answered-row-untested · two test files: the Today page row for a skipped, empty session says "Nothing to log" with the Done tick (and an unanswered row has neither); setCachedCompletion / removeCachedCompletion are checked through the real hook, including that Today re-mounts with the answer and no spinner · believes: fixed
+- done-skips-cache · not attempted (optional, not asked for)
