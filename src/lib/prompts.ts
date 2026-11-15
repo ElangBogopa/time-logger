@@ -207,7 +207,7 @@ export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 
   const pattern =
     days || hours
       ? `such as the ${named} where the focused work fell`
-      : 'such as which activities took the most hours'
+      : 'such as which activity took the most waking hours'
   const bestFocus =
     days || hours
       ? `\nCall the ${named} in the data "best focus" ${named}, as the data does; never call them productive.`
