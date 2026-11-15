@@ -25,7 +25,8 @@ only when it matters.
 
 `/do-all <the paragraph from /do-think>` runs steps 1 to 4 by itself,
 each with a fresh helper on the model the step before named, until a
-review finds nothing that must or should be fixed. A clean run is
+review finds nothing that must or should be fixed. There is always
+at least one review, even when the brief says none is needed. A clean run is
 pushed to `dev`; a run that stops early is not. `docs/FLOW.md` says
 when it stops.
 

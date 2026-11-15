@@ -27,10 +27,16 @@ Skip it when you can already say what you want in a sentence or two.
 it plans, builds, reviews and fixes, each with a fresh helper on the
 model the step before named, and goes round until a review finds
 nothing that must or should be fixed. Then it pushes `dev` and asks
-whether to carry on with the optional findings.
+whether to carry on with the optional findings. There is always
+at least one review before it pushes, even when the plan said none
+was needed.
 
-It stops and asks you only if the plan had to guess at something. It
-stops and does not push if a finding comes back after a stronger
+It stops and asks you only if the plan had a question, left something
+undecided, or had to guess at something you would notice — what the
+app shows or says, your data, a rule in `CLAUDE.md`, or what the
+change includes. Guesses you would never notice, like a test's name
+or where a file goes, it makes and lists in its report. It stops and
+does not push if a finding comes back after a stronger
 model has tried it, or after five rounds, and tells you which command
 to run by hand next.
 

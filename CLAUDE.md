@@ -15,7 +15,9 @@ This comes before everything else in this file.
   push. `/do-fix` does the same for the fixes it makes.
   A second standing exception: `/do-all` pushes `dev` to `origin dev` by
   itself when its run ends with nothing left that must or should be
-  fixed, so the preview is ready to try. A run that stopped early does
+  fixed, after at least one review
+  (a brief that says no review is needed is still reviewed), so the preview
+  is ready to try. A run that stopped early does
   not push. It never touches `main`.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
   a one-line fix, not for a docs change, not because the tests pass, and

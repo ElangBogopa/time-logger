@@ -63,18 +63,35 @@ prompt:
 > You cannot ask the owner anything. If step 2 of the command would have
 > you ask, do not write the brief: reply with `QUESTIONS:` and the
 > questions, in plain language. Otherwise save the brief, and end your
-> reply with `GUESSES:` followed by every choice you made that the request
-> did not settle, or `GUESSES: none`.
+> reply with every choice you made that the request did not settle,
+> sorted into two lists:
+>
+> `GUESSES THE OWNER WOULD NOTICE:` choices about what a person sees or
+> reads in the app, a person's data, a rule in `CLAUDE.md`, or what is
+> in or out of the change.
+>
+> `GUESSES THE OWNER WOULD NOT NOTICE:` everything else — the name of a
+> test, where a file goes, which model or effort, wording inside code
+> or the command files that no person using the app reads.
+>
+> Write `none` after a heading that has nothing under it. When unsure
+> which list a choice belongs to, put it in the first.
 
 When it returns, read the brief it saved.
 
-**Stop and ask the owner** if the helper returned questions, if it listed
-any guess, or if the brief's "Not decided" part says anything other than
-"nothing". Put the questions to the owner in plain language, one message,
-and wait. When they are answered, start a new plan helper with the
-original request followed by "The owner has since settled: <the answers>.
-Replace the brief at <path>." Repeat until a brief comes back with no
-questions, no guesses and nothing undecided.
+**Stop and ask the owner** if the helper returned questions, if it
+listed anything under `GUESSES THE OWNER WOULD NOTICE`, or if the brief's
+"Not decided" part says anything other than "nothing". Read the other
+list too: a guess there that plainly falls under one of the first list's
+kinds counts as the first kind. Put the questions to the owner in plain
+language, one message, and wait. When they are answered, start a new plan
+helper with the original request followed by "The owner has since
+settled: <the answers>. Replace the brief at <path>." Repeat until a
+brief comes back with no questions, nothing the owner would notice
+guessed, and nothing undecided.
+
+Do not stop for `GUESSES THE OWNER WOULD NOT NOTICE`. Keep that list,
+from the plan helper whose brief is built, for the report.
 
 Then read the brief's "Who should build and review this" part and note
 the build model, the review model and the effort.
@@ -91,13 +108,13 @@ When it returns, check: `git log --oneline -1` shows a new commit on
 the run **stops** (see "When the run stops"): the build could not pass its
 own checks or found the plan wrong.
 
-If the brief says "no review needed", go to "A clean finish" and say in
-the report that nothing was reviewed.
+Then go to step 3, always. A brief that says "no review needed" is
+still reviewed: use `opus` and the brief's effort for that review.
 
 ## 3. Review
 
 Model: the one the brief names for the review. Effort: the one the brief
-names.
+names. (`opus` if the brief says no review is needed.)
 
 Command: `do-review`, with these arguments:
 
@@ -169,6 +186,8 @@ Short, plain language, in this order:
 - **Rounds**: how many reviews and how many fixes.
 - **Fixed**: each finding fixed, one line, and the model that fixed it.
   Mark the ones that needed a second, stronger model.
+- **Guessed without asking**: the plan's `GUESSES THE OWNER WOULD NOT
+  NOTICE`, one line each, or "nothing".
 - **Left from before this run**: the earlier findings, ids only, untouched.
 - **Not checked**: what the last review said it did not check.
 - **Pushed**: yes, with the commit, and that the `dev` preview is the
@@ -180,6 +199,7 @@ Short, plain language, in this order:
 - Never commit to, push to, or merge into `main`. Merging is the owner's,
   asked for in words.
 - Never push when the run stopped early.
+- Never push before at least one review has run in this run.
 - Never edit, commit or stage anything yourself; only helpers change files.
 - Never run two helpers at once: they share one working tree and one log.
 - Never send an earlier finding to a fix.

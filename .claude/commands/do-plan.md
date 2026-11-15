@@ -43,7 +43,7 @@ in a separate session, on a cheaper model. So:
        would be costly or hard to see: sign-in, deleting or exporting data,
        payments, reminders, anything touching the database's shape. Say
        "no review needed" for a change a person can fully judge by looking
-       at the screen.
+       at the screen. (`/do-all` reviews it anyway, on Opus.)
      - *Effort*: medium unless there is a reason, which you state.
      Recommend the cheapest that will do the job well. A precise brief is
      what lets the cheaper model succeed, so if you are recommending a
