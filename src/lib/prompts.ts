@@ -181,11 +181,23 @@ export function buildWeekReviewContext(input: WeekReviewContextInput): string {
   const ordered = [...input.categories].sort(
     (a, b) => Number(a.label === sleep) - Number(b.label === sleep) || b.minutes - a.minutes
   )
+  // A week with no best focus days or hours gets the largest activity apart
+  // from sleep stated for it. Asked to find it, the model named the wrong
+  // one twice: rest was 10h, and it said chores (6h) took the most.
+  const noFocus = input.bestDays.length === 0 && input.bestHours.length === 0
+  const waking = input.categories.filter((c) => c.label !== sleep && c.minutes > 0)
+  const topMinutes = Math.max(0, ...waking.map((c) => c.minutes))
+  const top = waking.filter((c) => c.minutes === topMinutes)
+  const most =
+    noFocus && top.length > 0
+      ? `- Most hours apart from sleep: ${top.map((c) => c.label).join(' and ')} (${hoursOf(topMinutes)}h${top.length > 1 ? ' each' : ''})`
+      : ''
   const head = [
     'Weekly Review Data:',
     input.isPartialWeek ? 'The week is still in progress.' : '',
     input.bestDays.length > 0 ? `- Best focus days: ${input.bestDays.join(', ')}` : '',
     input.bestHours.length > 0 ? `- Best focus hours: ${input.bestHours.join(', ')}` : '',
+    most,
   ].filter((l) => l !== '')
   return `
 ${head.join('\n')}
@@ -199,7 +211,8 @@ ${noneThisWeek ? `\n${NO_FRIENDS_OR_FAMILY}` : ''}
 
 // A week with no best focus days or hours is told nothing about them: told
 // to call them "best focus", the model wrote that there was no focused work
-// and suggested using best focus hours that did not exist.
+// and suggested using best focus hours that did not exist. Its pattern points
+// at the stated "Most hours apart from sleep" fact, so nothing is ranked here.
 export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 'bestDays' | 'bestHours'>): string {
   const days = focus.bestDays.length > 0
   const hours = focus.bestHours.length > 0
@@ -207,7 +220,7 @@ export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 
   const pattern =
     days || hours
       ? `such as the ${named} where the focused work fell`
-      : 'such as which activity took the most waking hours'
+      : 'such as the activity the data gives as taking the most hours apart from sleep, named as the data names it'
   const bestFocus =
     days || hours
       ? `\nCall the ${named} in the data "best focus" ${named}, as the data does; never call them productive.`

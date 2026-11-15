@@ -159,6 +159,11 @@ const WEEK_SCENARIOS: WeekScenario[] = [
     bestDays: [],
     bestHours: [],
   }),
+  // No best focus, and the largest activity apart from sleep is not rest.
+  week('no-focus-home', [['Sleep', 56], ['Chores', 12], ['Errands', 7], ['Social', 5], ['Rest', 4]], {
+    bestDays: [],
+    bestHours: [],
+  }),
   week('meetings-week', [['Sleep', 50], ['Deep Work', 20], ['Meetings', 14], ['Meals', 7]]),
   week('faith-week', [['Sleep', 52], ['Deep Work', 18], ['Faith', 5], ['Meals', 8]]),
 ]

@@ -1,13 +1,13 @@
 # Review voice lines
 
-Date: 2026-11-15. 60 lines, 3 per scenario.
+Date: 2026-11-15. 63 lines, 3 per scenario.
 
 Day params: `{"model":"gpt-4o-mini","max_tokens":150,"temperature":0.4}`
 Week params: `{"model":"gpt-4o-mini","max_tokens":200,"temperature":0.4}`
 
 | rule | kind | lines breaching |
 |---|---|---|
-| banned-word | checker | 0 |
+| banned-word | checker | 2 |
 | verdict | checker | 0 |
 | exclamation | checker | 0 |
 | question | checker | 0 |
@@ -20,7 +20,7 @@ Week params: `{"model":"gpt-4o-mini","max_tokens":200,"temperature":0.4}`
 | false-absence | checker | 0 |
 | day-absence | checker | 0 |
 | absence-wording | checker | 0 |
-| absence-unsaid | checker | 2 |
+| absence-unsaid | checker | 3 |
 | partial-week-absence | checker | 0 |
 | label-read-back | checker | 0 |
 | too-long | checker | 0 |
@@ -31,11 +31,11 @@ Week params: `{"model":"gpt-4o-mini","max_tokens":200,"temperature":0.4}`
 | no_consolation | judge | 0 |
 | no_advice | judge | 0 |
 | one_suggestion | judge | 0 |
-| total_not_judged | judge | 2 |
+| total_not_judged | judge | 0 |
 
-Lines with any checker breach: 2. Lines failing any judge rule: 2.
+Lines with any checker breach: 5. Lines failing any judge rule: 0.
 
-Full-week lines with no time with friends or family in the input: 12. Of those, lines that say "friends or family": 10.
+Full-week lines with no time with friends or family in the input: 12. Of those, lines that say "friends or family": 9.
 
 ## Judge check: total_not_judged on lines with a known answer
 
@@ -68,7 +68,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - right · should keep · leisure-week · "Entertainment filled 30 hours, with 10 hours going to meals and 6 to shallow work. Wednesday around 2 PM held the most focus. An hour of deep work there on Wednesday is one option." · note: fine
 - right · should keep · partial · "So far this week, deep work has taken 9 hours and exercise 1 hour. Monday at 9 AM was where focus landed. You could try a second focus block on Tuesday at 9 AM." · note: fine
 - right · should keep · sleep-heavy · "Chores took 6 hours and rest 10 hours, with 3 hours of calls. Apart from sleep, rest took the most time. A call on Saturday morning is one option." · note: fine
-- right · should break · full-week · "Deep work took 22 hours across the week, and every day has an entry. Nothing is missing from the record. You could try a morning workout on Friday." · note: about_the_record: "Deep work took 22 hours across the week, and every day has an entry." about_the_record: "Nothing is missing from the record."
+- right · should break · full-week · "Deep work took 22 hours across the week, and every day has an entry. Nothing is missing from the record. You could try a morning workout on Friday." · note: about_the_record: "Nothing is missing from the record."
 - right · should break · thin-week · "Deep work took 3 hours and meals 1 hour. Most of the week is blank, so the picture is incomplete. You could schedule deep work on Monday at 10 AM." · note: about_the_record: "Most of the week is blank, so the picture is incomplete."
 - right · should break · partial · "Deep work took 9 hours so far. You have written down just one day of this week. Try noting your afternoons too, starting Tuesday." · note: about_the_record: "You have written down just one day of this week." suggests_recording: "Try noting your afternoons too, starting Tuesday."
 - right · should break · meetings-week · "Meetings took 14 hours and deep work 20 hours. Track your evenings next week so the totals are fuller." · note: suggests_recording: "Track your evenings next week so the totals are fuller."
@@ -83,15 +83,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - plan: 3 kept, 0 moved, 0 missed
 - scores (not shown to the model after the rewrite): Body 52, Mind 84, Heart 20
 
-> The day included 7 hours and 30 minutes of sleep and 1 hour for meals. There were 4 hours of deep work, with a 2-hour and 30-minute focus session on the essay draft and a longest focus session of 150 minutes on the same task. Three timed blocks were planned and all were kept.
+> The day included 7 hours and 30 minutes of sleep and 1 hour for meals. There were 4 hours of deep work, with a 2-hour and 30-minute focus session on the essay draft, which included a longest focus session of 150 minutes. Three timed blocks were planned and all were kept.
 
 - note: fine
 
-> The day included 7 hours and 30 minutes of sleep and 1 hour for meals. There were 4 hours of deep work, with a 2-hour and 30-minute focus session on the essay draft, and the longest focus session was 150 minutes on the same task. Three timed blocks were planned, and all three were kept.
+> The day included 7 hours and 30 minutes of sleep and 4 hours of deep work. There was a 2-hour and 30-minute focus session on the essay draft, with the longest focus session lasting 150 minutes. Meals took 1 hour, and all 3 planned timed blocks were kept.
 
 - note: fine
 
-> The day included 7 hours and 30 minutes of sleep and 1 hour for meals. There were 4 hours of deep work, with a 2-hour and 30-minute focus session on the "Essay draft" and a longest focus session of 150 minutes on the same task. Three timed blocks were planned and all were kept.
+> The day included 7 hours and 30 minutes of sleep and 1 hour for meals. There were 4 hours of deep work, with a 2-hour and 30-minute focus session on the essay draft, and the longest focus session was 150 minutes on the same task. Three timed blocks were planned and all were kept.
 
 - note: fine
 
@@ -105,12 +105,14 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - note: fine
 
-> The day included 8 hours of sleep and 3 hours of deep work. There were 2 hours spent on social activities and 1 hour of exercise. Meals took 1 hour and 30 minutes.
+> The day included 8 hours of sleep and 3 hours of deep work. There were 2 hours spent on social activities and 1 hour of exercise, along with 1 hour and 30 minutes for meals. The evening mood was great.
 
+- checker: banned-word ("great")
 - note: fine
 
-> The day included 8 hours of sleep and 3 hours of deep work. There were 2 hours spent on social activities and 1 hour and 30 minutes for meals. The person also exercised for 1 hour.
+> The day included 8 hours of sleep and 3 hours of deep work. There were 2 hours of social activity and 1 hour of exercise, along with 1 hour and 30 minutes for meals. The evening mood was great.
 
+- checker: banned-word ("great")
 - note: fine
 
 ## day: thin
@@ -118,7 +120,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Shallow Work 45 min
 - scores (not shown to the model after the rewrite): Body 20, Mind 25, Heart 5
 
-> Forty-five minutes of shallow work was logged. Time tracked was 45 minutes.
+> The day included 45 minutes of shallow work. Time tracked was 45 minutes.
 
 - note: fine
 
@@ -126,7 +128,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - note: fine
 
-> Forty-five minutes of shallow work was logged. Time tracked for the day was 45 minutes.
+> The day included 45 minutes of shallow work. Time tracked for the day was 45 minutes.
 
 - note: fine
 
@@ -157,7 +159,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - note: fine
 
-> The day included 4 hours of entertainment and 1 hour of deep work. The total time tracked was 5 hours. The evening mood was low.
+> Four hours of entertainment were logged. One hour was spent on deep work. The evening mood was low.
 
 - note: fine
 
@@ -171,11 +173,11 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - plan: 0 kept, 1 moved, 3 missed
 - scores (not shown to the model after the rewrite): Body 15, Mind 30, Heart 10
 
-> Four hours were spent in meetings. One hour and thirty minutes were dedicated to admin tasks. The plan included four timed blocks, with none kept, one done at another time, and three not done.
+> The day included 4 hours of meetings and 1 hour and 30 minutes of admin work. Four timed blocks were planned, with 0 kept, 1 done at another time, and 3 not done. Time tracked was 5 hours and 30 minutes.
 
 - note: fine
 
-> The day included 4 hours of meetings and 1 hour and 30 minutes of admin work. Four timed blocks were planned, with one completed at a different time and three not done. Time tracked was 5 hours and 30 minutes.
+> Four hours were spent in meetings. One hour and thirty minutes were dedicated to admin tasks. Four timed blocks were planned, with one completed at a different time and three not done.
 
 - note: fine
 
@@ -192,11 +194,11 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - note: fine
 
-> The day included 2 hours of exercise and 2 hours spent on chores. There were also 45 minutes dedicated to calls. Time tracked was 4 hours and 45 minutes.
+> The day included 2 hours of exercise and 2 hours of chores. There were also 45 minutes spent on calls. Time tracked was 4 hours and 45 minutes.
 
 - note: fine
 
-> The day included 2 hours of exercise and 2 hours of chores. There were also 45 minutes spent on calls. Time tracked was 4 hours and 45 minutes.
+> Two hours were spent on exercise and two hours on chores. There were 45 minutes of calls. The total time tracked was 4 hours and 45 minutes.
 
 - note: fine
 
@@ -206,15 +208,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - focus session: 200 min on "Quarterly model"
 - scores (not shown to the model after the rewrite): Body 25, Mind 90, Heart 0
 
-> The day included 6 hours of deep work, with the longest focus session lasting 200 minutes on the "Quarterly model." There were also 2 hours of shallow work and 30 minutes for meals. The total time tracked was 8 hours and 30 minutes.
+> Six hours of deep work, including a 200-minute focus session on the "Quarterly model." Two hours were spent on shallow work and 30 minutes on meals. Time tracked was 8 hours and 30 minutes.
 
 - note: fine
 
-> The day included 6 hours of deep work and 2 hours of shallow work. There was a 30-minute meal break. The longest focus session was 200 minutes on the "Quarterly model."
+> The day included 6 hours of deep work, with the longest focus session lasting 200 minutes on the "Quarterly model." There were also 2 hours of shallow work and 30 minutes allocated for meals. Time tracked was 8 hours and 30 minutes.
 
 - note: fine
 
-> The day included 6 hours of deep work and 2 hours of shallow work. There was a 30-minute meal break. The longest focus session lasted 200 minutes on the "Quarterly model."
+> The day included 6 hours of deep work, with the longest focus session lasting 200 minutes on the "Quarterly model." There were also 2 hours of shallow work and 30 minutes spent on meals. Time tracked totaled 8 hours and 30 minutes.
 
 - note: fine
 
@@ -223,7 +225,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Sleep 480 min
 - scores (not shown to the model after the rewrite): Body 40, Mind 0, Heart 0
 
-> The day included 8 hours of sleep. There were 8 hours tracked in total.
+> The day included 8 hours of sleep. Time tracked was 8 hours.
 
 - note: fine
 
@@ -231,7 +233,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - note: fine
 
-> The day included 8 hours of sleep. Time tracked was 8 hours.
+> The day included 8 hours of sleep. A total of 8 hours was tracked.
 
 - note: fine
 
@@ -257,15 +259,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - hours: Faith 60 min, Deep Work 180 min, Meals 60 min
 
-> Three hours of deep work were logged. One hour was spent on faith activities. One hour was dedicated to meals.
+> Three hours of deep work were logged. One hour was spent on faith activities, and one hour was allocated for meals. Time tracked was five hours.
 
 - note: fine
 
-> Three hours of deep work were logged. One hour was spent on faith activities. One hour was dedicated to meals.
+> Three hours of deep work were logged. One hour was spent on faith activities, and one hour was used for meals. Time tracked totaled five hours.
 
 - note: fine
 
-> Three hours of deep work were logged. One hour was spent on faith activities, along with one hour for meals. Total time tracked was five hours.
+> Three hours of deep work were logged. One hour was spent on faith activities. One hour was used for meals.
 
 - note: fine
 
@@ -273,15 +275,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - hours: Meetings 240 min, Faith 30 min
 
-> Four hours of meetings took place. There was also 30 minutes dedicated to faith. The total time tracked was 4 hours and 30 minutes.
+> The day included 4 hours of meetings and 30 minutes dedicated to faith. The total time tracked was 4 hours and 30 minutes.
 
 - note: fine
 
-> The day included 4 hours of meetings and 30 minutes dedicated to faith. Time tracked totaled 4 hours and 30 minutes.
+> The day included four hours of meetings and 30 minutes dedicated to faith. Time tracked totaled 4 hours and 30 minutes.
 
 - note: fine
 
-> The day included four hours of meetings and 30 minutes dedicated to faith. The total time tracked was 4 hours and 30 minutes.
+> The day included 4 hours of meetings and 30 minutes dedicated to faith. The total time tracked was 4 hours and 30 minutes.
 
 - note: fine
 
@@ -291,15 +293,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Sleep 52h, Deep Work 22h, Meetings 8h, Exercise 4h, Social 6h, Meals 9h, Entertainment 7h
 - best days: Tuesday, Thursday; best hours: 9 AM, 10 AM
 
-> You spent 22 hours on deep work, with best focus hours occurring at 9 AM and 10 AM on Tuesday and Thursday. You also logged 9 hours for meals and 8 hours for meetings. The data shows that your best focus days were Tuesday and Thursday. You could schedule deep work for 9 AM on Tuesday.
+> You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 9 hours for meals and 8 hours for meetings. A pattern in your data shows that your focused work occurred primarily on Tuesday and Thursday. You might consider scheduling more deep work sessions at 9 AM next week.
 
 - note: fine
 
-> You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 9 hours for meals and 8 hours for meetings. The data shows that your best focus days were Tuesday and Thursday. You can plan to schedule more deep work during the 9 AM hour on Tuesday.
+> You spent 22 hours on deep work, with your best focus days being Tuesday and Thursday. The best focus hours were at 9 AM and 10 AM. You also logged 9 hours for meals and 8 hours for meetings. You could schedule deep work for Tuesday at 9 AM.
 
 - note: fine
 
-> You spent 22 hours on deep work, with best focus hours occurring at 9 AM and 10 AM on Tuesday and Thursday. You also logged 9 hours for meals and 8 hours for meetings. A pattern in the data shows that your best focus days were Tuesday and Thursday. You might consider scheduling more deep work during the 9 AM hour on Tuesday.
+> You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 9 hours for meals and 8 hours for meetings. A pattern in the data shows that your best focus days were Tuesday and Thursday. You might consider scheduling more deep work during your best focus hours on those days.
 
 - note: fine
 
@@ -309,15 +311,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Deep Work 38h, Shallow Work 10h, Sleep 44h, Meals 5h
 - best days: Tuesday, Thursday; best hours: 8 AM, 9 AM
 
-> You spent 38 hours on deep work and 10 hours on shallow work. Your best focus days were Tuesday and Thursday, with your best focus hours at 8 AM and 9 AM. You logged no time with friends or family this week. Consider scheduling some time with friends on Tuesday evening.
+> You spent 38 hours on deep work and 10 hours on shallow work. Your best focus days were Tuesday and Thursday, with your best focus hours at 8 AM and 9 AM. You logged no time with friends or family this week. Consider scheduling some time with friends on one of your best focus days.
 
 - note: fine
 
-> This week held 38 hours of deep work and 10 hours of shallow work. You spent your best focus hours on Tuesday and Thursday at 8 AM and 9 AM. You logged no time with friends or family this week. Consider scheduling some time with friends on a best focus day next week.
+> You spent 38 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 8 AM and 9 AM. No time with friends or family was logged this week. You could consider scheduling some time with friends on Thursday after your focused work.
 
 - note: fine
 
-> You spent 38 hours on deep work and 10 hours on shallow work. Your best focus days were Tuesday and Thursday, with your best focus hours at 8 AM and 9 AM. You logged no time with friends or family this week. You could schedule a block of deep work on Tuesday at 8 AM.
+> You spent 38 hours on deep work and 10 hours on shallow work. Your best focus days were Tuesday and Thursday, with the best focus hours at 8 AM and 9 AM. You logged no time with friends or family this week. You could schedule a block of deep work on Tuesday at 8 AM.
 
 - note: fine
 
@@ -327,19 +329,17 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Deep Work 9h, Sleep 22h, Exercise 1h
 - best days: Monday; best hours: 9 AM, 10 AM
 
-> You spent 9 hours on deep work, primarily on Monday during the best focus hours of 9 AM and 10 AM. You also logged 1 hour of exercise this week. The data shows that your focused work fell mainly on Monday. You might consider dedicating more time to deep work on Monday morning.
+> This week so far held 9 hours of deep work and 1 hour of exercise. Your best focus day was Monday, with your best focus hours at 9 AM and 10 AM. You could schedule more deep work on Monday during those best focus hours.
 
 - note: fine
 
-> You spent 9 hours on deep work, with your best focus day being Monday and your best focus hours at 9 AM and 10 AM. You also logged 1 hour of exercise and 22 hours of sleep. Your deep work was concentrated on Monday. You could consider scheduling additional deep work on Monday at 9 AM.
+> You spent 9 hours on deep work, with your best focus day being Monday. Your best focus hours were at 9 AM and 10 AM. You also logged 1 hour of exercise and 22 hours of sleep. Consider scheduling more deep work sessions on Monday during your best focus hours.
 
-- judge: total_not_judged
-- note: fine total_not_judged: about_the_record: "You also logged 1 hour of exercise and 22 hours of sleep."
+- note: fine
 
-> You spent 9 hours on deep work, with your best focus day being Monday and your best focus hours at 9 AM and 10 AM. You also logged 1 hour of exercise and 22 hours of sleep. Your focused work fell on Monday during the morning hours. You could schedule another deep work session on Monday at 9 AM.
+> You spent 9 hours on deep work, with your best focus day on Monday and your best focus hours at 9 AM and 10 AM. You also logged 1 hour of exercise and 22 hours of sleep. The focused work fell primarily on Monday during the morning hours. You could consider scheduling another deep work session on Monday at 9 AM.
 
-- judge: total_not_judged
-- note: fine total_not_judged: about_the_record: "You also logged 1 hour of exercise and 22 hours of sleep."
+- note: fine
 
 ## week: leisure-week
 
@@ -347,15 +347,16 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Entertainment 30h, Sleep 60h, Meals 10h, Shallow Work 6h
 - best days: Wednesday; best hours: 2 PM
 
-> You spent 30 hours on entertainment, 10 hours on meals, and 6 hours on shallow work. Wednesday was your best focus day, with your best focus hour at 2 PM. You logged no time with friends or family this week. You could plan to engage in shallow work on Wednesday at 2 PM.
+> This week held 30 hours of entertainment, 10 hours for meals, and 6 hours of shallow work. The best focus day was Wednesday, with focused work occurring at 2 PM. You could consider scheduling focused work on Wednesday at 2 PM.
+
+- checker: absence-unsaid ("")
+- note: fine
+
+> This week held 30 hours of entertainment, 10 hours for meals, and 6 hours of shallow work. Your best focus day was Wednesday, with focused work at 2 PM. You logged no time with friends or family. You could consider scheduling some time with friends on Wednesday.
 
 - note: fine
 
-> This week held 30 hours of entertainment, 10 hours for meals, and 6 hours of shallow work. Your best focus day was Wednesday, with focused work occurring primarily at 2 PM. You could consider scheduling some time with friends or family next week.
-
-- note: fine
-
-> You spent 30 hours on entertainment, 10 hours on meals, and 6 hours on shallow work. Your best focus day was Wednesday, with your best focus hour at 2 PM. You have not logged any time with friends or family this week. Consider scheduling some time for shallow work on Wednesday at 2 PM.
+> You spent 30 hours on entertainment, 10 hours on meals, and 6 hours on shallow work. Your best focus day was Wednesday, with your best focus hours at 2 PM. You logged no time with friends or family this week. You could consider scheduling focused work during your best focus hour on Wednesday.
 
 - note: fine
 
@@ -365,11 +366,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Deep Work 3h, Meals 1h
 - best days: Monday; best hours: 10 AM
 
-> You spent 3 hours on deep work, all of it on Monday at 10 AM. You also logged 1 hour for meals. There was no time with friends or family logged this week. You could consider scheduling additional deep work on Monday at 10 AM.
-
-- note: fine
-
-> This week held 3 hours of deep work and 1 hour for meals. Your best focus day was Monday, and your best focus hour was at 10 AM. You could schedule another deep work session on Monday at 10 AM.
+> This week held 3 hours of deep work and 1 hour for meals. The best focus day was Monday, with focused work occurring at 10 AM. You could schedule another deep work session on Monday at 10 AM.
 
 - checker: absence-unsaid ("")
 - note: fine
@@ -379,21 +376,43 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - checker: absence-unsaid ("")
 - note: fine
 
+> You spent 3 hours on deep work on Monday at 10 AM. You logged 1 hour for meals. There were no hours logged for time with friends or family this week. You could schedule more deep work on Monday at 10 AM.
+
+- note: fine
+
 ## week: sleep-heavy
 
 - week: finished
 - hours: Sleep 63h, Rest 10h, Calls 3h, Chores 6h
 - best days: none; best hours: none
 
-> You spent 6 hours on chores and 3 hours on calls. Rest accounted for 10 hours this week. Chores took the most waking hours. You could schedule more time for calls on Wednesday.
+> You spent 10 hours resting, which is the most hours apart from sleep. You also logged 6 hours on chores and 3 hours on calls. Next week, consider scheduling more time for calls on Tuesday.
 
 - note: fine
 
-> You spent 6 hours on chores and 3 hours on calls. Rest took up 10 hours of your time. Chores accounted for the most waking hours this week. Consider scheduling more time for calls on Wednesday.
+> You spent 10 hours resting, which is the most time apart from sleep. You also logged 6 hours on chores and 3 hours on calls. You might consider scheduling a specific time for calls on Tuesday.
 
 - note: fine
 
-> You spent 6 hours on chores and 3 hours on calls. Rest accounted for 10 hours this week. Chores took the most waking hours. You could schedule more time for calls on Tuesday.
+> You spent 10 hours resting, which is the most hours apart from sleep. You also logged 6 hours on chores and 3 hours on calls. Next week, consider setting aside time on Tuesday for additional chores.
+
+- note: fine
+
+## week: no-focus-home
+
+- week: finished
+- hours: Sleep 56h, Chores 12h, Errands 7h, Social 5h, Rest 4h
+- best days: none; best hours: none
+
+> You spent 12 hours on chores, 7 hours on errands, and 5 hours on social activities. Chores took the most hours apart from sleep. You might consider scheduling some time for rest on Wednesday.
+
+- note: fine
+
+> You spent 12 hours on chores, 7 hours on errands, and 5 hours on social activities. Chores took the most hours apart from sleep. You could plan to allocate some time for rest on Wednesday.
+
+- note: fine
+
+> This week held 12 hours of chores, 7 hours of errands, and 5 hours of social activities. Chores took the most hours apart from sleep. You could plan for more rest on Wednesday for an hour.
 
 - note: fine
 
@@ -403,15 +422,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Sleep 50h, Deep Work 20h, Meetings 14h, Meals 7h
 - best days: Tuesday, Thursday; best hours: 9 AM, 10 AM
 
-> This week held 20 hours of deep work and 14 hours of meetings. Your best focus days were Tuesday and Thursday, with your best focus hours at 9 AM and 10 AM. You logged no time with friends or family this week. Consider scheduling a meal with friends on one of your best focus days.
+> You spent 20 hours on deep work this week, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 14 hours in meetings and 7 hours for meals. There was no time with friends or family logged this week. You could schedule some time for social activities on Wednesday.
 
 - note: fine
 
-> You spent 20 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. There was no time with friends or family logged this week. You could schedule a meal with friends on one of the best focus days.
+> You spent 20 hours on deep work and 14 hours in meetings. Your best focus days were Tuesday and Thursday, with the best focus hours being 9 AM and 10 AM. You logged no time with friends or family this week. You could schedule a block of deep work on Tuesday at 9 AM.
 
 - note: fine
 
-> You spent 20 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. No time with friends or family was logged this week. You could schedule a meeting for Tuesday at 9 AM.
+> You spent 20 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. There was no time with friends or family logged this week. You could schedule a meeting on Tuesday at 10 AM.
 
 - note: fine
 
@@ -421,15 +440,15 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 - hours: Sleep 52h, Deep Work 18h, Faith 5h, Meals 8h
 - best days: Tuesday, Thursday; best hours: 9 AM, 10 AM
 
-> This week held 18 hours of deep work, with best focus on Tuesday and Thursday, particularly at 9 AM and 10 AM. You spent 8 hours on meals and 5 hours on faith. Deep work consistently occupied the majority of your time. You might consider scheduling more deep work during the best focus hours on Tuesday.
+> You spent 18 hours on deep work, with your best focus days being Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. You logged 8 hours for meals and 5 hours for faith. You might consider scheduling more deep work during your best focus hours on Tuesday.
 
 - note: fine
 
-> You spent 18 hours on deep work this week, with your best focus days being Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. You might consider scheduling more deep work during those hours next week.
+> You spent 18 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. You also logged 8 hours for meals and 5 hours for faith. You might consider scheduling more deep work during the best focus hours on Tuesday.
 
 - note: fine
 
-> You spent 18 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. You logged 8 hours for meals and 5 hours for faith. For next week, consider scheduling deep work during your best focus hours on Tuesday.
+> You spent 18 hours on deep work this week. Your best focus days were Tuesday and Thursday, with your best focus hours at 9 AM and 10 AM. You also logged 8 hours for meals and 5 hours for faith. Consider scheduling more deep work during your best focus hours on Tuesday.
 
 - note: fine
 

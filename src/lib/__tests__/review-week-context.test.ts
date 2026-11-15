@@ -43,6 +43,28 @@ describe('the week review context', () => {
     expect(some).toContain('Best focus hours')
   })
 
+  it('states the largest activity apart from sleep for a week with no best focus', () => {
+    // Asked to find it, the model said chores (6h) took the most when rest had 10h.
+    const sleepHeavy = [
+      { label: 'Sleep', minutes: 3780 },
+      { label: 'Rest', minutes: 600 },
+      { label: 'Calls', minutes: 180 },
+      { label: 'Chores', minutes: 360 },
+    ]
+    const none = week({ bestDays: [], bestHours: [], categories: sleepHeavy })
+    expect(none).toContain('- Most hours apart from sleep: Rest (10h)')
+    const tie = week({
+      bestDays: [],
+      bestHours: [],
+      categories: [{ label: 'Sleep', minutes: 3000 }, { label: 'Chores', minutes: 360 }, { label: 'Rest', minutes: 360 }],
+    })
+    expect(tie).toContain('- Most hours apart from sleep: Chores and Rest (6h each)')
+    const onlySleep = week({ bestDays: [], bestHours: [], categories: [{ label: 'Sleep', minutes: 3000 }] })
+    expect(onlySleep).not.toContain('Most hours')
+    // A week with best focus keeps its pattern about the focus and is not told this.
+    expect(week({ categories: sleepHeavy })).not.toContain('Most hours')
+  })
+
   it('lists Sleep last and the rest by hours', () => {
     const context = week({
       categories: [
@@ -73,6 +95,12 @@ describe('the week review system prompt', () => {
     expect(none).not.toMatch(/best focus/i)
     expect(none).not.toMatch(/focused work/i)
     expect(none).not.toMatch(/productive/i)
+  })
+
+  it('does not ask a week with no best focus to rank the activities itself', () => {
+    const none = buildWeekReviewSystemPrompt({ bestDays: [], bestHours: [] })
+    expect(none).not.toMatch(/which activit(?:y|ies) took the most/i)
+    expect(none).toContain('the data gives as taking the most hours apart from sleep')
   })
 
   it('names only the best focus days or hours the week has', () => {
