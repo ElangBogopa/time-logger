@@ -230,4 +230,11 @@ describe('when each one arrives', () => {
     expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
     expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
   })
+
+  it('keeps the usual line while this device is still being checked, so it does not change a moment later', async () => {
+    await setup(push({ isSubscribed: false, permission: 'prompt', isLoading: true }))
+
+    expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
+    expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
+  })
 })
