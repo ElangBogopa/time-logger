@@ -219,3 +219,38 @@ Verdict: Not ready (1 must fix)
 - uncommitted work carried in this commit: the review 6 to 13 entries, and this entry
 - checks: tsc clean; npm test 1151 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
 - not checked: the screen on a phone or browser
+
+## Review 14 — 2026-11-15 — Opus 5.5 — reviewed 0c0fd49
+Verdict: Ready to merge (0 must fix)
+- fourteenth pass over the branch, narrow pass over fix 0c0fd49: one clause removed, one test added. For everything older, trying it on a phone is the better test
+- resolved: turn-on-line-needs-granted (condition is canSwitch && locked && !push.isLoading, as the plan had it); no-test-for-prompt-off (new test, off with permission 'prompt')
+- resolved: commit-message-understates (0731d3e cannot be reworded without rewriting history; 0c0fd49's message and fix attempt 5 record the extra clause, which is where a later session reading the log will look)
+- recurring: (none)
+- still open · should · judge-target-missed, backfill-sends-no-hours, week-suggestion-proposes-friends · unchanged
+- harm from the fix: none found. canSwitch still excludes 'denied' and unsupported, and their tests still pass; subscribed and loading still show the usual line
+- optional · ghost-future-drag-comment, flow-understates-do-all-stops, notice-list-catches-scope, flow-wording-counted-unnoticed · unchanged
+- uncommitted work: this entry
+- checks: tsc clean; npm test 1151 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors; build succeeded
+- not checked: the screen on a phone or browser (first open, never-asked, blocked, iPhone tab); `npm run eval:voice` (live model)
+
+## Review 15 — 2026-11-15 — Opus 5.5 — reviewed 2a810ef
+Verdict: Ready to merge (0 must fix)
+- fifteenth pass over the branch, full first pass over 2a810ef (/do-all decides the plan's guesses; built from docs/plans/do-all-decide-guesses.md), read in full beside the whole of do-all.md, do-plan.md and FLOW.md: text in four files and a new plan, nothing under src, scripts or supabase. For everything older, trying it on a phone is the better test
+- resolved: notice-list-catches-scope (optional; a guess no longer stops the run, so how wide the first list is no longer decides how often it stops)
+- recurring: (none)
+- still open · should · judge-target-missed, backfill-sends-no-hours, week-suggestion-proposes-friends · unchanged
+- still open · optional · flow-understates-do-all-stops · docs/FLOW.md:41-47 · rewritten again and still "only": leaves out the stop for a dirty working tree and for a build or fix with no commit
+- should · allows-hides-choices · .claude/commands/do-all.md:75-77 · "a choice the request states, allows or directly implies is not a guess: list it in neither"; nearly every choice is one a request allows, so a planner following it literally can leave a noticeable choice out of both lists and out of Decided for you, which is now the owner's only sight of it. "allows" was in the plan word for word; "states or directly implies" would do
+- optional · not-decided-stop-unreachable · .claude/commands/do-all.md:70-72, :93-95 · the planner is told its "Not decided" part says "nothing", so the stop for something undecided can only fire if a planner disobeys; FLOW.md and CLAUDE.md still describe it as a live stop
+- optional · data-choices-no-longer-stop · .claude/commands/do-all.md:102 · a planner's choice about a person's data or a CLAUDE.md rule is now built and pushed to the dev preview before the owner reads it; asked for by the owner, so not higher, but the preview is tried on a real account
+- optional · moved-guess-lacks-other-choice · .claude/commands/do-all.md:103-105 · a guess moved from the second list to Decided for you has no "other choice" line, which that heading promises
+- optional · ghost-future-drag-comment, flow-wording-counted-unnoticed · unchanged
+- checked by hand: the diff touches only the parts of do-all.md the plan named (step 0, steps 2 to 4, the stops, "Never" unchanged); the four /do-all descriptions agree on no stop for a guess, a stop for questions or something undecided, Decided for you first, a review before a push; the plan is tracked and marked BUILT; do-plan, do-build, do-review, do-fix, do-think and do-help are unchanged
+- uncommitted work: the review 14 entry, and this entry
+- checks: tsc clean; npm test 1151 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: /do-all actually run with the new rules (whether a planner decides rather than asks, and what lands under Decided for you); whether the dev preview shares the production database; `npm run eval:voice` (live model); the app on a phone
+
+## Fix attempt 6 — 2026-11-15 — Sonnet 5.5 — commit "fix: /do-all no longer lets a planner leave a noticeable choice out of both lists"
+- allows-hides-choices · do-all.md now says a choice the request "states or directly implies" is not a guess, and that one the request merely leaves open is a guess; "allows" is gone · believes: fixed
+- checks: tsc clean; npm test 1151 passed, 13 skipped; test:tz 42 passed; lint 0 errors; build succeeded
+- not checked: /do-all run with the new wording

@@ -73,8 +73,8 @@ prompt:
 >
 > Save the brief, and end your reply with every choice you made that
 > the request did not settle, sorted into two lists. A choice the
-> request states, allows or directly implies is not a guess: list it in
-> neither.
+> request states or directly implies is not a guess: list it in
+> neither. A choice the request merely leaves open is a guess.
 >
 > `GUESSES THE OWNER WOULD NOTICE:` choices about what a person sees or
 > reads in the app, a person's data, a rule in `CLAUDE.md`, or what is
