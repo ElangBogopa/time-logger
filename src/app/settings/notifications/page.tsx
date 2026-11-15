@@ -234,7 +234,7 @@ export default function NotificationsPage() {
           })}
         </section>
         <p className="mt-2 text-xs text-muted-foreground">
-          {canSwitch && locked && !push.isLoading && push.permission === 'granted'
+          {canSwitch && locked && !push.isLoading
             ? 'Turn reminders on to choose the times.'
             : 'Sent on the hour, give or take a few minutes, and skipped when you have already logged that part of the day.'}
         </p>

@@ -217,6 +217,13 @@ describe('when each one arrives', () => {
     expect(screen.queryByText(/Sent on the hour/)).not.toBeInTheDocument()
   })
 
+  it('says to turn reminders on for a device that has never been asked, which is the usual first state', async () => {
+    await setup(push({ isSubscribed: false, permission: 'prompt' }))
+
+    expect(screen.getByText('Turn reminders on to choose the times.')).toBeInTheDocument()
+    expect(screen.queryByText(/Sent on the hour/)).not.toBeInTheDocument()
+  })
+
   it('keeps the usual line where notifications are blocked, since there is nothing to turn on here', async () => {
     await setup(push({ isSubscribed: false, permission: 'denied' }))
 

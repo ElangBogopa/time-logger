@@ -92,3 +92,130 @@ Verdict: Not ready (1 must fix)
 - not attempted (not asked for): voice-eval-plan-not-marked-built, judge-target-missed, backfill-sends-no-hours, week-suggestion-says-consider
 - checks: tsc clean; npm test 1138 passed, 13 skipped (73 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
 - not checked: the review screens on a phone; saved day and week lines being replaced after the version change on a real account
+
+## Review 6 — 2026-11-14 — Fable 5.2 — reviewed 2e0edec
+Verdict: Not ready (1 must fix)
+- sixth pass; looked only for must-fix and for harm done by fix attempt 4 (the voice text, the two prompt builders, one checker rule, two version numbers). Trying it on a phone is now the better test for everything else
+- resolved: false-no-people-line (the sentence is gone from the voice, the builders add "Time with people: none logged." only when Social and Calls are both empty, both versions are 4 and both are in their fingerprints; in docs/voice-lines/after.md 0 of the 15 lines whose input has Social or Calls say it, counted again by hand)
+- recurring: (none)
+- still open · should · voice-eval-plan-not-marked-built · docs/plans/review-voice-eval.md · still untracked, still no "BUILT - do not run again" line
+- still open · should · judge-target-missed · docs/voice-lines/after.md · 19 of 48 lines fail a judge rule (16 are the week line and total_not_judged); waits for the owner to read the lines
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged; a day with no breakdown now gets no people line either, so it is no worse
+- must · meetings-read-as-no-people · src/lib/prompts.ts:55 · left by the fix: "people" is Social and Calls only, so a day of four hours of meetings is told "Time with people: none logged." and all 3 saved lines for it read "4 hours of meetings and 1 hour and 30 minutes of admin work. There was no time with people logged." Faith is left out too, although Heart counts it (SOCIAL_CATS in metrics-calc.ts:139), so the ring can be full beside a line saying nobody was seen. Needs a decision first: what counts as time with people, or a narrower sentence ("no social time or calls"); the test "counts Social and Calls, and nothing else" pins today's answer
+- should · data-label-read-back · src/lib/prompts.ts:65 · caused by the fix: 10 of 48 saved lines end with the data line pasted whole, "Time with people: none logged.", colon and all; true, so not higher, but it reads as a form field and neither the checker nor the judge flags it
+- checked by hand: both callers pass the per-category labels the people check matches on (day-summary categoryBreakdown through DayReviewContent, and the weekly route's own breakdown), not the six-bucket ones; the 19-item cap in the day route cannot cut Social or Calls off a real day
+- uncommitted work: the untracked plan above, and this entry
+- checks: tsc clean; npm test 1138 passed, 13 skipped (73 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: `npm run eval:voice` was not run again (live model; the saved second run was read instead); saved day and week lines being replaced after the version change on a real account; the review screens on a phone; everything listed as not checked in review 5
+
+## Review 7 — 2026-11-14 — Fable 5.2 — reviewed dac322b
+Verdict: Ready to merge (0 must fix)
+- seventh pass over the branch, first pass over dac322b (friends or family, built from docs/plans/friends-or-family-line.md; the log has no entry for it because it was a build, not a fix), which was read in full. For everything older, trying it on a phone is the better test
+- resolved: meetings-read-as-no-people (people are counted from SOCIAL_CATS, so Faith is in and Meetings stay out; the day prompt carries nothing about people; in docs/voice-lines/after.md the meetings day, both faith days and the faith week say nothing false, and the meetings week says "friends or family", never "people"); data-label-read-back (the data now holds a sentence, not a label and a colon; no saved line pastes a label, read by hand as well as by the new checker rule)
+- recurring: (none)
+- still open · should · voice-eval-plan-not-marked-built · docs/plans/review-voice-eval.md · still untracked, still no "BUILT - do not run again" line; nobody has attempted it
+- still open · should · judge-target-missed · docs/voice-lines/after.md · 19 of 60 lines fail a judge rule, all 19 the week line and total_not_judged; waits for the owner to read the lines
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged; still called by nothing
+- should · friends-plan-not-marked-built · docs/plans/friends-or-family-line.md · caused by the build: the plan built in dac322b is committed without the "BUILT - do not run again" line; fourth time
+- should · week-suggestion-proposes-friends · src/lib/prompts.ts:199 · caused by the build: in a finished week with none, the one suggestion is now often "consider scheduling time with friends" (6 of the 12 such saved lines), a nudge the plan did not ask for and the commit names; 2 focus-only lines run to five sentences for the same reason. Owner accepted both on commit; kept here so the next reading of the lines looks at them
+- checked by hand: the weekly route ends a week in progress at yesterday, so the current week is always partial and is never told it had none; both versions are 5 and both are in their fingerprints; the checker is used only by the eval and tests, not by a route
+- uncommitted work: the untracked voice-eval plan, the review 6 entry, and this entry
+- checks: tsc clean; npm test 1144 passed, 13 skipped (73 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: `npm run eval:voice` was not run again (live model; the saved third run was read instead); saved day and week lines being replaced after the version change on a real account; the review screens on a phone; an hour-old sign-in on a real deployment; Google actually refusing a grant; the tasks picker on a phone
+
+## Review 8 — 2026-11-14 — Fable 5.2 — reviewed 4dbe31a
+Verdict: Ready to merge (0 must fix)
+- eighth pass over the branch, first pass over 4dbe31a (/do-build marks and commits the plan it built; built from docs/plans/mark-plans-built.md, so the log has no fix entry for it), which was read in full: two command and README edits and three plan markers, nothing under src, scripts or CLAUDE.md. For everything older, trying it on a phone is the better test
+- resolved: voice-eval-plan-not-marked-built (tracked, line 3 says BUILT, naming fc8affe); friends-plan-not-marked-built (line 3 says BUILT, naming dac322b). Every file in docs/plans is tracked and says BUILT or PARKED in its first four lines, and /do-build now writes the line itself and refuses a marked plan
+- recurring: (none)
+- still open · should · judge-target-missed · docs/voice-lines/after.md · 19 of 60 lines fail a judge rule, all the week line and total_not_judged; waits for the owner to read the lines
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged; still called by nothing
+- still open · should · week-suggestion-proposes-friends · src/lib/prompts.ts:199 · unchanged; accepted by the owner on commit, kept for the next reading of the lines
+- new: (none; later pass, looked only for must-fix and for harm done by 4dbe31a)
+- uncommitted work: the review 6 and 7 entries, and this entry
+- checks: tsc clean; npm test 1144 passed, 13 skipped (73 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: the new /do-build step in use (the next build shows it); `npm run eval:voice` was not run again (live model); saved day and week lines being replaced after the version change on a real account; the review screens on a phone; an hour-old sign-in on a real deployment; Google actually refusing a grant; the tasks picker on a phone
+
+## Review 9 — 2026-11-14 — Fable 5.2 — reviewed 817ca6f
+Verdict: Ready to merge (0 must fix)
+- ninth pass over the branch, first pass over 817ca6f (/do-all; built from docs/plans/do-all.md, so the log has no fix entry for it), which was read in full beside the four commands it drives: one new command file, edits to do-think, FLOW.md, the plans README and CLAUDE.md, nothing under src, scripts or supabase. For everything older, trying it on a phone is the better test
+- resolved: (none)
+- recurring: (none)
+- still open · should · judge-target-missed · docs/voice-lines/after.md · 19 of 60 lines fail a judge rule, all the week line and total_not_judged; waits for the owner to read the lines
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged; still called by nothing
+- still open · should · week-suggestion-proposes-friends · src/lib/prompts.ts:199 · unchanged; accepted by the owner on commit, kept for the next reading of the lines
+- optional · flow-understates-do-all-stops · docs/FLOW.md:32-35 · says /do-all asks "only if the plan had to guess" and stops without pushing in two cases; the command also asks when the working tree holds anything but the review log, and also stops when a build or fix leaves no commit
+- optional · unreviewed-build-is-pushed · .claude/commands/do-all.md:94 · a brief that says "no review needed" is pushed to dev straight after the build; the plan named this as a choice, but the CLAUDE.md exception reads as if a review always came first
+- optional · round-count-loose · .claude/commands/do-all.md:122 · "a round is one fix followed by one review", yet one round can start a fix helper per model; a conductor could count either way toward the five
+- checked by hand: /do-all pushes only `origin dev`, checks the branch first, never forces, and does not push a run that stopped; it never sends a finding from before the run to a fix; the arguments it hands /do-review override the "narrower on a later pass" rule for the new commits only; the model names it passes are ones the helper tool accepts; the plan is tracked and marked BUILT; do-plan, do-build, do-review, do-fix and do-help are unchanged
+- uncommitted work: the review 6, 7 and 8 entries, and this entry
+- checks: tsc clean; npm test 1144 passed, 13 skipped (73 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: /do-all itself has never been run (its first run is the test: whether helpers follow a command file read from disk, whether the conductor stays silent and counts rounds as meant); `npm run eval:voice` was not run again (live model); saved day and week lines being replaced after the version change on a real account; the review screens on a phone; an hour-old sign-in on a real deployment; Google actually refusing a grant; the tasks picker on a phone
+
+## Review 10 — 2026-11-14 — Opus 5.5 — reviewed 7643111
+Verdict: Ready to merge (0 must fix)
+- tenth pass over the branch, full first pass over 7643111 (Reminders line while off; built from docs/plans/reminders-off-line.md), read in full: one conditional in src/app/settings/notifications/page.tsx:237, four tests, the plan marked BUILT. For everything older, trying it on a phone is the better test
+- resolved: (none)
+- recurring: (none)
+- still open · should · judge-target-missed · docs/voice-lines/after.md · unchanged
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged
+- still open · should · week-suggestion-proposes-friends · src/lib/prompts.ts:199 · unchanged
+- new must / should: (none). The condition uses the same canSwitch and locked that decide the Turn on button and the dimmed list, so the line and the button cannot disagree; the tests cover off, on, blocked and unsupported
+- optional · off-line-flashes-while-loading · src/app/settings/notifications/page.tsx:237 · if the push hook reports isSubscribed false before it has read the subscription, a subscribed device may show "Turn reminders on…" for a moment; the dimmed list and Turn on label already do the same, so not new in kind
+- uncommitted work: the review 6 to 9 entries, and this entry
+- checks: tsc clean; npm test 1147 passed, 13 skipped (73 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: the screen on a phone (off, on, blocked, iPhone tab); /do-all's own run beyond this review; `npm run eval:voice` (live model)
+
+## Review 11 — 2026-11-14 — Opus 5.5 — reviewed a29afe8
+Verdict: Ready to merge (0 must fix)
+- eleventh pass over the branch, full first pass over a29afe8 (unused ghost-events hook removed; built from docs/plans/remove-unused-ghost-hook.md), read in full: one deleted hook, one CLAUDE.md bullet, one new test file, the plan marked BUILT. For everything older, trying it on a phone is the better test
+- resolved: (none)
+- recurring: (none)
+- still open · should · judge-target-missed · docs/voice-lines/after.md · unchanged
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged
+- still open · should · week-suggestion-proposes-friends · src/lib/prompts.ts:199 · unchanged
+- new must / should: (none). Nothing under src imports useGhostEvents or ghostInteractionRef; the new Escape test has a passing control, so it does exercise the listener in useTimelineMouseCreate; the CLAUDE.md line matches TimelineView.tsx:208-233 (mouse down or a tap under 10px opens the sheet, no drag)
+- optional · ghost-future-drag-comment · src/components/TimelineView.tsx:213 · "In the future, this could integrate with the drag creation hooks" now points at hooks that are gone in spirit; the plan chose to leave it
+- uncommitted work: the review 6 to 10 entries, and this entry
+- checks: tsc clean; npm test 1149 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: a calendar block tapped and clicked on the preview; Escape mid-drag in a desktop browser; `npm run eval:voice` (live model)
+
+## Review 12 — 2026-11-15 — Opus 5.5 — reviewed c89a00e
+Verdict: Ready to merge (0 must fix)
+- twelfth pass over the branch, full first pass over c89a00e (/do-all sorts its guesses and always reviews; built from docs/plans/do-all-guesses-and-review.md), read in full beside the whole of do-all.md, FLOW.md and do-plan.md: text in five files and a new plan, nothing under src, scripts or supabase. For everything older, trying it on a phone is the better test
+- resolved: unreviewed-build-is-pushed (optional; step 2 now always goes on to a review, on opus when the brief says none is needed, and "Never" forbids a push before one)
+- recurring: (none)
+- still open · should · judge-target-missed · docs/voice-lines/after.md · unchanged
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged
+- still open · should · week-suggestion-proposes-friends · src/lib/prompts.ts:199 · unchanged
+- still open · optional · flow-understates-do-all-stops · docs/FLOW.md:34-41 · the rewritten sentence still says "only", and still leaves out the stop for a dirty working tree (do-all.md step 0) and for a build or fix with no commit
+- new must / should: (none). The four do-all mentions (do-all.md, FLOW.md, plans/README.md, CLAUDE.md) agree that a review always runs and when the run stops for guesses; the plan's grep checks hold; the plan is tracked and marked BUILT; do-build, do-review, do-fix, do-think and do-help are unchanged
+- optional · notice-list-catches-scope · .claude/commands/do-all.md:70-71, :78 · "what is in or out of the change" together with "when unsure, put it in the first" covers most choices a planner makes, so runs may still stop about as often as before; only a real run will show
+- optional · flow-wording-counted-unnoticed · .claude/commands/do-all.md:74-75 · wording in the command files is listed as something nobody notices, yet when the change is to the flow itself the owner is its only reader; FLOW.md is in neither list
+- uncommitted work: the review 6 to 11 entries, and this entry
+- checks: tsc clean; npm test 1149 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: /do-all actually run with the new rules (whether a planner sorts its guesses as meant, whether a "no review needed" brief gets its Opus review); `npm run eval:voice` (live model); the app on a phone
+
+## Review 13 — 2026-11-15 — Opus 5.5 — reviewed 0731d3e
+Verdict: Not ready (1 must fix)
+- thirteenth pass over the branch, full first pass over 0731d3e (Reminders line waits for the device check; built from docs/plans/reminders-line-no-flicker.md), read in full: one condition, one test, the plan marked BUILT. For everything older, trying it on a phone is the better test
+- resolved: off-line-flashes-while-loading (optional; the line now waits for push.isLoading)
+- recurring: (none)
+- still open · should · judge-target-missed · docs/voice-lines/after.md · unchanged
+- still open · should · backfill-sends-no-hours · src/app/api/day-review/backfill/route.ts:89 · unchanged
+- still open · should · week-suggestion-proposes-friends · src/lib/prompts.ts:199 · unchanged
+- must · turn-on-line-needs-granted · src/app/settings/notifications/page.tsx:237 · the build also added `push.permission === 'granted'`, which the plan did not ask for; a device that has never been asked (permission 'prompt', the usual state before the first Turn on) with reminders off now reads "Sent on the hour…" again, undoing 7643111 for most people who would see the line. Fix: drop that clause, as the plan's code shows
+- should · no-test-for-prompt-off · src/__tests__/reminders-screen.test.tsx:212 · the off test uses the helper's default permission 'granted', so nothing covers off-and-never-asked; that is why the extra clause passed
+- should · commit-message-understates · 0731d3e message · says only isLoading was added and "nothing else changes"; a later session reading it would not look for the permission clause
+- optional · ghost-future-drag-comment, flow-understates-do-all-stops, notice-list-catches-scope, flow-wording-counted-unnoticed · unchanged
+- uncommitted work: the review 6 to 12 entries, and this entry
+- checks: tsc clean; npm test 1150 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: the screen on a phone or browser (first open, never-asked, blocked, iPhone tab); `npm run eval:voice` (live model)
+
+## Fix attempt 5 — 2026-11-15 — Sonnet 5.5 — the commit titled "fix: the Reminders line says to turn on for a device never asked"
+- turn-on-line-needs-granted · dropped `&& push.permission === 'granted'` from the line's condition in notifications/page.tsx, so it is now `canSwitch && locked && !push.isLoading` as the plan had it · fixed
+- no-test-for-prompt-off · added a reminders-screen test: off with permission 'prompt' and not loading reads "Turn reminders on to choose the times." · fixed (the test would have failed with the granted clause)
+- commit-message-understates · 0731d3e's message cannot be changed without rewriting history, so it was left; this commit's message and this entry say that 0731d3e also added a permission clause and that it is now removed · partly fixed (the old message still understates)
+- uncommitted work carried in this commit: the review 6 to 13 entries, and this entry
+- checks: tsc clean; npm test 1151 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: the screen on a phone or browser
