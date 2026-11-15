@@ -55,3 +55,14 @@ Verdict: Ready to merge (0 must fix)
 - the same run (63 lines, 21 scenarios): banned-word 2, absence-unsaid 3, all other checker rows 0; every judge row 0 including total_not_judged 0. Lines with any checker breach 5, failing any judge rule 0. Calibration: unquoted kept 10 of 10, broken 11 of 11; quoted kept 6 of 6, broken 5 of 5. The 5 breaches are in prompts this fix did not change: banned-word is two great-day lines reading back the mood ("The evening mood was great"), absence-unsaid is one leisure-week and two thin-week lines leaving out the no-friends-or-family sentence — sampling, not this change
 - checks: tsc clean; npm test 1164 passed, 13 skipped (75 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
 - not changed: REVIEW_VOICE, the day line, PROMPT_VERSION, weeks with best focus. Not checked: the weekly line on the dev preview or a phone
+
+## Review 4 — 2026-11-15 — Opus 5.5 — reviewed 6bdaa6e
+Verdict: Ready to merge (0 must fix)
+- resolved: rest-called-the-most (buildWeekReviewContext states "Most hours apart from sleep" from the minutes, ties and sleep-only handled, tested; in after.md all six no-best-focus lines name the right activity and hours; read by hand)
+- still open · should · backfill-sends-no-hours, week-suggestion-proposes-friends (carried, not re-examined; after.md:314, :318, :355 still suggest time with friends)
+- no harm from 6bdaa6e found: the fact is added only when there are no best days and no best hours, so weeks with focus send the same context as before; COACH_PROMPT_VERSION 8 → 9 retires cached lines; the route's own "Most waking time" insight picks the same category
+- optional · most-line-restates · src/lib/prompts.ts:223 · the no-focus "pattern" is now the top activity already named in sentence 1, so those lines say it twice ("You spent 12 hours on chores... Chores took the most hours apart from sleep")
+- fourth pass: narrowed to must-fix and what the fix caused; trying the weekly line on the dev preview or a phone is the better test now
+- uncommitted work: this entry only
+- checks: tsc clean; npm test 1164 passed, 13 skipped (75 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: `npm run eval:voice` (live model, not rerun); the weekly line on the dev preview or a phone
