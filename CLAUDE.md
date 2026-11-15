@@ -18,9 +18,11 @@ This comes before everything else in this file.
   fixed, after at least one review
   (a brief that says no review is needed is still reviewed), so the preview
   is ready to try. It does not stop to ask
-  about a choice the plan made; its report lists those, the ones the
+  about a guess the plan made; its report lists those, the ones the
   owner would notice under "Decided for you", to reverse after trying the
-  preview. A run that stopped early does
+  preview. A choice about a person's data, or one that would change or
+  go against a rule in this file, is not a guess: the plan asks and the
+  run stops. A run that stopped early does
   not push. It never touches `main`.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
   a one-line fix, not for a docs change, not because the tests pass, and

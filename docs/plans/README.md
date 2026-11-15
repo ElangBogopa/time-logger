@@ -28,8 +28,10 @@ each with a fresh helper on the model the step before named, until a
 review finds nothing that must or should be fixed. There is always
 at least one review, even when the brief says none is needed. A clean run is
 pushed to `dev`; a run that stops early is not. It does not stop for the plan's guesses: it decides them and lists
-them in its report, the ones you would notice under "Decided for you". `docs/FLOW.md` says
-when it stops.
+them in its report, the ones you would notice under "Decided for you". A
+choice about a person's data, or one that would go against a rule in
+`CLAUDE.md`, is not a guess: the plan asks, and the run stops.
+`docs/FLOW.md` says when it stops.
 
 Do not use Plan mode for step 1. Its Approve button starts building at
 once, in the same session and on the same expensive model, and no brief

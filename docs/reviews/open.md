@@ -254,3 +254,24 @@ Verdict: Ready to merge (0 must fix)
 - allows-hides-choices · do-all.md now says a choice the request "states or directly implies" is not a guess, and that one the request merely leaves open is a guess; "allows" is gone · believes: fixed
 - checks: tsc clean; npm test 1151 passed, 13 skipped; test:tz 42 passed; lint 0 errors; build succeeded
 - not checked: /do-all run with the new wording
+
+## Review 16 — 2026-11-15 — Opus 5.5 — reviewed c593f1c
+Verdict: Ready to merge (0 must fix)
+- sixteenth pass over the branch, narrow pass over fix c593f1c: two lines of the plan helper's prompt in do-all.md. Third pass or more: trying the change on a phone, and a real /do-all run, are now the better tests
+- resolved: allows-hides-choices (do-all.md:75-77 now reads "states or directly implies is not a guess… A choice the request merely leaves open is a guess"; "allows" appears nowhere in the command files, FLOW.md or CLAUDE.md)
+- recurring: (none)
+- still open · should · judge-target-missed, backfill-sends-no-hours, week-suggestion-proposes-friends · unchanged
+- harm from the fix: none that matters. The new sentence agrees with "every choice you made that the request did not settle" just before it and with the two lists after it; nothing else in do-all.md, FLOW.md or CLAUDE.md quoted the old wording
+- optional · built-plan-grep-now-fails · docs/plans/do-all-decide-guesses.md:66, :184 · caused by the fix: the plan's quoted prompt and its "Done when" grep for "states, allows or directly implies", which now finds nothing; the plan is marked BUILT and kept as the record of what was asked, so only a reviewer re-running its checks would be misled
+- optional · flow-understates-do-all-stops, not-decided-stop-unreachable, data-choices-no-longer-stop, moved-guess-lacks-other-choice, ghost-future-drag-comment, flow-wording-counted-unnoticed · unchanged
+- uncommitted work: this entry
+- checks: tsc clean; npm test 1151 passed, 13 skipped (74 suites); test:tz 42 passed in each of 7 timezones; lint 0 errors, 54 warnings; build succeeded
+- not checked: /do-all actually run with the new wording; `npm run eval:voice` (live model); the app on a phone
+
+## Fix attempt 7 — 2026-11-15 — Sonnet 5.5 — commit "fix: /do-all stops for a choice about a person's data or a CLAUDE.md rule, and says so honestly"
+- data-choices-no-longer-stop · do-all.md planner prompt now returns such a choice under QUESTIONS (no brief) and drops "a person's data" and "a rule in CLAUDE.md" from the would-notice list; FLOW.md, plans/README.md and the /do-all exception in CLAUDE.md say the same · believes: fixed
+- not-decided-stop-unreachable · planner is told it writes "nothing" when it has decided everything; the stop is described as a backstop for a brief that still leaves something open (do-all.md, FLOW.md) · believes: fixed
+- moved-guess-lacks-other-choice · a guess moved into Decided for you carries the other choice if the planner gave one, else "other choice not given" · believes: fixed
+- flow-understates-do-all-stops · FLOW.md sentence rewritten without "only", listing every stop: unwritable plan, data or rule question, undecided part, dirty working tree, build or fix with no commit, stop-fixing finding, five rounds, wrong branch · believes: fixed
+- checks: tsc clean; npm test 1151 passed, 13 skipped; test:tz 42 passed; lint 0 errors; build succeeded
+- not checked: /do-all actually run with the new rules

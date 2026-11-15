@@ -33,18 +33,23 @@ was needed.
 
 It does not stop for choices the plan had to make. The planner makes
 the one it would recommend and carries on, and the report lists them:
-the ones you would notice — what the app shows or says, your data, a
-rule in `CLAUDE.md`, or what the change includes — first, under
-**Decided for you**, each with the other choice, so you can reverse
-one after trying the `dev` preview; the rest, like a test's name or
-where a file goes, under **Guessed without asking**. A choice your
-request already made is not listed at all. It stops and asks you only
-when the plan could not be written — the request is too vague, breaks
-a rule in `CLAUDE.md`, or rests on something not true of the code —
-or when the plan left something undecided. It stops and
-does not push if a finding comes back after a stronger
-model has tried it, or after five rounds, and tells you which command
-to run by hand next.
+the ones you would notice — what the app shows or says, or what the
+change includes — first, under **Decided for you**, each with the other
+choice, so you can reverse one after trying the `dev` preview; the rest,
+like a test's name or where a file goes, under **Guessed without
+asking**. A choice your request already made is not listed at all. A
+guess never stops the run, but a choice the request does not settle about
+a person's data (what is stored, deleted, exported or sent), or that
+would change or go against a rule in `CLAUDE.md`, is not a guess: the
+plan asks about it. The run stops and asks you when the plan could not
+be written (the request is too vague, breaks a rule in `CLAUDE.md`, or
+rests on something not true of the code), when the plan asks about such
+a choice, when the plan still leaves something undecided, or when the
+working tree holds anything but the review log before it starts. It
+stops and does not push if a build or a fix leaves no commit, if a
+finding comes back after a stronger model has tried it, after five
+rounds, or if `dev` is not the branch at the end, and tells you which
+command to run by hand next.
 
 Findings that were already in the log before the run are left alone.
 

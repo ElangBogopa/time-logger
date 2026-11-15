@@ -64,12 +64,15 @@ prompt:
 > guess. Ask a question only when no sensible brief can be written
 > without the answer: the request is too vague to plan, it breaks a
 > rule in `CLAUDE.md`, or it rests on something that is not true of the
-> code. Then do not write the brief: reply with `QUESTIONS:` and the
-> questions, in plain language. In every other case, where step 2 of
-> the command would have you ask, make the choice you would recommend,
-> write it into the brief as decided, and carry on. The brief's "Not
-> decided" part says "nothing": a choice you made goes in the brief and
-> in the lists below, not there.
+> code. Also ask when the request does not settle a choice about a
+> person's data (what is stored, deleted, exported or sent) or a choice
+> that would change or go against a rule in `CLAUDE.md`. Then do not
+> write the brief: reply with `QUESTIONS:` and the questions, in plain
+> language. In every other case, where step 2 of the command would have
+> you ask, make the choice you would recommend, write it into the brief
+> as decided, and carry on. When you have decided everything, the
+> brief's "Not decided" part says "nothing": a choice you made goes in
+> the brief and in the lists below, not there.
 >
 > Save the brief, and end your reply with every choice you made that
 > the request did not settle, sorted into two lists. A choice the
@@ -77,8 +80,7 @@ prompt:
 > neither. A choice the request merely leaves open is a guess.
 >
 > `GUESSES THE OWNER WOULD NOTICE:` choices about what a person sees or
-> reads in the app, a person's data, a rule in `CLAUDE.md`, or what is
-> in or out of the change. One plain line each: what you chose, and the
+> reads in the app, or what is in or out of the change. One plain line each: what you chose, and the
 > other choice.
 >
 > `GUESSES THE OWNER WOULD NOT NOTICE:` everything else — the name of a
@@ -90,9 +92,12 @@ prompt:
 
 When it returns, read the brief it saved.
 
-**Stop and ask the owner** only if the helper returned `QUESTIONS:`,
-or if the brief's "Not decided" part says anything other than
-"nothing". Put the questions, or what is undecided, to the owner in
+**Stop and ask the owner** only if the helper returned `QUESTIONS:`
+(which includes a choice about a person's data or a rule in `CLAUDE.md`
+that the request did not settle), or if the brief's "Not decided" part
+says anything other than "nothing". That second stop is a backstop for
+a brief that still leaves something open; a planner that has decided
+everything writes "nothing". Put the questions, or what is undecided, to the owner in
 plain language, one message, and wait. When they are answered, start
 a new plan helper with the original request followed by "The owner
 has since settled: <the answers>. Replace the brief at <path>."
@@ -102,7 +107,9 @@ undecided.
 Never stop for a guess, in either list. Keep both lists, from the plan
 helper whose brief is built, for the report. A guess under
 `GUESSES THE OWNER WOULD NOT NOTICE` that plainly falls under one of
-the first list's kinds goes in the report with the first list.
+the first list's kinds goes in the report with the first list, with
+the other choice if the planner's line gives one, and otherwise "other
+choice not given".
 
 Then read the brief's "Who should build and review this" part and note
 the build model, the review model and the effort.
