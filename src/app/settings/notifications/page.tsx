@@ -234,7 +234,9 @@ export default function NotificationsPage() {
           })}
         </section>
         <p className="mt-2 text-xs text-muted-foreground">
-          Sent on the hour, give or take a few minutes, and skipped when you have already logged that part of the day.
+          {canSwitch && locked
+            ? 'Turn reminders on to choose the times.'
+            : 'Sent on the hour, give or take a few minutes, and skipped when you have already logged that part of the day.'}
         </p>
       </div>
 

@@ -206,5 +206,28 @@ describe('when each one arrives', () => {
   it('says they go out on the hour and are skipped once that part is logged', async () => {
     await setup()
     expect(screen.getByText(/Sent on the hour, give or take a few minutes, and skipped when you have already logged/)).toBeInTheDocument()
+    expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
+  })
+
+  it('says to turn reminders on, instead, while they are off and can be turned on here', async () => {
+    await setup(push({ isSubscribed: false }))
+
+    expect(screen.getByRole('button', { name: 'Turn on' })).toBeInTheDocument()
+    expect(screen.getByText('Turn reminders on to choose the times.')).toBeInTheDocument()
+    expect(screen.queryByText(/Sent on the hour/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the usual line where notifications are blocked, since there is nothing to turn on here', async () => {
+    await setup(push({ isSubscribed: false, permission: 'denied' }))
+
+    expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
+    expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
+  })
+
+  it('keeps the usual line on a device that cannot receive them', async () => {
+    await setup(push({ isSupported: false, isSubscribed: false, permission: 'unsupported' }), { platform: 'ios', standalone: false })
+
+    expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
+    expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
   })
 })
