@@ -135,6 +135,81 @@ describe('getGoogleAccessToken — signed in with Google', () => {
   })
 })
 
+describe('getGoogleAccessToken — a sign-in token that has expired', () => {
+  const expiredJwt = (extra: Row = {}) => ({
+    accessToken: 'jwt-stale',
+    refreshToken: 'jwt-refresh',
+    accessTokenExpires: Date.now() - HOUR,
+    ...extra,
+  })
+
+  it('uses a token that is an hour from expiry as it is, without asking Google', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'jwt-access', accessTokenExpires: Date.now() + HOUR })
+
+    expect(await getGoogleAccessToken(request, viaGoogle)).toEqual({
+      accessToken: 'jwt-access',
+      source: 'session',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('renews it, without touching the database, when Google answers', async () => {
+    mockGetToken.mockResolvedValue(expiredJwt())
+    googleAnswers(200, { access_token: 'jwt-fresh', expires_in: 3600 })
+
+    expect(await getGoogleAccessToken(request, viaGoogle)).toEqual({
+      accessToken: 'jwt-fresh',
+      source: 'session',
+    })
+    expect(reads).toEqual([])
+    expect(updates).toEqual([])
+  })
+
+  it('says to reconnect when Google refuses and nothing is linked', async () => {
+    mockGetToken.mockResolvedValue(expiredJwt())
+    googleAnswers(400, { error: 'invalid_grant' })
+
+    expect(await getGoogleAccessToken(request, viaGoogle)).toEqual({
+      accessToken: null,
+      source: null,
+      problem: 'reconnect',
+    })
+  })
+
+  it('says Google is unavailable when it cannot be reached and nothing is linked', async () => {
+    mockGetToken.mockResolvedValue(expiredJwt())
+    fetchMock.mockRejectedValue(new Error('network down'))
+
+    expect(await getGoogleAccessToken(request, viaGoogle)).toEqual({
+      accessToken: null,
+      source: null,
+      problem: 'unavailable',
+    })
+  })
+
+  it('says to reconnect, without asking Google, when the sign-in has no refresh token', async () => {
+    mockGetToken.mockResolvedValue(expiredJwt({ refreshToken: undefined }))
+
+    expect(await getGoogleAccessToken(request, viaGoogle)).toEqual({
+      accessToken: null,
+      source: null,
+      problem: 'reconnect',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('uses a good linked account when the sign-in token cannot be renewed', async () => {
+    mockGetToken.mockResolvedValue(expiredJwt())
+    googleAnswers(400, { error: 'invalid_grant' })
+    connection = { google_access_token: 'stored', google_refresh_token: 'r', token_expires_at: future() }
+
+    expect(await getGoogleAccessToken(request, viaGoogle)).toEqual({
+      accessToken: 'stored',
+      source: 'connection',
+    })
+  })
+})
+
 describe('getGoogleAccessToken — a Google account linked separately', () => {
   it('ignores a token in the session when the sign-in was not Google', async () => {
     mockGetToken.mockResolvedValue({ accessToken: 'jwt-access' })
@@ -223,37 +298,37 @@ describe('getGoogleAccessToken — a Google account linked separately', () => {
     expect(updates[0].values).toEqual({ google_access_token: 'fresh', token_expires_at: null })
   })
 
-  // The three below pin what happens today rather than what would be best:
-  // the expired token is still handed to the route, Google then refuses it,
-  // and the route is what tells the person to reconnect.
-  it('hands back the expired token, and stores nothing, when Google refuses the refresh', async () => {
+  it('has no token, says to reconnect, and stores nothing, when Google refuses the refresh', async () => {
     connection = { google_access_token: 'stale', google_refresh_token: 'revoked', token_expires_at: past() }
     googleAnswers(400, { error: 'invalid_grant' })
 
     expect(await getGoogleAccessToken(request, viaLink)).toEqual({
-      accessToken: 'stale',
-      source: 'connection',
+      accessToken: null,
+      source: null,
+      problem: 'reconnect',
     })
     expect(updates).toEqual([])
   })
 
-  it('hands back the expired token when Google cannot be reached', async () => {
+  it('has no token, says Google is unavailable, and stores nothing, when Google cannot be reached', async () => {
     connection = { google_access_token: 'stale', google_refresh_token: 'refresh-1', token_expires_at: past() }
     fetchMock.mockRejectedValue(new Error('network down'))
 
     expect(await getGoogleAccessToken(request, viaLink)).toEqual({
-      accessToken: 'stale',
-      source: 'connection',
+      accessToken: null,
+      source: null,
+      problem: 'unavailable',
     })
     expect(updates).toEqual([])
   })
 
-  it('hands back the expired token without asking Google when there is no refresh token', async () => {
+  it('says to reconnect, without asking Google, when expired with no refresh token', async () => {
     connection = { google_access_token: 'stale', google_refresh_token: null, token_expires_at: past() }
 
     expect(await getGoogleAccessToken(request, viaLink)).toEqual({
-      accessToken: 'stale',
-      source: 'connection',
+      accessToken: null,
+      source: null,
+      problem: 'reconnect',
     })
     expect(fetchMock).not.toHaveBeenCalled()
   })

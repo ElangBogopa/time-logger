@@ -13,6 +13,17 @@ This comes before everything else in this file.
   given by the owner: `/do-build` commits to `dev` by itself once its checks
   pass, because a build is only reviewed once committed. It still does not
   push. `/do-fix` does the same for the fixes it makes.
+  A second standing exception: `/do-all` pushes `dev` to `origin dev` by
+  itself when its run ends with nothing left that must or should be
+  fixed, after at least one review
+  (a brief that says no review is needed is still reviewed), so the preview
+  is ready to try. It does not stop to ask
+  about a guess the plan made; its report lists those, the ones the
+  owner would notice under "Decided for you", to reverse after trying the
+  preview. A choice about a person's data, or one that would change or
+  go against a rule in this file, is not a guess: the plan asks and the
+  run stops. A run that stopped early does
+  not push. It never touches `main`.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
   a one-line fix, not for a docs change, not because the tests pass, and
   not because an earlier message approved an earlier merge.
@@ -27,6 +38,14 @@ This comes before everything else in this file.
   commit**: rename `docs/reviews/open.md` to
   `docs/reviews/merged-YYYY-MM-DD.md`. `docs/reviews/README.md` says what
   the log is for.
+- **And bring `docs/BUSINESS-CONTEXT.md` up to date in that same merge.**
+  It tells the non-coding conversations (naming, branding, pricing,
+  launch) what people using the app have today. Change the date and the
+  release id; rewrite "What a person can do in the app today" and "Where
+  it stands" for what this merge released; leave the decisions and the
+  voice alone unless the owner changed them. Plain language, no file
+  names, nothing private. If the merge changed nothing a user or a
+  customer would notice, change only the date and the release id.
 - A push to `dev` gets a Vercel preview deployment, which is where a
   change is tried on a phone before it reaches `main`.
 
@@ -63,7 +82,7 @@ CONFIRMED (status: 'confirmed')
 Calendar events shown as dashed blue blocks. Not stored in DB until user confirms. Click to convert to real entry.
 
 ### Categories (Supabase enum must match exactly)
-19 categories, grouped. The source of truth is `TimeCategory` in `lib/types.ts`.
+20 categories, grouped. The source of truth is `TimeCategory` in `lib/types.ts`.
 
 ```typescript
 type TimeCategory =
@@ -91,6 +110,8 @@ type TimeCategory =
   | 'calls'           // Personal calls/video chats
   // LEISURE
   | 'entertainment'   // TV, games, movies, browsing
+  // FAITH
+  | 'faith'           // Prayer, worship, scripture study, religious community
   // FALLBACK
   | 'other'           // Anything that doesn't fit
 ```
@@ -113,18 +134,15 @@ For display, these roll up into six `AggregatedCategory` buckets —
   takes `{ entries: [...] }` and inserts in one statement. Confirming four
   calendar events one at a time was four prompts and four inserts.
 - **DON'T**: Generate per-entry commentary for a bulk action
+- **DO**: Run `npm run eval:voice` after changing what the day or week review is told (`REVIEW_VOICE` and the builders beside it in `lib/prompts.ts`). It asks the real model for lines and checks each against the voice; the last run is in `docs/voice-lines/after.md`. Raise `PROMPT_VERSION` and `COACH_PROMPT_VERSION` in the same change.
+- The reviews count time with friends or family as the Heart ring does (`SOCIAL_CATS`: Social, Calls, Faith; work meetings are not). The day review never says there was none; a finished week with none is told so in a sentence (`NO_FRIENDS_OR_FAMILY`), never a label and a colon.
 - Pending entries use static `PENDING_COMMENTARY.planned` message
 
 ### Timeline Component
 - Must always show full 24 hours (0-24) with `h-[500px] overflow-y-scroll`
 - Touch drag-to-create: 150ms hold delay to distinguish from scroll
 - Current time indicator only shown on today
-- **Known bug, not fixed:** Escape may not cancel a ghost-entry drag. The
-  Escape listener in `hooks/useGhostEvents.ts` depends on
-  `ghostInteractionRef.current`, and a ref change does not re-render, so
-  the listener is only attached if something else renders mid-drag. The
-  lint rule that flags it is silenced there with a comment. Fixing it means
-  holding the interaction in state, which touches the drag code.
+- A calendar block opens its confirm sheet on a tap or click and cannot be dragged.
 
 ### Calendar API Caching
 - CalendarContext caches events for ±7/14 days from today
@@ -167,6 +185,11 @@ For display, these roll up into six `AggregatedCategory` buckets —
   `reconnectGoogle()` (`hooks/useAccount.ts`); a Google token for the
   calendar or tasks comes from `getGoogleAccessToken()`
   (`lib/google-token.ts`). All three wrap NextAuth.
+- `getGoogleAccessToken` does not hand over a token it knows is past its
+  expiry (60-second margin on the sign-in token; a token with no recorded
+  expiry is trusted as it is) — it renews it or returns none with a
+  `problem` (`'reconnect'` or `'unavailable'`), and only `'reconnect'` shows
+  the sign-in-again banner.
 - **Nothing else imports `next-auth`.** The sign-in itself does (`lib/auth.ts`,
   `lib/auth-adapter.ts`, the `[...nextauth]` route, the login page and
   `Providers.tsx`), and `session-discipline.test.ts` fails if any other
@@ -232,6 +255,7 @@ src/
 │   ├── auth.ts               # NextAuth options
 │   ├── session.ts            # getAppSession(): who is asking, for every API route
 │   ├── google-token.ts       # The Google access token for calendar + tasks, from either source
+│   ├── google-refresh.ts     # The one request that renews a Google access token; refused vs unavailable
 │   ├── account-data.ts       # Every table that holds a person's data; export + delete (server)
 │   ├── api.ts                # Client-side fetch wrappers (csrfFetch)
 │   └── rate-limit.ts         # API rate limiting

@@ -131,6 +131,40 @@ describe('a session due for renewal', () => {
   })
 })
 
+describe('a renewal that fails', () => {
+  beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  it('marks the session when Google refuses the grant', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) })
+
+    const result = await jwt(tokenDue())
+
+    expect(result.error).toBe('RefreshAccessTokenError')
+  })
+
+  it('leaves the token as it was, with no error, when Google cannot be reached', async () => {
+    fetchMock.mockRejectedValue(new Error('network down'))
+    const token = tokenDue()
+
+    const result = await jwt(token)
+
+    expect(result.error).toBeUndefined()
+    expect(result).toEqual(token)
+  })
+
+  it('does the same on a server error', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: 'backend_error' }) })
+    const token = tokenDue()
+
+    const result = await jwt(token)
+
+    expect(result.error).toBeUndefined()
+    expect(result).toEqual(token)
+  })
+})
+
 describe('what the rest of the app sees', () => {
   it('an ordinary session carries its id', async () => {
     const result = await session(tokenDue())

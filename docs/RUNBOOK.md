@@ -121,7 +121,7 @@ npx supabase db reset   # Reset local database
 #### Google OAuth Token Expired
 - **Symptoms:** "RefreshAccessTokenError" in Sentry, users see GoogleReauthBanner
 - **Fix:** User needs to sign out and sign in again to refresh tokens
-- **Prevention:** Monitor token refresh failures in `src/lib/auth.ts:refreshAccessToken`
+- **Prevention:** Watch the `[Google token] Refresh failed` log line from `src/lib/google-refresh.ts`. `invalid_grant` there means Google refused the grant (the banner is right); any other reason means Google could not be reached and no banner shows
 
 #### Supabase Connection Failed  
 - **Symptoms:** 500 errors on all API routes, "connection refused" in logs

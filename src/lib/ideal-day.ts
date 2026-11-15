@@ -116,7 +116,7 @@ export const IDEAL_DAY: IdealWindow[] = [
     bucket: 'body',
     anchor: 'body',
     categories: ['exercise', 'movement'],
-    reason: 'Body temperature peaks — your best window for physical effort',
+    reason: 'Body temperature peaks — for most people, the best window for physical effort',
     source: 'exercise-cognition',
   },
   {

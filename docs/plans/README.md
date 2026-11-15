@@ -6,6 +6,8 @@ The split is about cost: the strongest model writes a short plan, a cheaper
 model does the typing from it, and the strongest model reads the result
 only when it matters.
 
+0. **Think** (optional) — `/do-think <a rough idea>`. A conversation that
+   ends with a `/do-all` line to paste in the same session.
 1. **Plan** — strongest model, new session, **Auto mode**: `/do-plan <what you want>`.
    It saves a brief here and stops.
 2. **Build** — Sonnet, new session, Auto mode: `/do-build docs/plans/<name>.md`.
@@ -21,6 +23,16 @@ only when it matters.
    a fix, the next review says so and names a stronger model; after two
    failed attempts it says to stop and re-plan.
 
+`/do-all <the paragraph from /do-think>` runs steps 1 to 4 by itself,
+each with a fresh helper on the model the step before named, until a
+review finds nothing that must or should be fixed. There is always
+at least one review, even when the brief says none is needed. A clean run is
+pushed to `dev`; a run that stops early is not. It does not stop for the plan's guesses: it decides them and lists
+them in its report, the ones you would notice under "Decided for you". A
+choice about a person's data, or one that would go against a rule in
+`CLAUDE.md`, is not a guess: the plan asks, and the run stops.
+`docs/FLOW.md` says when it stops.
+
 Do not use Plan mode for step 1. Its Approve button starts building at
 once, in the same session and on the same expensive model, and no brief
 is saved — which is how the first plan made this way got built by the
@@ -30,10 +42,13 @@ Start a new session for each step and for each change. A long session
 re-reads its whole history on every message, and that is where credits go.
 
 Once a brief has been built, a line at the top marks it **BUILT - do not
-run again**, with the commit. It stays as the record of what was asked;
-do not point `/do-build` at it.
+run again**, with the date and the title of the commit that built it.
+`/do-build` writes that line itself and commits the brief with the
+build, so a built brief is never left unmarked or untracked. It stays
+as the record of what was asked; `/do-build` refuses a brief marked
+BUILT or PARKED.
 
-The commands are named `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
+The commands are named `/do-think`, `/do-all`, `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
 Claude Code has commands of its own called `/plan` and `/review`; typing
 those runs the built-in ones, which know nothing of this routine — no
 saved brief, no recommended model, no must-fix sorting.

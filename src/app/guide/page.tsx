@@ -272,7 +272,7 @@ export default function GuidePage() {
             </div>
             <div>
               <h1 className="page-title text-foreground">Your Ideal Day</h1>
-              <p className="text-sm text-muted-foreground">Science-backed daily planning guide</p>
+              <p className="text-sm text-muted-foreground">What the research adds up to, hour by hour</p>
             </div>
           </div>
         </header>
@@ -280,9 +280,9 @@ export default function GuidePage() {
         {/* Intro */}
         <div className="rounded-xl bg-secondary/50 border border-border p-4 mb-8">
           <p className="text-sm text-foreground/80 leading-relaxed">
-            How should you actually spend your time? Not based on hustle culture or guesswork — based on
-            peer-reviewed research in circadian biology, cognitive science, and well-being studies.
-            Here&apos;s what the science says about structuring your 16 waking hours.
+            How the research suggests spending 16 waking hours. The findings are averages across people,
+            from circadian biology, cognitive science and well-being studies, and some are stronger than
+            others. Where your own log disagrees, your log is the better guide.
           </p>
         </div>
 
@@ -302,11 +302,11 @@ export default function GuidePage() {
           <div className="flex items-start gap-3">
             <Lightbulb className="h-5 w-5 text-[#6B8CAE] flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-foreground mb-1">The 90-Minute Rule</p>
+              <p className="text-sm font-medium text-foreground mb-1">Blocks of about 90 minutes</p>
               <p className="text-xs text-foreground/70 leading-relaxed">
-                Your brain runs on 90-minute ultradian cycles. Work in 90-minute focused blocks, then take a
-                15–20 minute break. This isn&apos;t productivity advice — it&apos;s biology. Two solid 90-minute
-                deep work blocks per day beats 8 hours of scattered multitasking.
+                Attention tends to run in cycles of roughly 90 minutes. A focused block of about that length,
+                then a 15–20 minute break, suits most people. The evidence for these cycles in waking hours is
+                thinner than it is for sleep, so treat it as a starting point.
               </p>
             </div>
           </div>
@@ -332,11 +332,11 @@ export default function GuidePage() {
           <div className="flex items-start gap-3">
             <Gamepad2 className="h-5 w-5 text-[#8A7CA8] flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-foreground mb-1">Leisure Isn&apos;t Lazy</p>
+              <p className="text-sm font-medium text-foreground mb-1">Free time counts</p>
               <p className="text-xs text-foreground/70 leading-relaxed">
-                Research shows 2–5 hours of daily leisure is optimal for well-being. Less than 2 hours leads to
-                burnout. More than 5 hours gives diminishing returns. The key is active leisure — hobbies,
-                socializing, creating — not just passive scrolling. Schedule your fun like you schedule your work.
+                In one large study, well-being was lower for people with under about 2 hours of free time a
+                day, and also for those with more than about 5. Active leisure — hobbies, people, making
+                things — held up better than passive.
               </p>
             </div>
           </div>

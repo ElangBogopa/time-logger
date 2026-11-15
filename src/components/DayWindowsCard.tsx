@@ -144,7 +144,7 @@ export default function DayWindowsCard({ history }: { history: HabitEntry[] }) {
           <DialogHeader>
             <DialogTitle className="text-left">Today&rsquo;s windows</DialogTitle>
             <DialogDescription className="text-left">
-              What each part of your day is best for, and why.
+              What each part of the day tends to be best for, and why.
             </DialogDescription>
           </DialogHeader>
 

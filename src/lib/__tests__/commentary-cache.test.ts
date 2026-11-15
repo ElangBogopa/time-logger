@@ -41,6 +41,25 @@ describe('commentaryFingerprint', () => {
     expect(commentaryFingerprint({ ...base, ...patch } as CommentaryInputs)).not.toBe(commentaryFingerprint(base))
   })
 
+  it('changes when a category moves minutes with the total held equal, and not otherwise', () => {
+    const a = {
+      ...base,
+      categoryBreakdown: [
+        { category: 'deep_work', minutes: 120 },
+        { category: 'meals', minutes: 60 },
+      ],
+    }
+    const moved = {
+      ...base,
+      categoryBreakdown: [
+        { category: 'deep_work', minutes: 90 },
+        { category: 'meals', minutes: 90 },
+      ],
+    }
+    expect(commentaryFingerprint(moved)).not.toBe(commentaryFingerprint(a))
+    expect(commentaryFingerprint({ ...a })).toBe(commentaryFingerprint(a))
+  })
+
   it('tolerates missing wins and a null focus session', () => {
     expect(() =>
       commentaryFingerprint({ date: '2026-11-01', totalMinutesLogged: 0, wins: [], longestFocusSession: null })

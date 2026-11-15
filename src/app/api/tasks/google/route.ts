@@ -43,8 +43,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Get access token from JWT or calendar_connections
-    const { accessToken, source } = await getGoogleAccessToken(request, session)
+    const { accessToken, source, problem } = await getGoogleAccessToken(request, session)
     console.log('[Google Tasks] Access token source:', source, 'Has token:', !!accessToken)
+
+    if (!accessToken && problem === 'reconnect') {
+      return NextResponse.json(
+        { error: 'Google access has expired. Please sign in again.', code: 'TOKEN_EXPIRED' },
+        { status: 401 }
+      )
+    }
+    if (!accessToken && problem === 'unavailable') {
+      return NextResponse.json(
+        { error: 'Could not reach Google. Try again shortly.', code: 'GOOGLE_UNAVAILABLE' },
+        { status: 503 }
+      )
+    }
 
     if (!accessToken) {
       console.log('[Google Tasks] No access token found')

@@ -58,7 +58,7 @@ beforeEach(() => {
   ;(csrfFetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ commentary: 'A steady day.' }) })
 })
 
-const ready = () => waitFor(() => expect(screen.getByText("Today's Wins")).toBeInTheDocument())
+const ready = () => waitFor(() => expect(screen.getByText("What stood out")).toBeInTheDocument())
 
 describe('standalone /day-review', () => {
   it('draws its own heading and Back button, because the page has none', async () => {

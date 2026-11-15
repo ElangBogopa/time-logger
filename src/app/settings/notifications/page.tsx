@@ -128,6 +128,9 @@ export default function NotificationsPage() {
 
   const canSwitch = push.isSupported && push.permission !== 'denied'
   const locked = !push.isSubscribed
+  // On for this device, yet every time is switched off: nothing will arrive,
+  // and the line under the list must not read as if it will.
+  const allOff = push.isSubscribed && reminderTimes.length > 0 && reminderTimes.every((reminder) => !reminder.enabled)
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -234,7 +237,11 @@ export default function NotificationsPage() {
           })}
         </section>
         <p className="mt-2 text-xs text-muted-foreground">
-          Sent on the hour, give or take a few minutes, and skipped when you have already logged that part of the day.
+          {canSwitch && locked && !push.isLoading
+            ? 'Turn reminders on to choose the times.'
+            : allOff
+              ? 'All three are switched off, so nothing will be sent.'
+              : 'Sent on the hour, give or take a few minutes, and skipped when you have already logged that part of the day.'}
         </p>
       </div>
 

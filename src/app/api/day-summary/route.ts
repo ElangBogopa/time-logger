@@ -112,7 +112,7 @@ function generateWins(
   if (hasDeepWork && hasRest) {
     wins.push({
       id: 'balance',
-      text: 'Good balance of focus and rest',
+      text: 'Focused work and rest both got time',
       type: 'balance',
     })
   }

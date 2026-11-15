@@ -46,16 +46,16 @@ export interface LibraryEntry {
 
 export const LIBRARY: LibraryEntry[] = [
   {
-    id: 'time-paradox',
-    kind: 'book',
-    title: 'The Time Paradox',
-    author: 'Philip Zimbardo & John Boyd',
-    year: 2008,
+    id: 'progress-monitoring',
+    kind: 'study',
+    title: 'Does Monitoring Goal Progress Promote Goal Attainment?',
+    author: 'Harkin, Webb, Chang and colleagues',
+    year: 2016,
     finding:
-      'People overestimate how much of their time went to productive work by 25–40%. Self-monitoring — simply logging — is the most effective single correction for that bias.',
+      'A meta-analysis of 138 experiments, about 20,000 people: those prompted to track their progress towards a goal were more likely to reach it. The effect was small to moderate, and larger when the progress was written down. Most of the experiments were about health goals such as weight and diet, not about how a day is spent.',
     howWeUseIt:
-      'The reason the app exists. Logging is not bookkeeping: the act of writing a day down is what changes it, because it makes the gap between what you meant to do and what you did impossible to miss.',
-    link: 'https://openlibrary.org/works/OL23487W',
+      'The reason the app keeps a record. Writing down what a day held puts it next to what you meant it to hold. That the effect carries over from health goals to time is our inference, not the study’s.',
+    link: 'https://doi.org/10.1037/bul0000025',
     metrics: [],
   },
   {

@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { supabase } from './supabase-server'
 import type { AppSession } from './session'
+import { refreshGoogleAccessToken, type GoogleRefreshResult } from './google-refresh'
 
 /**
  * A Google access token to read someone's calendar and tasks with.
@@ -19,27 +20,67 @@ export type GoogleTokenSource = 'session' | 'connection'
 export interface GoogleAccessToken {
   accessToken: string | null
   source: GoogleTokenSource | null
+  /** Why there is no token although a Google account is connected.
+   *  'reconnect': Google refused the grant; only signing in again fixes it.
+   *  'unavailable': Google could not be reached; trying later may work. */
+  problem?: 'reconnect' | 'unavailable'
+}
+
+/** A token this close to its expiry is treated as already expired. */
+const EXPIRY_MARGIN_MS = 60_000
+
+/** The decoded sign-in cookie, or null when it cannot be read. */
+function readSignInJwt(request: NextRequest) {
+  return getToken({ req: request }).catch(() => null)
 }
 
 /** The tokens the Google sign-in left in the session, if it was one. */
 export async function getSignInGoogleTokens(
   request: NextRequest
 ): Promise<{ accessToken?: string; refreshToken?: string }> {
-  const jwt = await getToken({ req: request }).catch(() => null)
+  const jwt = await readSignInJwt(request)
   return { accessToken: jwt?.accessToken, refreshToken: jwt?.refreshToken }
 }
 
+/**
+ * A token that is good now, or none and the reason why.
+ *
+ * It never returns a token past its expiry: it renews it, or answers with
+ * no token and a `problem`. Only 'reconnect' means the person must sign in
+ * again.
+ */
 export async function getGoogleAccessToken(
   request: NextRequest,
   session: AppSession
 ): Promise<GoogleAccessToken> {
+  let problem: GoogleAccessToken['problem']
+  const none = (): GoogleAccessToken =>
+    problem ? { accessToken: null, source: null, problem } : { accessToken: null, source: null }
+  const fail = (result: Extract<GoogleRefreshResult, { ok: false }>) => {
+    problem ??= result.reason === 'refused' ? 'reconnect' : 'unavailable'
+  }
+
   if (session.authProvider === 'google') {
-    const { accessToken } = await getSignInGoogleTokens(request)
-    if (accessToken) return { accessToken, source: 'session' }
+    const jwt = await readSignInJwt(request)
+    if (jwt?.accessToken) {
+      const expires = jwt.accessTokenExpires
+      if (!expires || Date.now() < expires - EXPIRY_MARGIN_MS) {
+        return { accessToken: jwt.accessToken, source: 'session' }
+      }
+      if (jwt.refreshToken) {
+        const renewed = await refreshGoogleAccessToken(jwt.refreshToken)
+        // Not stored anywhere: a route handler cannot write the sign-in
+        // cookie. The browser's next /api/auth/session call does that.
+        if (renewed.ok) return { accessToken: renewed.accessToken, source: 'session' }
+        fail(renewed)
+      } else {
+        problem = 'reconnect'
+      }
+    }
   }
 
   const userId = session.user.id
-  if (!userId) return { accessToken: null, source: null }
+  if (!userId) return none()
 
   const { data: connection } = await supabase
     .from('calendar_connections')
@@ -47,46 +88,32 @@ export async function getGoogleAccessToken(
     .eq('user_id', userId)
     .single()
 
-  if (!connection) return { accessToken: null, source: null }
+  if (!connection) return none()
 
   const isExpired = connection.token_expires_at && new Date(connection.token_expires_at) < new Date()
-  if (isExpired && connection.google_refresh_token) {
-    const refreshed = await refreshConnectionToken(userId, connection.google_refresh_token)
-    if (refreshed) return { accessToken: refreshed, source: 'connection' }
+  if (!isExpired) return { accessToken: connection.google_access_token, source: 'connection' }
+
+  if (!connection.google_refresh_token) {
+    problem ??= 'reconnect'
+    return none()
   }
 
-  return { accessToken: connection.google_access_token, source: 'connection' }
+  const renewed = await refreshConnectionToken(userId, connection.google_refresh_token)
+  if (renewed.ok) return { accessToken: renewed.accessToken, source: 'connection' }
+  fail(renewed)
+  return none()
 }
 
-async function refreshConnectionToken(userId: string, refreshToken: string): Promise<string | null> {
-  try {
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-      }),
-    })
-    const tokens = await response.json()
-    if (!response.ok || !tokens.access_token) {
-      console.error('[Google token] Refresh failed:', tokens?.error ?? response.status)
-      return null
-    }
-
-    const expiresAt = tokens.expires_in
-      ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-      : null
+async function refreshConnectionToken(userId: string, refreshToken: string): Promise<GoogleRefreshResult> {
+  const result = await refreshGoogleAccessToken(refreshToken)
+  if (result.ok) {
     await supabase
       .from('calendar_connections')
-      .update({ google_access_token: tokens.access_token, token_expires_at: expiresAt })
+      .update({
+        google_access_token: result.accessToken,
+        token_expires_at: result.expiresAt ? new Date(result.expiresAt).toISOString() : null,
+      })
       .eq('user_id', userId)
-
-    return tokens.access_token
-  } catch (error) {
-    console.error('[Google token] Refresh threw:', error)
-    return null
   }
+  return result
 }

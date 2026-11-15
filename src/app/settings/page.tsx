@@ -288,7 +288,7 @@ export default function MorePage() {
             icon={Lightbulb}
             iconColor="text-muted-foreground"
             label="Your Ideal Day"
-            description="Science-backed daily planning guide"
+            description="What the research adds up to, hour by hour"
             onClick={() => router.push('/guide')}
           />
           <RowItem
