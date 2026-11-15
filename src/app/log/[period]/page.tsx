@@ -229,7 +229,7 @@ function LogPeriodContent() {
 
   const handlePickRepeatTime = (row: RepeatRow) => {
     setIsRepeatSheetOpen(false)
-    setQuickLogRange(retimeAfterClash(row, period))
+    setQuickLogRange(retimeAfterClash(row, period)) // null: nowhere in this session to put it, the person picks
     setQuickLogPrefill({ name: row.entry.activity, category: row.entry.category })
     setIsQuickLogOpen(true)
   }
@@ -252,12 +252,11 @@ function LogPeriodContent() {
   }, [toast])
 
   // Get period-relevant entries (excluding soft-deleted ones)
-  const visibleEntries = entries.filter(e => !pendingDeletes.has(e.id))
+  const visibleEntries = useMemo(() => entries.filter(e => !pendingDeletes.has(e.id)), [entries, pendingDeletes])
   const periodEntries = getEntriesForPeriod(visibleEntries, period)
   const repeatRows = useMemo(
     () => (repeatCandidate ? repeatRowsLeft(repeatCandidate, visibleEntries, period) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [repeatCandidate, entries, pendingDeletes, period]
+    [repeatCandidate, visibleEntries, period]
   )
   const stats = getSessionStats(visibleEntries, period)
 
@@ -570,7 +569,7 @@ function LogPeriodContent() {
             onClick={() => setIsRepeatSheetOpen(true)}
           >
             <div>
-              <h2 className="eyebrow mb-1">Same as {repeatCandidate.label}</h2>
+              <span className="eyebrow mb-1 block">Same as {repeatCandidate.label}</span>
               <p className="text-sm text-muted-foreground">
                 {repeatRows.map((row) => row.entry.activity).join(' · ')}
               </p>

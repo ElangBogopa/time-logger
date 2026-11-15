@@ -122,20 +122,23 @@ export function repeatRowsLeft(candidate: RepeatCandidate, dayEntries: TimeEntry
 /**
  * Where the add screen should start a clashing row: after the entry it
  * overlaps, keeping its length. A row belongs to the session its start falls
- * in, so a start that would land in a later session is not offered: the
- * entry would be logged there and this session would keep offering the row.
- * It keeps its copied times instead.
+ * in, so a start that would land in a later session (or past midnight) is not
+ * offered: the entry would be logged there and this session would keep
+ * offering the row. The copied times are no use either, since the clash
+ * already holds them and saving would be refused. So there is no suggestion
+ * and the add screen opens without times, for the person to choose.
  */
-export function retimeAfterClash(row: RepeatRow, period: TimePeriod): { startTime: string; endTime: string } {
+export function retimeAfterClash(row: RepeatRow, period: TimePeriod): { startTime: string; endTime: string } | null {
   const { entry, clash } = row
-  const ownStart = entry.start_time ?? ''
-  const ownEnd =
-    entry.end_time ?? (ownStart ? minutesToTime(timeToMinutes(ownStart) + entry.duration_minutes) : '')
   if (clash?.end_time) {
     const start = timeToMinutes(clash.end_time)
     const end = start + entry.duration_minutes
     if (end <= 1439 && start < PERIOD_TIME_RANGES[period].end * 60) return { startTime: minutesToTime(start), endTime: minutesToTime(end) }
+    return null
   }
+  const ownStart = entry.start_time ?? ''
+  if (!ownStart) return null
+  const ownEnd = entry.end_time ?? minutesToTime(timeToMinutes(ownStart) + entry.duration_minutes)
   return { startTime: ownStart, endTime: ownEnd }
 }
 
