@@ -7,7 +7,7 @@ model does the typing from it, and the strongest model reads the result
 only when it matters.
 
 0. **Think** (optional) — `/do-think <a rough idea>`. A conversation that
-   ends with a `/do-plan` line to paste in the same session.
+   ends with a `/do-all` line to paste in the same session.
 1. **Plan** — strongest model, new session, **Auto mode**: `/do-plan <what you want>`.
    It saves a brief here and stops.
 2. **Build** — Sonnet, new session, Auto mode: `/do-build docs/plans/<name>.md`.
@@ -22,6 +22,12 @@ only when it matters.
    attempt in the log, and commits to `dev`. If a problem comes back after
    a fix, the next review says so and names a stronger model; after two
    failed attempts it says to stop and re-plan.
+
+`/do-all <the paragraph from /do-think>` runs steps 1 to 4 by itself,
+each with a fresh helper on the model the step before named, until a
+review finds nothing that must or should be fixed. A clean run is
+pushed to `dev`; a run that stops early is not. `docs/FLOW.md` says
+when it stops.
 
 Do not use Plan mode for step 1. Its Approve button starts building at
 once, in the same session and on the same expensive model, and no brief
@@ -38,7 +44,7 @@ build, so a built brief is never left unmarked or untracked. It stays
 as the record of what was asked; `/do-build` refuses a brief marked
 BUILT or PARKED.
 
-The commands are named `/do-think`, `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
+The commands are named `/do-think`, `/do-all`, `/do-plan`, `/do-build`, `/do-review` and `/do-fix` on purpose.
 Claude Code has commands of its own called `/plan` and `/review`; typing
 those runs the built-in ones, which know nothing of this routine — no
 saved brief, no recommended model, no must-fix sorting.

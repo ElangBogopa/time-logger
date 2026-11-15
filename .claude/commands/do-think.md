@@ -8,7 +8,7 @@ edit code.
 
 The thought: $ARGUMENTS
 
-This is a conversation, and it comes before `/do-plan`. A plan written
+This is a conversation, and it comes before any plan. A plan written
 from a half-formed idea is a plan for something I did not want. Your job
 here is to find out what I actually want.
 
@@ -42,10 +42,11 @@ here is to find out what I actually want.
    - **What we left out**, on purpose.
    - **Still open**, if anything, and who decides it.
    - **The line to run next**, in a code block, ready to paste:
-     `/do-plan <one paragraph that carries everything we agreed, the
+     `/do-all <one paragraph that carries everything we agreed, the
      limits, and what done looks like>`
-   Then stop. Do not run `/do-plan` yourself and do not start planning,
-   even if I say "great" or "go ahead": tell me to paste the line.
+   Then stop. Do not run `/do-all` or `/do-plan` yourself and do not
+   start planning, even if I say "great" or "go ahead": tell me to
+   paste the line.
 
 Keep every message short. Plain language, no jargon, no file names unless
 I ask.

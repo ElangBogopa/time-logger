@@ -13,6 +13,10 @@ This comes before everything else in this file.
   given by the owner: `/do-build` commits to `dev` by itself once its checks
   pass, because a build is only reviewed once committed. It still does not
   push. `/do-fix` does the same for the fixes it makes.
+  A second standing exception: `/do-all` pushes `dev` to `origin dev` by
+  itself when its run ends with nothing left that must or should be
+  fixed, so the preview is ready to try. A run that stopped early does
+  not push. It never touches `main`.
 - **Never commit to, push to, or merge into `main` on your own.** Not for
   a one-line fix, not for a docs change, not because the tests pass, and
   not because an earlier message approved an earlier merge.
