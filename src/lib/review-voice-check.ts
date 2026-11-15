@@ -6,7 +6,8 @@
  * real people, which is a separate decision.
  */
 
-import { REVIEW_BANNED_WORDS } from '@/lib/prompts'
+import { REVIEW_BANNED_WORDS, REVIEW_DATA_LABELS } from '@/lib/prompts'
+import { CATEGORY_LABELS } from '@/lib/types'
 
 export interface VoiceBreach {
   rule: string
@@ -47,17 +48,37 @@ const ADVICE = wordRegex(['should', 'try', 'consider', 'aim', 'next time', 'need
 const CORRECTION = wordRegex(['should', 'need to', 'must'])
 const HARD_DAY = wordRegex(['tough', 'challenging', 'difficult', 'rough'])
 const EMOJI = /\p{Extended_Pictographic}/gu
-// "No time with people was logged", "no social time", "no calls were logged".
-const NO_PEOPLE =
-  /\bno (?:time |hours? )?(?:with (?:people|others|friends|family)|social(?: time| activit(?:y|ies))?|calls?)\b|\b(?:time with people|social time) was not\b/gi
+// Any statement that there was no time with people, however worded: "No time
+// with people was logged", "no time with friends or family", "no social
+// time", "no calls were logged", "Time with people: none".
+const WITH_WHOM = 'people|others|friends|family|loved ones'
+const ABSENCE = new RegExp(
+  `\\bno (?:time |hours? )?(?:spent |logged )?(?:with (?:${WITH_WHOM})|social(?: time| activit(?:y|ies))?|calls?)\\b` +
+    `|\\b(?:time with (?:${WITH_WHOM})(?: (?:or|and) (?:${WITH_WHOM}))?|social time)(?: was not\\b|: none\\b)`,
+  'gi'
+)
+// The wordings that are no longer allowed even when it is true: the phrase
+// is "friends or family", because meetings are people too.
+const ABSENCE_OLD_WORDS =
+  /\bno (?:time |hours? )?(?:spent |logged )?(?:with (?:people|others)|social(?: time| activit(?:y|ies))?|calls?)\b|\b(?:time with (?:people|others)|social time)(?: was not\b|: none\b)/gi
+const FRIENDS_OR_FAMILY = /friends (?:or|and) family/i
+// A label from the data, colon and all, pasted into the line.
+const LABEL_READ_BACK = new RegExp(
+  `\\b(?:${[...REVIEW_DATA_LABELS, ...Object.values(CATEGORY_LABELS), 'Time with people', 'Time with friends or family']
+    .map(escape)
+    .join('|')}):`,
+  'gi'
+)
 
 export function checkReviewLine(
   text: string,
   opts: {
     kind: 'day' | 'week'
     mood?: 'low' | 'okay' | 'great' | null
-    /** Minutes of Social and Calls in the input, when known. */
+    /** Minutes of Social, Calls and Faith in the input, when known. */
     peopleMinutes?: number
+    /** A week still in progress: nothing is said about what it lacks. */
+    isPartialWeek?: boolean
   }
 ): VoiceBreach[] {
   const breaches: VoiceBreach[] = []
@@ -74,9 +95,21 @@ export function checkReviewLine(
   add('emoji', findAll(text, EMOJI))
   add('score-talk', findAll(text, SCORE_TALK))
 
-  // Only checkable when the caller knows the input: a line that says nobody
-  // was seen on a day that has time with people in it.
-  if ((opts.peopleMinutes ?? 0) > 0) add('false-absence', findAll(text, NO_PEOPLE))
+  // A line that says nobody was seen when somebody was is false; a day line
+  // never says it at all; a finished week with none says it, as "friends or
+  // family"; a week in progress does not.
+  const absence = findAll(text, ABSENCE)
+  const hasSome = (opts.peopleMinutes ?? 0) > 0
+  if (hasSome) add('false-absence', absence)
+  else if (opts.kind === 'day') add('day-absence', absence)
+  if (opts.kind === 'week' && !hasSome) {
+    add('absence-wording', findAll(text, ABSENCE_OLD_WORDS))
+    if (opts.isPartialWeek === true) add('partial-week-absence', absence)
+    else if (opts.peopleMinutes === 0 && !FRIENDS_OR_FAMILY.test(text)) {
+      breaches.push({ rule: 'absence-unsaid', found: '' })
+    }
+  }
+  add('label-read-back', findAll(text, LABEL_READ_BACK))
 
   if (opts.kind === 'day') {
     add('relative-day', findAll(text, RELATIVE_DAY))

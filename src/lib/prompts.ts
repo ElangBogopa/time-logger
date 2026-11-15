@@ -1,5 +1,6 @@
 import { CATEGORIES, CATEGORY_LABELS, TimeCategory, TimeEntry } from '@/lib/types'
 import { formatDurationLong } from '@/lib/time-utils'
+import { SOCIAL_CATS } from '@/lib/metrics-calc'
 
 /**
  * Prompts shared by the API routes and the evaluation harness in scripts/eval.
@@ -40,30 +41,45 @@ export const REVIEW_VOICE = `VOICE: plain, calm, specific. Short sentences that 
 - State facts. Do not evaluate the person or the day. No praise, no encouragement, no consolation.
 - Never use these words or anything like them: ${REVIEW_BANNED_WORDS.join(', ')}.
 - No exclamation marks, no emoji, no questions.
-- Say there was no time with people only if the data carries the line "Time with people: none logged", and then once and flatly: it is what was logged, not a failing. Without that line, never say it.
-- Say nothing about any other area that is missing from the data.
+- Say nothing about an area that is missing from the data, and never state on your own that something was not logged. The one exception: when the data itself contains a full sentence saying that something was not logged, that sentence is a fact of the data like any other and your line must include it, once, flatly, in the data's own words. Leaving it out is a mistake. It is what was logged, not a failing.
 Example of the register, from someone else's day (its facts are not this person's; never reuse its sentences): "Four hours of focused work, most of it in one block on the essay. A 30-minute walk."`
 
 /**
- * The line that tells the model whether time with people was logged.
+ * What the reviews say about time with friends and family.
  *
- * The voice used to carry the sentence "No time with people was logged." as
- * its example, and the model closed almost every line with it, including on
- * days with two hours of Social. The absence is now a fact in the data,
- * worked out here, instead of a sentence to copy.
+ * It is counted as the Heart ring counts it: Social, Calls and Faith. Work
+ * meetings are left out on purpose; a day of meetings is not a day with
+ * friends or loved ones, and saying "no time with people" about it was false.
+ *
+ * The day review never says there was none: one day without it is not a
+ * finding. A finished week that had none is told so, once, in a sentence in
+ * the data (NO_FRIENDS_OR_FAMILY); a week still in progress is told nothing.
+ * The voice carries no wording about it at all, because an example sentence
+ * in the voice is what the model copied onto almost every line.
  */
-const PEOPLE_LABELS: readonly string[] = [CATEGORY_LABELS.social, CATEGORY_LABELS.calls]
+const PEOPLE_LABELS: readonly string[] = SOCIAL_CATS.map((c) => CATEGORY_LABELS[c as TimeCategory])
 
+/** Minutes of what the Heart ring counts: Social, Calls and Faith. Work meetings are left out on purpose. */
 export function peopleMinutes(categories: { label: string; minutes: number }[]): number {
   return categories
     .filter((c) => PEOPLE_LABELS.includes(c.label) && c.minutes > 0)
     .reduce((n, c) => n + c.minutes, 0)
 }
 
-/** Present only when there was none: an amount here was read back as a second total. */
-function peopleLine(categories: { label: string; minutes: number }[]): string {
-  return peopleMinutes(categories) > 0 ? '' : 'Time with people: none logged.'
-}
+/** A sentence, not a label: a label and a colon was pasted back whole. */
+export const NO_FRIENDS_OR_FAMILY = 'No time with friends or family was logged this week.'
+
+/**
+ * The labels the builders below write before a colon, so the checker can
+ * recognise one pasted back into a line. review-people-line.test.ts fails if
+ * a builder writes a label that is not listed here.
+ */
+export const REVIEW_DATA_LABELS = [
+  'Time by category', 'Time tracked', 'Plan', 'Noted', 'Evening mood',
+  'Longest focus session', 'Weekly Review Data', 'Days covered',
+  'Days with anything logged', 'Best focus days', 'Best focus hours',
+  'Hours by category',
+] as const
 
 export const DAY_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 150, temperature: 0.4 } as const
 export const WEEK_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 200, temperature: 0.4 } as const
@@ -116,13 +132,9 @@ export function buildDayReviewPrompt(dayData: DayReviewPromptInput): string {
     .map((c) => `- ${c.label}: ${formatDurationLong(c.minutes)}`)
   const hoursText = hoursList.length > 0 ? hoursList.join('\n') : 'Nothing was broken down by category.'
 
-  // No breakdown means nothing is known either way, so nothing is said.
-  const peopleText = hoursList.length > 0 ? peopleLine(dayData.hours ?? []) : ''
-
   const logged = [
     'Time by category:',
     hoursText,
-    peopleText,
     `Time tracked: ${hours}h ${minutes}m (this only says how much was written down — do not praise or criticise it)`,
     planText,
     winsText,
@@ -161,6 +173,9 @@ export interface WeekReviewContextInput {
 
 export function buildWeekReviewContext(input: WeekReviewContextInput): string {
   const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
+  // Only a finished week can have had none: one still in progress has not.
+  const noneThisWeek =
+    !input.isPartialWeek && input.categories.length > 0 && peopleMinutes(input.categories) === 0
   return `
 Weekly Review Data:
 - Days covered: ${input.isPartialWeek ? `${input.daysSoFar} of 7 — the week is still in progress` : 'all 7'}
@@ -170,7 +185,7 @@ Weekly Review Data:
 
 Hours by category${input.isPartialWeek ? ' so far' : ''}:
 ${input.categories.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
-${input.categories.length > 0 ? peopleLine(input.categories) : ''}
+${noneThisWeek ? `\n${NO_FRIENDS_OR_FAMILY}` : ''}
 
 `
 }

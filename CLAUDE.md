@@ -71,7 +71,7 @@ CONFIRMED (status: 'confirmed')
 Calendar events shown as dashed blue blocks. Not stored in DB until user confirms. Click to convert to real entry.
 
 ### Categories (Supabase enum must match exactly)
-19 categories, grouped. The source of truth is `TimeCategory` in `lib/types.ts`.
+20 categories, grouped. The source of truth is `TimeCategory` in `lib/types.ts`.
 
 ```typescript
 type TimeCategory =
@@ -99,6 +99,8 @@ type TimeCategory =
   | 'calls'           // Personal calls/video chats
   // LEISURE
   | 'entertainment'   // TV, games, movies, browsing
+  // FAITH
+  | 'faith'           // Prayer, worship, scripture study, religious community
   // FALLBACK
   | 'other'           // Anything that doesn't fit
 ```
@@ -122,6 +124,7 @@ For display, these roll up into six `AggregatedCategory` buckets —
   calendar events one at a time was four prompts and four inserts.
 - **DON'T**: Generate per-entry commentary for a bulk action
 - **DO**: Run `npm run eval:voice` after changing what the day or week review is told (`REVIEW_VOICE` and the builders beside it in `lib/prompts.ts`). It asks the real model for lines and checks each against the voice; the last run is in `docs/voice-lines/after.md`. Raise `PROMPT_VERSION` and `COACH_PROMPT_VERSION` in the same change.
+- The reviews count time with friends or family as the Heart ring does (`SOCIAL_CATS`: Social, Calls, Faith; work meetings are not). The day review never says there was none; a finished week with none is told so in a sentence (`NO_FRIENDS_OR_FAMILY`), never a label and a colon.
 - Pending entries use static `PENDING_COMMENTARY.planned` message
 
 ### Timeline Component

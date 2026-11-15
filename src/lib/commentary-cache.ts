@@ -18,7 +18,7 @@ import { readCachedText, writeCachedText, clearCachedText, stableHash } from './
 const NAMESPACE = 'day'
 
 // Raise this when the prompt's voice changes, so lines written by the old prompt are not reused.
-const PROMPT_VERSION = 4
+const PROMPT_VERSION = 5
 
 export interface CommentaryInputs {
   date: string

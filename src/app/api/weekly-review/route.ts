@@ -21,7 +21,7 @@ import { calcBody, calcFocus, calcSocial, METRIC_THRESHOLDS, type EntryRow } fro
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 // Raise this when the coach prompt's voice changes, so old lines are not reused.
-const COACH_PROMPT_VERSION = 4
+const COACH_PROMPT_VERSION = 5
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday

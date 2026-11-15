@@ -116,6 +116,8 @@ const DAY_SCENARIOS: DayScenario[] = [
     metrics: { body: 45, focus: 55, social: 50 },
     mood: 'okay',
   }),
+  day('faith-day', [{ label: 'Faith', minutes: 60 }, { label: 'Deep Work', minutes: 180 }, { label: 'Meals', minutes: 60 }]),
+  day('meetings-and-faith', [{ label: 'Meetings', minutes: 240 }, { label: 'Faith', minutes: 30 }]),
 ]
 
 function week(
@@ -162,6 +164,8 @@ const WEEK_SCENARIOS: WeekScenario[] = [
     bestDays: [],
     bestHours: [],
   }),
+  week('meetings-week', [['Sleep', 50], ['Deep Work', 20], ['Meetings', 14], ['Meals', 7]]),
+  week('faith-week', [['Sleep', 52], ['Deep Work', 18], ['Faith', 5], ['Meals', 8]]),
 ]
 
 const JUDGE_BOTH = [
@@ -225,7 +229,12 @@ async function run(): Promise<Line[]> {
       const withPeople = peopleMinutes(
         scenario.kind === 'day' ? scenario.input.hours ?? [] : scenario.input.categories
       )
-      const breaches = checkReviewLine(line, { kind: scenario.kind, mood, peopleMinutes: withPeople })
+      const breaches = checkReviewLine(line, {
+        kind: scenario.kind,
+        mood,
+        peopleMinutes: withPeople,
+        isPartialWeek: scenario.kind === 'week' ? scenario.input.isPartialWeek : undefined,
+      })
 
       const rules = judgeRules(scenario.kind)
       const judge = await openai.chat.completions.create({
@@ -266,7 +275,8 @@ Respond with JSON only: {${rules.map(([k]) => `"${k}": bool`).join(', ')}, "note
 
 const CHECKER_RULES = [
   'banned-word', 'verdict', 'exclamation', 'question', 'emoji', 'score-talk',
-  'relative-day', 'advice', 'correction', 'hard-day', 'false-absence', 'too-long', 'list', 'empty',
+  'relative-day', 'advice', 'correction', 'hard-day', 'false-absence', 'day-absence', 'absence-wording',
+  'absence-unsaid', 'partial-week-absence', 'label-read-back', 'too-long', 'list', 'empty',
 ]
 const JUDGE_RULES = [...JUDGE_BOTH, ...JUDGE_DAY, ...JUDGE_WEEK].map(([k]) => k as string)
 
@@ -314,6 +324,11 @@ function report(results: Line[]): { text: string; checkerCounts: Record<string, 
   for (const r of JUDGE_RULES) L.push(`| ${r} | judge | ${judgeCounts[r]} |`)
   L.push('')
   L.push(`Lines with any checker breach: ${results.filter((x) => x.breaches.length > 0).length}. Lines failing any judge rule: ${judgeFailLines}.`)
+  L.push('')
+  const noneWeeks = results.filter(
+    (x) => x.scenario.kind === 'week' && !x.scenario.input.isPartialWeek && peopleMinutes(x.scenario.input.categories) === 0
+  )
+  L.push(`Full-week lines with no time with friends or family in the input: ${noneWeeks.length}. Of those, lines that say "friends or family": ${noneWeeks.filter((x) => /friends or family/i.test(x.line)).length}.`)
   L.push('')
   for (const s of Array.from(new Set(results.map((x) => x.scenario)))) {
     L.push(`## ${s.kind}: ${s.id}`)
