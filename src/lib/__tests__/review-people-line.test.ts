@@ -55,7 +55,7 @@ describe('time with friends or family in the review prompts', () => {
   })
 
   it('gives the model no wording about it to copy', () => {
-    for (const text of [REVIEW_VOICE, buildWeekReviewSystemPrompt(), ...DAY_PROMPTS]) {
+    for (const text of [REVIEW_VOICE, buildWeekReviewSystemPrompt({ bestDays: ['Tuesday'], bestHours: ['9 AM'] }), buildWeekReviewSystemPrompt({ bestDays: [], bestHours: [] }), ...DAY_PROMPTS]) {
       expect(text).not.toMatch(/time with people/i)
       expect(text).not.toMatch(/friends or family/i)
     }

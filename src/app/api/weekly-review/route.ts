@@ -21,7 +21,7 @@ import { calcBody, calcFocus, calcSocial, METRIC_THRESHOLDS, type EntryRow } fro
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 // Raise this when the coach prompt's voice changes, so old lines are not reused.
-const COACH_PROMPT_VERSION = 6
+const COACH_PROMPT_VERSION = 7
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday
@@ -409,7 +409,7 @@ export async function POST(request: NextRequest) {
           const completion = await openai.chat.completions.create({
             ...WEEK_REVIEW_PARAMS,
             messages: [
-              { role: 'system', content: buildWeekReviewSystemPrompt() },
+              { role: 'system', content: buildWeekReviewSystemPrompt({ bestDays, bestHours }) },
               { role: 'user', content: context },
             ],
           })

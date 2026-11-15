@@ -197,12 +197,26 @@ ${noneThisWeek ? `\n${NO_FRIENDS_OR_FAMILY}` : ''}
 `
 }
 
-export function buildWeekReviewSystemPrompt(): string {
+// A week with no best focus days or hours is told nothing about them: told
+// to call them "best focus", the model wrote that there was no focused work
+// and suggested using best focus hours that did not exist.
+export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 'bestDays' | 'bestHours'>): string {
+  const days = focus.bestDays.length > 0
+  const hours = focus.bestHours.length > 0
+  const named = days && hours ? 'days and hours' : days ? 'days' : 'hours'
+  const pattern =
+    days || hours
+      ? `such as the ${named} where the focused work fell`
+      : 'such as which activities took the most hours'
+  const bestFocus =
+    days || hours
+      ? `\nCall the ${named} in the data "best focus" ${named}, as the data does; never call them productive.`
+      : ''
   return `You are writing a brief weekly reflection from the week's hours (3-4 sentences max).
 
 Write it in this order:
 1. What the week held: two or three specific things from the data, with their hours.
-2. One pattern in the data, stated as a fact, such as the days or hours where the focused work fell. Leave this out if the data shows none.
+2. One pattern in the data, stated as a fact, ${pattern}. Leave this out if the data shows none.
 3. One option for next week, in a single plain sentence that starts from a fact in the data and names a day, an hour or an activity. It is about something to do, not about something to record. This is the only sentence that is not a statement of what happened. It is an option, not a correction: no "should", no "need to", no "must".
 
 Use "you" language. Reference specific data from their week.
@@ -213,8 +227,7 @@ Don't use bullet points - write in flowing prose.
 Keep it concise - no more than 4 sentences total.
 The person's scores are on screen above your words: do not mention scores or targets, and do not sum the week up with a verdict.
 Write about what the time went to, never about the record of it. Say "you spent" or name the activity and its hours. Say nothing about how many days or hours the data covers, and do not suggest writing more down. Sleep is listed last and is not a finding.
-If the week is still in progress, say "so far" and do not compare it with a full week.
-Call the days and hours in the data "best focus" days and hours, as the data does; never call them productive.`
+If the week is still in progress, say "so far" and do not compare it with a full week.${bestFocus}`
 }
 
 /** One line per activity, with the category the classifier assigned. */

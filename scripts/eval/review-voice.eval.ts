@@ -171,10 +171,71 @@ const JUDGE_BOTH = [
 const JUDGE_DAY = [['no_advice', 'Nothing is suggested or recommended.']] as const
 const JUDGE_WEEK = [
   ['one_suggestion', 'At most one sentence suggests something, and it names a specific day, hour or activity.'],
-  ['total_not_judged', 'The total hours logged are not praised or criticised, and sleep being the largest category is not presented as a finding.'],
 ] as const
 
 const judgeRules = (k: 'day' | 'week') => [...JUDGE_BOTH, ...(k === 'day' ? JUDGE_DAY : JUDGE_WEEK)]
+
+// total_not_judged is graded on its own, one sentence at a time. It used to
+// be one more rule in the call above ("The total hours logged are not praised
+// or criticised"), and the judge failed nearly every week line that stated
+// hours, with the stock note "total hours logged are judged". Given a fuller
+// rule in that same call it still failed all eight CALIBRATION lines that
+// keep it; asked yes or no of each sentence it read every "consider
+// scheduling" as a breach. Sorting each sentence into a kind separates the
+// two sets. CALIBRATION below is graded before every run and printed with it.
+const RECORD_RULE = 'total_not_judged'
+// Each sentence is put in one of these kinds; the first three break the rule.
+const RECORD_KINDS = {
+  about_the_record:
+    'remarks on the record itself: how many days or hours were written down or logged, how complete, full or thin the log or the data is, or what that suggests. "You logged all seven days." "This week held three days of logging." "There were only 2 days with any time logged." "There is not enough data to determine your best focus days." "Only two days had any time logged, indicating limited activity."',
+  suggests_recording:
+    'suggests logging, recording, tracking or writing something down. "You might consider logging more focused work next week." "You could consider logging some time with friends."',
+  sleep_was_the_largest:
+    'says in words that sleep was the largest, biggest or main part of the week. "Sleep took up most of your week." "Sleep was the biggest category."',
+  sleep_hours:
+    'gives the hours of sleep and nothing more. "Sleep came to 40 hours." "You slept 45 hours."',
+  what_the_time_went_to:
+    'states what the time went to, an activity and its hours, which activity other than sleep took the most time (rest is not sleep), or a pattern such as which days or hours, even if it uses the word "logged". "You spent 22 hours on deep work." "You also logged 8 hours in meetings and 9 hours for meals." "Your best focus days were Tuesday and Thursday."',
+  no_time_with_people:
+    'says there was no time with friends or family, however it is worded and even if it uses "logged" or "log". "No time with friends or family was logged this week." "You did not log any time with friends or family."',
+  suggests_doing:
+    'suggests doing or scheduling an activity. "You could schedule more deep work at 9 AM on Tuesday." "Consider scheduling some time with friends on Saturday."',
+  other: 'anything else.',
+} as const
+const RECORD_BREAKS = ['about_the_record', 'suggests_recording', 'sleep_was_the_largest']
+
+async function judgeRecord(openai: OpenAI, line: string): Promise<{ kept: boolean; note: string }> {
+  const res = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are sorting the sentences of a weekly review written from a time log. Answer strictly as JSON.
+
+Split the review into its sentences and give each the one kind that fits it best:
+${Object.entries(RECORD_KINDS).map(([k, d]) => `- ${k}: ${d}`).join('\n')}
+
+If any clause of a sentence remarks on how much was recorded or how complete it is, the sentence is about_the_record even when the rest of it states hours. A fact introduced by "the data shows" or "the week held" is still what_the_time_went_to. A sentence that suggests doing an activity is suggests_doing, not suggests_recording, unless it asks for something to be logged or recorded. Judge only what each sentence is about; ignore its tone and accuracy.
+Respond with JSON only: {"sentences": [{"text": "the sentence", "kind": "one of the kinds"}]}`,
+      },
+      { role: 'user', content: line },
+    ],
+    temperature: 0,
+    max_tokens: 500,
+    response_format: { type: 'json_object' },
+  })
+  let parsed: { sentences?: { text?: unknown; kind?: unknown }[] } = {}
+  try {
+    parsed = JSON.parse(res.choices[0]?.message?.content || '{}')
+  } catch {
+    parsed = {}
+  }
+  if (!Array.isArray(parsed.sentences) || parsed.sentences.length === 0) {
+    return { kept: false, note: 'record judge gave no answer' }
+  }
+  const broken = parsed.sentences.filter((x) => RECORD_BREAKS.includes(String(x.kind)))
+  return { kept: broken.length === 0, note: broken.map((x) => `${String(x.kind)}: "${String(x.text ?? '')}"`).join(' ') }
+}
 
 interface Line {
   scenario: Scenario
@@ -187,6 +248,105 @@ interface Line {
 
 const out = (s = '') => process.stdout.write(s + '\n')
 
+async function judgeLine(
+  openai: OpenAI,
+  kind: 'day' | 'week',
+  input: string,
+  line: string
+): Promise<{ judge: Record<string, boolean>; note: string }> {
+  const rules = judgeRules(kind)
+  const [judge, record] = await Promise.all([
+    openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are grading one ${kind} review line written from a time log. Answer strictly as JSON.
+
+THE EXACT INPUT THE WRITER HAD:
+${input}
+
+Grade each rule true (kept) or false (broken):
+${rules.map(([k, d]) => `- ${k}: ${d}`).join('\n')}
+
+Respond with JSON only: {${rules.map(([k]) => `"${k}": bool`).join(', ')}, "note": "one short sentence on the worst problem, or 'fine'"}`,
+        },
+        { role: 'user', content: line },
+      ],
+      temperature: 0,
+      max_tokens: 250,
+      response_format: { type: 'json_object' },
+    }),
+    kind === 'week' ? judgeRecord(openai, line) : null,
+  ])
+  let parsed: Record<string, unknown> = {}
+  try {
+    parsed = JSON.parse(judge.choices[0]?.message?.content || '{}')
+  } catch {
+    parsed = {}
+  }
+  const verdicts: Record<string, boolean> = {}
+  for (const [k] of rules) verdicts[k] = parsed[k] === true
+  let note = String(parsed.note ?? '')
+  if (record) {
+    verdicts[RECORD_RULE] = record.kept
+    if (!record.kept) note += ` ${RECORD_RULE}: ${record.note}`
+  }
+  return { judge: verdicts, note }
+}
+
+// Week lines with a known total_not_judged answer, graded before the run so
+// the report shows whether the judge can tell them apart. "Keeps" lines are
+// from the run of 2026-11-15 (6a8f7e3), which the owner read and found do
+// not remark on the log; "breaks" lines are from the run before it
+// (3a15c1e), some trimmed, or are the owner's examples, and the sleep one
+// was written for this check. A line marked * quotes one
+// of the examples in the rule itself, so it is a weaker test.
+const CALIBRATION: { scenario: string; keeps: boolean; quoted?: boolean; line: string }[] = [
+  { scenario: 'full-week', keeps: true, quoted: true, line: 'You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 8 hours in meetings and 9 hours for meals. Best focus days were Tuesday and Thursday. You might consider scheduling more deep work during the 9 AM hour on those days.' },
+  { scenario: 'full-week', keeps: true, quoted: true, line: 'You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 8 hours in meetings and 9 hours for meals. The data shows that your best focus days were Tuesday and Thursday. You could schedule more deep work during your best focus hours next week.' },
+  { scenario: 'focus-only', keeps: true, line: 'You spent 38 hours on deep work and 10 hours on shallow work. Your best focus days were Tuesday and Thursday, with your best focus hours at 8 AM and 9 AM. You logged no time with friends or family this week. You might consider scheduling some shallow work during your best focus hours on Tuesday.' },
+  { scenario: 'partial', keeps: true, line: 'You spent 9 hours on deep work, with best focus hours at 9 AM and 10 AM on Monday. You also logged 1 hour of exercise. The data shows that your best focus day was Monday. You might consider scheduling another deep work session on Monday morning at 9 AM.' },
+  { scenario: 'thin-week', keeps: true, line: 'This week held 3 hours of deep work and 1 hour for meals. Your best focus day was Monday, with the best focus hour at 10 AM. You could consider scheduling more deep work sessions on Monday at 10 AM.' },
+  { scenario: 'leisure-week', keeps: true, line: 'This week held 30 hours of entertainment and 6 hours of shallow work. You spent your best focus day on Wednesday, with your best focus hour at 2 PM. You did not log any time with friends or family. You could consider scheduling a focused work session on Wednesday at 2 PM.' },
+  { scenario: 'meetings-week', keeps: true, line: 'You spent 20 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. No time with friends or family was logged this week. You could plan to schedule more time for meals on Tuesday.' },
+  { scenario: 'faith-week', keeps: true, line: 'You spent 18 hours on deep work, with your best focus days being Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. You also spent 8 hours on meals and 5 hours on faith. Consider scheduling more deep work during your best focus hours next week.' },
+  // These two were graded broken in the first run with the sorted judge: a
+  // sentence giving sleep's hours, and rest (not sleep) taking the most time.
+  { scenario: 'faith-week', keeps: true, line: 'You spent 18 hours on deep work this week. Your best focus days were Tuesday and Thursday, with your best focus hours at 9 AM and 10 AM. You logged 8 hours for meals and 5 hours for faith. You had 52 hours of sleep.' },
+  { scenario: 'sleep-heavy', keeps: true, line: 'You spent 10 hours resting, 6 hours on chores, and 3 hours on calls. The most time was dedicated to rest. You could consider scheduling more calls on Tuesday.' },
+  { scenario: 'full-week', keeps: false, quoted: true, line: 'This week held 22 hours of deep work, with best focus days on Tuesday and Thursday. The best focus hours were at 9 AM and 10 AM. You logged all seven days, with no hours unaccounted for. Consider scheduling more deep work during your best focus hours next week.' },
+  { scenario: 'focus-only', keeps: false, line: 'This week included 38 hours of deep work and 10 hours of shallow work, with all seven days logged. The best focus days were Tuesday and Thursday, with the best focus hours at 8 AM and 9 AM. You could consider scheduling some shallow work during your best focus hours on Tuesday.' },
+  { scenario: 'partial', keeps: false, quoted: true, line: 'This week held three days of logging, with 9 hours of deep work recorded. The best focus day was Monday, with focused hours at 9 AM and 10 AM. You might consider scheduling additional focused work on Monday during the best focus hours.' },
+  { scenario: 'partial', keeps: false, line: 'This week held 9 hours of deep work, all on Monday during the best focus hours of 9 AM and 10 AM. Sleep accounted for 22 hours, and there was 1 hour of exercise. You could consider logging additional activities on Tuesday or Wednesday.' },
+  { scenario: 'thin-week', keeps: false, line: 'This week included 3 hours of deep work, all logged on Monday during the best focus hour of 10 AM. You logged 1 hour for meals. There were only 2 days with any time logged. You could consider adding more activities on Wednesday, as it currently has no logged hours.' },
+  { scenario: 'thin-week', keeps: false, quoted: true, line: 'This week held 3 hours of deep work and 1 hour for meals. Only two days had any time logged, indicating limited activity. You could schedule deep work on Monday at 10 AM.' },
+  { scenario: 'sleep-heavy', keeps: false, line: 'You spent 10 hours resting, 6 hours on chores and 3 hours on calls. There is not enough data to determine your best focus days or hours. You might consider recording focused work next week to capture more details.' },
+  { scenario: 'leisure-week', keeps: false, line: 'This week held 30 hours of entertainment and 10 hours for meals. Wednesday was the best focus day. You might consider logging some time with friends or family on a day like Saturday.' },
+  { scenario: 'sleep-heavy', keeps: false, line: 'Sleep was the biggest part of your week at 63 hours, well ahead of 10 hours of rest and 6 hours of chores. You could schedule a call on Wednesday evening.' },
+]
+
+async function calibrate(openai: OpenAI) {
+  const rows = await Promise.all(
+    CALIBRATION.map(async (c) => {
+      const { kept, note } = await judgeRecord(openai, c.line)
+      return { ...c, got: kept, note: note || 'fine' }
+    })
+  )
+  const right = (keeps: boolean) => rows.filter((r) => r.keeps === keeps && r.got === keeps).length
+  const total = (keeps: boolean) => rows.filter((r) => r.keeps === keeps).length
+  const L: string[] = []
+  L.push('## Judge check: total_not_judged on lines with a known answer')
+  L.push('')
+  L.push(`Lines that keep the rule graded kept: ${right(true)} of ${total(true)}. Lines that break it graded broken: ${right(false)} of ${total(false)}. (* quotes an example given in the rule.)`)
+  L.push('')
+  for (const r of rows) {
+    const ok = r.got === r.keeps
+    L.push(`- ${ok ? 'right' : 'WRONG'} · should ${r.keeps ? 'keep' : 'break'}${r.quoted ? ' *' : ''} · ${r.scenario} · "${r.line}" · note: ${r.note}`)
+  }
+  return L.join('\n')
+}
+
 function promptFor(s: Scenario): { messages: OpenAI.Chat.ChatCompletionMessageParam[]; input: string } {
   if (s.kind === 'day') {
     const p = buildDayReviewPrompt(s.input)
@@ -195,7 +355,7 @@ function promptFor(s: Scenario): { messages: OpenAI.Chat.ChatCompletionMessagePa
   const context = buildWeekReviewContext(s.input)
   return {
     messages: [
-      { role: 'system', content: buildWeekReviewSystemPrompt() },
+      { role: 'system', content: buildWeekReviewSystemPrompt(s.input) },
       { role: 'user', content: context },
     ],
     input: context,
@@ -231,37 +391,8 @@ async function run(): Promise<Line[]> {
         isPartialWeek: scenario.kind === 'week' ? scenario.input.isPartialWeek : undefined,
       })
 
-      const rules = judgeRules(scenario.kind)
-      const judge = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are grading one ${scenario.kind} review line written from a time log. Answer strictly as JSON.
-
-THE EXACT INPUT THE WRITER HAD:
-${input}
-
-Grade each rule true (kept) or false (broken):
-${rules.map(([k, d]) => `- ${k}: ${d}`).join('\n')}
-
-Respond with JSON only: {${rules.map(([k]) => `"${k}": bool`).join(', ')}, "note": "one short sentence on the worst problem, or 'fine'"}`,
-          },
-          { role: 'user', content: line },
-        ],
-        temperature: 0,
-        max_tokens: 250,
-        response_format: { type: 'json_object' },
-      })
-      let parsed: Record<string, unknown> = {}
-      try {
-        parsed = JSON.parse(judge.choices[0]?.message?.content || '{}')
-      } catch {
-        parsed = {}
-      }
-      const verdicts: Record<string, boolean> = {}
-      for (const [k] of rules) verdicts[k] = parsed[k] === true
-      results[i] = { scenario, sample, line, breaches, judge: verdicts, note: String(parsed.note ?? '') }
+      const { judge, note } = await judgeLine(openai, scenario.kind, input, line)
+      results[i] = { scenario, sample, line, breaches, judge, note }
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker))
@@ -273,7 +404,7 @@ const CHECKER_RULES = [
   'relative-day', 'advice', 'correction', 'hard-day', 'false-absence', 'day-absence', 'absence-wording',
   'absence-unsaid', 'partial-week-absence', 'label-read-back', 'too-long', 'list', 'empty',
 ]
-const JUDGE_RULES = [...JUDGE_BOTH, ...JUDGE_DAY, ...JUDGE_WEEK].map(([k]) => k as string)
+const JUDGE_RULES = [...[...JUDGE_BOTH, ...JUDGE_DAY, ...JUDGE_WEEK].map(([k]) => k as string), RECORD_RULE]
 
 function describeInput(s: Scenario): string[] {
   if (s.kind === 'day') {
@@ -344,8 +475,17 @@ function report(results: Line[]): { text: string; checkerCounts: Record<string, 
 }
 
 it('reads the review lines against the voice', async () => {
+  loadEnv()
+  const check = await calibrate(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }))
+  // EVAL_CALIBRATE_ONLY=1 grades the known lines and stops: a cheap way to
+  // try a change to the judge before spending a full run on it.
+  if (process.env.EVAL_CALIBRATE_ONLY) {
+    out(check)
+    return
+  }
   const results = await run()
-  const { text } = report(results)
+  const { text: lines } = report(results)
+  const text = lines.replace(/\n## day: /, `\n${check}\n\n## day: `)
   out(text)
   if (process.env.EVAL_REPORT) writeFileSync(path.join(process.cwd(), process.env.EVAL_REPORT), text + '\n')
   expect(results.every((r) => r.line.length > 0)).toBe(true)
