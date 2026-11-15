@@ -13,6 +13,28 @@ export function timeToMinutes(time: string): number {
 }
 
 /**
+ * The first entry that a new stretch of time mostly sits on: more than half
+ * of the new stretch overlaps it. The add screen refuses such a time; the
+ * "Same as" sheet will not tick such a row.
+ */
+export function findMostlyOverlapping<T extends { start_time?: string | null; end_time?: string | null }>(
+  startTime: string,
+  endTime: string,
+  entries: readonly T[]
+): T | undefined {
+  const newStart = timeToMinutes(startTime)
+  const newEnd = timeToMinutes(endTime)
+  const newDuration = newEnd - newStart
+  return entries.find((entry) => {
+    if (!entry.start_time || !entry.end_time) return false
+    const entryStart = timeToMinutes(entry.start_time)
+    const entryEnd = timeToMinutes(entry.end_time)
+    const overlapDuration = Math.max(0, Math.min(newEnd, entryEnd) - Math.max(newStart, entryStart))
+    return newDuration > 0 && overlapDuration / newDuration > 0.5
+  })
+}
+
+/**
  * Convert total minutes to a time string (HH:MM)
  * Handles 1440 (24*60) as "24:00" for end-of-day midnight
  */
