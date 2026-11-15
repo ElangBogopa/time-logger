@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { fetchEntries as apiFetchEntries, fetchSessionCompletions } from '@/lib/api'
-import { TimeEntry, SessionCompletion, PERIOD_TIME_RANGES } from '@/lib/types'
+import { TimeEntry, SessionCompletion, TimePeriod, PERIOD_TIME_RANGES } from '@/lib/types'
 import { canLogYesterdayEvening, getYesterdayDateString } from '@/lib/session-utils'
 
 interface UseSessionDataReturn {
@@ -22,7 +22,7 @@ interface UseSessionDataProps {
 // Client-side cache for session data per date — shared across pages
 interface SessionCacheEntry {
   entries: TimeEntry[]
-  completions: SessionCompletion[]
+  completions: SessionCompletion[] | null // null = not fetched yet
 }
 const sessionDataCache = new Map<string, SessionCacheEntry>()
 
@@ -37,14 +37,36 @@ export function setCachedEntries(date: string, entries: TimeEntry[]): void {
   if (existing) {
     existing.entries = entries
   } else {
-    sessionDataCache.set(date, { entries, completions: [] })
+    sessionDataCache.set(date, { entries, completions: null })
   }
+}
+
+/** Cached completions for a date, or null when they have not been fetched. */
+export function getCachedCompletions(date: string): SessionCompletion[] | null {
+  return sessionDataCache.get(date)?.completions ?? null
+}
+
+/** Replace (or add) one period's completion in the cache, after saving it. */
+export function setCachedCompletion(date: string, completion: SessionCompletion): void {
+  const existing = sessionDataCache.get(date)
+  if (!existing || existing.completions === null) return
+  existing.completions = [
+    ...existing.completions.filter(c => c.period !== completion.period),
+    completion,
+  ]
+}
+
+/** Drop one period's completion from the cache, after an undo. */
+export function removeCachedCompletion(date: string, period: TimePeriod): void {
+  const existing = sessionDataCache.get(date)
+  if (!existing || existing.completions === null) return
+  existing.completions = existing.completions.filter(c => c.period !== period)
 }
 
 export function useSessionData({ userId, today, currentHour }: UseSessionDataProps): UseSessionDataReturn {
   const cached = sessionDataCache.get(today)
   const [entries, setEntries] = useState<TimeEntry[]>(cached?.entries || [])
-  const [completions, setCompletions] = useState<SessionCompletion[]>(cached?.completions || [])
+  const [completions, setCompletions] = useState<SessionCompletion[]>(cached?.completions ?? [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [yesterdayEveningLogged, setYesterdayEveningLogged] = useState(true)
 
@@ -56,7 +78,7 @@ export function useSessionData({ userId, today, currentHour }: UseSessionDataPro
     const cachedData = sessionDataCache.get(today)
     if (cachedData) {
       setEntries(cachedData.entries)
-      setCompletions(cachedData.completions)
+      setCompletions(cachedData.completions ?? [])
       setIsLoading(false)
     } else {
       setIsLoading(true)

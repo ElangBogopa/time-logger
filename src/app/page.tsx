@@ -216,16 +216,18 @@ function HomeContent() {
                 const Icon = info.period === 'morning' ? Sun : info.period === 'afternoon' ? Cloud : Moon
                 const periodLabel = info.period === 'morning' ? 'Morning' : info.period === 'afternoon' ? 'Afternoon' : 'Evening'
 
-                // Three states, each with a cue that is not colour:
-                // done has a tick, partial says so, and nothing logged is plain.
+                // Four states, each with a cue that is not colour:
+                // done has a tick, partial says so, nothing logged is plain,
+                // and "nothing to log" is told apart by its words.
                 const isDone = info.hasCompletion
+                const isAnswered = info.nothingToLog
                 const hasEntries = info.hasEntries
                 // "Not wrapped up" is a prompt, so it only shows while it
                 // can be acted on: today and yesterday. On older days it
                 // was a permanent amber mark against every session.
                 const isPartial = hasEntries && !isDone && canWrapUp
 
-                const rowTint = isDone
+                const rowTint = (isDone || isAnswered)
                   ? STATUS_CLASSES.green.tintStrong
                   : isPartial
                     ? STATUS_CLASSES.yellow.tintStrong
@@ -233,7 +235,7 @@ function HomeContent() {
                       ? 'bg-accent/50'
                       : ''
 
-                const iconColour = isDone
+                const iconColour = (isDone || isAnswered)
                   ? STATUS_CLASSES.green.icon
                   : isPartial
                     ? STATUS_CLASSES.yellow.icon
@@ -241,7 +243,9 @@ function HomeContent() {
                       ? 'text-foreground'
                       : 'text-muted-foreground'
 
-                const subtitle = (isDone || hasEntries)
+                const subtitle = isAnswered
+                  ? 'Nothing to log'
+                  : (isDone || hasEntries)
                   ? `${info.entryCount} ${info.entryCount === 1 ? 'entry' : 'entries'}`
                   : isToday
                     ? (isActive ? 'Tap to log' : info.state === 'upcoming' ? 'Upcoming' : 'Not logged')
@@ -260,7 +264,7 @@ function HomeContent() {
                       </p>
                       <p className="text-xs text-muted-foreground">{subtitle}</p>
                     </div>
-                    {isDone ? (
+                    {(isDone || isAnswered) ? (
                       <Check className={`h-4 w-4 shrink-0 ${STATUS_CLASSES.green.icon}`} aria-label="Done" />
                     ) : isPartial ? (
                       <span className={`shrink-0 text-xs ${STATUS_CLASSES.yellow.text}`}>Not wrapped up</span>

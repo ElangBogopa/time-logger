@@ -128,6 +128,7 @@ export interface SessionInfo {
   completedAt?: string
   hasCompletion: boolean // user pressed "Done"
   hasEntries: boolean    // entries exist in this period
+  nothingToLog: boolean  // the person said "Nothing to log", and nothing is logged there
 }
 
 // Mood/energy levels for session check-in

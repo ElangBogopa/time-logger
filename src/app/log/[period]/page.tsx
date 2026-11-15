@@ -3,14 +3,14 @@
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/hooks/useAccount'
-import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities } from '@/lib/api'
+import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities, fetchSessionCompletions, deleteSessionCompletion } from '@/lib/api'
 import { findRepeatCandidate, entriesForRepeat, repeatRowsLeft, retimeAfterClash, type RepeatCandidate, type RepeatRow } from '@/lib/repeat-session'
 import { PERIOD_CLASSES } from '@/lib/palette'
 import { findUnaccountedGaps } from '@/lib/gaps'
 import { unconfirmedEvents } from '@/lib/calendar-match'
 import NextUp from '@/components/NextUp'
-import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
-import { TimePeriod, TimeEntry, TimeCategory, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
+import { getCachedEntries, setCachedEntries, getCachedCompletions, setCachedCompletion, removeCachedCompletion } from '@/hooks/useSessionData'
+import { TimePeriod, TimeEntry, SessionCompletion, TimeCategory, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
 import {
   getEntriesForPeriod,
   getSessionStats,
@@ -209,6 +209,29 @@ function LogPeriodContent() {
     }
   }, [userId, selectedDate, safePeriod, isLocked])
 
+  // The "Nothing to log" answer, saved to the account. null = not known yet.
+  const [answered, setAnswered] = useState<boolean | null>(() => {
+    const cachedRows = getCachedCompletions(selectedDate)
+    if (!cachedRows) return null
+    return cachedRows.some(c => c.period === safePeriod && c.skipped)
+  })
+  const [isUndoing, setIsUndoing] = useState(false)
+
+  useEffect(() => {
+    if (!userId || !selectedDate) return
+    let cancelled = false
+    fetchSessionCompletions({ date: selectedDate, period: safePeriod })
+      .then((rows) => {
+        if (!cancelled) setAnswered(rows.some(r => r.skipped))
+      })
+      .catch(() => {
+        if (!cancelled) setAnswered(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId, selectedDate, safePeriod])
+
   const handleRepeatSession = async (ids: Set<string>) => {
     if (!repeatCandidate || isRepeating || ids.size === 0) return
     setIsRepeating(true)
@@ -403,18 +426,37 @@ function LogPeriodContent() {
   // Handle "Nothing to log" (skip)
   const handleSkip = async () => {
     try {
-      await upsertSessionCompletion({
+      const row = await upsertSessionCompletion({
         date: selectedDate,
         period,
         entry_count: 0,
         total_minutes: 0,
         skipped: true,
       })
+      setCachedCompletion(selectedDate, row as unknown as SessionCompletion)
     } catch (err) {
       console.error('Failed to save skip:', err)
+      sonnerToast.error('Could not save that. Try again.')
+      return
     }
 
     goHome()
+  }
+
+  // Take back "Nothing to log"
+  const handleUndo = async () => {
+    if (isUndoing) return
+    setIsUndoing(true)
+    try {
+      await deleteSessionCompletion({ date: selectedDate, period })
+      removeCachedCompletion(selectedDate, period)
+      setAnswered(false)
+    } catch (err) {
+      console.error('Failed to undo skip:', err)
+      sonnerToast.error('Could not undo that. Try again.')
+    } finally {
+      setIsUndoing(false)
+    }
   }
 
   // Handle summary close
@@ -735,12 +777,23 @@ function LogPeriodContent() {
                 <CheckCircle2 className="h-5 w-5" />
                 Done with {label}
               </Button>
-            ) : (
+            ) : answered === true ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-3">
+                <p className="text-sm text-muted-foreground">Nothing to log for this session</p>
+                <Button variant="outline" onClick={handleUndo} disabled={isUndoing}>
+                  Undo
+                </Button>
+              </div>
+            ) : answered === false ? (
               <Button onClick={handleSkip} variant="outline" className="w-full" size="lg">
                 Nothing to log for this session
               </Button>
-            )}
+            ) : null}
           </div>
+        )}
+
+        {isLocked && answered === true && periodEntries.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground">Nothing to log for this session</p>
         )}
 
         {isLocked && (

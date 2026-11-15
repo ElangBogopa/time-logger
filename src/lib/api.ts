@@ -195,6 +195,11 @@ export async function upsertSessionCompletion(
   return data
 }
 
+export async function deleteSessionCompletion(params: { date: string; period: string }): Promise<void> {
+  const searchParams = new URLSearchParams({ date: params.date, period: params.period })
+  await fetchJSON(`/api/session-completions?${searchParams}`, { method: 'DELETE' })
+}
+
 // ============================================================
 // CORRELATIONS / INSIGHTS
 // ============================================================

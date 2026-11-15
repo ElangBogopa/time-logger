@@ -29,6 +29,8 @@ jest.mock('@/lib/api', () => ({
   categorizeActivities: jest.fn(),
   deleteEntry: jest.fn(),
   upsertSessionCompletion: jest.fn(),
+  fetchSessionCompletions: jest.fn(async () => []),
+  deleteSessionCompletion: jest.fn(),
   csrfFetch: jest.fn(async () => ({ ok: true, json: async () => ({}) })),
 }))
 jest.mock('@/lib/types', () => ({
