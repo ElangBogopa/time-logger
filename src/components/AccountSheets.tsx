@@ -49,7 +49,7 @@ export function ExportDataSheet({ open, onOpenChange }: { open: boolean; onOpenC
               Download everything
             </Button>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              One .json file: your log, plans, goals, reviews and settings.
+              One .json file: your log, plans, reviews and settings.
             </p>
           </div>
           <div>
@@ -168,7 +168,7 @@ export function DeleteAccountSheet({
               <DialogTitle>Delete your account</DialogTitle>
               <DialogDescription>
                 This removes {email ? <strong className="font-medium text-foreground">{email}</strong> : 'your account'}{' '}
-                and everything in it: your log, plans, goals, reviews and settings. It cannot be undone.
+                and everything in it: your log, plans, reviews and settings. It cannot be undone.
               </DialogDescription>
             </DialogHeader>
 

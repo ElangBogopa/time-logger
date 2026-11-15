@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Privacy — Better' }
  */
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy" updated="12 November 2026">
+    <LegalPage title="Privacy" updated="15 November 2026">
       <section>
         <h2>The short version</h2>
         <p>
@@ -33,8 +33,8 @@ export default function PrivacyPage() {
             commentary.
           </li>
           <li>
-            <strong>What you plan:</strong> your goals, the tasks you set for a day and the times you
-            give them.
+            <strong>What you plan:</strong> the tasks you set for a day and the times you give
+            them.
           </li>
           <li>
             <strong>Around the log:</strong> which sessions you wrapped up, mood check-ins, saved day

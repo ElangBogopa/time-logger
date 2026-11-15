@@ -5,7 +5,7 @@
  * calendar and ends by making a first plan.
  */
 
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react'
 import { csrfFetch } from '@/lib/api'
 import { readFirstRun } from '@/lib/first-run'
 
@@ -21,7 +21,6 @@ jest.mock('@/contexts/CalendarContext', () => ({
 jest.mock('@/lib/api', () => ({
   csrfFetch: jest.fn(),
 }))
-jest.mock('@/lib/goals', () => ({ invalidateGoals: jest.fn() }))
 jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),
   getUserToday: () => '2026-11-03',
@@ -42,10 +41,7 @@ beforeEach(() => {
   localStorage.clear()
   mockHour = 19
   mockEvents = []
-  ;(csrfFetch as jest.Mock).mockImplementation(async (url: string, init?: { method?: string }) => ({
-    ok: true,
-    json: async () => (url === '/api/goals' && !init?.method ? { goals: [] } : {}),
-  }))
+  ;(csrfFetch as jest.Mock).mockImplementation(async () => ({ ok: true, json: async () => ({}) }))
 })
 
 /** Press Next until the screen with this heading is showing. */
@@ -154,14 +150,20 @@ it('cannot go on with nothing picked, but can leave planning for later', async (
   expect(readFirstRun()).toMatchObject({ started: true, planned: false })
 })
 
-it('does not create a second default goal for an account that has one', async () => {
-  ;(csrfFetch as jest.Mock).mockImplementation(async (url: string, init?: { method?: string }) => ({
-    ok: true,
-    json: async () =>
-      url === '/api/goals' && !init?.method ? { goals: [{ title: 'Increase Productivity', active: true }] } : {},
-  }))
-  const onComplete = await throughTo(/what matters tomorrow/i)
+it('never touches goals, whether it ends on a plan or is left for later', async () => {
+  const touchesGoals = () => calls().some((c) => String(c.url).startsWith('/api/goals'))
+
+  const first = await throughTo(/what matters tomorrow/i)
+  fireEvent.click(screen.getByRole('button', { name: 'Exercise' }))
+  fireEvent.click(screen.getByRole('button', { name: /find them a time/i }))
+  await waitFor(() => expect(first).toHaveBeenCalled())
+  expect(touchesGoals()).toBe(false)
+
+  cleanup()
+  jest.clearAllMocks()
+  ;(csrfFetch as jest.Mock).mockImplementation(async () => ({ ok: true, json: async () => ({}) }))
+  const second = await throughTo(/what matters tomorrow/i)
   fireEvent.click(screen.getByRole('button', { name: /plan later/i }))
-  await waitFor(() => expect(onComplete).toHaveBeenCalled())
-  expect(calls().some((c) => c.url === '/api/goals' && c.method === 'POST')).toBe(false)
+  await waitFor(() => expect(second).toHaveBeenCalled())
+  expect(touchesGoals()).toBe(false)
 })

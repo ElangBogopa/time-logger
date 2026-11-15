@@ -57,7 +57,7 @@ export function useDashboardState({ session, status }: UseDashboardStateProps): 
     }
   }, [status, router])
 
-  // Check if user needs onboarding (no productivity target or goals set)
+  // Check if user needs onboarding (no set-up flag, and no saved goal from before the flag)
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.id || hasCheckedTargets) {
       return
@@ -67,22 +67,22 @@ export function useDashboardState({ session, status }: UseDashboardStateProps): 
 
     async function checkOnboardingNeeded() {
       try {
-        // Check preferences for productivity_target and goals in parallel.
-        // Goals go through the shared reader, so this shares one request with
-        // YourPlan instead of making a second identical one.
-        const [prefsResponse, goals] = await Promise.all([
-          fetch('/api/preferences', { signal: controller.signal }),
-          fetchGoals(),
-        ])
+        // `productivity_target` is the flag that marks an account as set up.
+        const prefsResponse = await fetch('/api/preferences', { signal: controller.signal })
 
         if (prefsResponse.ok) {
           const prefsData = await prefsResponse.json()
 
-          const hasProductivityTarget = prefsData.preferences?.productivity_target != null
-          const hasGoals = goals.length > 0
-
-          if (!hasProductivityTarget && !hasGoals) {
-            setShowOnboarding(true)
+          if (prefsData.preferences?.productivity_target == null) {
+            // No flag. A saved goal still means set up: the lookup exists
+            // only for accounts set up before the flag was written, because
+            // goals are no longer shown or created. If it throws, the catch
+            // below runs and setup is not shown: a failed lookup must never
+            // put a set-up account back through setup.
+            const goals = await fetchGoals()
+            if (goals.length === 0) {
+              setShowOnboarding(true)
+            }
           }
         }
       } catch (error) {

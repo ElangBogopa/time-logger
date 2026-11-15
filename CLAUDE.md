@@ -401,8 +401,12 @@ Android gets the browser's own install prompt where it has offered one.
    ```
    This prevents the "spinner flash" when navigating back to previously-visited pages.
 9. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
-10. **Plan, then do — and the two must meet**: Planning happens on the Plan
-    tab and the goal page, which stay free of checkboxes. A plan is settled
+10. **Plan, then do — and the two must meet**: Planning happens on the Plan tab, which stays free of checkboxes.
+    Goals were removed from the app: nothing shows or creates one,
+    `/goal/<id>` redirects to Today, and the saved `user_goals` rows stay —
+    still in `ACCOUNT_TABLES`, so still exported and still deleted with the
+    account. `daily_plans.goal_id` is left as it is; a task once added under
+    a goal is an ordinary task. A plan is settled
     where the day is lived: the *Next up* list (`components/NextUp.tsx`,
     logic in `lib/next-up.ts`) on Today and in each session. *Did it* writes
     the entry at the planned time and marks the plan kept, tagged with the

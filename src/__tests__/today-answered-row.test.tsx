@@ -24,7 +24,6 @@ jest.mock('@/hooks/useSessionData', () => ({
 jest.mock('@/components/DashboardHero', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/components/OnboardingModal', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/components/dashboard/GreetingHeader', () => ({ __esModule: true, default: () => null }))
-jest.mock('@/components/YourPlan', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/components/NextUp', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/components/FirstRunCard', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/components/DayWindowsCard', () => ({ __esModule: true, default: () => null }))

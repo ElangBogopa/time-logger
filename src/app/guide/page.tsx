@@ -359,7 +359,7 @@ export default function GuidePage() {
         <div className="text-center mt-8 mb-4">
           <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
             These are research-backed guidelines, not rigid rules.
-            Adapt to your chronotype, life phase, and goals.
+            Adapt to your chronotype and life phase.
             The best schedule is the one you actually follow.
           </p>
         </div>
