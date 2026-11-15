@@ -44,6 +44,7 @@ import GhostEntryModal from '@/components/GhostEntryModal'
 import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
+import { toast as sonnerToast } from 'sonner'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { ChevronLeft, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, Sparkles, ChevronDown, CheckSquare } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -611,6 +612,10 @@ function CalendarContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: selectedDate, title }),
       })
+      if (!res.ok) {
+        sonnerToast.error("Couldn't add that task. Try again.")
+        return
+      }
       if (category) {
         const { plan } = (await res.json().catch(() => ({}))) as { plan?: { id: string } }
         if (plan?.id) rememberCategories({ [plan.id]: category })
@@ -633,12 +638,21 @@ function CalendarContent() {
     if (wanted.length === 0 || isAddingTask) return
     setIsAddingTask(true)
     try {
+      let failed = 0
       for (const title of wanted) {
-        await csrfFetch('/api/plans', {
+        const res = await csrfFetch('/api/plans', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: selectedDate, title }),
         })
+        if (!res.ok) failed++
+      }
+      if (failed > 0) {
+        sonnerToast.error(
+          failed === wanted.length
+            ? "Couldn't import those tasks. Try again."
+            : `${failed} of ${wanted.length} tasks couldn't be imported.`
+        )
       }
       // New tasks change what there is to place: any proposal is stale.
       setSuggestions(null)

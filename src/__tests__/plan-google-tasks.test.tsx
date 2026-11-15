@@ -1,10 +1,10 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { csrfFetch } from '@/lib/api'
+import { toast } from 'sonner'
 
-// Relative to the real clock. These were fixed dates — "today" 4 November,
-// "tomorrow" the 5th — with only one of the page's two notions of today
-// mocked, so the suite passed until the 5th and has failed ever since: the
-// planner correctly stopped calling a past date "Tomorrow".
+jest.mock('sonner', () => ({ toast: { error: jest.fn() } }))
+
+// Relative to the real clock, so the suite does not go stale as days pass.
 const mockDates = (() => {
   const types = jest.requireActual('@/lib/types')
   const today: string = types.getLocalDateString()
@@ -95,4 +95,12 @@ it('makes no request when nothing was picked', async () => {
   fireEvent.click(await screen.findByRole('button', { name: /Import from Google Tasks/ }))
   fireEvent.click(await screen.findByText('pick none'))
   expect(planPosts()).toHaveLength(0)
+})
+
+it('says so when the import fails, instead of closing silently', async () => {
+  ;(csrfFetch as jest.Mock).mockImplementation(async () => ({ ok: false, json: async () => ({}) }))
+  render(<CalendarPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /Import from Google Tasks/ }))
+  fireEvent.click(await screen.findByText('pick two'))
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/Couldn't import those tasks/)))
 })

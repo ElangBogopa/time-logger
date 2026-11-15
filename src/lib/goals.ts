@@ -44,7 +44,7 @@ export async function fetchGoals(): Promise<Goal[]> {
   return inFlight
 }
 
-/** Drop the cached list after a goal is created or removed. */
+/** Drop the cached list, so the next read asks again. */
 export function invalidateGoals(): void {
   cached = null
 }

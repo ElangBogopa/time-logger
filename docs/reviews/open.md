@@ -55,3 +55,23 @@ Verdict: Ready to merge (no must fix)
 
 ## Fix attempt 5 — 2026-11-15 — Sonnet 5.5 — commit pending
 - done-skips-cache · handleDone now hands its saved row to the completion cache as handleSkip does, only after the save succeeds; test added (seeds the cache through the real hook, fails without the change) · believes: fixed
+
+## Review 7 — 2026-11-15 — Opus 5.5 — reviewed d9d7a3a
+Verdict: Ready to merge (no must fix)
+- resolved: done-skips-cache (handleDone writes the saved row with setCachedCompletion only after the upsert returns, as handleSkip does; the new test fails with that line removed)
+- no harm from the fix: the POST route returns the full row via .select().single(); a failed save still writes nothing to the cache; setCachedCompletion does nothing for a date Today has not fetched
+- seventh review of this branch: trying it on a phone is now the better test
+
+## Review 8 — 2026-11-15 — Opus 5.5 — reviewed 97619a5
+Verdict: Ready to merge (no must fix)
+- first pass on 97619a5 (goals removed; Google Tasks import on the Plan tab); earlier findings all resolved, none reopened
+- checked as the plan asked: user_goals still in ACCOUNT_TABLES and account-data.ts untouched; set-up check asks for goals only without the flag, and a failed lookup leaves setup hidden; nothing left links to /goal/ or calls the two removed routes; no migration
+- optional · import-failure-silent · src/app/calendar/page.tsx:630-650 · a POST that answers not-ok is not checked, so a failed import closes the picker with fewer chips and no word (addTask does the same)
+- optional · stale-goal-comments · src/lib/goals.ts:47, src/__tests__/plan-google-tasks.test.tsx:129-132 · invalidateGoals still says "after a goal is created or removed"; the new test copies a note about fixed dates it never had
+- optional · unused-existing-task-count · src/components/GoogleTasksPicker.tsx:22,25 · the prop is now passed by nobody and was never read
+- eighth review of this branch: trying it on a phone is now the better test
+
+## Fix attempt 6 — 2026-11-15 — Sonnet 5.5 — commit pending
+- import-failure-silent · both the Google Tasks import and addTask now check each POST's `ok`; a failure shows an error toast (sonner, since the calendar page's own toast state is never rendered); test added · believes: fixed
+- stale-goal-comments · invalidateGoals comment now says what it does; the test file's note about fixed dates replaced with a one-line true one (the cited lines were at the top of the file) · believes: fixed
+- unused-existing-task-count · prop removed from GoogleTasksPicker · believes: fixed
