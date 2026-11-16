@@ -185,23 +185,37 @@ const OCCASION_WORDS = new Set(
 // Only "family" takes these as a topic ("Family planning clinic"); after
 // "friends" they begin a new phrase ("Dinner with friends planning the trip").
 const FAMILY_ONLY_FOLLOWERS = new Set(['planning', 'practice'])
-// After "at <people word>": a place, not a visit ("Coffee at Friends cafe").
-const HOME_WORDS = new Set(['house', 'place', 'home', 'apartment', 'flat'])
 const LEADING_PEOPLE = new Set(['family', 'friends', 'fam'])
 const VISIT_WORDS = new Set(['at', 'visit', 'visited', 'visiting', 'saw', 'seeing'])
-const DETERMINERS = new Set(['my', 'our', 'the', 'his', 'her', 'their'])
+const DETERMINERS = new Set(['my', 'our', 'the', 'his', 'her', 'their', 'a'])
 
 const CONJUNCTIONS = new Set(['and', '&'])
-// Words that may follow "at <people>" and still leave it a visit.
-const AFTER_VISIT_WORDS = new Set([
-  ...PHRASE_STOP_WORDS, 'and', '&', 'with', 'tonight', 'today', 'tomorrow', 'yesterday',
-  'this', 'last', 'all', 'morning', 'afternoon', 'evening', 'weekend',
-  'birthday', 'wedding', 'funeral', 'anniversary',
+// "at <people>" is a visit ("Dinner at mom's 7pm", "at grandma's cottage",
+// "at grandma tonight") unless one of these is among the next few words: then
+// it is somewhere a person goes for another reason ("Pickup at my son's
+// school", "Coffee at friends' cafe", "Meeting at the boys and girls club").
+// A deny-list on purpose. An allow-list of what may follow was tried and
+// dropped every unlisted word, a time and an emoji included; an apostrophe
+// was tried as the sign of a visit and "the kids' school" has one too. To
+// stop a place counting, add its word here; anything else stays a visit.
+const VENUE_WORDS = new Set([
+  ...NOT_COMPANY_FOLLOWERS,
+  ...('school preschool nursery kindergarten daycare creche crèche college university campus academy ' +
+    'class classes lesson lessons practice training club association committee ' +
+    'cafe café restaurant bar pub diner bistro bakery ' +
+    'work workplace job shop store salon gym studio hospital surgery ward centre center').split(' '),
 ])
+const VENUE_REACH = 3
 
-/** Whether the word after "at <people>" leaves it a visit, not a place. */
-function endsAVisit(next: string | undefined): boolean {
-  return next === undefined || HOME_WORDS.has(next) || OCCASION_WORDS.has(next) || AFTER_VISIT_WORDS.has(next)
+/** Whether the words from `from` name a venue before the phrase ends. */
+function namesAVenue(tokens: string[], from: number): boolean {
+  for (let k = from; k < tokens.length && k < from + VENUE_REACH; k++) {
+    const t = tokens[k]
+    // A dash, an emoji, "then", "with", "and": the phrase is over.
+    if (!/\p{L}/u.test(t) || PHRASE_STOP_WORDS.has(t) || t === 'with' || t === 'and') return false
+    if (VENUE_WORDS.has(t)) return true
+  }
+  return false
 }
 
 function isNotCompany(word: string, next: string | undefined): boolean {
@@ -251,10 +265,8 @@ export function withFriendsOrFamily(activity?: string | null): boolean {
         if (j >= 0 && DETERMINERS.has(tokens[j])) j--
         if (j >= 0 && VISIT_WORDS.has(tokens[j])) {
           if (tokens[j] !== 'at') return true
-          // After "at", what follows the people decides: "at mom and dad's",
-          // "at my parents then nap", "at grandma tonight" are visits;
-          // "at the kids' school", "at friends' cafe" are places. An
-          // apostrophe says nothing either way.
+          // After "at", a visit unless a venue follows the people; "mom and
+          // dad's" is read as one group first.
           let k = i + 1
           while (CONJUNCTIONS.has(rawTokens[k])) {
             let m = k + 1
@@ -262,7 +274,7 @@ export function withFriendsOrFamily(activity?: string | null): boolean {
             if (!PEOPLE_WORDS.has(tokens[m])) break
             k = m + 1
           }
-          if (endsAVisit(tokens[k])) return true
+          if (!namesAVenue(tokens, k)) return true
         }
       }
     }

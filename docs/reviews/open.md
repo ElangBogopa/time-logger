@@ -32,3 +32,11 @@ Verdict: Ready to merge (0 must fix) — third pass; trying it on a phone is now
 ## Fix attempt 3 — 2026-11-16 — Opus 5.5 — commit pending
 - at-school-counts · after "at <people>" the next word decides, not the apostrophe: a place ("school", "cafe", "daycare") makes it not count; tests for "kids' school", "my son's school", "friends' cafe", "daughter's daycare" · believes: fixed
 - at-visit-too-narrow · "at" counts when the people are followed by nothing, a home word, an occasion, a stop word ("then", "for") or a time word ("tonight"), and "mom and dad's" is read as one group; tests for the three reviewed examples plus "my parents' house", "mom's for her birthday" · believes: fixed (a place word not in the lists, e.g. "at grandma's cottage", now does not count)
+
+## Review 4 — 2026-11-16 — Opus 5.5 — reviewed d397483
+Verdict: Ready to merge (0 must fix) — fourth pass; trying it on a phone is now the better test
+- resolved: at-school-counts ("kids' school", "my son's school", "friends' cafe" no longer count)
+- optional · at-visit-too-narrow · src/lib/metrics-calc.ts:202 · recurring after one Opus attempt, moved: the three reviewed examples count, but the allow-list of what may follow "at <people>" now drops any unlisted word, not only places: "Dinner at mom's 7pm", "Dinner at mom's again", "Dinner at mom's - fun", "Dinner at grandma's 🎉", "Lunch at my brother's new place", "BBQ at uncle's backyard" (all counted at 750796f). Three rounds have traded one side for the other; leave it, or turn the allow-list into a short deny-list of place words
+
+## Fix attempt 4 — 2026-11-16 — Fable 5.2 — commit pending
+- at-visit-too-narrow · the allow-list of what may follow "at <people>" is gone; it is a visit unless a venue word (school, daycare, cafe, club, office, work, shop, class, practice and the like, `VENUE_WORDS`) is among the next three words before the phrase ends; "at a friend's" is read too; the test file now holds every example from all four reviews plus about twenty new ones on each side · believes: fixed for the reviewed examples. Still wrong, by design of a word list: a venue not on the list counts ("Talk at parents evening", "Sunday at the kids playground"); a relative's own venue does not ("Lunch at my cousin's restaurant"); "to grandma's", "Mom's for dinner", "Had the boys over" have no "at" or "with" and do not count
