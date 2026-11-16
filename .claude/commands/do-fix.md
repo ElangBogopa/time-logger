@@ -52,4 +52,6 @@ If nothing is given, fix the open and recurring **must-fix** findings only.
 8. Reply with: each finding and what you did, anything you left alone and
    why, the commit, the check results, and the next step — a new session
    and `/do-review` if app code changed, or "push and try it on a phone" if
-   only documents or tests did.
+   only documents or tests did. If the log alone changed because a finding
+   "cannot be done well", say instead that a new session and `/do-review`
+   has to run, so the review can close it; do not say "try it on a phone".

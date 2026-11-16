@@ -26,7 +26,8 @@ Skip it when you can already say what you want in a sentence or two.
 `/do-all <the paragraph from /do-think>` does steps 1 to 4 by itself:
 it plans, builds, reviews and fixes, each with a fresh helper on the
 model the step before named, and goes round until every finding a
-review made — optional ones included — is fixed or closed. Then it
+review made — optional ones included — is fixed, or closed and only
+optional (a closed must or should stops it unpushed). Then it
 pushes `dev`, once, and asks you nothing. There is always
 at least one review before it pushes, even when the plan said none
 was needed.
@@ -115,7 +116,7 @@ New chat when the next step does not need to remember the last one.
   `merge dev into main`.
 - `/do-build` and `/do-fix` commit by themselves. Nothing pushes
   until you type `push`, except `/do-all`, which pushes `dev` when every finding it chases is
-  fixed or closed.
+  fixed, or closed and only optional.
 - Use the `/do-` commands. Plain `/plan` and `/review` are Claude Code's
   own and know none of this.
 - Not Plan mode. Its Approve button starts building on the expensive model.

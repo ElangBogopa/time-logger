@@ -1,6 +1,3 @@
-- **Earlier findings**, only if there were any: resolved (ids, one line),
-  still open, recurring — each with who tried and "next: Fable" — and
-  closed.
 ---
 description: Review everything waiting on dev, sorted by how much it matters, remembering what earlier reviews found and what was tried.
 argument-hint: [optional: what to look at hardest]
@@ -118,8 +115,8 @@ Reply in this order:
   must-fix findings: "Ready to merge" when none remain, else "Not ready"
   and the count. Say which pass this is.
 - **Earlier findings**, only if there were any: resolved (ids, one line),
-  still open, and recurring — each recurring one with who tried and who
-  should try next.
+  still open, recurring — each with who tried and "next: Fable" — and
+  closed.
 - **Must fix**, most serious first: id, file and line, what would go
   wrong and for whom. "None." if none.
 - **Should fix**, briefly. **Optional**, one line each.

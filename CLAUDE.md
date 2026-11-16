@@ -15,7 +15,9 @@ This comes before everything else in this file.
   push. `/do-fix` does the same for the fixes it makes.
   A second standing exception: `/do-all` pushes `dev` to `origin dev` by
   itself when its run ends with every
-  finding it chases — must, should and optional — fixed or closed, after at least one review
+  finding it chases — must, should and optional — fixed, or closed and only
+  optional (a closed must- or should-fix finding stops the run unpushed),
+  after at least one review
   (a brief that says no review is needed is still reviewed), so the preview
   is ready to try. A finding the
   review marks as the plan's own choice or past the request is not chased;

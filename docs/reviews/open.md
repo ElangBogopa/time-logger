@@ -40,3 +40,21 @@ Verdict: Ready to merge (0 must fix) — fourth pass; trying it on a phone is no
 
 ## Fix attempt 4 — 2026-11-16 — Fable 5.2 — commit pending
 - at-visit-too-narrow · the allow-list of what may follow "at <people>" is gone; it is a visit unless a venue word (school, daycare, cafe, club, office, work, shop, class, practice and the like, `VENUE_WORDS`) is among the next three words before the phrase ends; "at a friend's" is read too; the test file now holds every example from all four reviews plus about twenty new ones on each side · believes: fixed for the reviewed examples. Still wrong, by design of a word list: a venue not on the list counts ("Talk at parents evening", "Sunday at the kids playground"); a relative's own venue does not ("Lunch at my cousin's restaurant"); "to grandma's", "Mom's for dinner", "Had the boys over" have no "at" or "with" and do not count
+
+## Review 5 — 2026-11-16 — Opus 5.5 — reviewed 9e3a55f
+Verdict: Ready to merge (0 must fix) — fifth pass; trying it on a phone is now the better test
+- resolved: at-visit-too-narrow (every example from reviews 3 and 4 counts; school, cafe and club examples still do not)
+- optional · at-a-public-place · src/lib/metrics-calc.ts:190 · caused by fix: "a" as a determiner opens "at a <people>" to public places off the venue list: "Volunteered at a kids camp", "Speaker at a family conference", "Shift at a children's charity" now count (did not at d397483); a known cost of the deny-list, not worth another round
+
+## Review 6 — 2026-11-16 — Opus 5.5 — reviewed aaa10b6
+Verdict: Ready to merge (0 must fix) — first pass on aaa10b6 (brief docs/plans/fable-before-giving-up.md), sixth on this dev; earlier findings left as they were
+- should · review-command-edit-misplaced · .claude/commands/do-review.md:1 · step 2d's new "Earlier findings" reply text was put above the front matter instead of replacing the bullet at :120: the `---` block no longer parses (the command's description now reads "- **Earlier findings**…", argument-hint lost), and the reply list still asks for the old wording, without "closed"
+- should · push-rule-says-closed-pushes · CLAUDE.md:18 · "pushes dev when every finding it chases … fixed or closed" reads as if a closed must- or should-fix finding still pushes; do-all.md stops unpushed then (docs/FLOW.md:29 and :118 say the same; its later paragraph corrects it, CLAUDE.md does not). The brief's rule 5 says it stops, so aligning the words undoes nothing
+- optional · do-fix-skips-closing-review · .claude/commands/do-fix.md:54 · when Fable answers "cannot be done well" (log only), step 8 says "push and try it on a phone", so by hand no review closes the finding and it still reads next: Fable
+- optional · plan's choice · do-all-description-stale · .claude/commands/do-all.md:2 · the front matter still says "until nothing that should be fixed is left", optional findings are chased now · the brief chose to keep the start of do-all.md word for word
+
+## Fix attempt 5 — 2026-11-16 — Sonnet 5.5 — commit pending
+- review-command-edit-misplaced · the stray "Earlier findings" lines removed from above the front matter of do-review.md and put in place of the old bullet in the reply list, now with "closed" · believes: fixed
+- push-rule-says-closed-pushes · CLAUDE.md and docs/FLOW.md (both places) now say fixed, or closed and only optional; a closed must or should stops the run unpushed · believes: fixed
+- do-fix-skips-closing-review · do-fix.md step 8 now sends a log-only "cannot be done well" answer to a new session and `/do-review`, not "try it on a phone" · believes: fixed
+- do-all-description-stale · not attempted (plan's choice)
