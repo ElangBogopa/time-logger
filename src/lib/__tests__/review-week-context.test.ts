@@ -113,4 +113,11 @@ describe('the week review system prompt', () => {
     expect(hoursOnly).toContain('"best focus" hours')
     expect(hoursOnly).not.toMatch(/"best focus" days/)
   })
+
+  it('decides the no-friends sentence from the Heart minutes when given', () => {
+    const categories = [{ label: 'Meals', minutes: 600 }]
+    expect(week({ categories, heartMinutes: 120 })).not.toContain('No time with friends or family')
+    expect(week({ categories, heartMinutes: 0 })).toContain('No time with friends or family')
+    expect(week({ categories })).toContain('No time with friends or family')
+  })
 })

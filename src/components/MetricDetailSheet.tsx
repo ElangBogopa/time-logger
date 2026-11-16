@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation'
 import { entriesForMetric } from '@/lib/library'
 import type { MetricKey, PersonalBest, TrendAPIResponse } from '@/lib/trend-types'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
-import { METRIC_LABELS as SHARED_METRIC_LABELS, FOCUS_WEIGHTS } from '@/lib/metrics-calc'
+import { METRIC_LABELS as SHARED_METRIC_LABELS, FOCUS_WEIGHTS, WITH_FRIENDS_OR_FAMILY_KEY } from '@/lib/metrics-calc'
 import { STATUS_CLASSES } from '@/lib/palette'
 
 // ── Detail types (cast from the generic Record at usage site) ──
@@ -76,6 +76,7 @@ const BODY_CATEGORY_INFO: Record<string, { label: string }> = {
 const SOCIAL_CATEGORY_INFO: Record<string, { label: string }> = {
   social: { label: 'Social Time' },
   calls: { label: 'Calls' },
+  [WITH_FRIENDS_OR_FAMILY_KEY]: { label: 'With friends or family' },
 }
 
 // ── Helpers ──

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 import { getUserToday } from '@/lib/types'
-import { EntryRow, FOCUS_WEIGHTS, BODY_CATS, SOCIAL_CATS, FOCUS_TARGET, BODY_TARGET, SOCIAL_TARGET, FOCUS_THRESHOLDS, BODY_THRESHOLDS, SOCIAL_THRESHOLDS, getStatusColor, getNudge, calcBody, calcFocus, calcSocial } from '@/lib/metrics-calc'
+import { EntryRow, FOCUS_WEIGHTS, BODY_CATS, FOCUS_TARGET, BODY_TARGET, SOCIAL_TARGET, FOCUS_THRESHOLDS, BODY_THRESHOLDS, SOCIAL_THRESHOLDS, getStatusColor, getNudge, calcBody, calcFocus, calcSocial, calcSocialDetails } from '@/lib/metrics-calc'
 export async function GET(request: NextRequest) {
   try {
     const session = await getAppSession()
@@ -62,16 +62,7 @@ export async function GET(request: NextRequest) {
     // ═══════════════════════════════════════
     // 👥 SOCIAL — connection time
     // ═══════════════════════════════════════
-    const socialMinutes = todayEntries
-      .filter(e => SOCIAL_CATS.includes(e.category))
-      .reduce((s, e) => s + e.duration_minutes, 0)
-
-    const socialBreakdown: Record<string, number> = {}
-    for (const entry of todayEntries) {
-      if (SOCIAL_CATS.includes(entry.category)) {
-        socialBreakdown[entry.category] = (socialBreakdown[entry.category] || 0) + entry.duration_minutes
-      }
-    }
+    const { totalMinutes: socialMinutes, breakdown: socialBreakdown } = calcSocialDetails(todayEntries)
 
     const socialValue = calcSocial(todayEntries)
     const socialColor = getStatusColor(socialValue, SOCIAL_THRESHOLDS)

@@ -151,6 +151,10 @@ const WEEK_SCENARIOS: WeekScenario[] = [
     bestDays: ['Wednesday'],
     bestHours: ['2 PM'],
   }),
+  // The games and dinners were with friends, so Heart counted them.
+  week('friends-in-leisure', [['Sleep', 54], ['Entertainment', 14], ['Meals', 9], ['Deep Work', 12]], {
+    heartMinutes: h(6),
+  }),
   week('thin-week', [['Deep Work', 3], ['Meals', 1]], {
     bestDays: ['Monday'],
     bestHours: ['10 AM'],
@@ -405,9 +409,10 @@ async function run(): Promise<Line[]> {
         (await openai.chat.completions.create({ ...params, messages })).choices[0]?.message?.content?.trim() || ''
 
       const mood = scenario.kind === 'day' ? scenario.input.mood ?? null : null
-      const withPeople = peopleMinutes(
-        scenario.kind === 'day' ? scenario.input.hours ?? [] : scenario.input.categories
-      )
+      const withPeople =
+        scenario.kind === 'week' && scenario.input.heartMinutes !== undefined
+          ? scenario.input.heartMinutes
+          : peopleMinutes(scenario.kind === 'day' ? scenario.input.hours ?? [] : scenario.input.categories)
       const breaches = checkReviewLine(line, {
         kind: scenario.kind,
         mood,
@@ -476,7 +481,7 @@ function report(results: Line[]): { text: string; checkerCounts: Record<string, 
   L.push(`Lines with any checker breach: ${results.filter((x) => x.breaches.length > 0).length}. Lines failing any judge rule: ${judgeFailLines}.`)
   L.push('')
   const noneWeeks = results.filter(
-    (x) => x.scenario.kind === 'week' && !x.scenario.input.isPartialWeek && peopleMinutes(x.scenario.input.categories) === 0
+    (x) => x.scenario.kind === 'week' && !x.scenario.input.isPartialWeek && (x.scenario.input.heartMinutes ?? peopleMinutes(x.scenario.input.categories)) === 0
   )
   L.push(`Full-week lines with no time with friends or family in the input: ${noneWeeks.length}. Of those, lines that say "friends or family": ${noneWeeks.filter((x) => /friends or family/i.test(x.line)).length}.`)
   L.push('')

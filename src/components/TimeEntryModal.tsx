@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label'
 import { Loader2, Pencil, Trash2, Clock, CheckCircle2, ChevronDown } from 'lucide-react'
 import CategoryPicker from '@/components/CategoryPicker'
 import { toast } from 'sonner'
+import { SOCIAL_CATS, METRIC_LABELS, withFriendsOrFamily } from '@/lib/metrics-calc'
 
 interface TimeEntryModalProps {
   entry: TimeEntry
@@ -523,6 +524,11 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
                       {CATEGORY_LABELS[entry.category]}
                       <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isPickingCategory ? 'rotate-180' : ''}`} aria-hidden="true" />
                     </button>
+                    {!SOCIAL_CATS.includes(entry.category) && withFriendsOrFamily(entry.activity) && (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Also counted toward {METRIC_LABELS.social}, as time with friends or family.
+                      </p>
+                    )}
                     {isPickingCategory && (
                       <div className="mt-3">
                         <p className="field-label mb-2">Count this as</p>

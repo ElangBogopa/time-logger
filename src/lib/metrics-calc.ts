@@ -131,12 +131,87 @@ export function upkeepMinutes(dayEntries: EntryRow[]): number {
   return minutes
 }
 
-// ── Heart category groups ──
+// ── Heart: what counts ──
+// Time with people counts whatever it was spent doing. An entry has one
+// category, so "video games with friends" is Entertainment and gave Heart
+// nothing. Heart therefore counts an entry if its category is Social, Calls
+// or Faith, OR if its words say it was done with friends, family or a
+// partner (`withFriendsOrFamily`). It is counted once, at full duration.
 // Faith sits here rather than under Body: prayer is not physical upkeep, and
 // the third metric is about what sustains you, not only who you saw. It is
 // additive — an hour with friends still maxes the metric on its own, so no
 // one is penalised for having no faith.
 export const SOCIAL_CATS = ['social', 'calls', 'faith']
+
+/** Breakdown key for minutes that count toward Heart through the entry's words. */
+export const WITH_FRIENDS_OR_FAMILY_KEY = 'with_friends_or_family'
+
+// Work words (colleague, coworker, client, team, boss, manager, partners) are
+// deliberately absent: work meetings are not time with friends or family.
+// Bare names are not recognised either. "partner" is handled in the matcher,
+// since it counts only after "my" or "our".
+const PEOPLE_WORDS = new Set(
+  (
+    'friend friends bestie besties bff buddy buddies pal pals mate mates ' +
+    'family families fam mom moms mum mums mommy mummy mother mothers dad ' +
+    'dads daddy father fathers parent parents brother brothers sister sisters ' +
+    'sibling siblings son sons daughter daughters kid kids child children baby ' +
+    'grandma grandpa grandmother grandfather grandparents granny gran nan nana ' +
+    'grandson grandsons granddaughter granddaughters grandkids grandchildren ' +
+    'aunt aunts auntie aunty uncle uncles cousin cousins niece nieces nephew ' +
+    'nephews in-laws wife husband spouse boyfriend girlfriend fiance fiancee ' +
+    'fiancé fiancée gf bf stepmom stepdad stepmother stepfather stepbrother ' +
+    'stepsister'
+  ).split(' '),
+)
+
+const PHRASE_STOP_WORDS = new Set(
+  'for about at in on to from then before after while during via over'.split(' '),
+)
+
+function cleanPeopleWord(raw: string): string {
+  let w = raw.replace(/'s$/, '').replace(/s'$/, '')
+  w = w.replace(/[^\p{L}-]/gu, '')
+  if (w === 'in-laws') return w
+  const idx = w.search(/-in-laws?$/)
+  if (idx > 0) w = w.slice(0, idx)
+  return w
+}
+
+/** Whether an entry's words say it was done with friends, family or a partner. */
+export function withFriendsOrFamily(activity?: string | null): boolean {
+  if (!activity) return false
+  const text = activity.toLowerCase().replace(/\u2019/g, "'").replace(/\bw\/\s*/g, 'with ')
+  for (const clause of text.split(/[,.;:!?()|+]/)) {
+    const withRe = /\bwith\b/g
+    let match: RegExpExecArray | null
+    while ((match = withRe.exec(clause)) !== null) {
+      const rest = clause.slice(match.index + match[0].length).split(/\s+/).filter(Boolean)
+      const words: string[] = []
+      for (const raw of rest) {
+        if (words.length >= 6 || PHRASE_STOP_WORDS.has(raw)) break
+        words.push(raw)
+      }
+      const cleaned = words.map(cleanPeopleWord)
+      for (let i = 0; i < cleaned.length; i++) {
+        const w = cleaned[i]
+        if (PEOPLE_WORDS.has(w)) return true
+        if (w === 'partner' && i > 0 && (cleaned[i - 1] === 'my' || cleaned[i - 1] === 'our')) return true
+      }
+    }
+  }
+  return false
+}
+
+/** Heart counts an entry by its category or by its words, never twice. */
+export function countsTowardHeart(entry: { category: string; activity?: string | null }): boolean {
+  return SOCIAL_CATS.includes(entry.category) || withFriendsOrFamily(entry.activity)
+}
+
+/** Minutes the Heart ring counts. */
+export function heartMinutes(entries: EntryRow[]): number {
+  return entries.reduce((s, e) => (countsTowardHeart(e) ? s + e.duration_minutes : s), 0)
+}
 
 /**
  * What the three hero metrics are called.
@@ -361,11 +436,7 @@ export function calcBodyDetails(dayEntries: EntryRow[]): {
 
 /** Calculate Social value for a set of entries on a single day */
 export function calcSocial(dayEntries: EntryRow[]): number {
-  const socialMinutes = dayEntries
-    .filter(e => SOCIAL_CATS.includes(e.category))
-    .reduce((s, e) => s + e.duration_minutes, 0)
-
-  return saturatingScore(socialMinutes, SOCIAL_TARGET)
+  return saturatingScore(heartMinutes(dayEntries), SOCIAL_TARGET)
 }
 
 /** Get Social details breakdown for a set of entries */
@@ -376,9 +447,12 @@ export function calcSocialDetails(dayEntries: EntryRow[]): {
   let totalMinutes = 0
   const breakdown: Record<string, number> = {}
   for (const entry of dayEntries) {
-    if (SOCIAL_CATS.includes(entry.category)) {
+    let key: string | null = null
+    if (SOCIAL_CATS.includes(entry.category)) key = entry.category
+    else if (withFriendsOrFamily(entry.activity)) key = WITH_FRIENDS_OR_FAMILY_KEY
+    if (key) {
       totalMinutes += entry.duration_minutes
-      breakdown[entry.category] = (breakdown[entry.category] || 0) + entry.duration_minutes
+      breakdown[key] = (breakdown[key] || 0) + entry.duration_minutes
     }
   }
   return { totalMinutes, breakdown }

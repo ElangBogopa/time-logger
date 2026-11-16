@@ -16,12 +16,12 @@ import {
   buildWeekReviewSystemPrompt,
   WEEK_REVIEW_PARAMS,
 } from '@/lib/prompts'
-import { calcBody, calcFocus, calcSocial, METRIC_THRESHOLDS, type EntryRow } from '@/lib/metrics-calc'
+import { calcBody, calcFocus, calcSocial, heartMinutes, METRIC_THRESHOLDS, type EntryRow } from '@/lib/metrics-calc'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 // Raise this when the coach prompt's voice changes, so old lines are not reused.
-const COACH_PROMPT_VERSION = 9
+const COACH_PROMPT_VERSION = 10
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday
@@ -398,6 +398,7 @@ export async function POST(request: NextRequest) {
         bestDays,
         bestHours,
         categories: categoryBreakdown,
+        heartMinutes: heartMinutes(entries.filter((e) => e.category) as unknown as EntryRow[]),
       })
 
       coachFingerprint = stableHash(`${COACH_PROMPT_VERSION}\n${context}`)

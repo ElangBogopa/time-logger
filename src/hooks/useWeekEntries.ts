@@ -38,6 +38,7 @@ export function useWeekEntries(weekStart: string, enabled = true): AlignmentEntr
       .then((rows) => {
         const entries: AlignmentEntry[] = rows.map((row) => ({
           category: row.category,
+          activity: row.activity,
           start_time: row.start_time,
           end_time: row.end_time,
           duration_minutes: row.duration_minutes,

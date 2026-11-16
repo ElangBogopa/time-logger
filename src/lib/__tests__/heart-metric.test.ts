@@ -8,7 +8,7 @@
  * rather than only who you saw.
  */
 
-import { calcSocial, SOCIAL_CATS, SOCIAL_TARGET, METRIC_LABELS, EntryRow } from '../metrics-calc'
+import { calcSocial, calcSocialDetails, calcBody, calcFocus, WITH_FRIENDS_OR_FAMILY_KEY, SOCIAL_CATS, SOCIAL_TARGET, METRIC_LABELS, EntryRow } from '../metrics-calc'
 
 // Hitting the target scores 80, not 100 — see saturatingScore.
 const AT_TARGET = 80
@@ -61,5 +61,45 @@ describe('what Heart counts', () => {
 
   it('scores nothing for a day with neither', () => {
     expect(calcSocial([entry('deep_work', 480), entry('meals', 60)])).toBe(0)
+  })
+})
+
+describe('time with friends or family, whatever the activity', () => {
+  const row = (category: string, activity: string, duration_minutes: number): EntryRow => ({
+    category,
+    activity,
+    duration_minutes,
+    date: '2026-11-02',
+  })
+
+  it('counts video games with friends toward Heart and not Mind', () => {
+    const rows = [row('entertainment', 'Video games with friends', 60)]
+    expect(calcSocial(rows)).toBe(AT_TARGET)
+    expect(calcFocus(rows)).toBe(0)
+  })
+
+  it('leaves Body as it was', () => {
+    expect(calcSocial([row('exercise', 'Gym with friends', 45)])).toBeGreaterThan(0)
+    expect(calcBody([row('exercise', 'Gym with friends', 45)])).toBe(calcBody([row('exercise', 'Gym', 45)]))
+  })
+
+  it('does not count work words or bare names', () => {
+    expect(calcSocial([row('meals', 'Lunch with colleagues', 60)])).toBe(0)
+    expect(calcSocial([row('exercise', 'Gym with Thabo', 60)])).toBe(0)
+  })
+
+  it('counts an entry once', () => {
+    expect(calcSocial([row('social', 'Dinner with family', 60)])).toBe(AT_TARGET)
+  })
+
+  it('still scores by category when there is no activity', () => {
+    expect(calcSocial([entry('social', 60)])).toBe(AT_TARGET)
+  })
+
+  it('lists the minutes in the breakdown', () => {
+    const details = calcSocialDetails([row('meals', 'Dinner with family', 60), row('calls', 'Call', 15)])
+    expect(details.totalMinutes).toBe(75)
+    expect(details.breakdown[WITH_FRIENDS_OR_FAMILY_KEY]).toBe(60)
+    expect(details.breakdown.calls).toBe(15)
   })
 })

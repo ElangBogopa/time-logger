@@ -94,3 +94,27 @@ it('gives a share for a sentence that needs one number', () => {
   expect(alignmentShare({ totalMinutes: 210, inWindowMinutes: 150 })).toBe(71)
   expect(alignmentShare({ totalMinutes: 0, inWindowMinutes: 0 })).toBe(0)
 })
+
+describe('time with people by words', () => {
+  const withActivity = (category: TimeCategory, activity: string, start: string, end: string): AlignmentEntry => ({
+    ...entry(category, start, end),
+    activity,
+  })
+
+  it('counts games with friends in the evening people window', () => {
+    expect(fact([withActivity('entertainment', 'Video games with friends', '19:30', '20:30')], 'people')).toMatchObject({
+      totalMinutes: 60,
+      inWindowMinutes: 60,
+    })
+  })
+
+  it('counts gym with friends as exercise and as time with people', () => {
+    const entries = [withActivity('exercise', 'Gym with friends', '17:00', '18:00')]
+    expect(fact(entries, 'movement')).toBeDefined()
+    expect(fact(entries, 'people')).toBeDefined()
+  })
+
+  it('ignores a bare name', () => {
+    expect(fact([withActivity('exercise', 'Gym with Thabo', '17:00', '18:00')], 'people')).toBeUndefined()
+  })
+})

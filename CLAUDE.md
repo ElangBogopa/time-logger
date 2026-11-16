@@ -135,7 +135,16 @@ For display, these roll up into six `AggregatedCategory` buckets —
   calendar events one at a time was four prompts and four inserts.
 - **DON'T**: Generate per-entry commentary for a bulk action
 - **DO**: Run `npm run eval:voice` after changing what the day or week review is told (`REVIEW_VOICE` and the builders beside it in `lib/prompts.ts`). It asks the real model for lines and checks each against the voice; the last run is in `docs/voice-lines/after.md`. Raise `PROMPT_VERSION` and `COACH_PROMPT_VERSION` in the same change.
-- The reviews count time with friends or family as the Heart ring does (`SOCIAL_CATS`: Social, Calls, Faith; work meetings are not). The day review never says there was none; a finished week with none is told so in a sentence (`NO_FRIENDS_OR_FAMILY`), never a label and a colon.
+- Time with friends or family is what the Heart ring counts: Social, Calls
+  and Faith, plus any entry whose words say it was with friends, family or a
+  partner (`withFriendsOrFamily` in `lib/metrics-calc.ts`). Such an entry
+  counts its full duration toward Heart and keeps its own category. Work
+  words ("with colleagues", "with a client") and bare names ("gym with
+  Thabo") do not count, and work meetings are not time with friends or
+  family. The ring, the reviews, the plan prediction and the windows card
+  all count it this way. The day review never says there was none; a
+  finished week with none is told so in a sentence (`NO_FRIENDS_OR_FAMILY`),
+  never a label and a colon.
 - Pending entries use static `PENDING_COMMENTARY.planned` message
 
 ### Timeline Component

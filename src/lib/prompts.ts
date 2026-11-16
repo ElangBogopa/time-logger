@@ -47,7 +47,8 @@ Example of the register, from someone else's day (its facts are not this person'
 /**
  * What the reviews say about time with friends and family.
  *
- * It is counted as the Heart ring counts it: Social, Calls and Faith. Work
+ * It is counted as the Heart ring counts it: Social, Calls and Faith, plus
+ * any entry whose words say it was with friends or family. Work
  * meetings are left out on purpose; a day of meetings is not a day with
  * friends or loved ones, and saying "no time with people" about it was false.
  *
@@ -59,7 +60,11 @@ Example of the register, from someone else's day (its facts are not this person'
  */
 const PEOPLE_LABELS: readonly string[] = SOCIAL_CATS.map((c) => CATEGORY_LABELS[c as TimeCategory])
 
-/** Minutes of what the Heart ring counts: Social, Calls and Faith. Work meetings are left out on purpose. */
+/**
+ * Minutes of what the Heart ring counts by category label: Social, Calls and
+ * Faith. Work meetings are left out on purpose. It sums labels only; the week
+ * route passes `heartMinutes` so an entry's words count too.
+ */
 export function peopleMinutes(categories: { label: string; minutes: number }[]): number {
   return categories
     .filter((c) => PEOPLE_LABELS.includes(c.label) && c.minutes > 0)
@@ -167,6 +172,11 @@ export interface WeekReviewContextInput {
   bestDays: string[]
   bestHours: string[]
   categories: { label: string; minutes: number }[]
+  /**
+   * Minutes the Heart ring counts this week, from the entries. When given, it
+   * decides the no-friends-or-family sentence instead of the category labels.
+   */
+  heartMinutes?: number
 }
 
 // No day counts are sent: the model turned them into remarks about how much was logged.
@@ -174,7 +184,7 @@ export function buildWeekReviewContext(input: WeekReviewContextInput): string {
   const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
   // Only a finished week can have had none: one still in progress has not.
   const noneThisWeek =
-    !input.isPartialWeek && input.categories.length > 0 && peopleMinutes(input.categories) === 0
+    !input.isPartialWeek && input.categories.length > 0 && (input.heartMinutes ?? peopleMinutes(input.categories)) === 0
   // Sleep last: it is the largest category for anyone who logs it, and a
   // line that opens with it presents it as the week's finding.
   const sleep = CATEGORY_LABELS.sleep

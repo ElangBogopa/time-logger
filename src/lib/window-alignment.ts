@@ -7,14 +7,20 @@
  * system, and a person whose best hours are not the textbook's is not doing
  * worse for it. Their own log already outranks the windows when the planner
  * suggests a time. This is information, not a mark.
+ *
+ * Time with people also counts an entry whose words say it was with friends
+ * or family (as Heart does), whatever its category; its suited windows are
+ * then the ones about people.
  */
 
 import type { TimeCategory, AggregatedCategory } from './types'
 import type { DayWindow } from './ideal-day'
 import { timeToMinutes } from './time-utils'
+import { withFriendsOrFamily } from './metrics-calc'
 
 export interface AlignmentEntry {
   category: TimeCategory | null
+  activity?: string | null
   start_time: string | null
   end_time: string | null
   duration_minutes: number
@@ -71,13 +77,18 @@ export function windowAlignment(entries: AlignmentEntry[], windows: DayWindow[])
     let inWindowMinutes = 0
 
     for (const entry of entries) {
-      if (!entry.category || !group.categories.includes(entry.category) || !entry.start_time) continue
+      if (!entry.category || !entry.start_time) continue
+      const byCategory = group.categories.includes(entry.category)
+      const byWords = group.key === 'people' && !byCategory && withFriendsOrFamily(entry.activity)
+      if (!byCategory && !byWords) continue
       const start = timeToMinutes(entry.start_time)
       const end = entry.end_time ? timeToMinutes(entry.end_time) : start + entry.duration_minutes
       if (end <= start) continue
 
       const suited = windows
-        .filter((window) => window.categories.includes(entry.category as TimeCategory))
+        .filter((window) =>
+          byWords ? window.bucket === 'connection' : window.categories.includes(entry.category as TimeCategory),
+        )
         .map((window) => [window.startMinutes, window.endMinutes] as [number, number])
 
       totalMinutes += end - start
