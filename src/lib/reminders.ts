@@ -7,6 +7,10 @@
  * logged — a reminder to do what you have done is how reminders get turned
  * off.
  *
+ * The job is called late and irregularly, so each reminder has a window
+ * rather than an hour: it runs until the next reminder's hour, or midnight.
+ * The `reminder_sends` table is what stops a second send inside a window.
+ *
  * This is the whole of the deciding. The job in /api/cron/reminders asks
  * these functions and sends what they say, so what is tested here is what
  * runs.
@@ -84,9 +88,33 @@ export function reminderHour(time: string): number {
   return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : -1
 }
 
-/** The reminder that is due in this hour, if one is switched on for it. */
+/** Before this hour a reminder is sent in its own hour only, never late. */
+const SMALL_HOURS_END = 5
+
+/**
+ * The one reminder a run at this hour may send: the switched-on reminder
+ * with the latest hour that has already come today. A run that arrives
+ * late still finds it, until the next reminder's hour takes over or the
+ * day ends; one set for the small hours (before 5) is sent in its own
+ * hour only. An earlier one that was missed is left: one reminder at a
+ * time, and the most recent part of the day is the one still remembered.
+ */
 export function dueReminder(times: ReminderTime[] | null | undefined, hour: number): ReminderTime | null {
-  return (times ?? []).find((time) => time.enabled && reminderHour(time.time) === hour) ?? null
+  let best: ReminderTime | null = null
+  let bestHour = -1
+  for (const time of times ?? []) {
+    if (!time.enabled) continue
+    const at = reminderHour(time.time)
+    if (at < 0 || at > hour) continue
+    // A reminder set for the small hours gets no late window: run at
+    // 7 it would be about the new day, not the one it was meant to close.
+    if (at < SMALL_HOURS_END && at !== hour) continue
+    if (at >= bestHour) {
+      best = time
+      bestHour = at
+    }
+  }
+  return best
 }
 
 /**

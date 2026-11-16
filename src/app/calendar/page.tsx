@@ -11,6 +11,7 @@ import TimelineView, { DragCreateData } from '@/components/TimelineView'
 import type { CommittedTask } from '@/components/timeline/TimelineCommitted'
 import CommitTimeModal from '@/components/CommitTimeModal'
 import SourceSheet from '@/components/SourceSheet'
+import GoogleTasksPicker from '@/components/GoogleTasksPicker'
 import { comparePlanToActual, type PlanOutcome } from '@/lib/plan-adherence'
 import DayAtAGlance, { blocksForGlance } from '@/components/DayAtAGlance'
 import TimeEntryModal from '@/components/TimeEntryModal'
@@ -43,8 +44,9 @@ import GhostEntryModal from '@/components/GhostEntryModal'
 import { Button } from '@/components/ui/button'
 import CalendarPicker from '@/components/CalendarPicker'
 import WeekStrip from '@/components/WeekStrip'
+import { toast as sonnerToast } from 'sonner'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { ChevronLeft, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, Sparkles, ChevronDown } from 'lucide-react'
+import { ChevronLeft, ChevronUp, Loader2, RefreshCw, Clock, X, Plus, Sparkles, ChevronDown, CheckSquare } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
 function formatDateDisplay(dateStr: string): { label: string; date: string; isFuture: boolean } {
@@ -116,6 +118,7 @@ function CalendarContent() {
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [showWholeDay, setShowWholeDay] = useState(false)
   const [isAddingTask, setIsAddingTask] = useState(false)
+  const [showGoogleTasks, setShowGoogleTasks] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
   /** The library entry behind the suggestion whose "why?" was tapped. */
   const [whySource, setWhySource] = useState<string | null>(null)
@@ -609,6 +612,10 @@ function CalendarContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: selectedDate, title }),
       })
+      if (!res.ok) {
+        sonnerToast.error("Couldn't add that task. Try again.")
+        return
+      }
       if (category) {
         const { plan } = (await res.json().catch(() => ({}))) as { plan?: { id: string } }
         if (plan?.id) rememberCategories({ [plan.id]: category })
@@ -620,6 +627,39 @@ function CalendarContent() {
       fetchEntriesForDate()
     } catch (err) {
       console.error('Failed to add task:', err)
+    } finally {
+      setIsAddingTask(false)
+    }
+  }
+
+  /** Google tasks, pulled in as tasks for the day being planned. */
+  const handleImportGoogleTasks = async (titles: string[]) => {
+    const wanted = titles.map((t) => t.trim()).filter(Boolean)
+    if (wanted.length === 0 || isAddingTask) return
+    setIsAddingTask(true)
+    try {
+      let failed = 0
+      for (const title of wanted) {
+        const res = await csrfFetch('/api/plans', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: selectedDate, title }),
+        })
+        if (!res.ok) failed++
+      }
+      if (failed > 0) {
+        sonnerToast.error(
+          failed === wanted.length
+            ? "Couldn't import those tasks. Try again."
+            : `${failed} of ${wanted.length} tasks couldn't be imported.`
+        )
+      }
+      // New tasks change what there is to place: any proposal is stale.
+      setSuggestions(null)
+      setUnplaced([])
+      fetchEntriesForDate()
+    } catch (err) {
+      console.error('Failed to import Google tasks:', err)
     } finally {
       setIsAddingTask(false)
     }
@@ -959,6 +999,16 @@ function CalendarContent() {
                 </div>
               )}
 
+              <button
+                type="button"
+                onClick={() => setShowGoogleTasks(true)}
+                disabled={isAddingTask}
+                className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground transition-all duration-150 hover:border-foreground/25 hover:text-foreground active:scale-[0.99] disabled:opacity-50"
+              >
+                <CheckSquare className="h-4 w-4" />
+                Import from Google Tasks
+              </button>
+
               {unscheduledTasks.length > 0 && !suggestions && (
                 <button
                   onClick={handleSuggestTimes}
@@ -1193,6 +1243,11 @@ function CalendarContent() {
         )}
 
         <SourceSheet sourceId={whySource} onClose={() => setWhySource(null)} />
+        <GoogleTasksPicker
+          isOpen={showGoogleTasks}
+          onClose={() => setShowGoogleTasks(false)}
+          onImport={handleImportGoogleTasks}
+        />
 
         {editingEntry && (
           <TimeEntryModal

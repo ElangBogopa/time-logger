@@ -1,5 +1,6 @@
 import {
   timeToMinutes,
+  findMostlyOverlapping,
   minutesToTime,
   formatDuration,
   formatDurationLong,
@@ -265,5 +266,31 @@ describe('formatHours', () => {
 
   it('handles 0 minutes', () => {
     expect(formatHours(0)).toBe('0m')
+  })
+})
+
+describe('findMostlyOverlapping', () => {
+  const existing = { start_time: '09:00', end_time: '10:00', activity: 'Dentist' }
+
+  it('finds an entry that covers just over half of the new stretch', () => {
+    // 9:29-10:29 overlaps 9:00-10:00 for 31 of its 60 minutes
+    expect(findMostlyOverlapping('09:29', '10:29', [existing])).toBe(existing)
+  })
+
+  it('does not count exactly half', () => {
+    expect(findMostlyOverlapping('09:30', '10:30', [existing])).toBeUndefined()
+  })
+
+  it('never clashes for a zero-length new stretch', () => {
+    expect(findMostlyOverlapping('09:30', '09:30', [existing])).toBeUndefined()
+  })
+
+  it('skips entries missing a time', () => {
+    expect(
+      findMostlyOverlapping('09:00', '10:00', [
+        { start_time: '09:00', end_time: null },
+        { start_time: null, end_time: '10:00' },
+      ])
+    ).toBeUndefined()
   })
 })

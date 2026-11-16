@@ -85,3 +85,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+// DELETE /api/session-completions?date=YYYY-MM-DD&period=morning - Take back a "Nothing to log" answer
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getAppSession()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const date = searchParams.get('date')
+    const period = searchParams.get('period')
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+    }
+    if (!period || !['morning', 'afternoon', 'evening'].includes(period)) {
+      return NextResponse.json({ error: 'Invalid period' }, { status: 400 })
+    }
+
+    // skipped = true on purpose: Undo takes back "Nothing to log" and must
+    // never remove a session that was wrapped up with "Done".
+    const { error } = await supabase
+      .from('session_completions')
+      .delete()
+      .eq('user_id', session.user.id)
+      .eq('date', date)
+      .eq('period', period)
+      .eq('skipped', true)
+
+    if (error) {
+      console.error('Error deleting session completion:', error)
+      return NextResponse.json({ error: 'Failed to undo' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error in DELETE /api/session-completions:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

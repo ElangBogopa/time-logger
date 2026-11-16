@@ -150,16 +150,30 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - Don't fetch calendar for each date change
 
 ### Reminders
-- Three a day — log your morning at 12, your afternoon at 6, your evening
-  at 9, in the person's own timezone — each skipped when that part of the
-  day is already logged. The rules are in `lib/reminders.ts`; the job is
-  `/api/cron/reminders`.
-- **It must be called every hour.** It matches people by their local hour,
-  so a daily schedule reaches nobody. Vercel's free plan only runs daily
+- Three a day — log your morning from 12, your afternoon from 6, your
+  evening from 9, in the person's own timezone — each skipped when that
+  part of the day is already logged. The rules are in `lib/reminders.ts`;
+  the job is `/api/cron/reminders`.
+- **A late run still sends, and each goes out once.** GitHub's scheduler
+  delays and drops runs, so a reminder is not tied to its exact hour: the
+  morning one may go any time from 12 until 6, the afternoon one from 6
+  until 9, the evening one from 9 until midnight — each window ends when
+  the next switched-on reminder's hour comes — and nothing about a day is
+  sent after its midnight. A reminder moved to the small hours (before 5)
+  has no late window and goes only in its own hour. A run sends only the most recent one
+  (`dueReminder`), never an earlier one it missed. `reminder_sends` holds
+  one row per person, local date and reminder; the job inserts it before
+  sending, so a second run or a second device's subscription cannot repeat
+  it, and removes it again if no device was reached. If the table cannot
+  be read the job sends nothing and answers 500. "Send a test" writes no
+  row.
+- **It must be called every hour.** It works from each person's local hour,
+  so a daily schedule would reach each person with one reminder at most. Vercel's free plan only runs daily
   jobs, which is why the caller is `.github/workflows/reminders.yml` and
   there is no `vercel.json`. It needs the `CRON_SECRET` secret and the
   `APP_URL` variable set in the GitHub repository. A second schedule
-  calling the same job would send that hour twice.
+  would not send twice (`reminder_sends` stops a repeat) but it is not
+  needed.
 - **Who gets them is the push subscription, nothing else.** Turning
   reminders on subscribes the device; turning them off removes the row.
   `reminder_enabled` still exists in `user_preferences` and is read by
@@ -231,7 +245,7 @@ src/
 │       ├── auth/[...nextauth]/ # NextAuth config
 │       ├── calendar/events/   # Google Calendar fetch (supports date ranges)
 │       ├── categorize/        # AI category classification
-│       ├── cron/reminders/    # The hour's reminders; called hourly by a GitHub workflow
+│       ├── cron/reminders/    # The reminders each person is still owed; called hourly by a GitHub workflow
 │       ├── push/              # subscribe/ a device to reminders; test/ sends one now
 │       └── commentary/        # AI witty remarks
 ├── components/
@@ -401,8 +415,12 @@ Android gets the browser's own install prompt where it has offered one.
    ```
    This prevents the "spinner flash" when navigating back to previously-visited pages.
 9. **Time-aware labels**: Never show negative/judging labels (e.g. "Tough day") when the user hasn't had a chance to act yet. Score labels must account for the current time of day.
-10. **Plan, then do — and the two must meet**: Planning happens on the Plan
-    tab and the goal page, which stay free of checkboxes. A plan is settled
+10. **Plan, then do — and the two must meet**: Planning happens on the Plan tab, which stays free of checkboxes.
+    Goals were removed from the app: nothing shows or creates one,
+    `/goal/<id>` redirects to Today, and the saved `user_goals` rows stay —
+    still in `ACCOUNT_TABLES`, so still exported and still deleted with the
+    account. `daily_plans.goal_id` is left as it is; a task once added under
+    a goal is an ordinary task. A plan is settled
     where the day is lived: the *Next up* list (`components/NextUp.tsx`,
     logic in `lib/next-up.ts`) on Today and in each session. *Did it* writes
     the entry at the planned time and marks the plan kept, tagged with the

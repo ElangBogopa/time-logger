@@ -241,7 +241,7 @@ export default function NotificationsPage() {
             ? 'Turn reminders on to choose the times.'
             : allOff
               ? 'All three are switched off, so nothing will be sent.'
-              : 'Sent on the hour, give or take a few minutes, and skipped when you have already logged that part of the day.'}
+              : 'Sent around the hour, sometimes a little later, and skipped when you have already logged that part of the day.'}
         </p>
       </div>
 

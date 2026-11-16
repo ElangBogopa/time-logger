@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase-server'
 import { DEFAULT_REMINDER_TIMES, type ReminderTime } from '@/lib/types'
 import { pushConfigured, sendPush, type StoredSubscription } from '@/lib/push-server'
-import { REMINDER_KINDS, alreadyLogged, dueReminder, localClock, notificationFor } from '@/lib/reminders'
+import { REMINDER_KINDS, alreadyLogged, dueReminder, localClock, notificationFor, type LocalClock } from '@/lib/reminders'
 
 /**
- * GET /api/cron/reminders — send whichever reminders are due this hour.
+ * GET /api/cron/reminders — send whichever reminder each person is still owed.
  *
- * Called once an hour by .github/workflows/reminders.yml. For each person
- * with a device subscribed it works out the hour where they are, and sends
- * the reminder set for that hour unless that part of their day is already
- * logged.
+ * Meant to be called once an hour by .github/workflows/reminders.yml, but
+ * GitHub's scheduler arrives late and drops runs. So a reminder is not tied
+ * to its exact hour: each has a window that lasts until the next one's hour
+ * or the person's midnight, and a run sends the latest one whose window it
+ * lands in. `reminder_sends` is claimed before sending, so a second run, or
+ * a second device, cannot repeat it.
  *
  * Who gets reminders is decided by the subscription alone. There is a
  * `reminder_enabled` column, and this used to require it — but nothing in
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
       devicesByUser.set(subscription.user_id, [...(devicesByUser.get(subscription.user_id) ?? []), subscription])
     }
 
-    const counts = { subscribers: devicesByUser.size, due: 0, alreadyLogged: 0, sent: 0, failed: 0, removed: 0 }
+    const counts = { subscribers: devicesByUser.size, due: 0, alreadySent: 0, alreadyLogged: 0, notRecorded: 0, sent: 0, failed: 0, removed: 0 }
     if (devicesByUser.size === 0) return done(counts)
 
     const { data: preferences, error: prefsError } = await supabase
@@ -66,12 +68,38 @@ export async function GET(request: NextRequest) {
 
     const now = new Date()
 
+    const candidates: { userId: string; devices: StoredSubscription[]; clock: LocalClock; reminder: ReminderTime }[] = []
     for (const [userId, devices] of devicesByUser) {
       const prefs = prefsByUser.get(userId)
       const clock = localClock(now, prefs?.timezone)
       const reminder = dueReminder(prefs?.reminder_times ?? DEFAULT_REMINDER_TIMES, clock.hour)
-      if (!reminder) continue
-      counts.due++
+      if (reminder) candidates.push({ userId, devices, clock, reminder })
+    }
+    counts.due = candidates.length
+    if (candidates.length === 0) return done(counts)
+
+    // Without this record every run would repeat the same reminder, so if it
+    // cannot be read (or the table is not there yet) nothing is sent.
+    const { data: sends, error: sendsError } = await supabase
+      .from('reminder_sends')
+      .select('user_id, date, reminder_id')
+      .in('user_id', candidates.map((c) => c.userId))
+      .in('date', [...new Set(candidates.map((c) => c.clock.date))])
+    if (sendsError) {
+      console.error('[Reminders] Could not read what has been sent:', sendsError.message)
+      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    }
+    const alreadySent = new Set(
+      ((sends ?? []) as { user_id: string; date: string; reminder_id: string }[]).map(
+        (row) => `${row.user_id}|${row.date}|${row.reminder_id}`
+      )
+    )
+
+    for (const { userId, devices, clock, reminder } of candidates) {
+      if (alreadySent.has(`${userId}|${clock.date}|${reminder.id}`)) {
+        counts.alreadySent++
+        continue
+      }
 
       const kind = REMINDER_KINDS[reminder.id]
       if (kind && (await isLogged(userId, clock.date, kind.period))) {
@@ -79,16 +107,44 @@ export async function GET(request: NextRequest) {
         continue
       }
 
+      // Claim before sending: the unique constraint is what makes two
+      // overlapping runs safe, because the second insert fails.
+      const { error: claimError } = await supabase
+        .from('reminder_sends')
+        .insert({ user_id: userId, date: clock.date, reminder_id: reminder.id })
+      if (claimError) {
+        if (claimError.code === '23505') {
+          counts.alreadySent++
+        } else {
+          console.error('[Reminders] Could not record a send:', claimError.message)
+          counts.notRecorded++
+        }
+        continue
+      }
+
       const payload = notificationFor(reminder.id)
+      let reached = false
       for (const device of devices) {
         const outcome = await sendPush(device, payload)
-        if (outcome === 'sent') counts.sent++
-        else if (outcome === 'failed') counts.failed++
+        if (outcome === 'sent') {
+          counts.sent++
+          reached = true
+        } else if (outcome === 'failed') counts.failed++
         else {
           // The browser has dropped this subscription; it will never deliver again.
           counts.removed++
           await supabase.from('push_subscriptions').delete().eq('id', device.id)
         }
+      }
+
+      // Nothing got through: let a later run in the same window try again.
+      if (!reached) {
+        await supabase
+          .from('reminder_sends')
+          .delete()
+          .eq('user_id', userId)
+          .eq('date', clock.date)
+          .eq('reminder_id', reminder.id)
       }
     }
 

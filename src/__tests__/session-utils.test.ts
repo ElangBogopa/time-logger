@@ -1,5 +1,5 @@
-import { findFirstGapInPeriod } from '@/lib/session-utils'
-import { TimeEntry } from '@/lib/types'
+import { findFirstGapInPeriod, buildSessionInfos } from '@/lib/session-utils'
+import { TimeEntry, SessionCompletion, TimePeriod } from '@/lib/types'
 
 // Helper to create a mock TimeEntry
 function createEntry(startTime: string, endTime: string): TimeEntry {
@@ -293,5 +293,41 @@ describe('findFirstGapInPeriod', () => {
       // Gap from 08:30 to 10:00, capped at 1 hour
       expect(result).toEqual({ startTime: '08:30', endTime: '09:30' })
     })
+  })
+})
+
+describe('buildSessionInfos nothingToLog', () => {
+  function completion(period: TimePeriod, skipped: boolean): SessionCompletion {
+    return {
+      id: `c-${period}`, user_id: 'test-user', date: '2024-01-15', period,
+      completed_at: '2024-01-15T20:00:00Z', entry_count: 0, total_minutes: 0, skipped,
+    }
+  }
+  const find = (infos: ReturnType<typeof buildSessionInfos>, p: TimePeriod) => infos.find(i => i.period === p)!
+
+  it('is true for a skipped row with no entries', () => {
+    const infos = buildSessionInfos([], [completion('evening', true)], 21)
+    expect(find(infos, 'evening').nothingToLog).toBe(true)
+  })
+
+  it('is false once an entry falls in that period', () => {
+    const infos = buildSessionInfos([createEntry('19:00', '20:00')], [completion('evening', true)], 21)
+    expect(find(infos, 'evening').nothingToLog).toBe(false)
+  })
+
+  it('is false for a row that is not skipped', () => {
+    const infos = buildSessionInfos([], [completion('evening', false)], 21)
+    expect(find(infos, 'evening').nothingToLog).toBe(false)
+  })
+
+  it('does not mark another period', () => {
+    const infos = buildSessionInfos([], [completion('morning', true)], 21)
+    expect(find(infos, 'morning').nothingToLog).toBe(true)
+    expect(find(infos, 'afternoon').nothingToLog).toBe(false)
+  })
+
+  it('leaves hasCompletion false for a skipped row', () => {
+    const infos = buildSessionInfos([], [completion('evening', true)], 21)
+    expect(find(infos, 'evening').hasCompletion).toBe(false)
   })
 })

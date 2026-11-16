@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowRight, ArrowLeft, Loader2, CalendarDays, Check, Plus } from 'lucide-react'
-import { invalidateGoals } from '@/lib/goals'
 import { useCalendar } from '@/contexts/CalendarContext'
 import { getUserToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
 import { formatTimeDisplay } from '@/lib/time-utils'
@@ -140,28 +139,6 @@ export default function OnboardingModal({ isOpen, onComplete }: OnboardingModalP
     setIsSubmitting(true)
     setError(null)
     try {
-      // The goal page hangs off this goal, and nothing else creates one.
-      const existingGoals = await csrfFetch('/api/goals')
-      const goalsData = existingGoals.ok ? await existingGoals.json() : { goals: [] }
-      const hasGoal = goalsData.goals?.some(
-        (g: { title: string; active: boolean }) => g.title === 'Increase Productivity' && g.active
-      )
-      if (!hasGoal) {
-        const goalResponse = await csrfFetch('/api/goals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: 'Increase Productivity',
-            description: 'Track your daily priorities and build consistent follow-through',
-          }),
-        })
-        if (!goalResponse.ok) {
-          const data = await goalResponse.json()
-          throw new Error(data.error || 'Failed to finish setting up')
-        }
-        invalidateGoals()
-      }
-
       // `productivity_target` is what marks an account as onboarded. It was
       // a slider here; nothing ever read the number, so it is no longer
       // asked for — but the column is still the flag.

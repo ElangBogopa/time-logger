@@ -182,6 +182,7 @@ export function buildSessionInfos(
       completedAt: completion?.completed_at,
       hasCompletion: !!completion && !completion.skipped,
       hasEntries: stats.entryCount > 0,
+      nothingToLog: !!completion?.skipped && stats.entryCount === 0,
     }
   })
 }

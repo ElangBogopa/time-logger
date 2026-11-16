@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
 import { getUserToday, getRealToday, TimeEntry, PENDING_COMMENTARY, TimeCategory, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR } from '@/lib/types'
-import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay } from '@/lib/time-utils'
+import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay, findMostlyOverlapping } from '@/lib/time-utils'
+import { sameActivityName } from '@/lib/repeat-session'
 import { parseTimeFromText, ParseResult, isMealWordDetection } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
@@ -48,9 +49,15 @@ interface QuickLogModalProps {
   disablePostSubmit?: boolean
   /** Pre-fill the activity field (e.g. from a committed task) */
   initialActivity?: string
+  /** Pre-fill the ordinary editable name input (unlike initialActivity, which is the read-only "Commit Task" mode) */
+  initialName?: string
+  /** Category to use instead of /api/categorize while the name is unchanged from initialName */
+  knownCategory?: TimeCategory | null
+  /** Open with both times empty, for the person to choose, instead of the day's defaults */
+  blankTimes?: boolean
 }
 
-export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false, onPeriodComplete, disablePostSubmit = false, initialActivity }: QuickLogModalProps) {
+export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntryEndTime, initialStartTime, initialEndTime, onShowToast, userId, calendarEvents = [], entries = [], selectedDate, isFutureDay = false, isPastDay = false, onPeriodComplete, disablePostSubmit = false, initialActivity, initialName, knownCategory, blankTimes = false }: QuickLogModalProps) {
   const [activity, setActivity] = useState(initialActivity || '')
   const [notes, setNotes] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -271,7 +278,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   // Reset form fields when modal opens
   useEffect(() => {
     if (isOpen) {
-      setActivity(initialActivity || '')
+      setActivity(initialActivity || initialName || '')
       setNotes('')
       setError(null)
       setDismissedSuggestion(null)
@@ -286,7 +293,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       timesInitialized.current = false // Reset flag when modal opens
       // Focus the activity input after a brief delay — but skip if pre-filled
       // (avoids keyboard popup + text selection when task is already set)
-      if (!initialActivity) {
+      if (!initialActivity && !initialName) {
         setTimeout(() => inputRef.current?.focus(), 100)
       }
       // Fetch smart suggestions
@@ -299,6 +306,14 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   useEffect(() => {
     if (!isOpen) return
     if (timesInitialized.current) return // Don't re-initialize once set
+
+    // The caller has no time to suggest: leave both empty rather than fall to a default
+    if (blankTimes && !initialStartTime && !initialEndTime) {
+      setStartTime('')
+      setEndTime('')
+      timesInitialized.current = true
+      return
+    }
 
     // If we have drag-created times, use them
     if (initialStartTime && initialEndTime) {
@@ -337,7 +352,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }
     // If initialStartTime/initialEndTime are undefined but might arrive later,
     // don't mark as initialized yet - wait for them
-  }, [isOpen, initialStartTime, initialEndTime, lastEntryEndTime, isFutureDay, isPastDay, calendarEvents])
+  }, [isOpen, initialStartTime, initialEndTime, lastEntryEndTime, isFutureDay, isPastDay, calendarEvents, blankTimes])
 
   const handleSuggestionClick = () => {
     if (suggestedEvent) {
@@ -405,22 +420,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       const existingEntries = allEntries.filter(e => e.status !== 'pending')
 
       if (existingEntries.length > 0 && startTime && endTime) {
-        const newStart = timeToMinutes(startTime)
-        const newEnd = timeToMinutes(endTime)
-
-        const overlappingEntry = existingEntries.find(entry => {
-          if (!entry.start_time || !entry.end_time) return false
-          const entryStart = timeToMinutes(entry.start_time)
-          const entryEnd = timeToMinutes(entry.end_time)
-
-          // Check for significant overlap (>50%)
-          const overlapStart = Math.max(newStart, entryStart)
-          const overlapEnd = Math.min(newEnd, entryEnd)
-          const overlapDuration = Math.max(0, overlapEnd - overlapStart)
-          const newDuration = newEnd - newStart
-
-          return newDuration > 0 && overlapDuration / newDuration > 0.5
-        })
+        const overlappingEntry = findMostlyOverlapping(startTime, endTime, existingEntries)
 
         if (overlappingEntry) {
           setError(`This time overlaps with "${overlappingEntry.activity}". Adjust times or delete the existing entry.`)
@@ -449,17 +449,22 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         // Toast removed
       } else {
         // Past/current entry - normal flow with AI categorization + commentary
-        const categoryResponse = await csrfFetch('/api/categorize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity }),
-        })
+        let category: TimeCategory
+        if (knownCategory && initialName && sameActivityName(activity, initialName)) {
+          category = knownCategory
+        } else {
+          const categoryResponse = await csrfFetch('/api/categorize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activity }),
+          })
 
-        if (!categoryResponse.ok) {
-          throw new Error('Failed to categorize activity')
+          if (!categoryResponse.ok) {
+            throw new Error('Failed to categorize activity')
+          }
+
+          category = (await categoryResponse.json()).category
         }
-
-        const { category } = await categoryResponse.json()
 
         const insertedEntry = await createEntry({
           date: entryDate,
@@ -562,7 +567,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         showCloseButton={!isSubmitting && !showPostSubmit}
         onOpenAutoFocus={(e) => {
           // Prevent Radix from auto-focusing the input when activity is pre-filled
-          if (initialActivity) e.preventDefault()
+          if (initialActivity || initialName) e.preventDefault()
         }}
       >
         {showPostSubmit ? (

@@ -12,7 +12,7 @@ it('returns the goals', async () => {
 })
 
 it('coalesces concurrent readers into one request', async () => {
-  // this is the dashboard case: YourPlan and useDashboardState mount together
+  // this is the dashboard case: two readers mount together
   const [a, b] = await Promise.all([fetchGoals(), fetchGoals()])
 
   expect(global.fetch).toHaveBeenCalledTimes(1)

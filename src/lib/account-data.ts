@@ -43,6 +43,8 @@ export const ACCOUNT_TABLES: AccountTable[] = [
   { table: 'calendar_connections', ownerType: 'uuid', export: { as: 'calendarConnections', columns: 'google_email, connected_at' } },
   { table: 'pending_calendar_connections', ownerType: 'uuid', export: null },
   { table: 'push_subscriptions', ownerType: 'uuid', export: null },
+  // After the subscription: once that is gone the job writes no more of these.
+  { table: 'reminder_sends', ownerType: 'uuid', export: { as: 'remindersSent', columns: '*' } },
 ]
 
 /**

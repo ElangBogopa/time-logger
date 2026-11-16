@@ -1,14 +1,13 @@
 /**
- * Shared reader for the user's goals.
+ * Reader for the user's saved goals.
  *
- * The dashboard fetched /api/goals twice on every load: YourPlan needs the
- * list to render, and useDashboardState needs to know whether any goal exists
- * before offering onboarding. Two components, same request, measured as two
- * round trips.
+ * Goals are no longer shown or created anywhere in the app. This reader
+ * survives for one job: useDashboardState asks it whether an older account,
+ * set up before the set-up flag was written, already has a goal, so that
+ * account is not sent back through setup.
  *
- * Callers share one in-flight request and a short-lived result, so concurrent
- * readers cost one call and a quick re-mount costs none. Anything that
- * creates or removes a goal calls invalidateGoals().
+ * Callers share one in-flight request and a short-lived result, so
+ * concurrent readers cost one call. invalidateGoals() clears it.
  */
 
 export interface Goal {
@@ -45,7 +44,7 @@ export async function fetchGoals(): Promise<Goal[]> {
   return inFlight
 }
 
-/** Drop the cached list after a goal is created or removed. */
+/** Drop the cached list, so the next read asks again. */
 export function invalidateGoals(): void {
   cached = null
 }

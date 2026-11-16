@@ -5,7 +5,7 @@ positioning, pricing, launch, users. Read this before advising. It is
 rewritten whenever `dev` is merged into `main`, so it describes what
 people using the app have today.
 
-Last updated: 15 November 2026, at release `510ada2`.
+Last updated: 16 November 2026, at release `6f8abc2`.
 
 ## The product in one paragraph
 
@@ -26,11 +26,15 @@ performance. Not exam candidates, not teams, not general time-trackers.
 
 - **Plan:** list what matters and get a time proposed for each, around the
   calendar, with the reason and its source. A usual hour learned from their
-  own log outranks the textbook.
+  own log outranks the textbook. Tasks kept in Google Tasks can be brought
+  into the plan. The Plan tab is the only place to plan: goals, a second
+  place that repeated it, are gone from the app.
 - **Your windows:** peak focus, the dip, the physical peak, wind-down —
   moved to when they wake — shown on Today with a reason for each.
 - **Do and record:** tick off what was planned, confirm calendar events,
-  or log anything in a tap.
+  or log anything in a tap. A part of the day with nothing worth recording
+  can be answered "Nothing to log", and undone. Repeating an earlier day
+  opens a list to choose which of its activities to log.
 - **Review:** a day and a week on three scores (Body, Mind, Heart), plus
   how much focused work, exercise and time with people fell inside their
   windows — stated as time, never as a fourth score. Each comes with a few
@@ -38,8 +42,9 @@ performance. Not exam candidates, not teams, not general time-trackers.
   praise nor console. The weekly lines say what the time held and no longer
   remark on how much was logged. A finished week with no time with friends
   or family is told so, once; a single day never is.
-- **Reminders:** log your morning at 12, afternoon at 6, evening at 9, in
-  their own timezone, skipped when already logged. The Reminders screen
+- **Reminders:** log your morning from 12, afternoon from 6, evening from
+  9, in their own timezone, skipped when already logged. One may arrive
+  late, but each arrives at most once a day. The Reminders screen
   says what to do while they are off, and says plainly that nothing will be
   sent when all three times are switched off.
 - **The science:** a library of the studies, cited from wherever they are
@@ -57,6 +62,13 @@ performance. Not exam candidates, not teams, not general time-trackers.
   Calendar in the background and asks someone to sign in again only when
   Google has actually withdrawn access, not when Google was briefly
   unreachable.
+- **Reminders:** had mostly not been arriving, because the service that
+  triggers them each hour skips most hours. They no longer depend on the
+  exact hour: a late trigger still sends the one that is owed. They can be
+  hours late, and an evening one can still be missed. A steadier trigger
+  is the fix if that proves too loose.
+- **Goals** were removed. Saved ones are kept, and are still exported and
+  deleted with the account.
 - **The written reviews** are now in the voice below. They are checked
   against it with real examples. The weekly lines have stopped remarking on
   how much was logged. Still rough: a week with no focused work can name

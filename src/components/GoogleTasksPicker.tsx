@@ -19,10 +19,9 @@ interface GoogleTasksPickerProps {
   isOpen: boolean
   onClose: () => void
   onImport: (tasks: string[]) => void
-  existingTaskCount?: number
 }
 
-export default function GoogleTasksPicker({ isOpen, onClose, onImport, existingTaskCount = 0 }: GoogleTasksPickerProps) {
+export default function GoogleTasksPicker({ isOpen, onClose, onImport }: GoogleTasksPickerProps) {
   const [tasks, setTasks] = useState<GoogleTask[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

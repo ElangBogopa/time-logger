@@ -187,12 +187,12 @@ describe('when each one arrives', () => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ preferences: { reminder_times: twoOff } }) })) as unknown as typeof fetch
     await setup()
     await waitFor(() => expect(within(when()).getByRole('switch', { name: 'Log your afternoon' })).not.toBeChecked())
-    expect(screen.getByText(/Sent on the hour/)).toBeInTheDocument()
+    expect(screen.getByText(/Sent around the hour/)).toBeInTheDocument()
 
     fireEvent.click(within(when()).getByRole('switch', { name: 'Log your morning' }))
 
     expect(await screen.findByText('All three are switched off, so nothing will be sent.')).toBeInTheDocument()
-    expect(screen.queryByText(/Sent on the hour/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Sent around the hour/)).not.toBeInTheDocument()
   })
 
   it('puts the screen back, and says so, when a change will not save', async () => {
@@ -218,7 +218,7 @@ describe('when each one arrives', () => {
 
   it('says they go out on the hour and are skipped once that part is logged', async () => {
     await setup()
-    expect(screen.getByText(/Sent on the hour, give or take a few minutes, and skipped when you have already logged/)).toBeInTheDocument()
+    expect(screen.getByText(/Sent around the hour, sometimes a little later, and skipped when you have already logged/)).toBeInTheDocument()
     expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
   })
 
@@ -227,34 +227,34 @@ describe('when each one arrives', () => {
 
     expect(screen.getByRole('button', { name: 'Turn on' })).toBeInTheDocument()
     expect(screen.getByText('Turn reminders on to choose the times.')).toBeInTheDocument()
-    expect(screen.queryByText(/Sent on the hour/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Sent around the hour/)).not.toBeInTheDocument()
   })
 
   it('says to turn reminders on for a device that has never been asked, which is the usual first state', async () => {
     await setup(push({ isSubscribed: false, permission: 'prompt' }))
 
     expect(screen.getByText('Turn reminders on to choose the times.')).toBeInTheDocument()
-    expect(screen.queryByText(/Sent on the hour/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Sent around the hour/)).not.toBeInTheDocument()
   })
 
   it('keeps the usual line where notifications are blocked, since there is nothing to turn on here', async () => {
     await setup(push({ isSubscribed: false, permission: 'denied' }))
 
-    expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
+    expect(screen.getByText(/Sent around the hour/)).toBeInTheDocument()
     expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
   })
 
   it('keeps the usual line on a device that cannot receive them', async () => {
     await setup(push({ isSupported: false, isSubscribed: false, permission: 'unsupported' }), { platform: 'ios', standalone: false })
 
-    expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
+    expect(screen.getByText(/Sent around the hour/)).toBeInTheDocument()
     expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
   })
 
   it('keeps the usual line while this device is still being checked, so it does not change a moment later', async () => {
     await setup(push({ isSubscribed: false, permission: 'prompt', isLoading: true }))
 
-    expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
+    expect(screen.getByText(/Sent around the hour/)).toBeInTheDocument()
     expect(screen.queryByText('Turn reminders on to choose the times.')).not.toBeInTheDocument()
   })
 
@@ -270,7 +270,7 @@ describe('when each one arrives', () => {
       await setup()
 
       expect(await screen.findByText(SENTENCE)).toBeInTheDocument()
-      expect(screen.queryByText(/Sent on the hour/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Sent around the hour/)).not.toBeInTheDocument()
       expect(screen.getByRole('status')).toHaveTextContent('On for this device.')
     })
 
@@ -281,7 +281,7 @@ describe('when each one arrives', () => {
       fireEvent.click(within(when()).getByRole('switch', { name: 'Log your morning' }))
 
       await waitFor(() => expect(screen.queryByText(SENTENCE)).not.toBeInTheDocument())
-      expect(screen.getByText(/Sent on the hour, give or take a few minutes/)).toBeInTheDocument()
+      expect(screen.getByText(/Sent around the hour/)).toBeInTheDocument()
       expect(saved().map((r: { enabled: boolean }) => r.enabled)).toEqual([true, false, false])
     })
 

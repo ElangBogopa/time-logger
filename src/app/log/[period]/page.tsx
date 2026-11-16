@@ -3,14 +3,14 @@
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/hooks/useAccount'
-import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities } from '@/lib/api'
-import { findRepeatCandidate, entriesForRepeat, type RepeatCandidate } from '@/lib/repeat-session'
+import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities, fetchSessionCompletions, deleteSessionCompletion } from '@/lib/api'
+import { findRepeatCandidate, entriesForRepeat, repeatRowsLeft, retimeAfterClash, type RepeatCandidate, type RepeatRow } from '@/lib/repeat-session'
 import { PERIOD_CLASSES } from '@/lib/palette'
 import { findUnaccountedGaps } from '@/lib/gaps'
 import { unconfirmedEvents } from '@/lib/calendar-match'
 import NextUp from '@/components/NextUp'
-import { getCachedEntries, setCachedEntries } from '@/hooks/useSessionData'
-import { TimePeriod, TimeEntry, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
+import { getCachedEntries, setCachedEntries, getCachedCompletions, setCachedCompletion, removeCachedCompletion } from '@/hooks/useSessionData'
+import { TimePeriod, TimeEntry, SessionCompletion, TimeCategory, PERIOD_LABELS, PERIOD_TIME_RANGES, getUserToday, getRealToday, getUserCurrentHour, shiftDateString } from '@/lib/types'
 import {
   getEntriesForPeriod,
   getSessionStats,
@@ -26,6 +26,7 @@ import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
 import TimeEntryModal from '@/components/TimeEntryModal'
 import ActivityList from '@/components/ActivityList'
 import QuickLogModal from '@/components/QuickLogModal'
+import RepeatSessionSheet from '@/components/RepeatSessionSheet'
 import { Button } from '@/components/ui/button'
 // Task completion happens exclusively in the post-session popup
 import {
@@ -41,7 +42,7 @@ import {
   CircleDashed,
   CalendarCheck,
   RefreshCw,
-  RotateCcw,
+  ChevronRight,
 } from 'lucide-react'
 import { toast as sonnerToast } from 'sonner'
 
@@ -121,12 +122,15 @@ function LogPeriodContent() {
   const [toast, setToast] = useState<string | null>(null) // kept for legacy compat, not shown
   const [repeatCandidate, setRepeatCandidate] = useState<RepeatCandidate | null>(null)
   const [isRepeating, setIsRepeating] = useState(false)
+  const [isRepeatSheetOpen, setIsRepeatSheetOpen] = useState(false)
   // 'all', or the id of the one event being confirmed
   const [confirming, setConfirming] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   /** The time range a gap row hands to the quick-log sheet. */
   const [quickLogRange, setQuickLogRange] = useState<{ startTime: string; endTime: string } | null>(null)
+  /** A "Same as" row handed to the quick-log sheet: its name, and the category it already has. */
+  const [quickLogPrefill, setQuickLogPrefill] = useState<{ name: string; category: TimeCategory | null; blankTimes: boolean } | null>(null)
 
   // Soft-delete: track entry IDs pending deletion (hidden from UI, deleted after toast expires)
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
@@ -180,13 +184,11 @@ function LogPeriodContent() {
     fetchEntries()
   }, [fetchEntries])
 
-  // A session with nothing in it can usually be copied from a recent day:
-  // most days have the same shape. Only looked up while the session is
-  // empty, and only from entries already stored, so it costs one request and
-  // no model calls.
-  const hasEntriesForPeriod = getEntriesForPeriod(entries, period).length > 0
+  // A session can usually be filled in from a recent day: most days have the
+  // same shape. Looked up from entries already stored, so it costs one request
+  // and no model calls; the box shows for as long as anything is left to log.
   useEffect(() => {
-    if (isLocked || !userId || !selectedDate || hasEntriesForPeriod) {
+    if (isLocked || !userId || !selectedDate) {
       setRepeatCandidate(null)
       return
     }
@@ -205,14 +207,38 @@ function LogPeriodContent() {
     return () => {
       cancelled = true
     }
-  }, [userId, selectedDate, safePeriod, isLocked, hasEntriesForPeriod])
+  }, [userId, selectedDate, safePeriod, isLocked])
 
-  const handleRepeatSession = async () => {
-    if (!repeatCandidate || isRepeating) return
+  // The "Nothing to log" answer, saved to the account. null = not known yet.
+  const [answered, setAnswered] = useState<boolean | null>(() => {
+    const cachedRows = getCachedCompletions(selectedDate)
+    if (!cachedRows) return null
+    return cachedRows.some(c => c.period === safePeriod && c.skipped)
+  })
+  const [isUndoing, setIsUndoing] = useState(false)
+
+  useEffect(() => {
+    if (!userId || !selectedDate) return
+    let cancelled = false
+    fetchSessionCompletions({ date: selectedDate, period: safePeriod })
+      .then((rows) => {
+        if (!cancelled) setAnswered(rows.some(r => r.skipped))
+      })
+      .catch(() => {
+        if (!cancelled) setAnswered(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId, selectedDate, safePeriod])
+
+  const handleRepeatSession = async (ids: Set<string>) => {
+    if (!repeatCandidate || isRepeating || ids.size === 0) return
     setIsRepeating(true)
     try {
-      const created = await createEntries(entriesForRepeat(repeatCandidate, selectedDate))
+      const created = await createEntries(entriesForRepeat(repeatCandidate, selectedDate, ids))
       await fetchEntries()
+      setIsRepeatSheetOpen(false)
       sonnerToast.success(
         `Logged ${created.length} ${created.length === 1 ? 'activity' : 'activities'} from ${repeatCandidate.label}`
       )
@@ -222,6 +248,16 @@ function LogPeriodContent() {
     } finally {
       setIsRepeating(false)
     }
+  }
+
+  const handlePickRepeatTime = (row: RepeatRow) => {
+    setIsRepeatSheetOpen(false)
+    const range = retimeAfterClash(row, period)
+    setQuickLogRange(range)
+    // No range: nowhere in this session to put it. The add screen opens with empty times,
+    // not its defaults (which can fall in another session), and the person chooses.
+    setQuickLogPrefill({ name: row.entry.activity, category: row.entry.category, blankTimes: !range })
+    setIsQuickLogOpen(true)
   }
 
   // Cleanup pending delete timers on unmount
@@ -242,8 +278,12 @@ function LogPeriodContent() {
   }, [toast])
 
   // Get period-relevant entries (excluding soft-deleted ones)
-  const visibleEntries = entries.filter(e => !pendingDeletes.has(e.id))
+  const visibleEntries = useMemo(() => entries.filter(e => !pendingDeletes.has(e.id)), [entries, pendingDeletes])
   const periodEntries = getEntriesForPeriod(visibleEntries, period)
+  const repeatRows = useMemo(
+    () => (repeatCandidate ? repeatRowsLeft(repeatCandidate, visibleEntries, period) : []),
+    [repeatCandidate, visibleEntries, period]
+  )
   const stats = getSessionStats(visibleEntries, period)
 
   // Get the last entry's end time for QuickLogModal auto-fill
@@ -345,13 +385,14 @@ function LogPeriodContent() {
   const handleDone = async () => {
     // Save session completion
     try {
-      await upsertSessionCompletion({
+      const row = await upsertSessionCompletion({
         date: selectedDate,
         period,
         entry_count: stats.entryCount,
         total_minutes: stats.totalMinutes,
         skipped: false,
       })
+      setCachedCompletion(selectedDate, row as unknown as SessionCompletion)
     } catch (err) {
       console.error('Failed to save session completion:', err)
     }
@@ -386,18 +427,37 @@ function LogPeriodContent() {
   // Handle "Nothing to log" (skip)
   const handleSkip = async () => {
     try {
-      await upsertSessionCompletion({
+      const row = await upsertSessionCompletion({
         date: selectedDate,
         period,
         entry_count: 0,
         total_minutes: 0,
         skipped: true,
       })
+      setCachedCompletion(selectedDate, row as unknown as SessionCompletion)
     } catch (err) {
       console.error('Failed to save skip:', err)
+      sonnerToast.error('Could not save that. Try again.')
+      return
     }
 
     goHome()
+  }
+
+  // Take back "Nothing to log"
+  const handleUndo = async () => {
+    if (isUndoing) return
+    setIsUndoing(true)
+    try {
+      await deleteSessionCompletion({ date: selectedDate, period })
+      removeCachedCompletion(selectedDate, period)
+      setAnswered(false)
+    } catch (err) {
+      console.error('Failed to undo skip:', err)
+      sonnerToast.error('Could not undo that. Try again.')
+    } finally {
+      setIsUndoing(false)
+    }
   }
 
   // Handle summary close
@@ -547,35 +607,21 @@ function LogPeriodContent() {
           )}
         </header>
 
-        {/* One tap to re-log a day that looked the same */}
-        {!isLocked && hasStarted && repeatCandidate && (
-          <section className="mb-4 rounded-xl border border-border bg-card p-4">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h2 className="eyebrow mb-1">Same as {repeatCandidate.label}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {repeatCandidate.entries.map((entry) => entry.activity).join(' · ')}
-                </p>
-              </div>
-              <RotateCcw className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        {/* Pick from a recent day that looked the same */}
+        {!isLocked && hasStarted && repeatCandidate && repeatRows.length > 0 && (
+          <button
+            type="button"
+            className="mb-4 flex w-full min-h-11 items-start justify-between gap-3 rounded-xl border border-border bg-card p-4 text-left"
+            onClick={() => setIsRepeatSheetOpen(true)}
+          >
+            <div>
+              <span className="eyebrow mb-1 block">Same as {repeatCandidate.label}</span>
+              <p className="text-sm text-muted-foreground">
+                {repeatRows.map((row) => row.entry.activity).join(' · ')}
+              </p>
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleRepeatSession}
-              disabled={isRepeating}
-            >
-              {isRepeating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  Log {repeatCandidate.entries.length}{' '}
-                  {repeatCandidate.entries.length === 1 ? 'activity' : 'activities'} again ·{' '}
-                  {formatSessionDuration(repeatCandidate.totalMinutes)}
-                </>
-              )}
-            </Button>
-          </section>
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          </button>
         )}
 
         {/* Calendar events nothing has answered yet. This row used to appear
@@ -732,12 +778,23 @@ function LogPeriodContent() {
                 <CheckCircle2 className="h-5 w-5" />
                 Done with {label}
               </Button>
-            ) : (
+            ) : answered === true ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-3">
+                <p className="text-sm text-muted-foreground">Nothing to log for this session</p>
+                <Button variant="outline" onClick={handleUndo} disabled={isUndoing}>
+                  Undo
+                </Button>
+              </div>
+            ) : answered === false ? (
               <Button onClick={handleSkip} variant="outline" className="w-full" size="lg">
                 Nothing to log for this session
               </Button>
-            )}
+            ) : null}
           </div>
+        )}
+
+        {isLocked && answered === true && periodEntries.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground">Nothing to log for this session</p>
         )}
 
         {isLocked && (
@@ -780,14 +837,19 @@ function LogPeriodContent() {
         onClose={() => {
           setIsQuickLogOpen(false)
           setQuickLogRange(null)
+          setQuickLogPrefill(null)
         }}
         onEntryAdded={() => {
           fetchEntries()
           setQuickLogRange(null)
+          setQuickLogPrefill(null)
         }}
         lastEntryEndTime={lastEntryEndTime}
         initialStartTime={quickLogRange?.startTime}
         initialEndTime={quickLogRange?.endTime}
+        initialName={quickLogPrefill?.name}
+        knownCategory={quickLogPrefill?.category}
+        blankTimes={quickLogPrefill?.blankTimes}
         onShowToast={setToast}
         userId={userId}
         calendarEvents={calendarEvents}
@@ -797,6 +859,18 @@ function LogPeriodContent() {
         isPastDay={selectedDate !== "" && selectedDate !== getUserToday()}
         disablePostSubmit={true}
       />
+
+      {repeatCandidate && (
+        <RepeatSessionSheet
+          open={isRepeatSheetOpen}
+          onOpenChange={setIsRepeatSheetOpen}
+          label={repeatCandidate.label}
+          rows={repeatRows}
+          isLogging={isRepeating}
+          onLog={handleRepeatSession}
+          onPickTime={handlePickRepeatTime}
+        />
+      )}
 
       {/* Editing one activity — the timeline used to own this modal */}
       {editingEntry && (
