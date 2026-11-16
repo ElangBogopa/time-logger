@@ -75,3 +75,27 @@ Verdict: Ready to merge (no must fix)
 - import-failure-silent · both the Google Tasks import and addTask now check each POST's `ok`; a failure shows an error toast (sonner, since the calendar page's own toast state is never rendered); test added · believes: fixed
 - stale-goal-comments · invalidateGoals comment now says what it does; the test file's note about fixed dates replaced with a one-line true one (the cited lines were at the top of the file) · believes: fixed
 - unused-existing-task-count · prop removed from GoogleTasksPicker · believes: fixed
+
+## Review 9 — 2026-11-15 — Opus 5.5 — reviewed af869f9
+Verdict: Ready to merge (no must fix)
+- resolved: import-failure-silent (each POST's ok is checked in the import and in addTask; the error toast goes through sonner, whose Toaster is mounted in Providers; a failed add keeps the typed title), stale-goal-comments, unused-existing-task-count (no caller passed it)
+- no harm from the fix: the early return in addTask still reaches finally, so the add button is not left disabled; the new test fails without the check
+- ninth review of this branch: trying it on a phone is now the better test
+
+## Review 10 — 2026-11-16 — Fable 5.2 — reviewed fca3ad3
+Verdict: Ready to merge (no must fix), once the owner has applied supabase/migrations/20261116_reminder_sends.sql to the real database; without the table the job answers 500 every hour and sends nothing
+- first pass on fca3ad3 (reminders forgive a late run; reminder_sends); earlier findings all resolved, none reopened
+- checked: claim before send and release when no device was reached; the unique constraint covers two runs at once and a truncated read; the record is keyed on the person's own date; reminder_sends is in ACCOUNT_TABLES after push_subscriptions, exported without the owner id, and cascades with the users row; the answer and the console lines hold counts only; "Send a test" writes no row
+- should · settings-copy-on-the-hour · src/app/settings/notifications/page.tsx:244 · the Reminders screen still says "Sent on the hour, give or take a few minutes"; a reminder may now arrive hours into its window (the plan kept this screen out of scope, so the wording is the owner's call)
+- should · small-hours-window · src/lib/reminders.ts:98-111 · the picker offers all 24 hours, and a reminder moved to the small hours (say "Log your evening" at 12 AM) now has a window until the next reminder's hour, so a late run can send it mid-morning, about the new day; CLAUDE.md's "nothing about a day is sent after its midnight" is untrue for that setting, and no test covers it
+- should · second-schedule-warning-stale · CLAUDE.md:174 · "A second schedule calling the same job would send that hour twice" contradicts the bullet above it: reminder_sends now stops a repeat
+- optional · workflow-comments-by-the-hour · .github/workflows/reminders.yml:1,21 · "Sends the hour's reminders" and "A late run still lands in the right hour" describe the old rule (the plan said to leave the file alone)
+- optional · release-not-checked · src/app/api/cron/reminders/route.ts:141-148 · a failed delete of the claim, or a run killed between the claim and the send, leaves the row and that reminder is not tried again that day; nothing counts or logs it
+- optional · gone-release-untested · src/__tests__/api/reminders-cron.test.ts · the claim's release is tested for 'failed' only, not for a person whose every device was 'gone'
+- tenth review of this branch: trying it on a phone is now the better test
+
+## Fix attempt 7 — 2026-11-16 — Sonnet 5.5 — commit pending
+- settings-copy-on-the-hour · the Reminders screen now says "Sent around the hour, sometimes a little later, and skipped..."; screen tests updated · believes: fixed
+- small-hours-window · dueReminder gives a reminder set before 5 AM no late window (its own hour only); CLAUDE.md says so; test added · believes: fixed (the cutoff of 5 is a judgement; a reminder at 5 or later still has the old window)
+- second-schedule-warning-stale · CLAUDE.md no longer says a second schedule sends twice · believes: fixed
+- the three optional findings (workflow-comments-by-the-hour, release-not-checked, gone-release-untested) · not attempted

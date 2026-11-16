@@ -159,7 +159,8 @@ For display, these roll up into six `AggregatedCategory` buckets —
   morning one may go any time from 12 until 6, the afternoon one from 6
   until 9, the evening one from 9 until midnight — each window ends when
   the next switched-on reminder's hour comes — and nothing about a day is
-  sent after its midnight. A run sends only the most recent one
+  sent after its midnight. A reminder moved to the small hours (before 5)
+  has no late window and goes only in its own hour. A run sends only the most recent one
   (`dueReminder`), never an earlier one it missed. `reminder_sends` holds
   one row per person, local date and reminder; the job inserts it before
   sending, so a second run or a second device's subscription cannot repeat
@@ -171,7 +172,8 @@ For display, these roll up into six `AggregatedCategory` buckets —
   jobs, which is why the caller is `.github/workflows/reminders.yml` and
   there is no `vercel.json`. It needs the `CRON_SECRET` secret and the
   `APP_URL` variable set in the GitHub repository. A second schedule
-  calling the same job would send that hour twice.
+  would not send twice (`reminder_sends` stops a repeat) but it is not
+  needed.
 - **Who gets them is the push subscription, nothing else.** Turning
   reminders on subscribes the device; turning them off removes the row.
   `reminder_enabled` still exists in `user_preferences` and is read by

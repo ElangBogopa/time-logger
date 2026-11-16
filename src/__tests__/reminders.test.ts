@@ -81,6 +81,16 @@ describe('which reminder is due', () => {
     expect(dueReminder(times, 12)?.id).toBe('midday')
   })
 
+  it('sends a small-hours reminder in its own hour only, never late', () => {
+    const times = [
+      { id: 'night', label: 'x', time: '00:00', enabled: true },
+      { id: 'midday', label: 'x', time: '12:00', enabled: true },
+    ]
+    expect(dueReminder(times, 0)?.id).toBe('night')
+    for (const hour of [1, 4, 7, 11]) expect(dueReminder(times, hour)).toBeNull()
+    expect(dueReminder(times, 13)?.id).toBe('midday')
+  })
+
   it('survives a time that is not one', () => {
     expect(reminderHour('soon')).toBe(-1)
     expect(dueReminder([{ id: 'midday', label: 'x', time: 'soon', enabled: true }], 12)).toBeNull()
