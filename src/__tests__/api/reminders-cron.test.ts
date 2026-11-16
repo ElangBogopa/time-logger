@@ -17,23 +17,38 @@ type Row = Record<string, unknown>
 
 let db: Record<string, Row[]> = {}
 let broken: string[] = []
+/** Tables whose select returns nothing while insert and delete still see the rows: two runs racing. */
+let blind: string[] = []
+/** Tables whose insert fails while everything else works. */
+let brokenInserts: string[] = []
 
 function makeBuilder(table: string) {
-  let op: 'select' | 'delete' = 'select'
+  let op: 'select' | 'delete' | 'insert' = 'select'
+  let inserted: Row | null = null
   const filters: ((row: Row) => boolean)[] = []
   const run = () => {
     if (broken.includes(table)) return { data: null, error: { message: 'boom' } }
     const rows = db[table] ?? []
+    if (op === 'insert') {
+      if (brokenInserts.includes(table)) return { data: null, error: { message: 'boom' } }
+      const row = inserted as Row
+      if (table === 'reminder_sends' && rows.some((r) => r.user_id === row.user_id && r.date === row.date && r.reminder_id === row.reminder_id)) {
+        return { data: null, error: { code: '23505', message: 'duplicate key' } }
+      }
+      db[table] = [...rows, row]
+      return { data: null, error: null }
+    }
     const matching = rows.filter((row) => filters.every((filter) => filter(row)))
     if (op === 'delete') {
       db[table] = rows.filter((row) => !matching.includes(row))
       return { data: null, error: null }
     }
-    return { data: matching, error: null }
+    return { data: blind.includes(table) ? [] : matching, error: null }
   }
   const builder = {
     select() { return builder },
     delete() { op = 'delete'; return builder },
+    insert(row: Row) { op = 'insert'; inserted = row; return builder },
     eq(column: string, value: unknown) { filters.push((row) => row[column] === value); return builder },
     in(column: string, values: unknown[]) { filters.push((row) => values.includes(row[column])); return builder },
     then(resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) {
@@ -97,11 +112,14 @@ beforeEach(() => {
   jest.useFakeTimers().setSystemTime(TORONTO_NOON)
   process.env.CRON_SECRET = SECRET
   broken = []
+  blind = []
+  brokenInserts = []
   db = {
     push_subscriptions: [device(TORONTO), device(LONDON)],
     user_preferences: [prefs(TORONTO, 'America/Toronto'), prefs(LONDON, 'Europe/London')],
     time_entries: [],
     session_completions: [],
+    reminder_sends: [],
   }
   ;(pushConfigured as jest.Mock).mockReturnValue(true)
   ;(sendPush as jest.Mock).mockResolvedValue('sent')
@@ -135,11 +153,13 @@ describe('who may call it', () => {
 })
 
 describe('who is reminded', () => {
-  it('reminds the person whose clock says noon, and not the one whose clock says five', async () => {
+  it('reminds the person whose clock has passed noon, and not the one whose clock has not', async () => {
+    // 13:05 in London, 08:05 in Toronto.
+    jest.setSystemTime(new Date('2026-11-12T13:05:00Z'))
     const res = await call()
 
     expect(res.status).toBe(200)
-    expect(sentTo()).toEqual([`${TORONTO}: Log your morning`])
+    expect(sentTo()).toEqual([`${LONDON}: Log your morning`])
     expect((sendPush as jest.Mock).mock.calls[0][1]).toMatchObject({ url: '/log/morning', tag: 'reminder-morning' })
   })
 
@@ -148,7 +168,7 @@ describe('who is reminded', () => {
     // so for most of a year this list was empty.
     expect(db.user_preferences.every((row) => row.reminder_enabled === false)).toBe(true)
     await call()
-    expect(sentTo()).toHaveLength(1)
+    expect(sentTo()).toHaveLength(2)
   })
 
   it('reminds nobody who has no device subscribed', async () => {
@@ -160,11 +180,11 @@ describe('who is reminded', () => {
   })
 
   it('sends to every device the person has', async () => {
-    db.push_subscriptions.push(device(TORONTO, 'toronto-laptop'))
+    db.push_subscriptions = [device(TORONTO), device(TORONTO, 'toronto-laptop')]
     const res = await call()
 
     expect(sendPush).toHaveBeenCalledTimes(2)
-    expect(res.body).toMatchObject({ subscribers: 2, due: 1, sent: 2 })
+    expect(res.body).toMatchObject({ subscribers: 1, due: 1, sent: 2 })
   })
 
   it('uses the usual three times for someone with no preferences saved', async () => {
@@ -172,6 +192,7 @@ describe('who is reminded', () => {
     jest.setSystemTime(new Date('2026-11-12T18:05:00Z')) // six in the evening, UTC
     await call()
 
+    // With no timezone saved both are read as UTC, where it is six.
     expect(sentTo()).toEqual([`${TORONTO}: Log your afternoon`, `${LONDON}: Log your afternoon`])
   })
 
@@ -193,7 +214,7 @@ describe('who is reminded', () => {
     expect(sentTo()).toEqual([`${LONDON}: Log your afternoon`])
   })
 
-  it('sends each of the three in its own hour across a day, and nothing in the other twenty-one', async () => {
+  it('sends each of the three once in its window across a day, and never again', async () => {
     db.push_subscriptions = [device(TORONTO)]
     const seen: string[] = []
     for (let hour = 0; hour < 24; hour++) {
@@ -204,12 +225,137 @@ describe('who is reminded', () => {
     }
 
     // Toronto is five hours behind UTC in November.
-    expect(seen).toEqual(['2Z Log your evening', '17Z Log your morning', '23Z Log your afternoon'])
+    expect(seen).toEqual(['0Z Log your afternoon', '2Z Log your evening', '17Z Log your morning', '23Z Log your afternoon'])
+  })
+})
+
+describe('a run that arrives late', () => {
+  const at = (iso: string) => jest.setSystemTime(new Date(iso))
+  beforeEach(() => {
+    db.push_subscriptions = [device(TORONTO)]
+  })
+
+  it('sends the reminder that was missed', async () => {
+    at('2026-11-12T19:05:00Z') // 14:05 in Toronto
+    await call()
+    expect(sentTo()).toEqual([`${TORONTO}: Log your morning`])
+
+    jest.clearAllMocks()
+    db.reminder_sends = []
+    at('2026-11-13T04:55:00Z') // 23:55 on the 12th
+    await call()
+    expect(sentTo()).toEqual([`${TORONTO}: Log your evening`])
+  })
+
+  it('does not repeat it on a second run in the same window', async () => {
+    await call()
+    at('2026-11-12T19:05:00Z')
+    const res = await call()
+
+    expect(sendPush).toHaveBeenCalledTimes(1)
+    expect(res.body).toMatchObject({ alreadySent: 1, sent: 0 })
+  })
+
+  it('sends only the latest missed one, and never goes back for an earlier one', async () => {
+    at('2026-11-12T23:30:00Z') // 18:30
+    await call()
+    expect(sentTo()).toEqual([`${TORONTO}: Log your afternoon`])
+
+    at('2026-11-13T00:30:00Z') // 19:30
+    await call()
+    expect(sendPush).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends nothing after midnight', async () => {
+    at('2026-11-13T05:05:00Z') // 00:05 on the 13th
+    await call()
+
+    expect(sendPush).not.toHaveBeenCalled()
+    expect(db.reminder_sends).toEqual([])
+  })
+
+  it('still skips a part of the day that is logged, and leaves no record', async () => {
+    db.time_entries = [{ user_id: TORONTO, date: '2026-11-12', start_time: '09:00:00', status: 'confirmed' }]
+    at('2026-11-12T19:05:00Z')
+    const res = await call()
+
+    expect(sendPush).not.toHaveBeenCalled()
+    expect(res.body).toMatchObject({ alreadyLogged: 1 })
+    expect(db.reminder_sends).toEqual([])
+  })
+
+  it('gives every device the reminder once', async () => {
+    db.push_subscriptions = [device(TORONTO), device(TORONTO, 'toronto-laptop')]
+    await call()
+    at('2026-11-12T19:05:00Z')
+    await call()
+
+    expect(sendPush).toHaveBeenCalledTimes(2)
+    expect(db.reminder_sends).toHaveLength(1)
+  })
+
+  it('records it under the person’s own date', async () => {
+    at(TORONTO_NINE_PM.toISOString())
+    await call()
+
+    expect(db.reminder_sends).toEqual([{ user_id: TORONTO, date: '2026-11-12', reminder_id: 'night' }])
+  })
+
+  it('does not count a send that reached no device, and lets a later run try again', async () => {
+    ;(sendPush as jest.Mock).mockResolvedValue('failed')
+    await call()
+    expect(db.reminder_sends).toEqual([])
+
+    ;(sendPush as jest.Mock).mockResolvedValue('sent')
+    at('2026-11-12T19:05:00Z')
+    await call()
+    expect(db.reminder_sends).toHaveLength(1)
+    expect(sentTo()).toEqual([`${TORONTO}: Log your morning`, `${TORONTO}: Log your morning`])
+  })
+
+  it('keeps the record when at least one device got it', async () => {
+    db.push_subscriptions = [device(TORONTO), device(TORONTO, 'toronto-laptop')]
+    ;(sendPush as jest.Mock).mockResolvedValueOnce('sent').mockResolvedValueOnce('failed')
+    await call()
+    expect(db.reminder_sends).toHaveLength(1)
+
+    ;(sendPush as jest.Mock).mockClear()
+    at('2026-11-12T19:05:00Z')
+    await call()
+    expect(sendPush).not.toHaveBeenCalled()
+  })
+
+  it('sends one when two runs happen at once', async () => {
+    db.reminder_sends = [{ user_id: TORONTO, date: '2026-11-12', reminder_id: 'midday' }]
+    blind = ['reminder_sends']
+    const res = await call()
+
+    expect(sendPush).not.toHaveBeenCalled()
+    expect(res.body).toMatchObject({ alreadySent: 1 })
+  })
+
+  it('sends nothing, and says so, when it cannot read what has been sent', async () => {
+    broken = ['reminder_sends']
+    jest.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await call()
+
+    expect(res.status).toBe(500)
+    expect(sendPush).not.toHaveBeenCalled()
+  })
+
+  it('does not send when it cannot write the record', async () => {
+    brokenInserts = ['reminder_sends']
+    jest.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await call()
+
+    expect(sendPush).not.toHaveBeenCalled()
+    expect(res.body).toMatchObject({ notRecorded: 1 })
   })
 })
 
 describe('not reminding someone to do what they have done', () => {
   it('skips the morning reminder when the morning is logged', async () => {
+    db.push_subscriptions = [device(TORONTO)]
     db.time_entries = [{ user_id: TORONTO, date: '2026-11-12', start_time: '09:00:00', status: 'confirmed' }]
     const res = await call()
 
@@ -218,6 +364,7 @@ describe('not reminding someone to do what they have done', () => {
   })
 
   it('skips it when the session was wrapped up without entries', async () => {
+    db.push_subscriptions = [device(TORONTO)]
     db.session_completions = [{ user_id: TORONTO, date: '2026-11-12', period: 'morning' }]
     await call()
     expect(sendPush).not.toHaveBeenCalled()
@@ -247,6 +394,7 @@ describe('not reminding someone to do what they have done', () => {
   })
 
   it('sends anyway if it cannot find out', async () => {
+    db.push_subscriptions = [device(TORONTO)]
     broken = ['time_entries', 'session_completions']
     await call()
     expect(sentTo()).toEqual([`${TORONTO}: Log your morning`])
@@ -256,14 +404,16 @@ describe('not reminding someone to do what they have done', () => {
 describe('what happens to a send', () => {
   it('forgets a device the browser has dropped, and keeps the rest', async () => {
     ;(sendPush as jest.Mock).mockResolvedValue('gone')
+    jest.setSystemTime(new Date('2026-11-12T13:05:00Z')) // only London is past noon
     const res = await call()
 
     expect(res.body).toMatchObject({ sent: 0, removed: 1 })
-    expect(db.push_subscriptions.map((row) => row.user_id)).toEqual([LONDON])
+    expect(db.push_subscriptions.map((row) => row.user_id)).toEqual([TORONTO])
   })
 
   it('keeps a device after a failure that might pass', async () => {
     ;(sendPush as jest.Mock).mockResolvedValue('failed')
+    jest.setSystemTime(new Date('2026-11-12T13:05:00Z')) // only London is past noon
     const res = await call()
 
     expect(res.body).toMatchObject({ sent: 0, failed: 1, removed: 0 })
@@ -274,8 +424,19 @@ describe('what happens to a send', () => {
     const res = await call()
     const text = JSON.stringify(res.body)
 
-    expect(res.body).toEqual({ success: true, subscribers: 2, due: 1, alreadyLogged: 0, sent: 1, failed: 0, removed: 0 })
+    expect(res.body).toEqual({
+      success: true,
+      subscribers: 2,
+      due: 2,
+      alreadySent: 0,
+      alreadyLogged: 0,
+      notRecorded: 0,
+      sent: 2,
+      failed: 0,
+      removed: 0,
+    })
     expect(text).not.toContain(TORONTO)
+    expect(text).not.toContain(LONDON)
     expect(text).not.toContain('push.example')
   })
 
@@ -327,6 +488,7 @@ describe('POST /api/push/test', () => {
     expect(res.body).toEqual({ sent: 1 })
     expect((sendPush as jest.Mock).mock.calls.map(([sub]) => sub.user_id)).toEqual([TORONTO])
     expect((sendPush as jest.Mock).mock.calls[0][1]).toMatchObject({ title: 'Reminders are on' })
+    expect(db.reminder_sends).toEqual([])
   })
 
   it('says reminders are not on when the account has no device', async () => {

@@ -150,12 +150,24 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - Don't fetch calendar for each date change
 
 ### Reminders
-- Three a day — log your morning at 12, your afternoon at 6, your evening
-  at 9, in the person's own timezone — each skipped when that part of the
-  day is already logged. The rules are in `lib/reminders.ts`; the job is
-  `/api/cron/reminders`.
-- **It must be called every hour.** It matches people by their local hour,
-  so a daily schedule reaches nobody. Vercel's free plan only runs daily
+- Three a day — log your morning from 12, your afternoon from 6, your
+  evening from 9, in the person's own timezone — each skipped when that
+  part of the day is already logged. The rules are in `lib/reminders.ts`;
+  the job is `/api/cron/reminders`.
+- **A late run still sends, and each goes out once.** GitHub's scheduler
+  delays and drops runs, so a reminder is not tied to its exact hour: the
+  morning one may go any time from 12 until 6, the afternoon one from 6
+  until 9, the evening one from 9 until midnight — each window ends when
+  the next switched-on reminder's hour comes — and nothing about a day is
+  sent after its midnight. A run sends only the most recent one
+  (`dueReminder`), never an earlier one it missed. `reminder_sends` holds
+  one row per person, local date and reminder; the job inserts it before
+  sending, so a second run or a second device's subscription cannot repeat
+  it, and removes it again if no device was reached. If the table cannot
+  be read the job sends nothing and answers 500. "Send a test" writes no
+  row.
+- **It must be called every hour.** It works from each person's local hour,
+  so a daily schedule would reach each person with one reminder at most. Vercel's free plan only runs daily
   jobs, which is why the caller is `.github/workflows/reminders.yml` and
   there is no `vercel.json`. It needs the `CRON_SECRET` secret and the
   `APP_URL` variable set in the GitHub repository. A second schedule
@@ -231,7 +243,7 @@ src/
 │       ├── auth/[...nextauth]/ # NextAuth config
 │       ├── calendar/events/   # Google Calendar fetch (supports date ranges)
 │       ├── categorize/        # AI category classification
-│       ├── cron/reminders/    # The hour's reminders; called hourly by a GitHub workflow
+│       ├── cron/reminders/    # The reminders each person is still owed; called hourly by a GitHub workflow
 │       ├── push/              # subscribe/ a device to reminders; test/ sends one now
 │       └── commentary/        # AI witty remarks
 ├── components/

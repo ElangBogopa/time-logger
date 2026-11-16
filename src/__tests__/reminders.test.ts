@@ -50,20 +50,35 @@ describe('which reminder is due', () => {
     expect(dueReminder(DEFAULT_REMINDER_TIMES, 21)?.id).toBe('night')
   })
 
-  it('is none in any other hour', () => {
-    for (const hour of [0, 7, 11, 13, 17, 19, 20, 22, 23]) expect(dueReminder(DEFAULT_REMINDER_TIMES, hour)).toBeNull()
+  it('is still that one late in its window: a run that arrives late still finds it', () => {
+    for (const hour of [13, 17]) expect(dueReminder(DEFAULT_REMINDER_TIMES, hour)?.id).toBe('midday')
+    for (const hour of [19, 20]) expect(dueReminder(DEFAULT_REMINDER_TIMES, hour)?.id).toBe('evening')
+    for (const hour of [22, 23]) expect(dueReminder(DEFAULT_REMINDER_TIMES, hour)?.id).toBe('night')
   })
 
-  it('is none when that reminder is switched off', () => {
-    const times = DEFAULT_REMINDER_TIMES.map((time) => (time.id === 'midday' ? { ...time, enabled: false } : time))
-    expect(dueReminder(times, 12)).toBeNull()
-    expect(dueReminder(times, 18)?.id).toBe('evening')
+  it('is none before the first hour of the day, so nothing about yesterday is sent', () => {
+    for (const hour of [0, 7, 11]) expect(dueReminder(DEFAULT_REMINDER_TIMES, hour)).toBeNull()
   })
 
-  it('goes by the hour: the job runs once an hour, so 12:30 is sent with the twelves', () => {
-    const times = [{ id: 'midday', label: 'x', time: '12:30', enabled: true }]
-    expect(dueReminder(times, 12)?.id).toBe('midday')
+  it('passes over a reminder switched off, and the one before it keeps its window', () => {
+    const eveningOff = DEFAULT_REMINDER_TIMES.map((time) => (time.id === 'evening' ? { ...time, enabled: false } : time))
+    expect(dueReminder(eveningOff, 19)?.id).toBe('midday')
+
+    const middayOff = DEFAULT_REMINDER_TIMES.map((time) => (time.id === 'midday' ? { ...time, enabled: false } : time))
+    expect(dueReminder(middayOff, 13)).toBeNull()
+    expect(dueReminder(middayOff, 18)?.id).toBe('evening')
+  })
+
+  it('moves its window with a moved time', () => {
+    const times = DEFAULT_REMINDER_TIMES.map((time) => (time.id === 'midday' ? { ...time, time: '14:00' } : time))
     expect(dueReminder(times, 13)).toBeNull()
+    expect(dueReminder(times, 14)?.id).toBe('midday')
+  })
+
+  it('goes by the hour: 12:30 counts from 12', () => {
+    const times = [{ id: 'midday', label: 'x', time: '12:30', enabled: true }]
+    expect(dueReminder(times, 11)).toBeNull()
+    expect(dueReminder(times, 12)?.id).toBe('midday')
   })
 
   it('survives a time that is not one', () => {
