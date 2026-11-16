@@ -76,6 +76,7 @@ const BODY_CATEGORY_INFO: Record<string, { label: string }> = {
 const SOCIAL_CATEGORY_INFO: Record<string, { label: string }> = {
   social: { label: 'Social Time' },
   calls: { label: 'Calls' },
+  faith: { label: 'Faith' },
   [WITH_FRIENDS_OR_FAMILY_KEY]: { label: 'With friends or family' },
 }
 

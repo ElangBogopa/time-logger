@@ -161,13 +161,30 @@ const PEOPLE_WORDS = new Set(
     'aunt aunts auntie aunty uncle uncles cousin cousins niece nieces nephew ' +
     'nephews in-laws wife husband spouse boyfriend girlfriend fiance fiancee ' +
     'fiancé fiancée gf bf stepmom stepdad stepmother stepfather stepbrother ' +
-    'stepsister'
+    'stepsister boys girls lads'
   ).split(' '),
 )
 
 const PHRASE_STOP_WORDS = new Set(
   'for about at in on to from then before after while during via over'.split(' '),
 )
+
+// A people word followed by one of these is an organisation or a topic, not
+// company: "Call with Family Services", "Meeting with the family law firm".
+const NOT_COMPANY_FOLLOWERS = new Set(
+  ('services service law court office business practice medicine doctor doctors planning ' +
+    'leave policy firm dentist therapist therapy counselling counseling lawyer attorney ' +
+    'foundation council clinic').split(' '),
+)
+
+// "Family dinner", "friends night": a people word leading a social occasion.
+const OCCASION_WORDS = new Set(
+  ('dinner lunch breakfast brunch supper time night gathering reunion visit outing ' +
+    'barbecue bbq party hangout get-together game games').split(' '),
+)
+const LEADING_PEOPLE = new Set(['family', 'friends', 'fam'])
+const VISIT_WORDS = new Set(['at', 'visit', 'visited', 'visiting', 'saw', 'seeing'])
+const DETERMINERS = new Set(['my', 'our', 'the', 'his', 'her', 'their'])
 
 function cleanPeopleWord(raw: string): string {
   let w = raw.replace(/'s$/, '').replace(/s'$/, '')
@@ -195,8 +212,20 @@ export function withFriendsOrFamily(activity?: string | null): boolean {
       const cleaned = words.map(cleanPeopleWord)
       for (let i = 0; i < cleaned.length; i++) {
         const w = cleaned[i]
-        if (PEOPLE_WORDS.has(w)) return true
+        if (PEOPLE_WORDS.has(w) && !NOT_COMPANY_FOLLOWERS.has(cleaned[i + 1])) return true
         if (w === 'partner' && i > 0 && (cleaned[i - 1] === 'my' || cleaned[i - 1] === 'our')) return true
+      }
+    }
+    // Without "with": "Family dinner", "Dinner at mom's", "Visited grandma".
+    const tokens = clause.split(/\s+/).filter(Boolean).map(cleanPeopleWord)
+    for (let i = 0; i < tokens.length; i++) {
+      const w = tokens[i]
+      if (NOT_COMPANY_FOLLOWERS.has(tokens[i + 1])) continue
+      if (LEADING_PEOPLE.has(w) && OCCASION_WORDS.has(tokens[i + 1])) return true
+      if (PEOPLE_WORDS.has(w)) {
+        let j = i - 1
+        if (j >= 0 && DETERMINERS.has(tokens[j])) j--
+        if (j >= 0 && VISIT_WORDS.has(tokens[j])) return true
       }
     }
   }

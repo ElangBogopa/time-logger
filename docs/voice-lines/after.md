@@ -363,6 +363,7 @@ All lines: kept 16 of 16; broken 16 of 16. (* repeats an example given in the ru
 
 - week: finished
 - hours: Sleep 54h, Entertainment 14h, Meals 9h, Deep Work 12h
+- with friends or family (Heart): 6h
 - best days: Tuesday, Thursday; best hours: 9 AM, 10 AM
 
 > You spent 12 hours on deep work, primarily on Tuesday and Thursday during your best focus hours of 9 AM and 10 AM. You also logged 14 hours for entertainment and 9 hours for meals. A pattern in the data shows that your focused work occurred on Tuesday and Thursday. You could consider dedicating more time to deep work on Thursday at 10 AM.

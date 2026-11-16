@@ -451,8 +451,9 @@ function describeInput(s: Scenario): string[] {
   return [
     `week: ${i.isPartialWeek ? 'in progress' : 'finished'}`,
     `hours: ${i.categories.map((c) => `${c.label} ${c.minutes / 60}h`).join(', ')}`,
+    i.heartMinutes !== undefined ? `with friends or family (Heart): ${i.heartMinutes / 60}h` : '',
     `best days: ${i.bestDays.join(', ') || 'none'}; best hours: ${i.bestHours.join(', ') || 'none'}`,
-  ]
+  ].filter(Boolean)
 }
 
 function report(results: Line[]): { text: string; checkerCounts: Record<string, number>; judgeCounts: Record<string, number>; judgeFailLines: number } {
