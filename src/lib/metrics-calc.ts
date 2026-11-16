@@ -191,6 +191,19 @@ const LEADING_PEOPLE = new Set(['family', 'friends', 'fam'])
 const VISIT_WORDS = new Set(['at', 'visit', 'visited', 'visiting', 'saw', 'seeing'])
 const DETERMINERS = new Set(['my', 'our', 'the', 'his', 'her', 'their'])
 
+const CONJUNCTIONS = new Set(['and', '&'])
+// Words that may follow "at <people>" and still leave it a visit.
+const AFTER_VISIT_WORDS = new Set([
+  ...PHRASE_STOP_WORDS, 'and', '&', 'with', 'tonight', 'today', 'tomorrow', 'yesterday',
+  'this', 'last', 'all', 'morning', 'afternoon', 'evening', 'weekend',
+  'birthday', 'wedding', 'funeral', 'anniversary',
+])
+
+/** Whether the word after "at <people>" leaves it a visit, not a place. */
+function endsAVisit(next: string | undefined): boolean {
+  return next === undefined || HOME_WORDS.has(next) || OCCASION_WORDS.has(next) || AFTER_VISIT_WORDS.has(next)
+}
+
 function isNotCompany(word: string, next: string | undefined): boolean {
   if (next === undefined) return false
   return NOT_COMPANY_FOLLOWERS.has(next) || (word === 'family' && FAMILY_ONLY_FOLLOWERS.has(next))
@@ -237,12 +250,19 @@ export function withFriendsOrFamily(activity?: string | null): boolean {
         let j = i - 1
         if (j >= 0 && DETERMINERS.has(tokens[j])) j--
         if (j >= 0 && VISIT_WORDS.has(tokens[j])) {
-          // "at" names a visit only at someone's ("at mom's"), at their home
-          // or as the last words; "at the kids school" is a place.
           if (tokens[j] !== 'at') return true
-          const possessive = /'s?$/.test(rawTokens[i])
-          const next = tokens[i + 1]
-          if (possessive || next === undefined || HOME_WORDS.has(next)) return true
+          // After "at", what follows the people decides: "at mom and dad's",
+          // "at my parents then nap", "at grandma tonight" are visits;
+          // "at the kids' school", "at friends' cafe" are places. An
+          // apostrophe says nothing either way.
+          let k = i + 1
+          while (CONJUNCTIONS.has(rawTokens[k])) {
+            let m = k + 1
+            if (DETERMINERS.has(tokens[m])) m++
+            if (!PEOPLE_WORDS.has(tokens[m])) break
+            k = m + 1
+          }
+          if (endsAVisit(tokens[k])) return true
         }
       }
     }

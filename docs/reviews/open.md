@@ -22,3 +22,13 @@ Verdict: Ready to merge (0 must fix)
 ## Fix attempt 2 — 2026-11-16 — Sonnet 5.5 — commit pending
 - company-veto-too-wide · "planning" and "practice" removed from the general veto; they veto only after "family" ("Family planning clinic") · believes: fixed
 - at-school-counts · "at" counts as a visit only at someone's ("at mom's"), at their house/home/place, or as the last words; "at the kids school", "at Friends cafe" no longer count; tests added for both · believes: fixed
+
+## Review 3 — 2026-11-16 — Opus 5.5 — reviewed 750796f
+Verdict: Ready to merge (0 must fix) — third pass; trying it on a phone is now the better test
+- resolved: company-veto-too-wide ("Dinner with friends planning the trip" counts again; "family planning clinic" still does not)
+- optional · at-school-counts · src/lib/metrics-calc.ts:243 · recurring after one Sonnet attempt (optional, so no escalation): an apostrophe still makes it count: "Parent-teacher meeting at the kids' school", "Pickup at my son's school", "Coffee at friends' cafe"
+- optional · at-visit-too-narrow · src/lib/metrics-calc.ts:243 · caused by fix: "Dinner at mom and dad's", "Sunday lunch at my parents then nap", "Dinner at grandma tonight" no longer count (they did at 83c608d)
+
+## Fix attempt 3 — 2026-11-16 — Opus 5.5 — commit pending
+- at-school-counts · after "at <people>" the next word decides, not the apostrophe: a place ("school", "cafe", "daycare") makes it not count; tests for "kids' school", "my son's school", "friends' cafe", "daughter's daycare" · believes: fixed
+- at-visit-too-narrow · "at" counts when the people are followed by nothing, a home word, an occasion, a stop word ("then", "for") or a time word ("tonight"), and "mom and dad's" is read as one group; tests for the three reviewed examples plus "my parents' house", "mom's for her birthday" · believes: fixed (a place word not in the lists, e.g. "at grandma's cottage", now does not count)

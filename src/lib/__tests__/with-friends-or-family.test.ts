@@ -8,6 +8,8 @@ const yes = [
   'Board games with friends, then bed', 'Family dinner', 'Dinner at mom\'s', 'Visited grandma',
   'Hangout with the boys', 'Friends night', 'Dinner at my sister\'s',
   'Dinner with friends planning the trip', 'Dinner with friends practice night', 'Lunch at grandma',
+  'Dinner at mom and dad\'s', 'Sunday lunch at my parents then nap', 'Dinner at grandma tonight',
+  'Dinner at my parents\' house', 'Lunch at mom\'s for her birthday',
 ]
 const no: (string | null | undefined)[] = [
   'Lunch with colleagues', 'Call with a client', 'Sync with my team', 'Gym with Thabo',
@@ -16,6 +18,8 @@ const no: (string | null | undefined)[] = [
   '', null, undefined, 'Lunch with colleagues about family leave policy',
   'Call with Family Services', 'Meeting with the family law firm', 'Meeting at the family office',
   'Parent-teacher meeting at the kids school', 'Coffee at Friends cafe', 'Appointment with family planning clinic',
+  'Parent-teacher meeting at the kids\' school', 'Pickup at my son\'s school', 'Coffee at friends\' cafe',
+  'Drop-off at my daughter\'s daycare',
 ]
 
 describe('withFriendsOrFamily', () => {
