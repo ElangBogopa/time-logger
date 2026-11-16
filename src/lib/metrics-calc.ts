@@ -172,7 +172,7 @@ const PHRASE_STOP_WORDS = new Set(
 // A people word followed by one of these is an organisation or a topic, not
 // company: "Call with Family Services", "Meeting with the family law firm".
 const NOT_COMPANY_FOLLOWERS = new Set(
-  ('services service law court office business practice medicine doctor doctors planning ' +
+  ('services service law court office business medicine doctor doctors ' +
     'leave policy firm dentist therapist therapy counselling counseling lawyer attorney ' +
     'foundation council clinic').split(' '),
 )
@@ -182,9 +182,19 @@ const OCCASION_WORDS = new Set(
   ('dinner lunch breakfast brunch supper time night gathering reunion visit outing ' +
     'barbecue bbq party hangout get-together game games').split(' '),
 )
+// Only "family" takes these as a topic ("Family planning clinic"); after
+// "friends" they begin a new phrase ("Dinner with friends planning the trip").
+const FAMILY_ONLY_FOLLOWERS = new Set(['planning', 'practice'])
+// After "at <people word>": a place, not a visit ("Coffee at Friends cafe").
+const HOME_WORDS = new Set(['house', 'place', 'home', 'apartment', 'flat'])
 const LEADING_PEOPLE = new Set(['family', 'friends', 'fam'])
 const VISIT_WORDS = new Set(['at', 'visit', 'visited', 'visiting', 'saw', 'seeing'])
 const DETERMINERS = new Set(['my', 'our', 'the', 'his', 'her', 'their'])
+
+function isNotCompany(word: string, next: string | undefined): boolean {
+  if (next === undefined) return false
+  return NOT_COMPANY_FOLLOWERS.has(next) || (word === 'family' && FAMILY_ONLY_FOLLOWERS.has(next))
+}
 
 function cleanPeopleWord(raw: string): string {
   let w = raw.replace(/'s$/, '').replace(/s'$/, '')
@@ -212,20 +222,28 @@ export function withFriendsOrFamily(activity?: string | null): boolean {
       const cleaned = words.map(cleanPeopleWord)
       for (let i = 0; i < cleaned.length; i++) {
         const w = cleaned[i]
-        if (PEOPLE_WORDS.has(w) && !NOT_COMPANY_FOLLOWERS.has(cleaned[i + 1])) return true
+        if (PEOPLE_WORDS.has(w) && !isNotCompany(w, cleaned[i + 1])) return true
         if (w === 'partner' && i > 0 && (cleaned[i - 1] === 'my' || cleaned[i - 1] === 'our')) return true
       }
     }
     // Without "with": "Family dinner", "Dinner at mom's", "Visited grandma".
-    const tokens = clause.split(/\s+/).filter(Boolean).map(cleanPeopleWord)
+    const rawTokens = clause.split(/\s+/).filter(Boolean)
+    const tokens = rawTokens.map(cleanPeopleWord)
     for (let i = 0; i < tokens.length; i++) {
       const w = tokens[i]
-      if (NOT_COMPANY_FOLLOWERS.has(tokens[i + 1])) continue
+      if (isNotCompany(w, tokens[i + 1])) continue
       if (LEADING_PEOPLE.has(w) && OCCASION_WORDS.has(tokens[i + 1])) return true
       if (PEOPLE_WORDS.has(w)) {
         let j = i - 1
         if (j >= 0 && DETERMINERS.has(tokens[j])) j--
-        if (j >= 0 && VISIT_WORDS.has(tokens[j])) return true
+        if (j >= 0 && VISIT_WORDS.has(tokens[j])) {
+          // "at" names a visit only at someone's ("at mom's"), at their home
+          // or as the last words; "at the kids school" is a place.
+          if (tokens[j] !== 'at') return true
+          const possessive = /'s?$/.test(rawTokens[i])
+          const next = tokens[i + 1]
+          if (possessive || next === undefined || HOME_WORDS.has(next)) return true
+        }
       }
     }
   }
