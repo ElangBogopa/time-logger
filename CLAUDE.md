@@ -14,10 +14,12 @@ This comes before everything else in this file.
   pass, because a build is only reviewed once committed. It still does not
   push. `/do-fix` does the same for the fixes it makes.
   A second standing exception: `/do-all` pushes `dev` to `origin dev` by
-  itself when its run ends with nothing left that must or should be
-  fixed, after at least one review
+  itself when its run ends with every
+  finding it chases — must, should and optional — fixed or closed, after at least one review
   (a brief that says no review is needed is still reviewed), so the preview
-  is ready to try. It does not stop to ask
+  is ready to try. A finding the
+  review marks as the plan's own choice or past the request is not chased;
+  the report lists it for the owner. It does not stop to ask
   about a guess the plan made; its report lists those, the ones the
   owner would notice under "Decided for you", to reverse after trying the
   preview. A choice about a person's data, or one that would change or

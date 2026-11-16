@@ -25,11 +25,20 @@ Skip it when you can already say what you want in a sentence or two.
 
 `/do-all <the paragraph from /do-think>` does steps 1 to 4 by itself:
 it plans, builds, reviews and fixes, each with a fresh helper on the
-model the step before named, and goes round until a review finds
-nothing that must or should be fixed. Then it pushes `dev` and asks
-whether to carry on with the optional findings. There is always
+model the step before named, and goes round until every finding a
+review made — optional ones included — is fixed or closed. Then it
+pushes `dev`, once, and asks you nothing. There is always
 at least one review before it pushes, even when the plan said none
 was needed.
+
+A finding gets two tries at most: Sonnet first (or a stronger model if
+the review names one), then Fable, once, given the story of what was
+tried, what it broke and every example as a test. Damage a fix does
+counts as the same finding, not a new one. If Fable cannot fix an
+optional finding, the report lists it under
+**Fable could not fix this** and the run still pushes. A finding that would undo what the
+plan chose on purpose, or go past what you asked, is not fixed: the
+report lists it under **Not chased** for you to decide.
 
 It does not stop for choices the plan had to make. The planner makes
 the one it would recommend and carries on, and the report lists them:
@@ -46,8 +55,8 @@ be written (the request is too vague, breaks a rule in `CLAUDE.md`, or
 rests on something not true of the code), when the plan asks about such
 a choice, when the plan still leaves something undecided, or when the
 working tree holds anything but the review log before it starts. It
-stops and does not push if a build or a fix leaves no commit, if a
-finding comes back after a stronger model has tried it, after five
+stops and does not push if a build or a fix leaves no commit, if Fable could not fix a must- or should-fix
+finding, if a must-fix finding is the plan's own choice, after five
 rounds, or if `dev` is not the branch at the end, and tells you which
 command to run by hand next.
 
@@ -62,11 +71,16 @@ and follow the table.
   the change. Happy? `merge dev into main`.
 - **"Not ready"** → `/do-fix` on the model it names. If the fix changed how
   the app behaves, new chat and `/do-review` once more.
-- **A finding marked recurring** → use the stronger model it names.
-- **"Stop fixing"** → the plan is wrong. New chat, `/do-plan` again.
+- **A finding marked recurring** → `/do-fix <id>` on Fable. It gathers
+  the story itself.
+- **A must- or should-fix finding closed** ("Fable could not fix
+  this") → the plan is wrong. New chat, `/do-plan` again.
+- **Marked plan's choice or past the request** → yours to decide; no
+  fix is suggested.
 
 Only **must-fix** findings block a release. Should-fix: once, if cheap
-(`/do-fix must and should`). Optional: ignore.
+(`/do-fix must and should`). Optional: your
+choice — the review names who would try them, on the same ladder.
 
 **Two reviews per change at most.** After that the phone is the better
 judge.
@@ -90,7 +104,8 @@ New chat when the next step does not need to remember the last one.
 
 - **Tiny change** (wording, a colour): skip 1 and 3. Sonnet, new chat, say
   what you want, then `commit` and `push`.
-- **Stuck:** Sonnet failing twice on the same thing → switch to Opus.
+- **Stuck:** a fix that failed once → Fable, once, with the story. There
+  is no third try.
 - **Risky** (sign-in, deleting data, payments, reminders, the database):
   Fable for the plan and the review.
 
@@ -99,8 +114,8 @@ New chat when the next step does not need to remember the last one.
 - Everything goes to `dev`. Nothing reaches `main` until you type
   `merge dev into main`.
 - `/do-build` and `/do-fix` commit by themselves. Nothing pushes
-  until you type `push`, except `/do-all`, which pushes `dev` when its
-  run finishes clean.
+  until you type `push`, except `/do-all`, which pushes `dev` when every finding it chases is
+  fixed or closed.
 - Use the `/do-` commands. Plain `/plan` and `/review` are Claude Code's
   own and know none of this.
 - Not Plan mode. Its Approve button starts building on the expensive model.

@@ -46,11 +46,11 @@ look at the repository yourself, as each step says.
    `docs/reviews/open.md`, stop and ask the owner what to do with it: a
    review could not tell it from this run's work.
 3. Note the starting commit: `git rev-parse --short HEAD`.
-4. If `docs/reviews/open.md` exists, read its last `## Review` entry and
-   note the id of every must-fix or should-fix finding it does not list as
-   resolved. These are the **earlier findings**. They are not this run's:
-   never send them to a fix, and never count them when deciding whether
-   the run is clean.
+4. If `docs/reviews/open.md` exists, read it and note the id of every
+   finding, of any group — must, should or optional — that no `## Review`
+   entry lists as resolved or closed. These are the **earlier findings**.
+   They are not this run's: never send them to a fix, and never count
+   them when deciding whether the run is clean.
 
 ## 1. Plan
 
@@ -137,41 +137,86 @@ names. (`opus` if the brief says no review is needed.)
 Command: `do-review`, with these arguments:
 
 > The commits after <starting commit> are new and no review has seen them:
-> give them a full first pass, should-fix and optional included. Findings
-> the log already held before them stay as they are.
+> give them a full first pass, should-fix and optional included. They were
+> built from the brief at <brief path>: mark any finding whose fix would
+> undo something it chose on purpose, or go past what it was asked to do.
+> Findings the log already held before them stay as they are.
 
 For a review that follows a fix, the arguments are instead:
 
-> This follows a fix of: <the ids just attempted>. Settle those, and look
-> for harm the fix did.
+> This follows a fix of: <each id just attempted, with the model that
+> tried it>. Settle those under the same ids. Anything the fix broke is
+> that finding recurring, under its id, not a new finding. The brief is
+> <brief path>.
 
 When it returns, read the last `## Review` entry in
-`docs/reviews/open.md` yourself. From it, list **this run's findings**:
-every must-fix or should-fix line (new, still open or recurring) whose id
-is not one of the earlier findings.
+`docs/reviews/open.md` yourself, and sort what it lists whose id is not
+an earlier finding:
+- **Chaseable**: every finding, must, should or optional — new, still
+  open or recurring — that is not closed and not marked `plan's choice`
+  or `past the request`.
+- **Not chased**: findings marked `plan's choice` or `past the request`.
+  Never send them to a fix. Keep them for the report.
+- **Closed**: findings the entry closes after Fable's attempt ("Fable
+  could not fix this"). Keep them for the report.
 
-- **None left** → go to "A clean finish".
-- **Any marked "stop fixing"** → the run **stops**.
+Then:
+- **A closed must- or should-fix finding** → the run **stops**: Fable
+  could not fix it, so the plan has to change.
+- **A must-fix finding marked `plan's choice` or `past the request`** →
+  the run **stops**: the plan chose something that must not stand.
+- **Nothing chaseable left** → go to "A clean finish". Closed optional
+  findings and not-chased should-fix or optional findings do not stop it.
 - **Otherwise** → go to step 4.
+
+A reviewer's "leave it" or "stop fixing" on a finding that Fable has not
+yet tried stops nothing: that finding goes to Fable in step 4, and the
+remark goes into its story.
 
 ## 4. Fix
 
 A round is one fix followed by one review. **After five rounds the run
 stops**, whatever is left.
 
-Sort this run's findings by who should try:
-- a finding nobody has attempted: the model the review's "Next step" names
-  for `/do-fix`, or `sonnet` if it names none;
-- a recurring finding: the stronger model the review names after "next:".
+Sort the chaseable findings by who tries. There is no other case: a
+finding Fable has tried is resolved or closed.
+- **Not yet attempted**: the model the finding's line names after
+  `first try:` (`opus` or `fable`), otherwise `sonnet`.
+- **Attempted once, not by Fable, and still there or did harm**
+  (recurring): `fable`. Never `opus` for a second attempt, never a second
+  `fable`.
 
-For each model that has findings, weakest first, one helper at a time:
+For each model that has findings, in the order `sonnet`, `opus`,
+`fable`, one helper at a time:
 
-Command: `do-fix`, with that model's finding ids, separated by spaces, as
-its arguments.
+Command: `do-fix`, with that model's finding ids, separated by spaces,
+as its arguments.
 
-When each returns, check: `git log --oneline -1` shows its commit, and
-`docs/reviews/open.md` ends with its `## Fix attempt` entry. If there is
-no commit, the run **stops**: the fix could not pass the checks.
+**For a second attempt, write the story into the prompt.** Before
+starting the `fable` helper, gather for each recurring id, from
+`docs/reviews/open.md` and `git log`: every earlier attempt at it (the
+model, its attempt line, and what its commit changed: find the commit
+with `git log -S "## Fix attempt <n> —" --format=%h -- docs/reviews/open.md`
+and read `git show --stat <commit>` and the diff of the files the
+finding names); every review line about it after each attempt, and, in a
+log written before this rule, any line marked "caused by fix" that names
+the same file and code; and every example (an activity text, an input, a
+case) named in any of those lines, with the answer it must give. Add to
+the prompt, for each such id:
+
+> This is the second and last attempt at <id>. What was tried:
+> <attempt by attempt: the model, what it changed, what the next review
+> said was still wrong or broken>. What the reviewers said, word for
+> word: <the remarks, including any "leave it" or "stop fixing">. The
+> examples, each with the answer it must give: <the list>. Keep every
+> one of them as a test with that answer; a fix that changes any of
+> those answers has failed. Fix the cause, not the last example. If it
+> cannot be done well, change no app code and say so in your attempt
+> entry with your reasons; that is your attempt.
+
+When each helper returns, check: `git log --oneline -1` shows its commit,
+and `docs/reviews/open.md` ends with its `## Fix attempt` entry. If there
+is no commit, the run **stops**: the fix could not pass the checks.
 
 Note which findings were attempted and on which model; the report needs
 it. Then go back to step 3.
@@ -181,21 +226,22 @@ it. Then go back to step 3.
 1. `git branch --show-current` must say `dev`. If it does not, stop and
    say so; push nothing.
 2. `git push origin dev`. Never any other branch, never `--force`.
-3. Write the report (below). It ends by listing this run's optional
-   findings and asking: "Carry on with the optional ones?"
-4. If the owner says yes: one fix helper on `sonnet` with those ids, then
-   step 3 again. The same limits apply, the rounds keep counting from
-   where they were, and a clean finish pushes again.
+3. Write the report (below). Ask the owner nothing: every chaseable
+   finding, optional included, is fixed or closed, and the push is the
+   run's only one.
 
 ## When the run stops
 
 Push nothing. Leave everything as the helpers left it. Write the report,
-and in place of the question about optional findings say: what is still
-open (ids, one line each), why the run stopped (a finding marked "stop
-fixing", five rounds used, a build or a fix with no commit, or a branch
-that was not `dev`), and the one command to run by hand next, with the
-model to switch to: `/do-plan` again when a finding says stop fixing,
-`/do-fix <ids>` or `/do-review` otherwise.
+and end it with the stop account: what is still open (ids, one line
+each), why the run stopped (a must- or should-fix finding Fable could
+not fix, a must-fix finding marked as the plan's choice or past the
+request, five rounds used with chaseable findings left, a build or a fix
+with no commit, or a branch that was not `dev`), and the one command to
+run by hand next, with the model to switch to: `/do-plan` again for the
+first two; otherwise `/do-fix <ids>` on the model the ladder names
+(Sonnet or the named first try for a first attempt, Fable for a second),
+or `/do-review`.
 
 ## The report
 
@@ -207,14 +253,22 @@ Short, plain language, in this order:
 - **Built**: what the change is, in two lines, and the brief's path.
 - **Rounds**: how many reviews and how many fixes.
 - **Fixed**: each finding fixed, one line, and the model that fixed it.
-  Mark the ones that needed a second, stronger model.
+  Mark the ones that needed Fable's second attempt.
+- **Fable could not fix this**: each finding closed after Fable's
+  attempt, one line each: its group, what is still wrong, and Fable's
+  reason if it said it cannot be done well. A must- or should-fix one
+  is also why the run stopped. Or "nothing".
+- **Not chased — for you to decide**: each finding marked as the
+  plan's choice or past the request, one line each: which of the two,
+  what the reviewer found, and what the brief chose or left out. Or
+  "nothing".
 - **Guessed without asking**: the plan's `GUESSES THE OWNER WOULD NOT
   NOTICE`, one line each, or "nothing".
 - **Left from before this run**: the earlier findings, ids only, untouched.
 - **Not checked**: what the last review said it did not check.
 - **Pushed**: yes, with the commit, and that the `dev` preview is the
   place to try it; or no, and why.
-- then the optional findings and the question, or the stop account.
+- then, if the run stopped, the stop account.
 
 ## Never
 
@@ -225,4 +279,8 @@ Short, plain language, in this order:
 - Never edit, commit or stage anything yourself; only helpers change files.
 - Never run two helpers at once: they share one working tree and one log.
 - Never send an earlier finding to a fix.
+- Never send a finding marked `plan's choice` or `past the request` to a
+  fix.
+- Never give a finding an Opus attempt after a failed one, or a second
+  Fable attempt.
 - Never rename or delete `docs/reviews/open.md`.

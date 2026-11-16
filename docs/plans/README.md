@@ -20,12 +20,15 @@ only when it matters.
 4. **Fix** — the model the review names, any session: `/do-fix`. It fixes
    the must-fix findings (or `/do-fix must and should`), records the
    attempt in the log, and commits to `dev`. If a problem comes back after
-   a fix, the next review says so and names a stronger model; after two
-   failed attempts it says to stop and re-plan.
+   a fix, or the fix broke something, the next review says so under the
+   same id and names Fable for one last try, with the story; if Fable
+   fails, a must- or should-fix finding means re-plan.
 
 `/do-all <the paragraph from /do-think>` runs steps 1 to 4 by itself,
-each with a fresh helper on the model the step before named, until a
-review finds nothing that must or should be fixed. There is always
+each with a fresh helper on the model the step before named, until every
+finding a review made, optional ones included, is fixed or closed; a
+finding that is the plan's own choice or past the request is reported,
+not fixed. There is always
 at least one review, even when the brief says none is needed. A clean run is
 pushed to `dev`; a run that stops early is not. It does not stop for the plan's guesses: it decides them and lists
 them in its report, the ones you would notice under "Decided for you". A
