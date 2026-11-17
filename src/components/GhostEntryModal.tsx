@@ -121,8 +121,8 @@ export default function GhostEntryModal({
       const existingEntries = await fetchEntries({ date: selectedDate, fields: 'id,start_time,end_time,activity' })
 
       if (existingEntries.length > 0) {
-        // Same rule as the lists (a crossing event counts as its evening),
-        // so a second confirm of an event that crosses midnight is refused.
+        // The lists' own rule (lib/calendar-match.ts), so a second confirm
+        // is refused wherever the event has stopped being offered.
         const overlappingEntry = existingEntries.find(entry =>
           isEventLogged({ startTime, endTime }, [entry])
         )

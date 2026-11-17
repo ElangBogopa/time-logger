@@ -24,6 +24,7 @@ import TimeEntryModal from '@/components/TimeEntryModal'
 import { blocksForGlance } from '@/components/DayAtAGlance'
 import { useEntryAdjustment } from '@/hooks/useEntryAdjustment'
 import { useOvernightSpill } from '@/hooks/useOvernightSpill'
+import { useTimelineData } from '@/hooks/useTimelineData'
 import { fetchEntries, updateEntry } from '@/lib/api'
 
 const night = {
@@ -100,6 +101,113 @@ describe('a drag on an overnight entry', () => {
 
   it('never starts for one that crosses midnight', () => {
     expect(press(placed('23:00', '07:00')).isAdjustingEntry).toBe(false)
+  })
+})
+
+describe('a touch on an overnight entry', () => {
+  const placed = (start: string, end: string) => ({
+    ...night, start_time: start, end_time: end, placedStartTime: '00:00', placedEndTime: '07:00',
+    isEstimated: false,
+  })
+  // A finger held still on the entry: at its bottom edge (a resize) or in
+  // its middle (a move, after the longer hold).
+  const hold = (entry: ReturnType<typeof placed>, clientY: number) => {
+    jest.useFakeTimers()
+    const { result, unmount } = renderHook(() =>
+      useEntryAdjustment({
+        scrollContainerRef: { current: null as unknown as HTMLDivElement },
+        startHour: 0,
+        onEntryDeleted: jest.fn(),
+        yToTime: () => '01:00',
+        onEntryClick: jest.fn(),
+      })
+    )
+    const el = document.createElement('div')
+    el.getBoundingClientRect = () => ({ top: 0, height: 100 } as DOMRect)
+    act(() => {
+      result.current.handleEntryTouchStart(
+        { touches: [{ clientY }], stopPropagation: jest.fn(), currentTarget: el } as never,
+        entry as never
+      )
+    })
+    const touchActive = result.current.isEntryTouchActive
+    act(() => {
+      jest.advanceTimersByTime(1000)
+    })
+    const after = { touchActive, adjusting: result.current.isAdjustingEntry, preview: result.current.adjustPreview }
+    unmount()
+    return after
+  }
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('starts a resize for an ordinary entry held at its bottom edge', () => {
+    expect(hold(placed('06:00', '07:00'), 95)).toMatchObject({ touchActive: true, adjusting: true })
+  })
+
+  it('starts a move for an ordinary entry held in its middle', () => {
+    expect(hold(placed('06:00', '07:00'), 40)).toMatchObject({ touchActive: true, adjusting: true })
+  })
+
+  it('never starts a resize or a move for one that crosses midnight', () => {
+    expect(hold(placed('23:00', '07:00'), 95)).toEqual({ touchActive: false, adjusting: false, preview: null })
+    expect(hold(placed('23:00', '07:00'), 40)).toEqual({ touchActive: false, adjusting: false, preview: null })
+  })
+})
+
+describe('the timeline\'s own placing', () => {
+  const confirmed = (over: Record<string, unknown>) => ({ ...night, status: 'confirmed', category: 'sleep', ...over })
+  const timeline = (entries: unknown[], covered?: unknown[]) =>
+    renderHook(() =>
+      useTimelineData({
+        entries: entries as never,
+        calendarEvents: [],
+        dismissedEventIds: new Set<string>(),
+        showDismissed: false,
+        isToday: false,
+        covered: covered as never,
+      })
+    ).result.current
+
+  it('places a 23:00-07:00 night at 00:00-07:00 on its date', () => {
+    const { placedEntries } = timeline([confirmed({})])
+    expect(placedEntries).toHaveLength(1)
+    expect(placedEntries[0]).toMatchObject({ placedStartTime: '00:00', placedEndTime: '07:00', isEstimated: false })
+  })
+
+  it('places a night that is mostly evening from its start to midnight', () => {
+    const { placedEntries } = timeline([confirmed({ start_time: '18:00', end_time: '01:00' })])
+    expect(placedEntries[0]).toMatchObject({ placedStartTime: '18:00', placedEndTime: '24:00' })
+  })
+
+  it('fits an entry without times after the night, not inside it', () => {
+    const untimed = confirmed({ id: 'u', activity: 'Breakfast', category: 'meals', start_time: null, end_time: null, duration_minutes: 60 })
+    const { placedEntries } = timeline([confirmed({}), untimed])
+    expect(placedEntries.find((p) => p.id === 'u')).toMatchObject({
+      placedStartTime: '07:00', placedEndTime: '08:00', isEstimated: true,
+    })
+  })
+
+  it('finds the gap after the night, where it sits on the day', () => {
+    const lunch = confirmed({ id: 'l', activity: 'Lunch', category: 'meals', start_time: '12:00', end_time: '13:00', duration_minutes: 60 })
+    const { timeGaps } = timeline([confirmed({}), lunch])
+    expect(timeGaps.map((g) => [g.startTime, g.endTime])).toEqual([['07:00', '12:00']])
+  })
+
+  it('treats a neighbouring night\'s spill as occupied', () => {
+    const desk = confirmed({ id: 'd', activity: 'Desk', category: 'deep_work', start_time: '09:00', end_time: '10:00', duration_minutes: 60 })
+    const spill = { entryId: 's', activity: 'Sleep', category: 'sleep', startTime: '00:00', endTime: '07:30', homeDate: '2026-11-16' }
+
+    expect(timeline([desk]).timeGaps.map((g) => [g.startTime, g.endTime])).toEqual([['07:00', '09:00']])
+    expect(timeline([desk], [spill]).timeGaps.map((g) => [g.startTime, g.endTime])).toEqual([['07:30', '09:00']])
+  })
+
+  it('leaves no gap where the spill covers all of it', () => {
+    const desk = confirmed({ id: 'd', activity: 'Desk', category: 'deep_work', start_time: '09:00', end_time: '10:00', duration_minutes: 60 })
+    const spill = { entryId: 's', activity: 'Sleep', category: 'sleep', startTime: '00:00', endTime: '09:00', homeDate: '2026-11-16' }
+    expect(timeline([desk], [spill]).timeGaps).toEqual([])
   })
 })
 
