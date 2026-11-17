@@ -163,9 +163,19 @@ interface SavableRow {
 /**
  * What a save writes: the row as it is (with a typed 00:00 end stored as
  * 24:00), one overnight sleep with its real duration, or two pieces split at
- * midnight, each carrying the row's other fields.
+ * midnight, each carrying the row's other fields. The first is what the row
+ * itself becomes and keeps the row's date.
+ *
+ * `dateIsWakeDay` says the row's date is the morning it ended, as for a
+ * stored one-piece night placed on its wake day: the evening piece then goes
+ * on the day before and the row keeps the morning piece. Otherwise the date
+ * is the evening and the morning piece goes on the day after.
  */
-export function planOvernightSave<T extends SavableRow>(row: T, isSleep: boolean): T[] {
+export function planOvernightSave<T extends SavableRow>(
+  row: T,
+  isSleep: boolean,
+  { dateIsWakeDay = false }: { dateIsWakeDay?: boolean } = {}
+): T[] {
   const start = row.start_time ?? null
   const end = normalizeMidnightEnd(start, row.end_time ?? null)
   const normalized: T = end === (row.end_time ?? null) ? row : { ...row, end_time: end }
@@ -174,6 +184,14 @@ export function planOvernightSave<T extends SavableRow>(row: T, isSleep: boolean
 
   if (isSleep) {
     return [{ ...normalized, duration_minutes: overnightDuration(start as string, end as string) }]
+  }
+
+  if (dateIsWakeDay) {
+    const [evening, morning] = splitAtMidnight(shiftDateString(row.date, -1), start as string, end as string)
+    return [
+      { ...normalized, ...morning },
+      { ...normalized, ...evening },
+    ]
   }
 
   const [first, second] = splitAtMidnight(row.date, start as string, end as string)

@@ -183,4 +183,18 @@ describe('planOvernightSave', () => {
       { ...base, date: '2026-11-17', start_time: '00:00', end_time: '01:00', duration_minutes: 60 },
     ])
   })
+
+  it('keeps the morning on a row dated its wake day, and puts the evening on the day before', () => {
+    const row = { ...base, date: '2026-11-17', start_time: '23:00', end_time: '06:30' }
+    expect(planOvernightSave(row, false, { dateIsWakeDay: true })).toEqual([
+      { ...base, date: '2026-11-17', start_time: '00:00', end_time: '06:30', duration_minutes: 390 },
+      { ...base, date: '2026-11-16', start_time: '23:00', end_time: '24:00', duration_minutes: 60 },
+    ])
+  })
+
+  it('crosses a month start backwards', () => {
+    const row = { ...base, date: '2026-12-01', start_time: '23:00', end_time: '06:30' }
+    const [, evening] = planOvernightSave(row, false, { dateIsWakeDay: true })
+    expect(evening.date).toBe('2026-11-30')
+  })
 })

@@ -237,6 +237,37 @@ describe('PUT /api/entries/[id] across midnight', () => {
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ start_time: '22:30', end_time: '06:30', duration_minutes: 480 }))
   })
 
+  it('splits a wake-day night that is no longer a sleep with its evening on the day before', async () => {
+    // 23:00–07:00 dated Tuesday is Monday night. Moved off sleep earlier,
+    // its end now moves to 06:30.
+    stored = storedRow({ date: '2026-11-17', activity: 'Sleep', category: 'rest', start_time: '23:00:00', end_time: '07:00:00', duration_minutes: 480 })
+    await PUT(request({ date: '2026-11-17', start_time: '23:00', end_time: '06:30' }), params)
+    expect(inserted()).toEqual([
+      expect.objectContaining({ date: '2026-11-16', start_time: '23:00', end_time: '24:00', duration_minutes: 60, category: 'rest' }),
+    ])
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-11-17', start_time: '00:00', end_time: '06:30', duration_minutes: 390 }))
+  })
+
+  it('splits a wake-day sleep reworded off sleep in the same save the same way', async () => {
+    stored = storedRow({ date: '2026-11-17', activity: 'Sleep', category: 'sleep', start_time: '23:00:00', end_time: '07:00:00', duration_minutes: 480 })
+    await PUT(request({ activity: 'Reading', category: 'learning', start_time: '23:00', end_time: '06:30' }), params)
+    expect(inserted()).toEqual([
+      expect.objectContaining({ date: '2026-11-16', start_time: '23:00', end_time: '24:00', activity: 'Reading' }),
+    ])
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ start_time: '00:00', end_time: '06:30', duration_minutes: 390 }))
+    expect(update.mock.calls[0][0]).not.toHaveProperty('date')
+  })
+
+  it('splits a start-day night that is no longer a sleep with its morning on the day after', async () => {
+    // 18:00–01:00 dated Monday began on Monday.
+    stored = storedRow({ date: '2026-11-16', activity: 'Evening', category: 'rest', start_time: '18:00:00', end_time: '01:00:00', duration_minutes: 420 })
+    await PUT(request({ start_time: '18:00', end_time: '01:30' }), params)
+    expect(inserted()).toEqual([
+      expect.objectContaining({ date: '2026-11-17', start_time: '00:00', end_time: '01:30', duration_minutes: 90 }),
+    ])
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ start_time: '18:00', end_time: '24:00', duration_minutes: 360 }))
+  })
+
   it('keeps a planned entry marked overnight_sleep as one row, and never writes the mark', async () => {
     stored = storedRow({ activity: 'Sleep', category: null, status: 'pending', start_time: '22:00:00', end_time: '23:00:00' })
     await PUT(request({ start_time: '23:00', end_time: '07:00', overnight_sleep: true }), params)

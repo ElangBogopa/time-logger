@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
-import { planOvernightSave } from '@/lib/overnight'
+import { crossesMidnight, overnightPlacement, planOvernightSave } from '@/lib/overnight'
 
 /** HH:MM of a stored or sent time, for telling whether a save moves it. */
 function clock(time: unknown): string | null {
@@ -68,7 +68,12 @@ export async function PUT(
       const merged = { ...stored, ...updates }
       const isSleep =
         merged.category === 'sleep' || (merged.category == null && body.overnight_sleep === true)
-      const pieces = planOvernightSave(merged, isSleep)
+      // A stored one-piece night placed on its wake day is dated the morning
+      // it ended: if it now splits, its evening is the day before.
+      const dateIsWakeDay =
+        crossesMidnight(stored.start_time, stored.end_time) &&
+        overnightPlacement(stored.start_time, stored.end_time) === 'wake-day'
+      const pieces = planOvernightSave(merged, isSleep, { dateIsWakeDay })
       const [first, second] = pieces
 
       updates.start_time = first.start_time
