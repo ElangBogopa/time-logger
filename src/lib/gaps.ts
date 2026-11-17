@@ -6,10 +6,12 @@
  * asks the question instead: "11:00–13:30 · 2h 30m unaccounted", one tap,
  * and the day closes up.
  *
- * The search runs from the first thing logged in the session, not from the
- * start of the session, because the morning period begins at midnight and
- * nobody wants to be asked to account for being asleep. The far end is now,
- * on today, so it never asks about time that has not happened.
+ * The Afternoon and Evening search from the session's start (12:00, 18:00),
+ * also when nothing is logged yet, so any hour of them can be answered from
+ * the session screen. The Morning searches from the first thing logged,
+ * because it begins at midnight and nobody wants to be asked to account for
+ * being asleep. The far end is now, on today, so it never asks about time
+ * that has not happened.
  */
 
 import { TimeEntry } from './types'
@@ -37,6 +39,11 @@ export interface FindGapsParams {
   nowMinutes?: number | null
   /** Below this, a gap is a rounding error rather than a question. */
   minimumMinutes?: number
+  /**
+   * True for the Afternoon and Evening, whose start is a time people are
+   * awake; false for the Morning, which starts at midnight.
+   */
+  fromSessionStart?: boolean
 }
 
 export function findUnaccountedGaps({
@@ -46,6 +53,7 @@ export function findUnaccountedGaps({
   periodEnd,
   nowMinutes = null,
   minimumMinutes = 30,
+  fromSessionStart = false,
 }: FindGapsParams): Gap[] {
   const windowStart = periodStart * 60
   const windowEnd = Math.min(periodEnd * 60, nowMinutes ?? Number.POSITIVE_INFINITY)
@@ -57,14 +65,15 @@ export function findUnaccountedGaps({
     if (!entry.start_time) continue
     const start = timeToMinutes(entry.start_time)
     const end = entry.end_time ? timeToMinutes(entry.end_time) : start + entry.duration_minutes
-    if (end > start) busy.push({ start, end })
+    // An end at or before the start means it runs past midnight.
+    busy.push({ start, end: end > start ? end : 24 * 60 })
   }
 
   for (const event of events) {
     if (!event.startTime || !event.endTime) continue
     const start = timeToMinutes(event.startTime)
     const end = timeToMinutes(event.endTime)
-    if (end > start) busy.push({ start, end })
+    busy.push({ start, end: end > start ? end : 24 * 60 })
   }
 
   // Clip to the session, drop anything outside it
@@ -75,7 +84,11 @@ export function findUnaccountedGaps({
 
   // Nothing logged in this session yet: that is an empty session, not a gap.
   // "Same as yesterday" and the add button are the answer there.
-  if (clipped.length === 0) return []
+  if (clipped.length === 0) {
+    return fromSessionStart && windowEnd - windowStart >= minimumMinutes
+      ? [toGap(windowStart, windowEnd)]
+      : []
+  }
 
   const merged: Busy[] = []
   for (const block of clipped) {
@@ -88,7 +101,7 @@ export function findUnaccountedGaps({
   }
 
   const gaps: Gap[] = []
-  let cursor = merged[0].start // the first thing logged, not the session start
+  let cursor = fromSessionStart ? windowStart : merged[0].start
 
   for (const block of merged) {
     if (block.start - cursor >= minimumMinutes) {

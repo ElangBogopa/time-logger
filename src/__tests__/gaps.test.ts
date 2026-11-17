@@ -89,10 +89,9 @@ it('treats a calendar event as accounted for', () => {
   expect(gaps).toEqual([])
 })
 
-it('says nothing when the session is empty', () => {
-  // An empty session is not a gap — "same as yesterday" and the add button
-  // are the answer there.
-  expect(findUnaccountedGaps({ entries: [], ...AFTERNOON, nowMinutes: 17 * 60 })).toEqual([])
+it('says nothing when the Morning is empty', () => {
+  // An empty Morning is not a gap — nobody is asked about being asleep.
+  expect(findUnaccountedGaps({ entries: [], ...MORNING, nowMinutes: 11 * 60 })).toEqual([])
 })
 
 it('ignores anything shorter than the minimum', () => {
@@ -129,4 +128,81 @@ it('clips entries that run past the session', () => {
   })
 
   expect(gaps).toEqual([{ startTime: '14:00', endTime: '15:00', durationMinutes: 60 }])
+})
+
+describe('from the session start (Afternoon and Evening)', () => {
+  const EVENING = { periodStart: 18, periodEnd: 24 }
+  const from = { fromSessionStart: true }
+  const g = (a: string, b: string, d: number) => ({ startTime: a, endTime: b, durationMinutes: d })
+
+  it('offers the time before the first entry', () => {
+    expect(
+      findUnaccountedGaps({ entries: [entry('14:00', '15:00')], ...AFTERNOON, ...from, nowMinutes: 15 * 60 })
+    ).toEqual([g('12:00', '14:00', 120)])
+  })
+
+  it('offers an empty Afternoon from 12:00 to now', () => {
+    expect(
+      findUnaccountedGaps({ entries: [], ...AFTERNOON, ...from, nowMinutes: 15 * 60 + 30 })
+    ).toEqual([g('12:00', '15:30', 210)])
+  })
+
+  it('offers an empty Afternoon of a finished day whole', () => {
+    expect(findUnaccountedGaps({ entries: [], ...AFTERNOON, ...from })).toEqual([g('12:00', '18:00', 360)])
+  })
+
+  it('says nothing under the minimum or before the session', () => {
+    expect(findUnaccountedGaps({ entries: [], ...AFTERNOON, ...from, nowMinutes: 12 * 60 + 20 })).toEqual([])
+    expect(findUnaccountedGaps({ entries: [], ...AFTERNOON, ...from, nowMinutes: 11 * 60 })).toEqual([])
+    expect(
+      findUnaccountedGaps({ entries: [entry('12:10', '15:00')], ...AFTERNOON, ...from, nowMinutes: 15 * 60 })
+    ).toEqual([])
+  })
+
+  it('offers the Evening around an entry', () => {
+    expect(
+      findUnaccountedGaps({ entries: [entry('19:00', '20:00')], ...EVENING, ...from, nowMinutes: 21 * 60 })
+    ).toEqual([g('18:00', '19:00', 60), g('20:00', '21:00', 60)])
+  })
+
+  it('offers an empty Evening of a finished day whole', () => {
+    expect(findUnaccountedGaps({ entries: [], ...EVENING, ...from })).toEqual([g('18:00', '24:00', 360)])
+  })
+
+  it('does not ask about an entry that started in the previous session', () => {
+    expect(
+      findUnaccountedGaps({ entries: [entry('11:30', '12:45')], ...AFTERNOON, ...from, nowMinutes: 15 * 60 })
+    ).toEqual([g('12:45', '15:00', 135)])
+    expect(
+      findUnaccountedGaps({ entries: [entry('17:15', '18:40')], ...EVENING, ...from, nowMinutes: 20 * 60 })
+    ).toEqual([g('18:40', '20:00', 80)])
+  })
+
+  it('counts an event only for its own time', () => {
+    expect(
+      findUnaccountedGaps({
+        entries: [entry('14:00', '15:00')],
+        events: [{ startTime: '11:30', endTime: '12:30' }],
+        ...AFTERNOON,
+        ...from,
+        nowMinutes: 15 * 60,
+      })
+    ).toEqual([g('12:30', '14:00', 90)])
+  })
+
+  it('treats an entry that runs past midnight as running to 24:00', () => {
+    expect(findUnaccountedGaps({ entries: [entry('22:00', '00:00')], ...EVENING, ...from })).toEqual([
+      g('18:00', '22:00', 240),
+    ])
+    expect(findUnaccountedGaps({ entries: [entry('23:00', '01:00')], ...EVENING, ...from })).toEqual([
+      g('18:00', '23:00', 300),
+    ])
+  })
+
+  it('leaves the Morning as it was', () => {
+    expect(
+      findUnaccountedGaps({ entries: [entry('08:30', '09:00')], ...MORNING, nowMinutes: 11 * 60 })
+    ).toEqual([g('09:00', '11:00', 120)])
+    expect(findUnaccountedGaps({ entries: [], ...MORNING, nowMinutes: 11 * 60 })).toEqual([])
+  })
 })

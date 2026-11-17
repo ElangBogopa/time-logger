@@ -360,21 +360,24 @@ function LogPeriodContent() {
   /**
    * The stretches of this session with nothing in them. Answering a row is
    * one tap; the alternative is the hold-and-drag gesture on the timeline,
-   * which needs five conditions to line up (see lib/gaps.ts).
+   * which needs five conditions to line up (see lib/gaps.ts). The Afternoon
+   * and Evening offer time from the session's start; the whole day's entries
+   * are passed so one running over the seam is not asked about twice.
    */
   const gaps = useMemo(() => {
-    if (isLocked || !selectedDate) return []
+    if (isLocked || isLoading || !selectedDate) return []
     const isToday = selectedDate === getUserToday()
     const currentHour = getUserCurrentHour()
     return findUnaccountedGaps({
-      entries: periodEntries,
+      entries: visibleEntries,
       events: calendarEvents,
+      fromSessionStart: period !== 'morning',
       periodStart: range.start,
       periodEnd: range.end,
       // On today, never ask about time that has not happened yet.
       nowMinutes: isToday ? currentHour * 60 + new Date().getMinutes() : null,
     })
-  }, [isLocked, selectedDate, periodEntries, calendarEvents, range.start, range.end])
+  }, [isLocked, isLoading, selectedDate, visibleEntries, period, calendarEvents, range.start, range.end])
 
   const handleFillGap = (startTime: string, endTime: string) => {
     setQuickLogRange({ startTime, endTime })

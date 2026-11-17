@@ -12,11 +12,14 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { fetchEntries } from '@/lib/api'
 
 const push = jest.fn()
+let mockPeriod = 'morning'
+let mockHour = 11
+let mockDate = '2026-11-04'
 
 jest.mock('next/navigation', () => ({
-  useParams: () => ({ period: 'morning' }),
+  useParams: () => ({ period: mockPeriod }),
   useRouter: () => ({ push, back: jest.fn(), replace: jest.fn() }),
-  useSearchParams: () => new URLSearchParams('date=2026-11-04'),
+  useSearchParams: () => new URLSearchParams(`date=${mockDate}`),
 }))
 jest.mock('@/hooks/useAccount', () => ({
   useAccount: () => ({ status: 'authenticated', data: { user: { id: 'u1' } } }),
@@ -38,7 +41,7 @@ jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),
   getUserToday: () => '2026-11-04',
   getRealToday: () => '2026-11-04',
-  getUserCurrentHour: () => 11,
+  getUserCurrentHour: () => mockHour,
 }))
 jest.mock('@/components/PeriodSummaryPopup', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/components/QuickLogModal', () => ({
@@ -64,6 +67,9 @@ const entry = (id: string, activity: string, start: string, end: string, minutes
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockPeriod = 'morning'
+  mockHour = 11
+  mockDate = '2026-11-04'
   // The hour is pinned to 11 above; the screen reads the minute from the
   // real clock. From a quarter past the hour the stretch since the 10:45
   // entry is itself "30m unaccounted", a second match, and this suite
@@ -113,4 +119,74 @@ it('asks nothing of a session that is still loading', async () => {
   expect(screen.queryByText(/Nothing logged yet/)).not.toBeInTheDocument()
   release([])
   await waitFor(() => expect(screen.getByText(/Nothing logged yet/)).toBeInTheDocument())
+})
+
+describe('Afternoon and Evening offer time from the session start', () => {
+  it('offers the hours before the first entry, and opens the sheet on them', async () => {
+    mockPeriod = 'afternoon'
+    mockHour = 15
+    ;(fetchEntries as jest.Mock).mockResolvedValue([entry('1', 'Report', '14:00', '15:00', 60)])
+    render(<LogPeriodPage />)
+
+    const row = await screen.findByText('12:00 PM – 2:00 PM')
+    expect(screen.getByText('2h unaccounted')).toBeInTheDocument()
+    fireEvent.click(row)
+    await waitFor(() => expect(screen.getByTestId('quick-log')).toHaveTextContent('12:00→14:00'))
+  })
+
+  it('offers an empty Afternoon from 12:00 to now', async () => {
+    mockPeriod = 'afternoon'
+    mockHour = 15
+    ;(fetchEntries as jest.Mock).mockResolvedValue([])
+    render(<LogPeriodPage />)
+
+    const row = await screen.findByText('12:00 PM – 3:00 PM')
+    expect(screen.getByText('3h unaccounted')).toBeInTheDocument()
+    fireEvent.click(row)
+    await waitFor(() => expect(screen.getByTestId('quick-log')).toHaveTextContent('12:00→15:00'))
+  })
+
+  it('does not offer time a morning entry still covers', async () => {
+    mockPeriod = 'afternoon'
+    mockHour = 15
+    ;(fetchEntries as jest.Mock).mockResolvedValue([entry('1', 'Brunch', '11:30', '12:45', 75)])
+    render(<LogPeriodPage />)
+
+    expect(await screen.findByText('12:45 PM – 3:00 PM')).toBeInTheDocument()
+    expect(screen.queryByText(/^12:00 PM –/)).not.toBeInTheDocument()
+  })
+
+  it('offers the Evening from 6 PM', async () => {
+    mockPeriod = 'evening'
+    mockHour = 21
+    ;(fetchEntries as jest.Mock).mockResolvedValue([entry('1', 'Dinner', '19:00', '20:00', 60)])
+    render(<LogPeriodPage />)
+
+    const first = await screen.findByText('6:00 PM – 7:00 PM')
+    expect(screen.getByText('8:00 PM – 9:00 PM')).toBeInTheDocument()
+    fireEvent.click(first)
+    await waitFor(() => expect(screen.getByTestId('quick-log')).toHaveTextContent('18:00→19:00'))
+  })
+
+  it('still offers nothing for an empty Morning', async () => {
+    ;(fetchEntries as jest.Mock).mockResolvedValue([])
+    render(<LogPeriodPage />)
+
+    await waitFor(() => expect(screen.getByText(/Nothing logged yet/)).toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: 'Unaccounted' })).not.toBeInTheDocument()
+  })
+
+  it('offers nothing until the entries have arrived', async () => {
+    mockPeriod = 'afternoon'
+    mockHour = 15
+    // yesterday: the shared entries cache holds nothing for it yet, so the screen is loading
+    mockDate = '2026-11-03'
+    let release: (value: unknown[]) => void = () => {}
+    ;(fetchEntries as jest.Mock).mockReturnValue(new Promise((resolve) => { release = resolve }))
+    render(<LogPeriodPage />)
+
+    expect(screen.queryByRole('heading', { name: 'Unaccounted' })).not.toBeInTheDocument()
+    release([])
+    expect(await screen.findByText('12:00 PM – 6:00 PM')).toBeInTheDocument()
+  })
 })
