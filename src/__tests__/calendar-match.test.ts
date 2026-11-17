@@ -37,3 +37,32 @@ describe('unconfirmedEvents', () => {
     expect(unconfirmedEvents([standup, review], [entry('14:00', '15:00')])).toEqual([standup])
   })
 })
+
+describe('an event that crosses midnight', () => {
+  const late = event('22:00', '01:00')
+
+  it('is not logged with nothing saved', () => {
+    expect(isEventLogged(late, [])).toBe(false)
+  })
+
+  it('is logged once the evening piece of its split is saved', () => {
+    expect(isEventLogged(late, [entry('22:00', '24:00')])).toBe(true)
+  })
+
+  it('is logged as a one-piece sleep, and with stored seconds', () => {
+    expect(isEventLogged(event('23:00', '07:00'), [entry('23:00:00', '07:00:00')])).toBe(true)
+  })
+
+  it('is not logged by something that only touches its edge', () => {
+    expect(isEventLogged(late, [entry('20:00', '22:30')])).toBe(false)
+  })
+
+  it('leaves the list once confirmed', () => {
+    const e = { id: 'x', ...late }
+    expect(unconfirmedEvents([e], [entry('22:00', '24:00')])).toEqual([])
+  })
+
+  it('treats an event that ends at 00:00 like one that ends at midnight', () => {
+    expect(isEventLogged(event('23:00', '00:00'), [entry('23:00', '24:00')])).toBe(true)
+  })
+})

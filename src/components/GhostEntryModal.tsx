@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { getLocalDateString } from '@/lib/types'
 import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
 import { CalendarEvent } from './TimelineView'
+import { isEventLogged } from '@/lib/calendar-match'
 import TimeRangePicker from './TimeRangePicker'
 import {
   Dialog,
@@ -120,22 +121,11 @@ export default function GhostEntryModal({
       const existingEntries = await fetchEntries({ date: selectedDate, fields: 'id,start_time,end_time,activity' })
 
       if (existingEntries.length > 0) {
-        const newStart = timeToMinutes(startTime)
-        const newEnd = timeToMinutes(endTime)
-
-        const overlappingEntry = existingEntries.find(entry => {
-          if (!entry.start_time || !entry.end_time) return false
-          const entryStart = timeToMinutes(entry.start_time)
-          const entryEnd = timeToMinutes(entry.end_time)
-
-          // Check for significant overlap (>50%)
-          const overlapStart = Math.max(newStart, entryStart)
-          const overlapEnd = Math.min(newEnd, entryEnd)
-          const overlapDuration = Math.max(0, overlapEnd - overlapStart)
-          const newDuration = newEnd - newStart
-
-          return newDuration > 0 && overlapDuration / newDuration > 0.5
-        })
+        // Same rule as the lists (a crossing event counts as its evening),
+        // so a second confirm of an event that crosses midnight is refused.
+        const overlappingEntry = existingEntries.find(entry =>
+          isEventLogged({ startTime, endTime }, [entry])
+        )
 
         if (overlappingEntry) {
           setError(`This time slot overlaps with "${overlappingEntry.activity}". Please adjust the times or delete the existing entry first.`)

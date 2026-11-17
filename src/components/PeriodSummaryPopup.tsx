@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
-import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, PERIOD_TIME_RANGES, getUserToday, getRealToday } from '@/lib/types'
+import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, getUserToday, getRealToday } from '@/lib/types'
 import { PERIOD_CLASSES } from '@/lib/palette'
 import CommentaryThread from '@/components/CommentaryThread'
 import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Zap, Share2, Check } from 'lucide-react'
@@ -238,16 +238,10 @@ export default function PeriodSummaryPopup({
     }
   }
 
-  // Filter entries to only include those within this period's time range
-  // Must be before early return to maintain hooks order
-  const periodEntries = useMemo(() => {
-    const range = PERIOD_TIME_RANGES[period]
-    return entries.filter(entry => {
-      if (!entry.start_time) return false
-      const hour = parseInt(entry.start_time.split(':')[0])
-      return hour >= range.start && hour < range.end
-    })
-  }, [entries, period])
+  // The page hands over the session's own entries (`getEntriesForPeriod`,
+  // which places a night by `onDayTimes`). Filtering again by the raw start
+  // hour dropped a night logged 23:00-07:00 from the Morning.
+  const periodEntries = entries
 
   /**
    * There was a session score here, drawn as an unlabelled number in a ring.

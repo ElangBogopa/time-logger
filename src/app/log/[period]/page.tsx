@@ -342,7 +342,7 @@ function LogPeriodContent() {
       const titles = events.map((event) => event.title)
       const categories = await categorizeActivities(titles).catch(() => [])
 
-      const created = await createEntries(
+      await createEntries(
         events.map((event, i) => ({
           date: selectedDate,
           activity: event.title,
@@ -357,7 +357,9 @@ function LogPeriodContent() {
       )
 
       await fetchEntries()
-      sonnerToast.success(`Confirmed ${created.length} calendar ${created.length === 1 ? 'event' : 'events'}`)
+      // Count the events asked for, not the rows made: one that crosses
+      // midnight is saved as two.
+      sonnerToast.success(`Confirmed ${events.length} calendar ${events.length === 1 ? 'event' : 'events'}`)
     } catch (err) {
       console.error('Failed to confirm calendar events:', err)
       sonnerToast.error('Could not confirm those events')
