@@ -4,6 +4,7 @@ import { updateEntry } from '@/lib/api'
 import { PlacedEntry } from './useTimelineData'
 import { PIXELS_PER_MINUTE } from '@/components/timeline/constants'
 import { snapToHalfHour } from '@/components/timeline/utils'
+import { crossesMidnight } from '@/lib/overnight'
 
 export interface UseEntryAdjustmentParams {
   scrollContainerRef: React.RefObject<HTMLDivElement>
@@ -82,8 +83,10 @@ export function useEntryAdjustment({
     if (e.button !== 0) return // Only left click
     e.stopPropagation() // Don't trigger grid mousedown
 
-    // Don't allow adjusting entries without times (estimated entries)
-    if (entry.isEstimated) return
+    // Don't allow adjusting entries without times (estimated entries), or
+    // an overnight one: it is drawn clipped to this day, and a drag would
+    // write the clipped times back. It opens on a tap (TimelineEntry).
+    if (entry.isEstimated || crossesMidnight(entry.start_time, entry.end_time)) return
 
     const target = e.currentTarget as HTMLElement
     const rect = target.getBoundingClientRect()
@@ -121,8 +124,9 @@ export function useEntryAdjustment({
   const handleEntryTouchStart = useCallback((e: React.TouchEvent, entry: PlacedEntry) => {
     e.stopPropagation() // Don't trigger grid touchstart
 
-    // Don't allow adjusting entries without times (estimated entries)
-    if (entry.isEstimated) return
+    // Don't allow adjusting entries without times (estimated entries), or
+    // an overnight one (see handleEntryMouseDown)
+    if (entry.isEstimated || crossesMidnight(entry.start_time, entry.end_time)) return
 
     const touch = e.touches[0]
     const target = e.currentTarget as HTMLElement

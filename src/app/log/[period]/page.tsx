@@ -7,6 +7,7 @@ import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, 
 import { findRepeatCandidate, entriesForRepeat, repeatRowsLeft, retimeAfterClash, type RepeatCandidate, type RepeatRow } from '@/lib/repeat-session'
 import { PERIOD_CLASSES } from '@/lib/palette'
 import { findUnaccountedGaps, entryEndForGap, type Gap } from '@/lib/gaps'
+import { useOvernightSpill } from '@/hooks/useOvernightSpill'
 import { unconfirmedEvents } from '@/lib/calendar-match'
 import NextUp from '@/components/NextUp'
 import { getCachedEntries, setCachedEntries, getCachedCompletions, setCachedCompletion, removeCachedCompletion } from '@/hooks/useSessionData'
@@ -119,6 +120,8 @@ function LogPeriodContent() {
   // False when nothing is known about this date's entries (no cache and the fetch failed):
   // an empty list then means "could not look", not "nothing logged".
   const [entriesKnown, setEntriesKnown] = useState(!!cachedEntries)
+  // A neighbouring day's sleep where it spills into this one: not a gap.
+  const covered = useOvernightSpill(selectedDate || null, entries)
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
@@ -380,6 +383,7 @@ function LogPeriodContent() {
     const found = findUnaccountedGaps({
       entries: visibleEntries,
       events: calendarEvents,
+      covered,
       fromSessionStart: period !== 'morning',
       periodStart: range.start,
       periodEnd: range.end,
@@ -387,7 +391,7 @@ function LogPeriodContent() {
       nowMinutes,
     })
     return { gaps: found, gapsNowMinutes: nowMinutes }
-  }, [isLocked, isLoading, entriesKnown, selectedDate, visibleEntries, period, calendarEvents, range.start, range.end])
+  }, [isLocked, isLoading, entriesKnown, selectedDate, visibleEntries, period, calendarEvents, covered, range.start, range.end])
 
   const handleFillGap = (gap: Gap) => {
     setQuickLogRange({ startTime: gap.startTime, endTime: entryEndForGap(gap, gapsNowMinutes) })

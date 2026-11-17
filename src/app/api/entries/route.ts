@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
+import { planOvernightSave } from '@/lib/overnight'
 
 // GET /api/entries - Fetch time entries with flexible filters
 export async function GET(request: NextRequest) {
@@ -88,22 +89,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const rows = input.map((item) => ({
-      user_id: session.user!.id,
-      date: item.date,
-      activity: item.activity,
-      category: item.category ?? null,
-      duration_minutes: item.duration_minutes,
-      start_time: item.start_time || null,
-      end_time: item.end_time || null,
-      description: item.description || null,
-      commentary: item.commentary || null,
-      status: item.status || 'confirmed',
+    const built = input.map((item) => ({
+      item,
+      row: {
+        user_id: session.user!.id,
+        date: item.date as string,
+        activity: item.activity,
+        category: item.category ?? null,
+        duration_minutes: item.duration_minutes as number,
+        start_time: (item.start_time as string) || null,
+        end_time: (item.end_time as string) || null,
+        description: item.description || null,
+        commentary: item.commentary || null,
+        status: item.status || 'confirmed',
+      },
     }))
 
-    if (rows.some((row) => !row.date || !row.activity || !row.duration_minutes)) {
+    if (built.some(({ row }) => !row.date || !row.activity || !row.duration_minutes)) {
       return NextResponse.json({ error: 'Missing required fields: date, activity, duration_minutes' }, { status: 400 })
     }
+
+    // Across midnight: sleep stays one row, anything else becomes two, one on
+    // each day (lib/overnight.ts). A planned entry has no category, so the
+    // client says whether it is a sleep with `overnight_sleep`, which is
+    // never stored. A null category without it is not a sleep. No model call.
+    const rows = built.flatMap(({ item, row }) => {
+      const isSleep = row.category === 'sleep' || (row.category === null && item.overnight_sleep === true)
+      return planOvernightSave(row, isSleep)
+    })
 
     const { data, error } = await supabase
       .from('time_entries')
@@ -116,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     // The single form keeps returning a single object: every existing caller
-    // reads `data.id`.
+    // reads `data.id`. For a split that is the piece on the day it started.
     return NextResponse.json({ data: isBatch ? data : data?.[0] })
   } catch (error) {
     console.error('Error in POST /api/entries:', error)

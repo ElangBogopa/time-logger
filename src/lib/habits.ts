@@ -16,6 +16,7 @@
 import type { TimeCategory } from './types'
 import { activityMatch, activityKey } from './plan-adherence'
 import { timeToMinutes } from './time-utils'
+import { crossesMidnight, overnightPlacement } from './overnight'
 
 export interface HabitEntry {
   activity: string
@@ -101,9 +102,14 @@ export function usualWakeMinutes(entries: HabitEntry[]): number | null {
     if (entry.category !== 'sleep' || !entry.start_time || !entry.end_time) continue
     const start = timeToMinutes(entry.start_time)
     const end = timeToMinutes(entry.end_time)
+    if (end > 12 * 60) continue
     // A night's sleep as it is logged here: begins after midnight (or is
-    // the tail of the night) and ends before noon.
-    if (end <= start || end > 12 * 60) continue
+    // the tail of the night) and ends before noon — or one row across
+    // midnight, dated the day it ended, whose end is that day's wake time.
+    const overnightNight =
+      crossesMidnight(entry.start_time, entry.end_time) &&
+      overnightPlacement(entry.start_time, entry.end_time) === 'wake-day'
+    if (end <= start && !overnightNight) continue
     perDay.set(entry.date, Math.max(perDay.get(entry.date) ?? 0, end))
   }
   if (perDay.size < MIN_DAYS) return null

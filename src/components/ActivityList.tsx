@@ -2,6 +2,7 @@
 
 import { TimeEntry, CATEGORY_LABELS, getAggregatedCategory, AggregatedCategory } from '@/lib/types'
 import { formatDuration } from '@/lib/time-utils'
+import { onDayTimes } from '@/lib/overnight'
 import { AGGREGATED_HEX } from '@/lib/palette'
 import {
   Brain,
@@ -85,10 +86,13 @@ export default function ActivityList({ entries, onEntryClick, emptyMessage }: Ac
     )
   }
 
-  // Sort by start_time
+  // Sort by where each starts on this date: a night's sleep logged as
+  // 23:00–07:00 comes first, at midnight (lib/overnight.ts)
   const sorted = [...entries].sort((a, b) => {
-    if (!a.start_time || !b.start_time) return 0
-    return a.start_time.localeCompare(b.start_time)
+    const aStart = onDayTimes(a)?.start
+    const bStart = onDayTimes(b)?.start
+    if (!aStart || !bStart) return 0
+    return aStart.localeCompare(bStart)
   })
 
   return (

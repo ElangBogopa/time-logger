@@ -3,6 +3,7 @@
 import React from 'react'
 import { formatDuration, formatTimeDisplay, timeToMinutes } from '@/lib/time-utils'
 import { TimeEntry, isPendingEntryReadyToConfirm } from '@/lib/types'
+import { crossesMidnight } from '@/lib/overnight'
 import { Clock } from 'lucide-react'
 
 export interface PlacedEntry extends TimeEntry {
@@ -46,6 +47,14 @@ export default function TimelineEntry({
   const isShort = height < 50
   const isPending = entry.status === 'pending'
   const isReadyToConfirm = isPending && isPendingEntryReadyToConfirm(entry)
+  // An overnight entry is drawn where it falls on this day but labelled with
+  // its real times and length. It cannot be dragged (useEntryAdjustment), so
+  // a tap opens it here.
+  const isOvernight = crossesMidnight(entry.start_time, entry.end_time)
+  const openOnClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onClick?.(entry)
+  }
 
   // Pending entries get ghost styling (with drag-to-adjust if they have times)
   if (isPending) {
@@ -58,6 +67,9 @@ export default function TimelineEntry({
     const pendingDisplayHeight = Math.max((pendingDisplayEndMins - pendingDisplayStartMins) * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT)
     const pendingDisplayDuration = pendingDisplayEndMins - pendingDisplayStartMins
     const hasTimes = !entry.isEstimated
+    const pendingTimeText = isOvernight
+      ? `${formatTimeDisplay(entry.start_time!)} - ${formatTimeDisplay(entry.end_time!)}`
+      : `${formatTimeDisplay(pendingDisplayStartTime)} - ${formatTimeDisplay(pendingDisplayEndTime)}`
 
     return (
       <div
@@ -66,10 +78,7 @@ export default function TimelineEntry({
         data-pending
         onMouseDown={hasTimes ? (e) => onMouseDown(e, entry) : undefined}
         onTouchStart={hasTimes ? (e) => onTouchStart(e, entry) : undefined}
-        onClick={!hasTimes ? (e) => {
-          e.stopPropagation()
-          onClick?.(entry)
-        } : undefined}
+        onClick={!hasTimes || isOvernight ? openOnClick : undefined}
         className={`absolute left-1 right-1 overflow-hidden rounded-lg border-2 border-dashed transition-all ${
           pendingIsBeingAdjusted
             ? 'z-30 shadow-xl ring-2 ring-primary/50 opacity-80'
@@ -78,7 +87,7 @@ export default function TimelineEntry({
           isReadyToConfirm
             ? 'border-[#B5A07A]/80 bg-[#B5A07A]/50 dark:border-[#B5A07A]/60 dark:bg-[#B5A07A]/30'
             : 'border-zinc-400/60 bg-zinc-100/50 dark:border-zinc-500/40 dark:bg-zinc-700/30'
-        } ${hasTimes ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+        } ${hasTimes && !isOvernight ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
         style={{ top: pendingDisplayTop, height: pendingDisplayHeight }}
       >
         <div className={`flex h-full flex-col justify-center px-2 py-1 ${isReadyToConfirm ? 'text-[#B5A07A] dark:text-[#CBB894]' : 'text-zinc-600 dark:text-zinc-300'}`}>
@@ -96,7 +105,7 @@ export default function TimelineEntry({
                 {entry.activity}
               </span>
               <div className="mt-0.5 flex items-center gap-2 text-xs opacity-80">
-                <span>{formatTimeDisplay(pendingDisplayStartTime)} - {formatTimeDisplay(pendingDisplayEndTime)}</span>
+                <span>{pendingTimeText}</span>
                 <span>({pendingIsBeingAdjusted ? formatDuration(pendingDisplayDuration) : formatDuration(entry.duration_minutes)})</span>
               </div>
               {height > 70 && !pendingIsBeingAdjusted && (
@@ -131,11 +140,12 @@ export default function TimelineEntry({
       data-entry-block
       onMouseDown={(e) => onMouseDown(e, entry)}
       onTouchStart={(e) => onTouchStart(e, entry)}
+      onClick={isOvernight ? openOnClick : undefined}
       className={`absolute overflow-hidden rounded-xl border-l-4 shadow-sm transition-all ${
         isBeingAdjusted
           ? 'z-30 shadow-xl ring-2 ring-zinc-400/50 dark:ring-zinc-500/50'
           : 'hover:shadow-md'
-      } ${colors.bg} ${colors.border} ${entry.isEstimated ? 'opacity-70 cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
+      } ${colors.bg} ${colors.border} ${entry.isEstimated ? 'opacity-70 cursor-pointer' : isOvernight ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
       style={{
         top: displayTop,
         height: displayHeight,
@@ -161,7 +171,7 @@ export default function TimelineEntry({
             </span>
             <div className="mt-0.5 flex items-center gap-2 text-xs opacity-80">
               <span>
-                {entry.isEstimated ? '~' : ''}{formatTimeDisplay(displayStartTime)} - {formatTimeDisplay(displayEndTime)}
+                {entry.isEstimated ? '~' : ''}{formatTimeDisplay(isOvernight ? entry.start_time! : displayStartTime)} - {formatTimeDisplay(isOvernight ? entry.end_time! : displayEndTime)}
               </span>
               <span>({isBeingAdjusted ? formatDuration(displayDuration) : formatDuration(entry.duration_minutes)})</span>
             </div>
@@ -173,7 +183,7 @@ export default function TimelineEntry({
       </div>
 
       {/* Bottom resize handle — subtle bar to hint at drag-to-adjust */}
-      {!entry.isEstimated && (
+      {!entry.isEstimated && !isOvernight && (
         <div className="absolute inset-x-0 bottom-0 h-3 flex items-center justify-center cursor-ns-resize">
           <div className="h-[2px] w-10 rounded-full bg-current opacity-15" />
         </div>

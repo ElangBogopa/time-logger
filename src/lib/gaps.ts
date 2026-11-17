@@ -14,10 +14,16 @@
  * that has not happened. A row running up to now opens an entry ending at the
  * last half hour passed (`entryEndForGap`), so it never fills in time that has
  * not happened.
+ *
+ * An entry counts only for the part of it on this date (`onDayTimes`): a
+ * night's sleep logged on Tuesday as 23:00–07:00 holds Tuesday's 00:00–07:00,
+ * not its evening. The part of a neighbouring day's sleep that spills into
+ * this one comes in as `covered` and is never offered as a gap.
  */
 
 import { TimeEntry } from './types'
 import { timeToMinutes, minutesToTime } from './time-utils'
+import { onDayTimes } from './overnight'
 
 export interface Gap {
   startTime: string
@@ -34,6 +40,8 @@ export interface FindGapsParams {
   entries: TimeEntry[]
   /** Calendar events count as accounted for: confirming them is their own flow. */
   events?: { startTime: string; endTime: string }[]
+  /** A neighbouring day's overnight sleep, where it spills into this day (`coveredOn`). */
+  covered?: { startTime: string; endTime: string }[]
   /** The session's bounds, in hours. */
   periodStart: number
   periodEnd: number
@@ -51,6 +59,7 @@ export interface FindGapsParams {
 export function findUnaccountedGaps({
   entries,
   events = [],
+  covered = [],
   periodStart,
   periodEnd,
   nowMinutes = null,
@@ -64,14 +73,15 @@ export function findUnaccountedGaps({
   const busy: Busy[] = []
 
   for (const entry of entries) {
-    if (!entry.start_time) continue
-    const start = timeToMinutes(entry.start_time)
-    const end = entry.end_time ? timeToMinutes(entry.end_time) : start + entry.duration_minutes
-    // An end at or before the start means it runs past midnight.
+    const times = onDayTimes(entry)
+    if (!times) continue
+    const start = timeToMinutes(times.start)
+    const end = times.end ? timeToMinutes(times.end) : start + entry.duration_minutes
+    // An entry ending 00:00 still runs to midnight.
     busy.push({ start, end: end > start ? end : 24 * 60 })
   }
 
-  for (const event of events) {
+  for (const event of [...events, ...covered]) {
     if (!event.startTime || !event.endTime) continue
     const start = timeToMinutes(event.startTime)
     const end = timeToMinutes(event.endTime)

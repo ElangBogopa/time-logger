@@ -133,6 +133,10 @@ For display, these roll up into six `AggregatedCategory` buckets —
 ### AI API Calls
 - **DO**: Call `/api/categorize` and `/api/commentary` only for confirmed entries
 - **DON'T**: Categorize pending/future entries - wastes API calls
+  - One exception, approved by the owner: a planned entry whose times cross
+    midnight is categorised once at save, only to tell sleep from the rest
+    (sleep is kept as one row, anything else is split). The category is not
+    stored; the plan is saved with none, as any plan is.
 - **DO**: Use the batch forms when acting on a set — `/api/categorize` takes
   `{ activities: string[] }` and answers in one model call, `/api/entries`
   takes `{ entries: [...] }` and inserts in one statement. Confirming four
@@ -156,6 +160,31 @@ For display, these roll up into six `AggregatedCategory` buckets —
 - Touch drag-to-create: 150ms hold delay to distinguish from scroll
 - Current time indicator only shown on today
 - A calendar block opens its confirm sheet on a tap or click and cannot be dragged.
+
+### Entries across midnight
+- An entry whose end is earlier than its start crosses midnight (an end of
+  `00:00` or `24:00` ends exactly at midnight and does not). Anything that
+  is not sleep is split at midnight into two ordinary entries, one on each
+  day, and nothing links them afterwards. Sleep stays one row on the date
+  it was logged on, so its `end_time` may be earlier than its `start_time`.
+- Which day a one-piece overnight row belongs to: the day that holds more
+  of it, and a tie goes to the wake-up day. 23:00–07:00 dated Tuesday is
+  Monday 23:00 to Tuesday 07:00; 18:00–01:00 dated Monday is Monday 18:00 to
+  Tuesday 01:00. Its whole `duration_minutes` counts on its own date.
+- Anything that places an entry in a day — a session, an hour, a gap, the
+  timeline, a sort — uses `onDayTimes` from `lib/overnight.ts`, never the
+  raw times. The part that spills into the neighbouring day is `coveredOn`
+  (`useOvernightSpill` on a screen): display only, never summed.
+- The rule runs when a save changes the times (`planOvernightSave`, in
+  `POST /api/entries` and `PUT /api/entries/[id]`). A save of the category,
+  status or words alone neither splits nor rejoins, and nothing reaches back
+  to rewrite older rows.
+- The add sheet asks two questions, only on today: "Did this start
+  yesterday?" for a crossing entry whose start is still ahead, and "Is this
+  tonight's sleep?" for a night typed from 6pm. Nothing else asks.
+- A plan has no category, so the client says whether it is a sleep with
+  `overnight_sleep`, which is never stored. The server never calls the
+  model.
 
 ### Calendar API Caching
 - CalendarContext caches events for ±7/14 days from today
@@ -278,6 +307,7 @@ src/
 │   ├── types.ts              # TimeEntry, TimeCategory, date + domain helpers
 │   ├── palette.ts            # Every data colour, defined once
 │   ├── time-utils.ts         # Time formatting, calculations
+│   ├── overnight.ts          # Entries across midnight: split, placement, the part on each day
 │   ├── supabase-server.ts    # Supabase client (server-side; the only one)
 │   ├── auth.ts               # NextAuth options
 │   ├── session.ts            # getAppSession(): who is asking, for every API route
@@ -308,6 +338,10 @@ time_entries (
   created_at timestamptz
 )
 ```
+
+`end_time` may be earlier than `start_time`: that is an overnight sleep, one
+row on the date it was logged on (see "Entries across midnight"). An end at
+midnight is stored as `24:00`.
 
 ## What the app is for
 

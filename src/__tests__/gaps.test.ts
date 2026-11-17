@@ -216,13 +216,22 @@ describe('from the session start (Afternoon and Evening)', () => {
     ).toEqual([g('18:00', '20:00', 120)])
   })
 
-  it('treats an entry that runs past midnight as running to 24:00', () => {
+  it('treats an entry that ends at midnight as running to 24:00', () => {
     expect(findUnaccountedGaps({ entries: [entry('22:00', '00:00')], ...EVENING, ...from })).toEqual([
       g('18:00', '22:00', 240),
     ])
-    expect(findUnaccountedGaps({ entries: [entry('23:00', '01:00')], ...EVENING, ...from })).toEqual([
-      g('18:00', '23:00', 300),
+    expect(findUnaccountedGaps({ entries: [entry('22:00', '24:00')], ...EVENING, ...from })).toEqual([
+      g('18:00', '22:00', 240),
     ])
+  })
+
+  it('places an entry that crosses midnight by the day holding more of it', () => {
+    // 23:00–01:00 is a tie, so it belongs to the morning it ended in.
+    expect(findUnaccountedGaps({ entries: [entry('23:00', '01:00')], ...EVENING, ...from })).toEqual([
+      g('18:00', '24:00', 360),
+    ])
+    // 18:00–01:00 is mostly before midnight: this evening, to 24:00.
+    expect(findUnaccountedGaps({ entries: [entry('18:00', '01:00')], ...EVENING, ...from })).toEqual([])
   })
 
   it('leaves the Morning as it was', () => {
@@ -230,6 +239,35 @@ describe('from the session start (Afternoon and Evening)', () => {
       findUnaccountedGaps({ entries: [entry('08:30', '09:00')], ...MORNING, nowMinutes: 11 * 60 })
     ).toEqual([g('09:00', '11:00', 120)])
     expect(findUnaccountedGaps({ entries: [], ...MORNING, nowMinutes: 11 * 60 })).toEqual([])
+  })
+})
+
+describe('a night\'s sleep across midnight', () => {
+  const EVENING = { periodStart: 18, periodEnd: 24 }
+  const g = (a: string, b: string, d: number) => ({ startTime: a, endTime: b, durationMinutes: d })
+  const sleep = { ...entry('23:00', '07:00'), activity: 'Sleep', category: 'sleep', duration_minutes: 480 } as TimeEntry
+
+  it('leaves Tuesday evening 23:00–24:00 unaccounted for a Tuesday 23:00–07:00 sleep', () => {
+    expect(
+      findUnaccountedGaps({ entries: [entry('18:00', '23:00'), sleep], ...EVENING, fromSessionStart: true })
+    ).toEqual([g('23:00', '24:00', 60)])
+  })
+
+  it('covers 00:00–07:00 with it', () => {
+    expect(
+      findUnaccountedGaps({ entries: [sleep, entry('09:00', '12:00')], ...MORNING, fromSessionStart: true })
+    ).toEqual([g('07:00', '09:00', 120)])
+  })
+
+  it('never offers a covered block as a gap', () => {
+    expect(
+      findUnaccountedGaps({
+        entries: [entry('18:00', '23:00')],
+        covered: [{ startTime: '23:00', endTime: '24:00' }],
+        ...EVENING,
+        fromSessionStart: true,
+      })
+    ).toEqual([])
   })
 })
 

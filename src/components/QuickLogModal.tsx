@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
-import { getUserToday, getRealToday, TimeEntry, PENDING_COMMENTARY, TimeCategory, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR } from '@/lib/types'
+import { getUserToday, getRealToday, TimeEntry, PENDING_COMMENTARY, TimeCategory, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR, getUserCurrentHour, shiftDateString } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay, findMostlyOverlapping } from '@/lib/time-utils'
 import { sameActivityName } from '@/lib/repeat-session'
+import { crossesMidnight, overnightPlacement } from '@/lib/overnight'
 import { parseTimeFromText, ParseResult, isMealWordDetection } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
@@ -84,6 +85,14 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   const [showPostSubmit, setShowPostSubmit] = useState(false)
   const [lastLoggedActivity, setLastLoggedActivity] = useState<string>('')
   const [isDoneLoading, setIsDoneLoading] = useState(false)
+
+  // Times that cross midnight on today can mean two days; this asks which,
+  // in place of the form. Closing the sheet while it shows saves nothing.
+  const [overnightQuestion, setOvernightQuestion] = useState<{
+    kind: 'tonight-sleep' | 'started-yesterday'
+    category: TimeCategory
+    entryDate: string
+  } | null>(null)
 
   // Real-time parsing as user types - NO auto-apply, just show the suggestion chip
   useEffect(() => {
@@ -288,6 +297,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setShowHighlightedInput(false)
       setOriginalTimes(null)
       setShowPostSubmit(false)
+      setOvernightQuestion(null)
       setLastLoggedActivity('')
       setIsInputFocused(false)
       timesInitialized.current = false // Reset flag when modal opens
@@ -429,6 +439,11 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         }
       }
 
+      if (crossesMidnight(startTime, endTime)) {
+        await submitOvernight(entryDate, isOnTodayView)
+        return
+      }
+
       if (isPlanningMode) {
         // Future/planned entry - save as pending without AI categorization/commentary
         await createEntry({
@@ -449,22 +464,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
         // Toast removed
       } else {
         // Past/current entry - normal flow with AI categorization + commentary
-        let category: TimeCategory
-        if (knownCategory && initialName && sameActivityName(activity, initialName)) {
-          category = knownCategory
-        } else {
-          const categoryResponse = await csrfFetch('/api/categorize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activity }),
-          })
-
-          if (!categoryResponse.ok) {
-            throw new Error('Failed to categorize activity')
-          }
-
-          category = (await categoryResponse.json()).category
-        }
+        const category = await resolveCategory()
 
         const insertedEntry = await createEntry({
           date: entryDate,
@@ -477,29 +477,163 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           status: 'confirmed',
         })
 
-        // Skip per-entry commentary - we'll show period summary instead
-        // Just save a placeholder commentary for the entry
-        await updateEntry(insertedEntry.id, { commentary: 'Logged' })
+        await finishConfirmed(insertedEntry)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
-        onEntryAdded()
+  // The category for what was typed: the one the caller knows while the
+  // name is unchanged, otherwise one /api/categorize call.
+  const resolveCategory = async (): Promise<TimeCategory> => {
+    if (knownCategory && initialName && sameActivityName(activity, initialName)) {
+      return knownCategory
+    }
+    const categoryResponse = await csrfFetch('/api/categorize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activity }),
+    })
 
-        if (disablePostSubmit) {
-          // Calendar page: just close after logging
-          onClose()
+    if (!categoryResponse.ok) {
+      throw new Error('Failed to categorize activity')
+    }
+
+    return (await categoryResponse.json()).category
+  }
+
+  // After a planned entry is saved: no period summary for planning.
+  const finishPlanned = () => {
+    onEntryAdded()
+    onClose()
+  }
+
+  // After a confirmed entry is saved.
+  const finishConfirmed = async (insertedEntry: TimeEntry) => {
+    // Skip per-entry commentary - we'll show period summary instead
+    // Just save a placeholder commentary for the entry
+    await updateEntry(insertedEntry.id, { commentary: 'Logged' })
+
+    onEntryAdded()
+
+    if (disablePostSubmit) {
+      // Calendar page: just close after logging
+      onClose()
+    } else {
+      // Reset form for next entry (no popup, just keep logging)
+      setOvernightQuestion(null)
+      setActivity('')
+      setNotes('')
+      setError(null)
+      setParseResult(null)
+      setIsAutoParseApplied(false)
+      setShowHighlightedInput(false)
+      // Set start time to end of last entry for next entry
+      setStartTime(endTime)
+      setEndTime(getCurrentTime())
+      // Focus input for next entry
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }
+
+  // A plan: no category, the static planned line. `overnightSleep` tells the
+  // server to keep a sleep as one row; anything else it splits at midnight.
+  const savePlanned = async (date: string, overnightSleep: boolean) => {
+    await createEntry({
+      date,
+      activity,
+      category: null,
+      duration_minutes: duration,
+      start_time: startTime,
+      end_time: endTime,
+      description: notes || null,
+      commentary: PENDING_COMMENTARY.planned,
+      status: 'pending',
+      ...(overnightSleep ? { overnight_sleep: true } : {}),
+    })
+    finishPlanned()
+  }
+
+  const saveConfirmed = async (date: string, category: TimeCategory) => {
+    const insertedEntry = await createEntry({
+      date,
+      activity,
+      category,
+      duration_minutes: duration,
+      start_time: startTime,
+      end_time: endTime,
+      description: notes || null,
+      status: 'confirmed',
+    })
+    await finishConfirmed(insertedEntry)
+  }
+
+  // A sleep that is not tonight's: a plan on a future day, or on today when
+  // a start-day sleep has not begun yet; otherwise last night's, confirmed
+  // on this date even though its start reads as later than now.
+  const saveSleepNotTonight = async (entryDate: string) => {
+    const startDayAhead = overnightPlacement(startTime, endTime) === 'start-day' && isFutureStartTime
+    if (isFutureDay || startDayAhead) {
+      await savePlanned(entryDate, true)
+    } else {
+      await saveConfirmed(entryDate, 'sleep')
+    }
+  }
+
+  // Times that cross midnight (lib/overnight.ts). The category is needed to
+  // tell sleep from the rest, so it is fetched once, also for a plan; the
+  // server keeps a sleep as one row and splits anything else.
+  const submitOvernight = async (entryDate: string, isOnTodayView: boolean) => {
+    let category: TimeCategory
+    try {
+      category = await resolveCategory()
+    } catch {
+      setError('Failed to categorize activity')
+      return
+    }
+
+    const onToday = !isFutureDay && !isPastDay && isOnTodayView
+
+    if (category === 'sleep') {
+      if (onToday && overnightPlacement(startTime, endTime) === 'wake-day' && getUserCurrentHour() >= 18) {
+        setOvernightQuestion({ kind: 'tonight-sleep', category, entryDate })
+        return
+      }
+      await saveSleepNotTonight(entryDate)
+      return
+    }
+
+    if (onToday && isFutureStartTime) {
+      setOvernightQuestion({ kind: 'started-yesterday', category, entryDate })
+      return
+    }
+
+    if (isPlanningMode) {
+      await savePlanned(entryDate, false)
+    } else {
+      await saveConfirmed(entryDate, category)
+    }
+  }
+
+  const answerOvernight = async (yes: boolean) => {
+    if (!overnightQuestion) return
+    const { kind, category, entryDate } = overnightQuestion
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      if (kind === 'tonight-sleep') {
+        if (yes) {
+          await savePlanned(shiftDateString(entryDate, 1), true)
         } else {
-          // Reset form for next entry (no popup, just keep logging)
-          setActivity('')
-          setNotes('')
-          setError(null)
-          setParseResult(null)
-          setIsAutoParseApplied(false)
-          setShowHighlightedInput(false)
-          // Set start time to end of last entry for next entry
-          setStartTime(endTime)
-          setEndTime(getCurrentTime())
-          // Focus input for next entry
-          setTimeout(() => inputRef.current?.focus(), 100)
+          await saveSleepNotTonight(entryDate)
         }
+      } else if (yes) {
+        await saveConfirmed(shiftDateString(entryDate, -1), category)
+      } else {
+        await savePlanned(entryDate, false)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -570,7 +704,44 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           if (initialActivity || initialName) e.preventDefault()
         }}
       >
-        {showPostSubmit ? (
+        {overnightQuestion ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                {overnightQuestion.kind === 'tonight-sleep' ? 'Is this tonight\'s sleep?' : 'Did this start yesterday?'}
+              </DialogTitle>
+              <DialogDescription>
+                {activity}, {formatTimeDisplay(startTime)}–{formatTimeDisplay(endTime)}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <Button
+                type="button"
+                className="w-full"
+                size="lg"
+                disabled={isSubmitting}
+                onClick={() => answerOvernight(true)}
+              >
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Yes
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                size="lg"
+                disabled={isSubmitting}
+                onClick={() => answerOvernight(false)}
+              >
+                {overnightQuestion.kind === 'tonight-sleep' ? 'No, last night\'s' : 'No, it\'s tonight'}
+              </Button>
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+            </div>
+          </>
+        ) : showPostSubmit ? (
           // Post-submit state - show options
           <>
             {/* Close button */}

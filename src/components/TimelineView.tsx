@@ -15,6 +15,8 @@ import TimelineEntry from './timeline/TimelineEntry'
 import TimelineGap from './timeline/TimelineGap'
 import TimelineGhost, { type CalendarEvent } from './timeline/TimelineGhost'
 import TimelineCommitted, { type CommittedTask } from './timeline/TimelineCommitted'
+import TimelineCovered from './timeline/TimelineCovered'
+import type { CoveredBlock } from '@/lib/overnight'
 import type { PlanOutcome } from '@/lib/plan-adherence'
 import { CurrentTimeIndicator, DragPreview, PIXELS_PER_MINUTE } from './timeline'
 import { HOUR_HEIGHT, MIN_BLOCK_HEIGHT } from './timeline/constants'
@@ -40,6 +42,8 @@ export interface TimelineViewProps {
   canLog?: boolean
   visibleStartHour?: number
   visibleEndHour?: number
+  /** A neighbouring day's overnight sleep, where it spills into this day (`useOvernightSpill`). */
+  covered?: CoveredBlock[]
 }
 
 export default function TimelineView({
@@ -59,6 +63,7 @@ export default function TimelineView({
   canLog = true,
   visibleStartHour,
   visibleEndHour,
+  covered,
 }: TimelineViewProps) {
   // Modal state (kept in main component)
   const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null)
@@ -242,6 +247,7 @@ export default function TimelineView({
     visibleEndHour,
     isToday,
     isFutureDay,
+    covered,
   })
 
   // Use the updated data
@@ -493,6 +499,15 @@ export default function TimelineView({
                 </div>
               </div>
             )}
+
+            {/* A neighbouring day's sleep spilling into this one, under the entries */}
+            {covered?.map((block) => (
+              <TimelineCovered
+                key={`covered-${block.entryId}`}
+                block={block}
+                startHour={updatedStartHour}
+              />
+            ))}
 
             {/* Entry blocks */}
             {updatedPlacedEntries.map((entry) => (

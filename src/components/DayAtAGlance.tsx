@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import { getAggregatedCategory, type TimeEntry } from '@/lib/types'
 import { AGGREGATED_HEX } from '@/lib/palette'
 import { timeToMinutes } from '@/lib/time-utils'
+import { onDayTimes, type CoveredBlock } from '@/lib/overnight'
 
 /**
  * The day as one band, closed.
@@ -29,22 +30,29 @@ export interface GlanceBlock {
   proposed?: boolean
 }
 
-/** Entries, calendar events and planned tasks as one set of bands. */
+/**
+ * Entries, calendar events and planned tasks as one set of bands. Each entry
+ * is drawn where it sits on this date (`onDayTimes`); a neighbouring day's
+ * sleep spilling into this one (`covered`) is drawn in its entry's colour.
+ */
 export function blocksForGlance({
   entries,
   events = [],
   planned = [],
+  covered = [],
 }: {
   entries: TimeEntry[]
   events?: { id: string; startTime: string; endTime: string }[]
   planned?: { id: string; committed_start: string; committed_end: string }[]
+  covered?: CoveredBlock[]
 }): GlanceBlock[] {
   const blocks: GlanceBlock[] = []
 
   for (const entry of entries) {
-    if (!entry.start_time) continue
-    const start = timeToMinutes(entry.start_time)
-    const end = entry.end_time ? timeToMinutes(entry.end_time) : start + entry.duration_minutes
+    const onDay = onDayTimes(entry)
+    if (!onDay) continue
+    const start = timeToMinutes(onDay.start)
+    const end = onDay.end ? timeToMinutes(onDay.end) : start + entry.duration_minutes
     if (end <= start) continue
     blocks.push({
       id: `entry-${entry.id}`,
@@ -52,6 +60,19 @@ export function blocksForGlance({
       endMinutes: end,
       colour: AGGREGATED_HEX[entry.category ? getAggregatedCategory(entry.category) : 'escape'],
     })
+  }
+
+  for (const block of covered) {
+    const start = timeToMinutes(block.startTime)
+    const end = timeToMinutes(block.endTime)
+    if (end > start) {
+      blocks.push({
+        id: `covered-${block.entryId}`,
+        startMinutes: start,
+        endMinutes: end,
+        colour: AGGREGATED_HEX[block.category ? getAggregatedCategory(block.category) : 'escape'],
+      })
+    }
   }
 
   for (const event of events) {

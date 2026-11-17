@@ -118,6 +118,12 @@ describe('whether that part of the day still needs reminding', () => {
   it('ignores an entry with no time: it cannot be placed in a part of the day', () => {
     expect(alreadyLogged('morning', [{ start_time: null }], [])).toBe(false)
   })
+
+  it('counts a night\'s sleep 23:00–07:00 as the morning logged, not the evening', () => {
+    const sleep = [{ start_time: '23:00:00', end_time: '07:00:00' }]
+    expect(alreadyLogged('morning', sleep, [])).toBe(true)
+    expect(alreadyLogged('evening', sleep, [])).toBe(false)
+  })
 })
 
 describe('what is sent', () => {

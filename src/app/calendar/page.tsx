@@ -22,6 +22,8 @@ import { usualFor, recurringActivities } from '@/lib/habits'
 import { windowsForWake } from '@/lib/ideal-day'
 import { useWakeTime } from '@/hooks/useWakeTime'
 import { useHabitHistory } from '@/hooks/useHabitHistory'
+import { useOvernightSpill } from '@/hooks/useOvernightSpill'
+import { onDayTimes } from '@/lib/overnight'
 import { markFirstRun } from '@/lib/first-run'
 import { calcBody, calcFocus, calcSocial, type EntryRow } from '@/lib/metrics-calc'
 import type { TimeCategory } from '@/lib/types'
@@ -88,6 +90,8 @@ function CalendarContent() {
   const cachedEntries = selectedDate ? getCachedEntries(selectedDate) : null
   const [entries, setEntries] = useState<TimeEntry[]>(cachedEntries ?? [])
   const [isLoading, setIsLoading] = useState(!cachedEntries)
+  // A neighbouring day's sleep where it spills into this one: drawn, never counted.
+  const covered = useOvernightSpill(selectedDate || null, entries)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState<{ message: string } | null>(null)
@@ -217,6 +221,7 @@ function CalendarContent() {
           committed_start: t.committed_start,
           committed_end: t.committed_end,
         })),
+        covered,
       }).concat(
         // Proposals, drawn on the day before they are accepted, each in the
         // colour of the ring it would feed — so the shape of the day being
@@ -233,7 +238,7 @@ function CalendarContent() {
           }
         })
       ),
-    [entries, calendarEvents, committedTasks, suggestions, taskCategories]
+    [entries, calendarEvents, committedTasks, suggestions, taskCategories, covered]
   )
 
   const nowMinutes = useMemo(() => {
@@ -260,6 +265,8 @@ function CalendarContent() {
     type Item = {
       key: string
       start: string
+      /** Where it sits on this date: a night's sleep logged as 23:00–07:00 sorts at midnight. */
+      sortKey: string
       end: string
       title: string
       colour: string
@@ -269,10 +276,12 @@ function CalendarContent() {
     const items: Item[] = []
 
     for (const entry of entries) {
-      if (!entry.start_time) continue
+      const onDay = onDayTimes(entry)
+      if (!entry.start_time || !onDay) continue
       items.push({
         key: `entry-${entry.id}`,
         start: entry.start_time,
+        sortKey: onDay.start,
         end: entry.end_time || entry.start_time,
         title: entry.activity,
         colour: AGGREGATED_HEX[entry.category ? getAggregatedCategory(entry.category) : 'escape'],
@@ -285,6 +294,7 @@ function CalendarContent() {
       items.push({
         key: `plan-${task.id}`,
         start: task.committed_start,
+        sortKey: task.committed_start,
         end: task.committed_end,
         title: task.title,
         colour: '#8B7E74',
@@ -307,6 +317,7 @@ function CalendarContent() {
       items.push({
         key: `event-${event.id}`,
         start: event.startTime,
+        sortKey: event.startTime,
         end: event.endTime,
         title: event.title,
         colour: '#8B8680',
@@ -315,7 +326,7 @@ function CalendarContent() {
       })
     }
 
-    return items.sort((a, b) => a.start.localeCompare(b.start))
+    return items.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
   }, [entries, committedTasks, calendarEvents])
 
   const glanceSummary = useMemo(() => {
@@ -344,14 +355,21 @@ function CalendarContent() {
   /** Everything already in the day: logged, on the calendar, or planned. */
   const busyBlocks = useMemo<Busy[]>(
     () => [
-      ...entries
-        .filter((e) => e.start_time)
-        .map((e) => ({
-          startMinutes: timeToMinutes(e.start_time!),
-          endMinutes: e.end_time
-            ? timeToMinutes(e.end_time)
-            : timeToMinutes(e.start_time!) + e.duration_minutes,
-        })),
+      ...entries.flatMap((e) => {
+        // Where it sits on this date (lib/overnight.ts)
+        const onDay = onDayTimes(e)
+        if (!onDay) return []
+        const startMinutes = timeToMinutes(onDay.start)
+        return [{
+          startMinutes,
+          endMinutes: onDay.end ? timeToMinutes(onDay.end) : startMinutes + e.duration_minutes,
+        }]
+      }),
+      // A neighbouring day's sleep spilling into this one: never planned over.
+      ...covered.map((b) => ({
+        startMinutes: timeToMinutes(b.startTime),
+        endMinutes: timeToMinutes(b.endTime),
+      })),
       ...calendarEvents.map((e) => ({
         startMinutes: timeToMinutes(e.startTime),
         endMinutes: timeToMinutes(e.endTime),
@@ -361,7 +379,7 @@ function CalendarContent() {
         endMinutes: timeToMinutes(t.committed_end),
       })),
     ],
-    [entries, calendarEvents, committedTasks]
+    [entries, calendarEvents, committedTasks, covered]
   )
 
   /**
@@ -1220,6 +1238,7 @@ function CalendarContent() {
               canLog={canLog}
               visibleStartHour={gridWindow.startHour}
               visibleEndHour={gridWindow.endHour}
+              covered={covered}
             />
           </section>
           )}

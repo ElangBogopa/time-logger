@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase-server'
 import { calculateDailyScore, DailyProductivityScore, PlanItem } from '@/lib/productivity-score'
 import { calcBody, calcFocus, calcSocial, type EntryRow } from '@/lib/metrics-calc'
 import { formatDuration } from '@/lib/time-utils'
+import { onDayTimes } from '@/lib/overnight'
 import { comparePlanToActual, summarisePlanAdherence, type PlanAdherence, type PlanRow } from '@/lib/plan-adherence'
 import { TimeEntry, SessionCompletion, getUserToday, getUserCurrentHour, TimeCategory, CATEGORY_LABELS, MoodCheckin, AggregatedCategory, ENERGY_VIEW, AGGREGATED_CATEGORY_LABELS, aggregateByView } from '@/lib/types'
 interface Win {
@@ -128,11 +129,13 @@ function buildTimeline(entries: TimeEntry[]): TimelineBlock[] {
     timeline.push({ hour, entries: [], totalMinutes: 0 })
   }
 
-  // Place entries into hours based on start time
+  // Place entries into hours based on where they start on this date: a
+  // night's sleep logged as 23:00–07:00 sits at midnight (lib/overnight.ts)
   for (const entry of entries) {
-    if (!entry.start_time) continue
+    const onDayStart = onDayTimes(entry)?.start
+    if (!entry.start_time || !onDayStart) continue
 
-    const startHour = parseInt(entry.start_time.split(':')[0])
+    const startHour = parseInt(onDayStart.split(':')[0])
     if (startHour >= 0 && startHour < 24) {
       timeline[startHour].entries.push({
         id: entry.id,

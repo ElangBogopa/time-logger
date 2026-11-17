@@ -94,6 +94,16 @@ describe('usualWakeMinutes', () => {
     ]
     expect(usualWakeMinutes(entries)).toBe(7 * 60)
   })
+
+  it('reads a night logged as one row across midnight by its end', () => {
+    const night = (date: string) => ({ ...entry(date, 'Sleep', 'sleep', '00:00', '07:00'), start_time: '23:00', duration_minutes: 480 })
+    expect(usualWakeMinutes([night('2026-11-02'), night('2026-11-03'), night('2026-11-04')])).toBe(7 * 60)
+  })
+
+  it('does not read a sleep mostly before midnight as a wake time', () => {
+    const early = (date: string) => ({ ...entry(date, 'Sleep', 'sleep', '00:00', '01:00'), start_time: '18:00', duration_minutes: 420 })
+    expect(usualWakeMinutes([early('2026-11-02'), early('2026-11-03'), early('2026-11-04')])).toBeNull()
+  })
 })
 
 describe('recurringActivities', () => {

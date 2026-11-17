@@ -95,6 +95,8 @@ interface CreateEntryParams {
   description?: string | null
   commentary?: string | null
   status?: 'pending' | 'confirmed'
+  /** A planned (category null) entry across midnight is a sleep: kept as one row. Never stored. */
+  overnight_sleep?: boolean
 }
 
 export async function createEntry(params: CreateEntryParams): Promise<TimeEntry> {
@@ -129,7 +131,10 @@ export async function categorizeActivities(activities: string[]): Promise<TimeCa
   return categories
 }
 
-export async function updateEntry(id: string, updates: Partial<TimeEntry>): Promise<TimeEntry> {
+export async function updateEntry(
+  id: string,
+  updates: Partial<TimeEntry> & { overnight_sleep?: boolean }
+): Promise<TimeEntry> {
   const { data } = await fetchJSON<{ data: TimeEntry }>(`/api/entries/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

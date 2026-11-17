@@ -164,12 +164,12 @@ function done(counts: Record<string, number>) {
 /** If either lookup fails the reminder is sent: a spare nudge is the smaller mistake. */
 async function isLogged(userId: string, date: string, period: (typeof REMINDER_KINDS)[string]['period']): Promise<boolean> {
   const [entries, completions] = await Promise.all([
-    supabase.from('time_entries').select('start_time').eq('user_id', userId).eq('date', date).eq('status', 'confirmed'),
+    supabase.from('time_entries').select('start_time, end_time').eq('user_id', userId).eq('date', date).eq('status', 'confirmed'),
     supabase.from('session_completions').select('period').eq('user_id', userId).eq('date', date),
   ])
   return alreadyLogged(
     period,
-    (entries.data ?? []) as { start_time: string | null }[],
+    (entries.data ?? []) as { start_time: string | null; end_time: string | null }[],
     (completions.data ?? []) as { period: string }[]
   )
 }

@@ -12,6 +12,7 @@ import {
   DAY_ROLLOVER_HOUR,
 } from './types'
 import { timeToMinutes } from './time-utils'
+import { onDayTimes } from './overnight'
 
 /**
  * Determine the session state based on current time, entries, and completions
@@ -77,13 +78,16 @@ export function getYesterdayDateString(): string {
 }
 
 /**
- * Filter entries to a specific period based on start_time
+ * Filter entries to a specific period based on where they start on this date
+ * (`onDayTimes`): a night's sleep logged on Tuesday as 23:00–07:00 is a
+ * Morning entry, not an Evening one.
  */
 export function getEntriesForPeriod(entries: TimeEntry[], period: TimePeriod): TimeEntry[] {
   const range = PERIOD_TIME_RANGES[period]
   return entries.filter(entry => {
-    if (!entry.start_time) return false
-    const hour = parseInt(entry.start_time.split(':')[0])
+    const onDay = onDayTimes(entry)
+    if (!onDay) return false
+    const hour = parseInt(onDay.start.split(':')[0])
     return hour >= range.start && hour < range.end
   })
 }
@@ -95,15 +99,16 @@ export function getEntriesForPeriod(entries: TimeEntry[], period: TimePeriod): T
 export function splitEntryByPeriod(entry: TimeEntry): Map<TimePeriod, number> {
   const result = new Map<TimePeriod, number>()
 
-  if (!entry.start_time || !entry.end_time) {
+  const onDay = onDayTimes(entry)
+  if (!onDay || !onDay.end) {
     // No time info, attribute to current period
     const currentPeriod = getCurrentPeriod()
     result.set(currentPeriod, entry.duration_minutes)
     return result
   }
 
-  const startMins = timeToMinutes(entry.start_time)
-  const endMins = timeToMinutes(entry.end_time)
+  const startMins = timeToMinutes(onDay.start)
+  const endMins = timeToMinutes(onDay.end)
 
   const periods: TimePeriod[] = ['morning', 'afternoon', 'evening']
 
@@ -275,12 +280,9 @@ export function findFirstGapInPeriod(
   // Filter entries that overlap with this period
   // An entry overlaps if its time range intersects with the period
   const overlappingEntries = entries
-    .filter(e => e.start_time && e.end_time)
-    .map(e => {
-      const entryStart = timeToMinutes(e.start_time!)
-      const entryEnd = timeToMinutes(e.end_time!)
-      return { start: entryStart, end: entryEnd }
-    })
+    .map(e => onDayTimes(e))
+    .filter((t): t is { start: string; end: string } => !!t?.end)
+    .map(t => ({ start: timeToMinutes(t.start), end: timeToMinutes(t.end) }))
     .filter(e => {
       // Entry overlaps with period if: entry.start < period.end AND entry.end > period.start
       return e.start < periodEndMins && e.end > periodStartMins

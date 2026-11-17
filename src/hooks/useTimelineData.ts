@@ -3,6 +3,7 @@ import { TimeEntry } from '@/lib/types'
 import { timeToMinutes, minutesToTime } from '@/lib/time-utils'
 import { CalendarEvent } from '@/components/TimelineView'
 import { PlacedEntry } from '@/components/timeline/TimelineEntry'
+import { onDayTimes, type CoveredBlock } from '@/lib/overnight'
 
 // Re-export PlacedEntry for convenience
 export type { PlacedEntry }
@@ -16,6 +17,8 @@ export interface UseTimelineDataParams {
   visibleEndHour?: number
   isToday?: boolean
   isFutureDay?: boolean
+  /** A neighbouring day's overnight sleep, where it spills into this day: occupied, not counted. */
+  covered?: CoveredBlock[]
 }
 
 export interface TimeGap {
@@ -45,24 +48,35 @@ export interface UseTimelineDataReturn {
 import { PIXELS_PER_MINUTE } from '@/components/timeline/constants'
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE // 90px per hour
 
+/**
+ * Where an entry sits on this date, in minutes. A night's sleep logged as
+ * 23:00–07:00 sits at 00:00–07:00 (lib/overnight.ts); with no end, it runs
+ * for its duration.
+ */
+function onDayMinutes(entry: TimeEntry): { start: number; end: number } | null {
+  const times = onDayTimes(entry)
+  if (!times) return null
+  const start = timeToMinutes(times.start)
+  return { start, end: times.end ? timeToMinutes(times.end) : start + entry.duration_minutes }
+}
+
 // Find gaps in the timeline where untimed entries could fit
 function findGaps(timedEntries: TimeEntry[], startHour: number, endHour: number): { start: number; end: number }[] {
   const gaps: { start: number; end: number }[] = []
   const startMinutes = startHour * 60
   const endMinutes = endHour * 60
 
-  const sorted = [...timedEntries]
-    .filter(e => e.start_time)
-    .sort((a, b) => timeToMinutes(a.start_time!) - timeToMinutes(b.start_time!))
+  const sorted = timedEntries
+    .map(onDayMinutes)
+    .filter((t): t is { start: number; end: number } => t !== null)
+    .sort((a, b) => a.start - b.start)
 
   let lastEnd = startMinutes
 
-  for (const entry of sorted) {
-    const entryStart = timeToMinutes(entry.start_time!)
+  for (const { start: entryStart, end: entryEnd } of sorted) {
     if (entryStart > lastEnd) {
       gaps.push({ start: lastEnd, end: entryStart })
     }
-    const entryEnd = entry.end_time ? timeToMinutes(entry.end_time) : entryStart + entry.duration_minutes
     lastEnd = Math.max(lastEnd, entryEnd)
   }
 
@@ -83,10 +97,12 @@ function smartPlaceEntries(
   const placed: PlacedEntry[] = []
 
   for (const entry of timedEntries) {
+    // The part on this date: an overnight sleep is drawn where it falls today.
+    const onDay = onDayTimes(entry)!
     placed.push({
       ...entry,
-      placedStartTime: entry.start_time!,
-      placedEndTime: entry.end_time!,
+      placedStartTime: onDay.start,
+      placedEndTime: onDay.end!,
       isEstimated: false,
     })
   }
@@ -139,6 +155,8 @@ function smartPlaceEntries(
   return placed
 }
 
+const NO_COVERED: CoveredBlock[] = []
+
 export function useTimelineData({
   entries,
   calendarEvents,
@@ -148,6 +166,7 @@ export function useTimelineData({
   visibleEndHour,
   isToday = true,
   isFutureDay = false,
+  covered = NO_COVERED,
 }: UseTimelineDataParams): UseTimelineDataReturn {
   // Memoize total minutes calculation
   const totalMinutes = useMemo(() => {
@@ -271,21 +290,19 @@ export function useTimelineData({
     // Don't show gaps on future days or empty days
     if (isFutureDay) return []
     
-    // Only consider confirmed entries with actual times
-    const confirmedTimed = entries.filter(
-      e => e.status === 'confirmed' && e.start_time && e.end_time
-    )
-    if (confirmedTimed.length === 0) return []
-
-    // Sort by start time
-    const sorted = [...confirmedTimed].sort(
-      (a, b) => timeToMinutes(a.start_time!) - timeToMinutes(b.start_time!)
-    )
+    // Only consider confirmed entries with actual times, where they sit on
+    // this date
+    const sorted = entries
+      .filter(e => e.status === 'confirmed' && e.start_time && e.end_time)
+      .map(onDayMinutes)
+      .filter((t): t is { start: number; end: number } => t !== null)
+      .sort((a, b) => a.start - b.start)
+    if (sorted.length === 0) return []
 
     // Determine range: between first and last entry of the day
     // Default waking hours: 7am-11pm, but clamp to actual entries
-    const firstEntryStart = timeToMinutes(sorted[0].start_time!)
-    const lastEntryEnd = timeToMinutes(sorted[sorted.length - 1].end_time!)
+    const firstEntryStart = sorted[0].start
+    const lastEntryEnd = sorted[sorted.length - 1].end
     const rangeStart = Math.min(firstEntryStart, 7 * 60) // Don't start before 7am
     const rangeEnd = Math.max(lastEntryEnd, firstEntryStart) // At minimum, go to last entry
 
@@ -297,11 +314,14 @@ export function useTimelineData({
       effectiveEnd = Math.max(rangeEnd, currentMinutes)
     }
 
-    // Build sorted list of occupied intervals (merge overlapping)
+    // Build sorted list of occupied intervals (merge overlapping). A
+    // neighbouring day's sleep spilling into this one is occupied too.
+    const occupied = [
+      ...sorted,
+      ...covered.map(block => ({ start: timeToMinutes(block.startTime), end: timeToMinutes(block.endTime) })),
+    ].sort((a, b) => a.start - b.start)
     const intervals: { start: number; end: number }[] = []
-    for (const entry of sorted) {
-      const s = timeToMinutes(entry.start_time!)
-      const e = timeToMinutes(entry.end_time!)
+    for (const { start: s, end: e } of occupied) {
       if (intervals.length > 0 && s <= intervals[intervals.length - 1].end) {
         // Overlapping or adjacent — extend
         intervals[intervals.length - 1].end = Math.max(intervals[intervals.length - 1].end, e)
@@ -345,7 +365,7 @@ export function useTimelineData({
     }
 
     return gaps
-  }, [entries, isFutureDay, isToday])
+  }, [entries, isFutureDay, isToday, covered])
 
   // Memoize hours array
   const hours = useMemo(() => {

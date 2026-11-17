@@ -1,4 +1,4 @@
-import { findFirstGapInPeriod, buildSessionInfos } from '@/lib/session-utils'
+import { findFirstGapInPeriod, buildSessionInfos, getEntriesForPeriod, splitEntryByPeriod } from '@/lib/session-utils'
 import { TimeEntry, SessionCompletion, TimePeriod } from '@/lib/types'
 
 // Helper to create a mock TimeEntry
@@ -329,5 +329,29 @@ describe('buildSessionInfos nothingToLog', () => {
   it('leaves hasCompletion false for a skipped row', () => {
     const infos = buildSessionInfos([], [completion('evening', true)], 21)
     expect(find(infos, 'evening').hasCompletion).toBe(false)
+  })
+})
+
+describe('a night\'s sleep across midnight', () => {
+  // Logged on the day it ended: 23:00–07:00 is that day's 00:00–07:00.
+  const sleep = { ...createEntry('23:00', '07:00'), category: 'sleep' as const, duration_minutes: 480 }
+
+  it('is a Morning entry, not an Evening one', () => {
+    expect(getEntriesForPeriod([sleep], 'morning')).toEqual([sleep])
+    expect(getEntriesForPeriod([sleep], 'evening')).toEqual([])
+  })
+
+  it('splits only its part on this date across periods', () => {
+    expect(Array.from(splitEntryByPeriod(sleep).entries())).toEqual([['morning', 420]])
+  })
+
+  it('covers the Morning up to 07:00 when finding a gap', () => {
+    expect(findFirstGapInPeriod([sleep], 'morning', 60)).toEqual({ startTime: '07:00', endTime: '08:00' })
+  })
+
+  it('puts a sleep mostly before midnight in the Evening', () => {
+    const early = createEntry('18:00', '01:00')
+    expect(getEntriesForPeriod([early], 'evening')).toEqual([early])
+    expect(findFirstGapInPeriod([early], 'evening', 60)).toBeNull()
   })
 })
