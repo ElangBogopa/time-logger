@@ -116,6 +116,9 @@ function LogPeriodContent() {
   const cachedEntries = selectedDate ? getCachedEntries(selectedDate) : null
   const [entries, setEntries] = useState<TimeEntry[]>(cachedEntries ?? [])
   const [isLoading, setIsLoading] = useState(!cachedEntries)
+  // False when nothing is known about this date's entries (no cache and the fetch failed):
+  // an empty list then means "could not look", not "nothing logged".
+  const [entriesKnown, setEntriesKnown] = useState(!!cachedEntries)
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
@@ -165,14 +168,17 @@ function LogPeriodContent() {
     const cached = getCachedEntries(selectedDate)
     if (cached) {
       setEntries(cached)
+      setEntriesKnown(true)
       setIsLoading(false)
     } else {
+      setEntriesKnown(false)
       setIsLoading(true)
     }
 
     try {
       const data = await apiFetchEntries({ date: selectedDate, status: 'confirmed', orderBy: 'start_time', orderAsc: true })
       setEntries(data)
+      setEntriesKnown(true)
       setCachedEntries(selectedDate, data)
     } catch (err) {
       console.error('Failed to fetch entries:', err)
@@ -365,7 +371,7 @@ function LogPeriodContent() {
    * are passed so one running over the seam is not asked about twice.
    */
   const gaps = useMemo(() => {
-    if (isLocked || isLoading || !selectedDate) return []
+    if (isLocked || isLoading || !entriesKnown || !selectedDate) return []
     const isToday = selectedDate === getUserToday()
     const currentHour = getUserCurrentHour()
     return findUnaccountedGaps({
@@ -377,7 +383,7 @@ function LogPeriodContent() {
       // On today, never ask about time that has not happened yet.
       nowMinutes: isToday ? currentHour * 60 + new Date().getMinutes() : null,
     })
-  }, [isLocked, isLoading, selectedDate, visibleEntries, period, calendarEvents, range.start, range.end])
+  }, [isLocked, isLoading, entriesKnown, selectedDate, visibleEntries, period, calendarEvents, range.start, range.end])
 
   const handleFillGap = (startTime: string, endTime: string) => {
     setQuickLogRange({ startTime, endTime })

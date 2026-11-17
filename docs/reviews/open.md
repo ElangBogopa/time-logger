@@ -58,3 +58,22 @@ Verdict: Ready to merge (0 must fix) — first pass on aaa10b6 (brief docs/plans
 - push-rule-says-closed-pushes · CLAUDE.md and docs/FLOW.md (both places) now say fixed, or closed and only optional; a closed must or should stops the run unpushed · believes: fixed
 - do-fix-skips-closing-review · do-fix.md step 8 now sends a log-only "cannot be done well" answer to a new session and `/do-review`, not "try it on a phone" · believes: fixed
 - do-all-description-stale · not attempted (plan's choice)
+
+## Review 7 — 2026-11-16 — Opus 5.5 — reviewed 2b02db0
+Verdict: Ready to merge (0 must fix) — second pass on the brief docs/plans/fable-before-giving-up.md, seventh on this dev; trying it on a phone is now the better test
+- resolved: review-command-edit-misplaced (front matter parses again; the reply bullet at do-review.md:117 has the brief's wording, with "closed"), push-rule-says-closed-pushes (CLAUDE.md:17 and docs/FLOW.md:29, :118 say a closed must or should stops unpushed, as do-all.md:164 does), do-fix-skips-closing-review (do-fix.md:55 sends a log-only answer to `/do-review`)
+
+## Review 8 — 2026-11-16 — Opus 5.5 — reviewed c27d97c
+Verdict: Ready to merge (0 must fix) — first pass on c27d97c (brief docs/plans/session-gaps-from-start.md), eighth on this dev; earlier findings left as they were
+- should · zero-length-event-runs-to-midnight · src/lib/gaps.ts:76 · a timed calendar event whose end equals its start (Google allows it; the events route also falls back to the start when an event has no end) now counts as busy until 24:00 instead of being dropped, so every row after it vanishes, in the Morning too (event 09:00–09:00, entry 08:00–08:30, now 11:00: was 08:30–11:00, now 08:30–09:00); the brief says "at or before", but only an end before the start (or at 00:00) is the midnight case it meant; should, not must, because such events are rare
+- should · failed-fetch-offers-whole-session · src/app/log/[period]/page.tsx:178 · with no cache and a failed fetch (offline), isLoading ends with no entries, so an Afternoon or Evening offers "12:00 PM – now" over time that may be logged; the screen already says "Nothing logged yet" then, which is why this is not must
+- should · stale-empty-session-comment · src/lib/gaps.ts:85 · the comment still says an empty session is not a gap and the add button is the answer; true now only for the Morning
+- should · no-event-midnight-test · src/__tests__/gaps.test.ts · the end-before-start rule for calendar events (gaps.ts:76) has no test; only entries are tested
+- optional · plan's choice · long-event-from-before-flex-range · src/app/log/[period]/page.tsx:300 · an event starting before 10:00 that runs into the Afternoon (08:00–14:00) is not passed, so 12:00–14:00 is offered · the brief chose to keep the session's events filtered by start hour
+
+## Fix attempt 6 — 2026-11-16 — Sonnet 5.5 — commit pending
+- zero-length-event-runs-to-midnight · an event whose end equals its start is skipped; only an end before the start (or 00:00) runs to midnight · believes: fixed
+- failed-fetch-offers-whole-session · the session screen tracks whether this date's entries are known (cache or a successful fetch); with no cache and a failed fetch it offers no gaps · believes: fixed
+- stale-empty-session-comment · the comment in gaps.ts now says only the Morning offers nothing when empty · believes: fixed
+- no-event-midnight-test · a test covers a zero-length event, an end before the start and an end at 00:00 · believes: fixed
+- long-event-from-before-flex-range · not attempted (plan's choice)

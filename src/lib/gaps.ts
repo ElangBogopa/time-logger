@@ -73,6 +73,9 @@ export function findUnaccountedGaps({
     if (!event.startTime || !event.endTime) continue
     const start = timeToMinutes(event.startTime)
     const end = timeToMinutes(event.endTime)
+    // A zero-length event (end equals start) holds no time. Only an end before
+    // the start (or 00:00) is an event running to midnight.
+    if (end === start) continue
     busy.push({ start, end: end > start ? end : 24 * 60 })
   }
 
@@ -82,8 +85,9 @@ export function findUnaccountedGaps({
     .filter(({ start, end }) => end > start)
     .sort((a, b) => a.start - b.start)
 
-  // Nothing logged in this session yet: that is an empty session, not a gap.
-  // "Same as yesterday" and the add button are the answer there.
+  // Nothing in this session yet. The Afternoon and Evening offer the whole
+  // stretch from the session's start; the Morning, which starts at midnight,
+  // offers nothing, and the add button is the answer there.
   if (clipped.length === 0) {
     return fromSessionStart && windowEnd - windowStart >= minimumMinutes
       ? [toGap(windowStart, windowEnd)]

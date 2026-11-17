@@ -190,6 +190,32 @@ describe('from the session start (Afternoon and Evening)', () => {
     ).toEqual([g('12:30', '14:00', 90)])
   })
 
+  it('ignores a zero-length event and runs an event that ends before it starts to midnight', () => {
+    expect(
+      findUnaccountedGaps({
+        entries: [entry('08:00', '08:30')],
+        events: [{ startTime: '09:00', endTime: '09:00' }],
+        ...MORNING,
+        nowMinutes: 11 * 60,
+      })
+    ).toEqual([g('08:30', '11:00', 150)])
+    expect(
+      findUnaccountedGaps({
+        entries: [],
+        events: [{ startTime: '20:00', endTime: '20:00' }],
+        ...EVENING,
+        ...from,
+        nowMinutes: 22 * 60,
+      })
+    ).toEqual([g('18:00', '22:00', 240)])
+    expect(
+      findUnaccountedGaps({ entries: [], events: [{ startTime: '20:00', endTime: '01:00' }], ...EVENING, ...from })
+    ).toEqual([g('18:00', '20:00', 120)])
+    expect(
+      findUnaccountedGaps({ entries: [], events: [{ startTime: '20:00', endTime: '00:00' }], ...EVENING, ...from })
+    ).toEqual([g('18:00', '20:00', 120)])
+  })
+
   it('treats an entry that runs past midnight as running to 24:00', () => {
     expect(findUnaccountedGaps({ entries: [entry('22:00', '00:00')], ...EVENING, ...from })).toEqual([
       g('18:00', '22:00', 240),
