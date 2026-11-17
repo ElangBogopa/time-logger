@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Pencil, Trash2, Clock, CheckCircle2, ChevronDown } from 'lucide-react'
 import CategoryPicker from '@/components/CategoryPicker'
+import TimeRangePicker from '@/components/TimeRangePicker'
 import { toast } from 'sonner'
 import { SOCIAL_CATS, METRIC_LABELS, withFriendsOrFamily } from '@/lib/metrics-calc'
 
@@ -414,25 +415,14 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
               </div>
 
               {/* Start & End Time */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-start">Start Time</Label>
-                  <Input
-                    id="edit-start"
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-end">End Time</Label>
-                  <Input
-                    id="edit-end"
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Time</Label>
+                <TimeRangePicker
+                  startTime={startTime}
+                  endTime={endTime}
+                  onStartTimeChange={setStartTime}
+                  onEndTimeChange={setEndTime}
+                />
               </div>
 
               {/* Duration */}

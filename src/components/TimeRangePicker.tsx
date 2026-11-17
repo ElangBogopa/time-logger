@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import { roundToNearest15, addMinutesToTime, calculateDuration, formatDuration, formatTimeDisplay } from '@/lib/time-utils'
+import { TIME_SLOTS, MAX_RANGE_MINUTES, endSlotsAfter, defaultEndAfter, endScrollTarget, normalizeEnd } from '@/lib/time-slots'
 
 interface TimeRangePickerProps {
   startTime: string
@@ -21,52 +22,35 @@ interface TimeRangePickerProps {
   variant?: 'default' | 'quicklog'
 }
 
-// Generate time slots in 15-minute increments (00:00 to 23:45)
-function generateTimeSlots(): string[] {
-  const slots: string[] = []
-  for (let hour = 0; hour < 24; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
-      slots.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
-    }
-  }
-  return slots
-}
-
-const TIME_SLOTS = generateTimeSlots()
-
 interface TimeColumnProps {
   value: string
   onChange: (time: string) => void
   label: string
+  slots: string[]
+  /** The slot the column opens at, as its top row. */
+  scrollTarget: string
+  testId: string
 }
 
-function TimeColumn({ value, onChange, label }: TimeColumnProps) {
+function TimeColumn({ value, onChange, label, slots, scrollTarget, testId }: TimeColumnProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const itemHeight = 48
 
-  // Scroll to selected value
-  const scrollToTime = useCallback((time: string, smooth = true) => {
-    if (!scrollRef.current) return
-    const index = TIME_SLOTS.indexOf(time)
-    if (index >= 0) {
-      const scrollTop = index * itemHeight
-      scrollRef.current.scrollTo({
-        top: scrollTop,
-        behavior: smooth ? 'smooth' : 'auto'
-      })
-    }
-  }, [])
-
-  // On mount or when value changes externally, scroll to it
+  // Position the column at its target, on mount and whenever it changes
   useEffect(() => {
-    if (value) {
-      scrollToTime(value, false)
+    if (!scrollRef.current) return
+    const index = slots.indexOf(scrollTarget)
+    if (index >= 0) {
+      scrollRef.current.scrollTo({ top: index * itemHeight, behavior: 'auto' })
     }
-  }, [value, scrollToTime])
+  }, [scrollTarget, slots])
 
   const handleSelect = (slot: string) => {
     onChange(slot)
-    scrollToTime(slot, true)
+    const index = slots.indexOf(slot)
+    if (index >= 0) {
+      scrollRef.current?.scrollTo({ top: index * itemHeight, behavior: 'smooth' })
+    }
   }
 
   return (
@@ -76,11 +60,12 @@ function TimeColumn({ value, onChange, label }: TimeColumnProps) {
       </p>
       <div
         ref={scrollRef}
+        data-testid={testId}
         className="h-[288px] overflow-y-auto overscroll-contain rounded-lg border bg-muted/30"
         style={{ scrollSnapType: 'y mandatory' }}
       >
-        {TIME_SLOTS.map((slot) => {
-          const isSelected = slot === value
+        {slots.map((slot) => {
+          const isSelected = slot === normalizeEnd(value)
 
           return (
             <button
@@ -119,7 +104,9 @@ export default function TimeRangePicker({
   const duration = calculateDuration(tempStart, tempEnd)
   // Allow midnight crossing (e.g. 23:00 → 00:00 = 1h) — only invalid if duration is 0 or too long
   const isEndBeforeStart = tempStart && tempEnd && duration <= 0
-  const isValidRange = tempStart && tempEnd && duration > 0 && duration <= 16 * 60 // Max 16 hours
+  const isValidRange = tempStart && tempEnd && duration > 0 && duration <= MAX_RANGE_MINUTES // Max 16 hours
+
+  const endSlots = useMemo(() => (tempStart ? endSlotsAfter(tempStart) : TIME_SLOTS), [tempStart])
 
   // Handle start time change - auto-snap end time to start + 30 minutes
   const handleStartChange = useCallback((time: string) => {
@@ -134,14 +121,14 @@ export default function TimeRangePicker({
       setTempStart(startTime)
       setTempEnd(endTime)
     } else if (startTime) {
-      // Have start, default end to start + 30min
+      // Have start, default end to an hour after it
       setTempStart(startTime)
-      setTempEnd(addMinutesToTime(startTime, 30))
+      setTempEnd(defaultEndAfter(startTime))
     } else {
-      // Smart defaults: current time rounded to 15min, end 30min later
+      // Smart defaults: current time rounded to 15min, end an hour later
       const defaultStart = roundToNearest15()
       setTempStart(defaultStart)
-      setTempEnd(addMinutesToTime(defaultStart, 30))
+      setTempEnd(defaultEndAfter(defaultStart))
     }
     setIsOpen(true)
   }
@@ -229,12 +216,18 @@ export default function TimeRangePicker({
               value={tempStart}
               onChange={handleStartChange}
               label="Start"
+              slots={TIME_SLOTS}
+              scrollTarget={tempStart}
+              testId="time-column-start"
             />
 
             <TimeColumn
               value={tempEnd}
               onChange={setTempEnd}
               label="End"
+              slots={endSlots}
+              scrollTarget={tempStart ? endScrollTarget(tempStart, tempEnd) : tempEnd}
+              testId="time-column-end"
             />
           </div>
 

@@ -11,7 +11,9 @@
  * the session screen. The Morning searches from the first thing logged,
  * because it begins at midnight and nobody wants to be asked to account for
  * being asleep. The far end is now, on today, so it never asks about time
- * that has not happened.
+ * that has not happened. A row running up to now opens an entry ending at the
+ * last half hour passed (`entryEndForGap`), so it never fills in time that has
+ * not happened.
  */
 
 import { TimeEntry } from './types'
@@ -120,6 +122,19 @@ export function findUnaccountedGaps({
   }
 
   return gaps
+}
+
+/**
+ * Where the entry opened from a gap row ends. A gap that runs up to now ends
+ * at the last half-hour mark already passed (7:13 -> 7:00), so the entry never
+ * fills in time that has not happened. If no mark lies after the gap's start,
+ * the current time is used. A gap closed by a later entry, a finished day or a
+ * session already over keeps its own end. The start is never touched.
+ */
+export function entryEndForGap(gap: Gap, nowMinutes: number | null): string {
+  if (nowMinutes === null || timeToMinutes(gap.endTime) !== nowMinutes) return gap.endTime
+  const mark = Math.floor(nowMinutes / 30) * 30
+  return mark > timeToMinutes(gap.startTime) ? minutesToTime(mark) : gap.endTime
 }
 
 function toGap(start: number, end: number): Gap {

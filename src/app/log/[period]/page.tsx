@@ -6,7 +6,7 @@ import { useAccount } from '@/hooks/useAccount'
 import { fetchEntries as apiFetchEntries, deleteEntry, upsertSessionCompletion, csrfFetch, createEntries, categorizeActivities, fetchSessionCompletions, deleteSessionCompletion } from '@/lib/api'
 import { findRepeatCandidate, entriesForRepeat, repeatRowsLeft, retimeAfterClash, type RepeatCandidate, type RepeatRow } from '@/lib/repeat-session'
 import { PERIOD_CLASSES } from '@/lib/palette'
-import { findUnaccountedGaps } from '@/lib/gaps'
+import { findUnaccountedGaps, entryEndForGap, type Gap } from '@/lib/gaps'
 import { unconfirmedEvents } from '@/lib/calendar-match'
 import NextUp from '@/components/NextUp'
 import { getCachedEntries, setCachedEntries, getCachedCompletions, setCachedCompletion, removeCachedCompletion } from '@/hooks/useSessionData'
@@ -370,23 +370,27 @@ function LogPeriodContent() {
    * and Evening offer time from the session's start; the whole day's entries
    * are passed so one running over the seam is not asked about twice.
    */
-  const gaps = useMemo(() => {
-    if (isLocked || isLoading || !entriesKnown || !selectedDate) return []
+  const { gaps, gapsNowMinutes } = useMemo(() => {
+    if (isLocked || isLoading || !entriesKnown || !selectedDate) {
+      return { gaps: [] as Gap[], gapsNowMinutes: null as number | null }
+    }
     const isToday = selectedDate === getUserToday()
     const currentHour = getUserCurrentHour()
-    return findUnaccountedGaps({
+    const nowMinutes = isToday ? currentHour * 60 + new Date().getMinutes() : null
+    const found = findUnaccountedGaps({
       entries: visibleEntries,
       events: calendarEvents,
       fromSessionStart: period !== 'morning',
       periodStart: range.start,
       periodEnd: range.end,
       // On today, never ask about time that has not happened yet.
-      nowMinutes: isToday ? currentHour * 60 + new Date().getMinutes() : null,
+      nowMinutes,
     })
+    return { gaps: found, gapsNowMinutes: nowMinutes }
   }, [isLocked, isLoading, entriesKnown, selectedDate, visibleEntries, period, calendarEvents, range.start, range.end])
 
-  const handleFillGap = (startTime: string, endTime: string) => {
-    setQuickLogRange({ startTime, endTime })
+  const handleFillGap = (gap: Gap) => {
+    setQuickLogRange({ startTime: gap.startTime, endTime: entryEndForGap(gap, gapsNowMinutes) })
     setIsQuickLogOpen(true)
   }
 
@@ -713,7 +717,7 @@ function LogPeriodContent() {
               {gaps.map((gap) => (
                 <button
                   key={gap.startTime}
-                  onClick={() => handleFillGap(gap.startTime, gap.endTime)}
+                  onClick={() => handleFillGap(gap)}
                   className="w-full flex items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 px-4 py-3 text-left transition-all duration-150 hover:border-foreground/25 hover:bg-card active:scale-[0.99]"
                 >
                   <CircleDashed className="h-4 w-4 text-muted-foreground shrink-0" />

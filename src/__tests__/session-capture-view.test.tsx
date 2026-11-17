@@ -190,3 +190,27 @@ describe('Afternoon and Evening offer time from the session start', () => {
     expect(await screen.findByText('12:00 PM – 6:00 PM')).toBeInTheDocument()
   })
 })
+
+describe('a row running up to now opens an entry ending at the last half hour', () => {
+  beforeEach(() => {
+    mockPeriod = 'afternoon'
+    mockHour = 15
+    ;(Date.prototype.getMinutes as jest.Mock).mockReturnValue(13)
+    ;(fetchEntries as jest.Mock).mockResolvedValue([entry('1', 'Report', '14:00', '14:30', 30)])
+  })
+
+  it('rounds the stretch since the last entry down to 3:00 PM, wording unchanged', async () => {
+    render(<LogPeriodPage />)
+
+    const row = await screen.findByText('2:30 PM – 3:13 PM')
+    fireEvent.click(row)
+    await waitFor(() => expect(screen.getByTestId('quick-log')).toHaveTextContent('14:30→15:00'))
+  })
+
+  it('does not round a gap closed by an entry', async () => {
+    render(<LogPeriodPage />)
+
+    fireEvent.click(await screen.findByText('12:00 PM – 2:00 PM'))
+    await waitFor(() => expect(screen.getByTestId('quick-log')).toHaveTextContent('12:00→14:00'))
+  })
+})

@@ -9,7 +9,7 @@
  * covers.
  */
 
-import { findUnaccountedGaps } from '@/lib/gaps'
+import { findUnaccountedGaps, entryEndForGap } from '@/lib/gaps'
 import type { TimeEntry } from '@/lib/types'
 
 const entry = (start: string, end: string): TimeEntry =>
@@ -230,5 +230,30 @@ describe('from the session start (Afternoon and Evening)', () => {
       findUnaccountedGaps({ entries: [entry('08:30', '09:00')], ...MORNING, nowMinutes: 11 * 60 })
     ).toEqual([g('09:00', '11:00', 120)])
     expect(findUnaccountedGaps({ entries: [], ...MORNING, nowMinutes: 11 * 60 })).toEqual([])
+  })
+})
+
+describe('entryEndForGap', () => {
+  const gap = (startTime: string, endTime: string) => ({ startTime, endTime, durationMinutes: 0 })
+
+  it('ends a gap running to now at the last half hour passed', () => {
+    expect(entryEndForGap(gap('06:00', '07:13'), 433)).toBe('07:00')
+    expect(entryEndForGap(gap('06:40', '07:05'), 425)).toBe('07:00')
+  })
+  it('uses the current time when no half hour has passed since the start', () => {
+    expect(entryEndForGap(gap('06:00', '06:20'), 380)).toBe('06:20')
+    expect(entryEndForGap(gap('06:40', '06:55'), 415)).toBe('06:55')
+  })
+  it('keeps an end that is already on the mark', () => {
+    expect(entryEndForGap(gap('06:00', '07:30'), 450)).toBe('07:30')
+  })
+  it('keeps the end of a gap closed by a later entry', () => {
+    expect(entryEndForGap(gap('06:00', '08:10'), 540)).toBe('08:10')
+  })
+  it('keeps the end on a finished day', () => {
+    expect(entryEndForGap(gap('06:00', '07:13'), null)).toBe('07:13')
+  })
+  it('keeps the end when the session is already over', () => {
+    expect(entryEndForGap(gap('12:00', '18:00'), 1140)).toBe('18:00')
   })
 })
