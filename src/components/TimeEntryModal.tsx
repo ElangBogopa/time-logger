@@ -70,6 +70,9 @@ function formatDate(dateStr: string): string {
   })
 }
 
+// The database returns times as "06:00:00"; the picker's slots are "06:00".
+const hhmm = (t?: string | null) => (t || '').slice(0, 5)
+
 export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, promptAddTimes = false, onShowToast }: TimeEntryModalProps) {
   const [isEditing, setIsEditing] = useState(promptAddTimes)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -85,8 +88,8 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
   // Edit form state
   const [date, setDate] = useState(entry.date)
   const [activity, setActivity] = useState(entry.activity)
-  const [startTime, setStartTime] = useState(entry.start_time || '')
-  const [endTime, setEndTime] = useState(entry.end_time || '')
+  const [startTime, setStartTime] = useState(hhmm(entry.start_time))
+  const [endTime, setEndTime] = useState(hhmm(entry.end_time))
   const [duration, setDuration] = useState(String(entry.duration_minutes))
   const [description, setDescription] = useState(entry.description || '')
   const [category, setCategory] = useState<TimeCategory | null>(entry.category)
@@ -264,8 +267,8 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
     setIsEditing(false)
     setDate(entry.date)
     setActivity(entry.activity)
-    setStartTime(entry.start_time || '')
-    setEndTime(entry.end_time || '')
+    setStartTime(hhmm(entry.start_time))
+    setEndTime(hhmm(entry.end_time))
     setDuration(String(entry.duration_minutes))
     setDescription(entry.description || '')
     setError(null)

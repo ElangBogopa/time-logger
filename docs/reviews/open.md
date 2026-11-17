@@ -77,3 +77,16 @@ Verdict: Ready to merge (0 must fix) — first pass on c27d97c (brief docs/plans
 - stale-empty-session-comment · the comment in gaps.ts now says only the Morning offers nothing when empty · believes: fixed
 - no-event-midnight-test · a test covers a zero-length event, an end before the start and an end at 00:00 · believes: fixed
 - long-event-from-before-flex-range · not attempted (plan's choice)
+
+## Review 9 — 2026-11-16 — Opus 5.5 — reviewed c8a5510
+Verdict: Ready to merge (0 must fix) — second pass on the brief docs/plans/session-gaps-from-start.md, ninth on this dev; trying it on a phone is now the better test
+- resolved: zero-length-event-runs-to-midnight (gaps.ts:78 skips end == start; 09:00–09:00 with 08:00–08:30 at 11:00 gives 08:30–11:00 again; 20:00–01:00 and 20:00–00:00 still run to midnight), failed-fetch-offers-whole-session (page.tsx:121, :374 — no cache and a failed fetch leaves `entriesKnown` false, so no rows; a cached list still counts as known), stale-empty-session-comment (gaps.ts:88), no-event-midnight-test (gaps.test.ts:193 covers zero-length, past-midnight and 00:00 events)
+
+## Review 10 — 2026-11-16 — Opus 5.5 — reviewed f10c681
+Verdict: Not ready (1 must fix) — first pass on f10c681 (brief docs/plans/gap-end-and-end-picker.md), tenth on this dev; earlier findings left as they were
+- must · edit-picker-seconds · src/components/TimeEntryModal.tsx:88 · the edit form hands the picker the stored times as the database returns them ("06:00:00", as /api/entries passes rows through), which are never in the slot lists: the Start column opens at 12:00 AM, End opens an hour after the start instead of at the held end (an 06:00–08:30 entry opens at 7:00), and neither column highlights anything (TimeRangePicker.tsx:42, :68); the test (entry-edit-times.test.tsx) uses "06:00", so it cannot see it; trim to HH:MM where the modal sets and resets its times (:88, :267), and test with "06:00:00"
+- optional · plan's choice · edit-times-cannot-be-cleared · src/components/TimeEntryModal.tsx:418 · the native fields could be emptied to make an entry duration-only; the picker can set times but never clear them · the brief chose to replace the edit form's native fields with TimeRangePicker
+
+## Fix attempt 7 — 2026-11-16 — Sonnet 5.5 — commit pending
+- edit-picker-seconds · the edit form trims stored times to HH:MM where it sets and resets them (`hhmm` in TimeEntryModal.tsx); a test with "06:00:00" / "08:30:00" checks the End column opens on 8:30 · believes: fixed
+- edit-times-cannot-be-cleared · not attempted (plan's choice)

@@ -29,3 +29,17 @@ it('edits times with the picker, End listing only times after the start', () => 
   fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
   expect(screen.getByLabelText(/Duration/)).toHaveValue(90)
 })
+
+it('opens the picker on the held times when the database returns seconds', () => {
+  const stored = { ...entry, start_time: '06:00:00', end_time: '08:30:00', duration_minutes: 150 }
+  render(
+    <TimeEntryModal entry={stored as never} onClose={jest.fn()} onUpdate={jest.fn()} onDelete={jest.fn()} onShowToast={jest.fn()} />
+  )
+  fireEvent.click(screen.getByRole('button', { name: /edit/i }))
+  fireEvent.click(screen.getByText('End'))
+  const col = screen.getByTestId('time-column-end')
+  let top: number | undefined
+  scrollTo.mock.calls.forEach((c, i) => { if (scrollTo.mock.contexts[i] === col) top = c[0].top })
+  // 15-minute slots after 6:00: 8:30 is the tenth, so the column opens on it
+  expect(top).toBe(9 * 48)
+})
