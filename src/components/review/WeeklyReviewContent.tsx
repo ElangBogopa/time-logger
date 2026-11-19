@@ -3,14 +3,13 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
-import { ChevronLeft, ChevronRight, Loader2, TrendingUp, TrendingDown, Minus, Sparkles, BarChart3, Grid3X3, ArrowRight, CalendarClock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Sparkles, BarChart3, Grid3X3, ArrowRight, CalendarClock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getLocalDateString, getWeekStartForDate, shiftDateString, getUserToday } from '@/lib/types'
 import { MetricRingRow } from '@/components/MetricRings'
 import type { MetricKey } from '@/lib/chart-colors'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
-import { STATUS_CLASSES } from '@/lib/palette'
 import { METRIC_THRESHOLDS } from '@/lib/metrics-calc'
 import { useMyWindows } from '@/hooks/useMyWindows'
 import { useWeekEntries } from '@/hooks/useWeekEntries'
@@ -99,12 +98,6 @@ function formatWeekRange(start: string, end: string) {
   const e = new Date(end + 'T12:00:00')
   const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
   return `${s.toLocaleDateString('en-US', opts)} – ${e.toLocaleDateString('en-US', opts)}`
-}
-
-function formatMinutes(m: number) {
-  const h = Math.floor(m / 60)
-  const mins = m % 60
-  return h > 0 ? `${h}h ${mins}m` : `${mins}m`
 }
 
 const RATING_STYLES = {
@@ -276,10 +269,6 @@ export default function WeeklyReviewContent() {
 
   const isRecentWeek = isCurrentWeek || weekStart === shiftDateString(getWeekStart(new Date()), -7)
 
-  const weekChange = reviewData.previousWeekMinutes !== null
-    ? Math.round(((reviewData.totalMinutes - reviewData.previousWeekMinutes) / reviewData.previousWeekMinutes) * 100)
-    : null
-
   return (
     <div>
       {/* Week Navigation */}
@@ -306,20 +295,6 @@ export default function WeeklyReviewContent() {
             caption={weekLabel}
           />
         ) : null}
-        {weekChange !== null && (
-          <div className="flex items-center justify-center gap-1 mt-2 text-xs">
-            {weekChange > 0 ? (
-              <><TrendingUp className={`h-3.5 w-3.5 ${STATUS_CLASSES.green.icon}`} /><span className={STATUS_CLASSES.green.icon}>+{weekChange}%</span></>
-            ) : weekChange < 0 ? (
-              <><TrendingDown className={`h-3.5 w-3.5 ${STATUS_CLASSES.red.icon}`} /><span className={STATUS_CLASSES.red.icon}>{weekChange}%</span></>
-            ) : (
-              <><Minus className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground">Same</span></>
-            )}
-            <span className="text-muted-foreground">
-              time logged vs {isCurrentWeek ? 'the same days last week' : 'last week'}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Highlights */}
@@ -373,22 +348,6 @@ export default function WeeklyReviewContent() {
           )}
         </section>
       )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-3 gap-2 mb-5">
-        <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-xs text-muted-foreground">Logged</p>
-          <p className="text-lg font-bold">{formatMinutes(reviewData.totalMinutes)}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-xs text-muted-foreground">Active Days</p>
-          <p className="text-lg font-bold">{reviewData.activeDays}/{reviewData.evaluatedDays || 7}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-xs text-muted-foreground">Entries</p>
-          <p className="text-lg font-bold">{reviewData.entryCount}</p>
-        </div>
-      </div>
 
       {/* Target Scorecards, Goal Progress, Category Breakdown — removed (old weekly targets, not meaningful) */}
 

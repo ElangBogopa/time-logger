@@ -30,7 +30,6 @@ import {
   Circle,
   Clock,
   Sparkles,
-  Calendar,
   Lock,
   Loader2,
 } from 'lucide-react'
@@ -203,71 +202,6 @@ function PlanNextCard({ reviewDate }: { reviewDate: string }) {
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
-    </section>
-  )
-}
-
-function WinsSection({ wins }: { wins: Win[] }) {
-  if (wins.length === 0) return null
-
-  return (
-    <section className="space-y-3">
-      <h2 className="eyebrow">What stood out</h2>
-      <div className="rounded-xl border border-border bg-card divide-y divide-border">
-        {wins.map(win => (
-          <div key={win.id} className="px-4 py-3 text-sm text-foreground">
-            {win.text}
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-// Timeline Strip
-function TimelineStrip({ timeline, startHour = 6, endHour = 23 }: { timeline: TimelineBlock[]; startHour?: number; endHour?: number }) {
-  const visibleHours = timeline.slice(startHour, endHour + 1)
-
-  return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Calendar className="h-5 w-5 text-muted-foreground" />
-        <h2 className="font-semibold text-foreground">Your Day</h2>
-      </div>
-      <div className="flex gap-0.5 h-12 rounded-lg overflow-hidden bg-secondary">
-        {visibleHours.map(block => {
-          const hasEntries = block.entries.length > 0
-          const primaryCategory = block.entries[0]?.category
-
-          return (
-            <div
-              key={block.hour}
-              className={cn(
-                'flex-1 relative group',
-                hasEntries && primaryCategory
-                  ? CATEGORY_COLORS[primaryCategory]
-                  : 'bg-zinc-200 dark:bg-zinc-700'
-              )}
-              title={
-                hasEntries
-                  ? `${block.hour}:00 - ${block.entries.map(e => e.activity).join(', ')}`
-                  : `${block.hour}:00 - No activity`
-              }
-            >
-              {/* Hour label on hover */}
-              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                {block.hour}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      {/* Hour labels */}
-      <div className="flex justify-between text-xs text-muted-foreground px-1">
-        <span>{startHour}:00</span>
-        <span>12:00</span>
-        <span>{endHour}:00</span>
-      </div>
     </section>
   )
 }
@@ -851,12 +785,11 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
               values={metrics}
               size={84}
               srLabel="Scores for this day"
-              caption={`${summary.sessionsLogged}/${summary.totalSessions} sessions · ${formatMinutes(summary.totalMinutesLogged)} tracked`}
+              caption={`${formatMinutes(summary.totalMinutesLogged)} logged`}
             />
           ) : (
             <p className="text-center text-sm text-muted-foreground">
-              {summary.sessionsLogged}/{summary.totalSessions} sessions ·{' '}
-              {formatMinutes(summary.totalMinutesLogged)} tracked
+              {formatMinutes(summary.totalMinutesLogged)} logged
             </p>
           )}
         </section>
@@ -892,25 +825,6 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
           </section>
         )}
 
-        {/* Wins */}
-        {summary.wins.length > 0 && (
-          <div className="mb-6">
-            <WinsSection wins={summary.wins} />
-          </div>
-        )}
-
-        {/* Timeline */}
-        <div className="mb-6">
-          <TimelineStrip timeline={summary.timeline} />
-        </div>
-
-        {/* Whether things landed where they go best */}
-        {alignment.length > 0 && (
-          <div className="mb-6">
-            <WindowAlignmentCard facts={alignment} />
-          </div>
-        )}
-
         {/* What you planned, against what happened */}
         {summary.productivityScore?.hasPlans && (
           <section className="mb-6">
@@ -922,6 +836,14 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
             />
           </section>
         )}
+
+        {/* Whether things landed where they go best */}
+        {alignment.length > 0 && (
+          <div className="mb-6">
+            <WindowAlignmentCard facts={alignment} />
+          </div>
+        )}
+
 
         {/* Energy Breakdown, Category Breakdown, and Mood — commented out until science-based measurement is ready
         {summary.aggregatedBreakdown && summary.aggregatedBreakdown.length > 0 && (
@@ -941,31 +863,11 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
         )}
         */}
 
-        {/* The day is reviewed; the next move is tomorrow. This is the
-            moment the planner is for. */}
-        {summary.date >= getUserToday() && (
-          <button
-            onClick={() => router.push(`/calendar?date=${shiftDateString(summary.date, 1)}`)}
-            className="w-full flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 mb-6 text-left transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]"
-          >
-            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${AGGREGATED_CLASSES.focus.tint}`}>
-              <CalendarClock className={`h-4 w-4 ${AGGREGATED_CLASSES.focus.text}`} />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">Plan tomorrow</p>
-              <p className="text-xs text-muted-foreground">Give tomorrow&apos;s tasks a time</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </button>
-        )}
-
         {/* Longest Focus */}
         {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
-          <section className="rounded-xl border border-border bg-card p-4">
+          <section className="rounded-xl border border-border bg-card p-4 mb-6">
             <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${AGGREGATED_CLASSES.focus.tint}`}>
-                <Clock className={`h-5 w-5 ${AGGREGATED_CLASSES.focus.text}`} />
-              </div>
+              <Clock className="h-5 w-5 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Longest focus session</p>
                 <p className="font-medium text-foreground">

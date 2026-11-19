@@ -73,7 +73,7 @@ beforeEach(() => {
 })
 
 async function settle() {
-  await waitFor(() => expect(screen.getByText("What stood out")).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText("5h logged")).toBeInTheDocument())
   // Long enough for many cycles of a 30ms request: the pre-fix component reached
   // ~20 calls in this window.
   for (let i = 0; i < 8; i++) await delay(100)
@@ -116,18 +116,18 @@ it('requests commentary once when the request throws', async () => {
   expect(csrfFetch).toHaveBeenCalledTimes(1)
 })
 
-it('renders each win from the summary', async () => {
-  // The local Win type claimed { icon, label }, which the API never sends, so
-  // the section rendered its heading over empty rows.
+it('no longer lists the wins on the screen', async () => {
+  // The wins are still sent to the coach and saved with the review, but the
+  // screen no longer repeats them.
   ;(csrfFetch as jest.Mock).mockImplementation(async () => {
     await delay(30)
     return { ok: true, json: async () => ({ commentary: 'Good day.' }) }
   })
 
   render(<DayReviewContent />)
-  await waitFor(() => expect(screen.getByText("What stood out")).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText("5h logged")).toBeInTheDocument())
 
-  expect(screen.getByText('150 min focus session on "Coding"')).toBeInTheDocument()
+  expect(screen.queryByText('150 min focus session on "Coding"')).not.toBeInTheDocument()
 })
 
 it('renders the commentary and stops requesting on success', async () => {

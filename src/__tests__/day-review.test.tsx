@@ -169,8 +169,9 @@ describe('DayReviewPage', () => {
     })
     expect(screen.getByText('84')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
-    // the sessions line survives as a caption: a fact, not a score
-    expect(screen.getByText(/2\/3 sessions/)).toBeInTheDocument()
+    // the time logged survives as a caption: a fact, not a score
+    expect(screen.getByText('7h logged')).toBeInTheDocument()
+    expect(screen.queryByText(/sessions/)).not.toBeInTheDocument()
     expect(screen.queryByText('75')).not.toBeInTheDocument()
   })
 
@@ -487,6 +488,44 @@ describe('DayReviewPage', () => {
     routeFetch(createMockDaySummary())
     render(<DayReviewPage />)
     expect(await screen.findByText(/^Plan (tomorrow|the rest of today)$/)).toBeInTheDocument()
+  })
+
+  it('has exactly one Plan tomorrow when reviewing today after 9pm', async () => {
+    jest.useFakeTimers({
+      doNotFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'setImmediate',
+        'clearImmediate', 'nextTick', 'queueMicrotask', 'requestAnimationFrame',
+        'cancelAnimationFrame', 'performance', 'hrtime', 'requestIdleCallback', 'cancelIdleCallback'],
+      now: new Date(2024, 1, 20, 21, 30),
+    })
+    try {
+      ;(useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams('date=2024-02-20'))
+      routeFetch(createMockDaySummary({ date: '2024-02-20' }))
+      render(<DayReviewPage />)
+
+      expect(await screen.findByText('7h logged')).toBeInTheDocument()
+      expect(screen.getAllByText(/^Plan tomorrow$/)).toHaveLength(1)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('does not show the Your Day strip or What stood out, nor the win text', async () => {
+    ;(useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams('date=2024-01-10'))
+    routeFetch(createMockDaySummary({
+      date: '2024-01-10',
+      timeline: Array.from({ length: 24 }, (_, i) => ({
+        hour: i,
+        entries: i === 9 ? [{ activity: 'Coding', category: 'deep_work' }] : [],
+        totalMinutes: i === 9 ? 60 : 0,
+      })),
+      wins: [{ id: 'longest-focus', text: 'A very particular win', type: 'focus' }],
+    }))
+    render(<DayReviewPage />)
+
+    expect(await screen.findByText('7h logged')).toBeInTheDocument()
+    expect(screen.queryByText('Your Day')).not.toBeInTheDocument()
+    expect(screen.queryByText('What stood out')).not.toBeInTheDocument()
+    expect(screen.queryByText('A very particular win')).not.toBeInTheDocument()
   })
 
   it('says so plainly when nothing was logged, and asks the model for nothing', async () => {

@@ -84,6 +84,8 @@ it('generates a summary and returns its fingerprint on a cold call', async () =>
   expect(res.body.coachSummary).toBe('A strong week of focus.')
   expect(res.body.coachFingerprint).toEqual(expect.any(String))
   expect(res.body.coachSummaryUnchanged).toBe(false)
+  const insights = (res.body as unknown as { insights: string[] }).insights
+  expect(insights.some((i) => i.startsWith('Logged '))).toBe(false)
 })
 
 it('skips the model when the caller already holds that summary', async () => {

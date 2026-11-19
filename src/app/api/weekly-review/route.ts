@@ -343,16 +343,6 @@ export async function POST(request: NextRequest) {
       insights.push(`Most waking time: ${topCategory.label} (${hours}h)`)
     }
 
-    if (hasPreviousWeekData && previousWeekMinutes !== null) {
-      const change = Math.round(((totalMinutes - previousWeekMinutes) / previousWeekMinutes) * 100)
-      const versus = isPartialWeek ? 'the same days last week' : 'last week'
-      if (change > 10) {
-        insights.push(`Logged ${change}% more time than ${versus}`)
-      } else if (change < -10) {
-        insights.push(`Logged ${Math.abs(change)}% less time than ${versus}`)
-      }
-    }
-
     // Calculate active days (days with at least one entry)
     const activeDays = Array.from(entriesByDay.values()).filter(dayEntries => dayEntries.length > 0).length
     // evaluatedDays already calculated above (before scorecards)

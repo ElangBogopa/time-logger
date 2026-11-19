@@ -138,7 +138,7 @@ describe('the day review', () => {
     serveDay(daySummary({ entries: [entry('meals', '12:00', '12:30'), entry('sleep', '00:00', '07:00')] }))
     render(<DayReviewContent embedded />)
 
-    await waitFor(() => expect(screen.getByText("What stood out")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText("5h logged")).toBeInTheDocument())
     expect(screen.queryByRole('region', { name: 'In your windows' })).not.toBeInTheDocument()
   })
 
@@ -204,6 +204,19 @@ describe('the weekly review', () => {
     expect(within(card).getByText('3h')).toBeInTheDocument()
     expect(within(card).getByText(/of 4h/)).toBeInTheDocument()
     expect(within(card).getByText('Time with people')).toBeInTheDocument()
+  })
+
+  it('leaves out the logging-volume figures, even with a week to compare to', async () => {
+    ;(csrfFetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...review, previousWeekMinutes: 300, hasPreviousWeekData: true }),
+    })
+    render(<WeeklyReviewContent />)
+
+    await waitFor(() => expect(screen.getByText('This week')).toBeInTheDocument())
+    expect(screen.queryByText('Active Days')).not.toBeInTheDocument()
+    expect(screen.queryByText('Entries')).not.toBeInTheDocument()
+    expect(screen.queryByText(/time logged vs/)).not.toBeInTheDocument()
   })
 
   it('leaves the card out of a week with nothing to report', async () => {
