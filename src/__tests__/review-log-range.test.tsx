@@ -108,14 +108,32 @@ describe('useReadAction', () => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ plans: [] }) })) as unknown as typeof fetch
   })
 
-  it('reads the plan from the cache at once', async () => {
-    const { getUserToday } = jest.requireActual('@/lib/types')
+  it('reads the plan from the cache at once: a cached plan of the same title turns the slot off before the refresh answers', async () => {
+    const { getUserToday, shiftDateString } = jest.requireActual('@/lib/types')
+    // A review of today always targets tomorrow, whatever the clock says.
+    const today = getUserToday()
+    const tomorrow = shiftDateString(today, 1)
     window.sessionStorage.setItem(
-      `read-action-plans:${getUserToday()}`,
+      `read-action-plans:${tomorrow}`,
       JSON.stringify({ plans: [{ id: 'p0', title: 'Essay draft', committed_start: null, committed_end: null }] })
     )
-    const { result } = renderHook(() => useReadAction(read, { reviewDate: getUserToday() }, false))
-    expect(result.current.action).not.toBeNull()
+    // The refresh is asked for and held, so the first answer is the cache's alone.
+    const release: ((res: unknown) => void)[] = []
+    global.fetch = jest.fn(() => new Promise((resolve) => release.push(resolve))) as unknown as typeof fetch
+
+    const { result } = renderHook(() => useReadAction(read, { reviewDate: today }, true))
+    expect(result.current.action?.targetDate).toBe(tomorrow)
+    expect(result.current.action?.slot).toBeNull()
+    expect(result.current.action?.label).toBe('Plan tomorrow')
+
+    // Still off once the refresh has been asked for and has not answered.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(`/api/plans?date=${tomorrow}`))
+    expect(result.current.action?.slot).toBeNull()
+
+    // The refresh outranks the cache: the plan is gone, so the slot is offered again.
+    await act(async () => release.forEach((r) => r({ ok: true, json: async () => ({ plans: [] }) })))
+    expect(result.current.action?.slot).toEqual(read.slot)
+    expect(JSON.parse(window.sessionStorage.getItem(`read-action-plans:${tomorrow}`) as string).plans).toEqual([])
   })
 
   it('does not add a second plan when timing the first failed', async () => {
