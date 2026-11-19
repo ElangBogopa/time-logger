@@ -43,39 +43,60 @@ describe('the week review context', () => {
     expect(some).toContain('Best focus hours')
   })
 
-  it('states the largest activity apart from sleep for a week with no best focus', () => {
+  it('states the largest activity for a week with no best focus', () => {
     // Asked to find it, the model said chores (6h) took the most when rest had 10h.
-    const sleepHeavy = [
-      { label: 'Sleep', minutes: 3780 },
+    const restHeavy = [
       { label: 'Rest', minutes: 600 },
       { label: 'Calls', minutes: 180 },
       { label: 'Chores', minutes: 360 },
     ]
-    const none = week({ bestDays: [], bestHours: [], categories: sleepHeavy })
-    expect(none).toContain('- Most hours apart from sleep: Rest (10h)')
+    const none = week({ bestDays: [], bestHours: [], categories: restHeavy })
+    expect(none).toContain('- Most hours: Rest (10h)')
     const tie = week({
       bestDays: [],
       bestHours: [],
-      categories: [{ label: 'Sleep', minutes: 3000 }, { label: 'Chores', minutes: 360 }, { label: 'Rest', minutes: 360 }],
+      categories: [{ label: 'Chores', minutes: 360 }, { label: 'Rest', minutes: 360 }],
     })
-    expect(tie).toContain('- Most hours apart from sleep: Chores and Rest (6h each)')
-    const onlySleep = week({ bestDays: [], bestHours: [], categories: [{ label: 'Sleep', minutes: 3000 }] })
-    expect(onlySleep).not.toContain('Most hours')
+    expect(tie).toContain('- Most hours: Chores and Rest (6h each)')
     // A week with best focus keeps its pattern about the focus and is not told this.
-    expect(week({ categories: sleepHeavy })).not.toContain('Most hours')
+    expect(week({ categories: restHeavy })).not.toContain('Most hours')
   })
 
-  it('lists Sleep last and the rest by hours', () => {
+  it('lists the categories by hours', () => {
     const context = week({
       categories: [
-        { label: 'Sleep', minutes: 3000 },
         { label: 'Meetings', minutes: 480 },
         { label: 'Deep Work', minutes: 1200 },
       ],
     })
     const at = (l: string) => context.indexOf(`- ${l}:`)
     expect(at('Deep Work')).toBeLessThan(at('Meetings'))
-    expect(at('Meetings')).toBeLessThan(at('Sleep'))
+  })
+
+  it('a week holding old sleep rows tells the model nothing about sleep', () => {
+    const categories = [
+      { label: 'Sleep', minutes: 3000 },
+      { label: 'Deep Work', minutes: 1200 },
+      { label: 'Social', minutes: 120 },
+    ]
+    for (const context of [
+      week({ categories }),
+      week({ categories, bestDays: [], bestHours: [] }),
+      week({ categories, isPartialWeek: true }),
+      week({ categories: [{ label: 'Sleep', minutes: 3000 }], bestDays: [], bestHours: [] }),
+    ]) {
+      expect(context).not.toMatch(/sleep/i)
+    }
+    for (const prompt of [
+      buildWeekReviewSystemPrompt({ bestDays: [], bestHours: [] }),
+      buildWeekReviewSystemPrompt({ bestDays: ['Tuesday'], bestHours: ['9 AM'] }),
+    ]) {
+      expect(prompt).not.toMatch(/sleep/i)
+    }
+  })
+
+  it('a week of only old sleep rows is not told it had no friends or family', () => {
+    expect(week({ categories: [{ label: 'Sleep', minutes: 3000 }] })).not.toContain('No time with friends or family')
   })
 })
 
@@ -88,7 +109,7 @@ describe('the week review system prompt', () => {
   })
 
   it('says nothing of best focus to a week that has none', () => {
-    // The sleep-heavy week was told to call them "best focus", and answered
+    // The rest-heavy week was told to call them "best focus", and answered
     // that there was no focused work and suggested best focus hours.
     // REVIEW_VOICE's example sentence is shared with the day line.
     const none = buildWeekReviewSystemPrompt({ bestDays: [], bestHours: [] }).replace(REVIEW_VOICE, '')
@@ -100,7 +121,7 @@ describe('the week review system prompt', () => {
   it('does not ask a week with no best focus to rank the activities itself', () => {
     const none = buildWeekReviewSystemPrompt({ bestDays: [], bestHours: [] })
     expect(none).not.toMatch(/which activit(?:y|ies) took the most/i)
-    expect(none).toContain('the data gives as taking the most hours apart from sleep')
+    expect(none).toContain('the data gives as taking the most hours')
   })
 
   it('names only the best focus days or hours the week has', () => {

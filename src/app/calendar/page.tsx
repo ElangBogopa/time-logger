@@ -90,7 +90,7 @@ function CalendarContent() {
   const cachedEntries = selectedDate ? getCachedEntries(selectedDate) : null
   const [entries, setEntries] = useState<TimeEntry[]>(cachedEntries ?? [])
   const [isLoading, setIsLoading] = useState(!cachedEntries)
-  // A neighbouring day's sleep where it spills into this one: drawn, never counted.
+  // An older one-piece overnight row on a neighbouring day, where it spills into this one: drawn, never counted.
   const covered = useOvernightSpill(selectedDate || null, entries)
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false)
   const [selectedGhostEvent, setSelectedGhostEvent] = useState<CalendarEvent | null>(null)
@@ -265,7 +265,7 @@ function CalendarContent() {
     type Item = {
       key: string
       start: string
-      /** Where it sits on this date: a night's sleep logged as 23:00–07:00 sorts at midnight. */
+      /** Where it sits on this date: an older one-piece row of 23:00–07:00 sorts at midnight. */
       sortKey: string
       end: string
       title: string
@@ -365,7 +365,7 @@ function CalendarContent() {
           endMinutes: onDay.end ? timeToMinutes(onDay.end) : startMinutes + e.duration_minutes,
         }]
       }),
-      // A neighbouring day's sleep spilling into this one: never planned over.
+      // An older one-piece overnight row spilling in from a neighbouring day: never planned over.
       ...covered.map((b) => ({
         startMinutes: timeToMinutes(b.startTime),
         endMinutes: timeToMinutes(b.endTime),
@@ -383,10 +383,10 @@ function CalendarContent() {
   )
 
   /**
-   * The day starts when you do. Half an hour after you usually get up, and
-   * never before five; six, as before, until the log has a few mornings in it.
+   * The day starts when you do. Half an hour after the wake time you have
+   * stated, and never before five; six when you have stated none.
    */
-  const { wakeMinutes } = useWakeTime(history)
+  const { wakeMinutes } = useWakeTime()
   const earliestMinutes = wakeMinutes === null ? 6 * 60 : Math.max(5 * 60, wakeMinutes + 30)
   // The day's windows, moved to when this person wakes: what "peak focus"
   // and "physical peak" mean for them, not for the reference day.
@@ -1137,7 +1137,7 @@ function CalendarContent() {
                     <span style={{ color: METRIC_TEXT_HEX.social }}>Heart {forecast.social}</span>
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Counting only what is on this page. Sleep, meals and anything unplanned add to it.
+                    Counting only what is on this page. Anything unplanned adds to it.
                   </p>
                 </div>
               )}

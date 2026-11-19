@@ -45,12 +45,17 @@ describe('ENERGY_VIEW configuration', () => {
     expect(ENERGY_VIEW.ops.label).toBe('Ops')
   })
 
-  it('maps body to exercise, movement, meals, sleep', () => {
+  it('maps body to exercise, movement, meals', () => {
     expect(ENERGY_VIEW.body.categories).toContain('exercise')
     expect(ENERGY_VIEW.body.categories).toContain('movement')
     expect(ENERGY_VIEW.body.categories).toContain('meals')
-    expect(ENERGY_VIEW.body.categories).toContain('sleep')
+    expect(ENERGY_VIEW.body.categories).not.toContain('sleep')
     expect(ENERGY_VIEW.body.label).toBe('Body')
+  })
+
+  it('puts sleep, no longer offered, in ops beside other', () => {
+    expect(ENERGY_VIEW.ops.categories).toContain('sleep')
+    expect(ENERGY_VIEW.ops.categories).toContain('other')
   })
 
   it('maps recovery to rest, self_care', () => {
@@ -166,8 +171,8 @@ describe('getAggregatedCategory', () => {
     expect(getAggregatedCategory('meals')).toBe('body')
   })
 
-  it('returns body for sleep', () => {
-    expect(getAggregatedCategory('sleep')).toBe('body')
+  it('returns ops for sleep, saved before it was removed', () => {
+    expect(getAggregatedCategory('sleep')).toBe('ops')
   })
 
   it('returns recovery for rest', () => {
@@ -258,11 +263,10 @@ describe('aggregateByView', () => {
       ['exercise', 60],
       ['movement', 30],
       ['meals', 45],
-      ['sleep', 480],
     ])
     const result = aggregateByView(categoryMinutes)
 
-    expect(result.get('body')).toBe(615) // 60 + 30 + 45 + 480
+    expect(result.get('body')).toBe(135) // 60 + 30 + 45
   })
 
   it('does not include categories with 0 minutes', () => {

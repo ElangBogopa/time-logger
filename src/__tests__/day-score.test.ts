@@ -28,12 +28,11 @@ it('counts a metric once it reaches its target', () => {
 })
 
 it('counts all three on a balanced day', () => {
-  // Body now wants training *and* upkeep: a session alone reaches 66, which
-  // is deliberate — see body-metric.test.ts.
+  // Body is movement: the session reaches the target on its own — see
+  // body-metric.test.ts.
   const day = [
     entry('deep_work', 240), // Mind
     entry('exercise', 60), // Body: the session
-    entry('sleep', 480), //   and the upkeep
     entry('meals', 120),
     entry('self_care', 45),
     entry('social', 60), // Heart
@@ -64,7 +63,6 @@ it('never exceeds three', () => {
   const huge = [
     entry('deep_work', 900),
     entry('exercise', 300),
-    entry('sleep', 480),
     entry('self_care', 120),
     entry('social', 400),
     entry('faith', 200),

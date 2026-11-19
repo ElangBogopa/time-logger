@@ -17,7 +17,8 @@ function weekdayOf(date: string): string {
 }
 
 /**
- * The part of a neighbouring day's overnight sleep that falls on this day.
+ * The part of a neighbouring day's older one-piece overnight row that falls
+ * on this day.
  * It is counted on its own day, so here it is neutral, shown and nothing
  * more: it cannot be dragged or opened, and a press on it does not start a
  * new entry underneath.

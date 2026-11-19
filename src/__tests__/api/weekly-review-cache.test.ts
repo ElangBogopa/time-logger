@@ -33,6 +33,9 @@ const previousEntries = Array.from({ length: 20 }, (_, i) => ({
   date: `2026-10-${String(19 + (i % 5)).padStart(2, '0')}`,
 }))
 
+// Rows a test adds for its own week, such as sleep saved before it was removed.
+let extraRows: Array<Record<string, unknown>> = []
+
 // hoisted function declaration, so the jest.mock factory can reach it.
 // It honours the date range, so each week's query gets that week's entries.
 function makeBuilder() {
@@ -52,7 +55,7 @@ function makeBuilder() {
   // awaited at the end of a chain
   b.then = (resolve: (v: unknown) => unknown) =>
     resolve({
-      data: [...entries, ...previousEntries].filter(
+      data: [...entries, ...previousEntries, ...(extraRows as typeof entries)].filter(
         (e) => (!range.gte || e.date >= range.gte) && (!range.lte || e.date <= range.lte)
       ),
       error: null,
@@ -72,6 +75,12 @@ jest.mock('next/server', () => ({
 }))
 jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
+// Every test here is one request from the same person; the limiter is not what is tested.
+jest.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: () => ({ success: true, remaining: 9, resetTime: Date.now() + 60000 }),
+  getRateLimitHeaders: () => ({}),
+  RATE_LIMITS: { ai: { limit: 10, windowMs: 60000 } },
+}))
 jest.mock('@/lib/supabase-server', () => ({ supabase: { from: () => makeBuilder() } }))
 jest.mock('openai', () => ({
   __esModule: true,
@@ -95,6 +104,7 @@ function request(body: unknown): NextRequest {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  extraRows = []
   ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
 })
 
@@ -206,4 +216,24 @@ it('says which one sentence may be a suggestion, with no evaluation and no score
   expect(system).not.toContain('needing attention')
   expect(user).not.toContain('/100')
   expect(args.temperature).toBe(0.4)
+})
+
+it('a week holding old sleep rows tells the model nothing about sleep', async () => {
+  extraRows = ['2026-10-26', '2026-10-27', '2026-10-28'].map((date, i) => ({
+    ...entries[0],
+    id: `s${i}`,
+    date,
+    activity: 'Sleep',
+    category: 'sleep',
+    duration_minutes: 480,
+    start_time: '23:00',
+    end_time: '07:00',
+  }))
+  const res = (await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))) as unknown as {
+    body: { insights: string[] }
+  }
+
+  const calls = mockCreate.mock.calls as unknown as Array<[{ messages: Array<{ role: string; content: string }> }]>
+  for (const message of calls[0][0].messages) expect(message.content).not.toMatch(/sleep/i)
+  expect(res.body.insights.join(' ')).not.toMatch(/sleep/i)
 })

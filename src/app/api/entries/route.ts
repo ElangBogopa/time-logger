@@ -95,7 +95,9 @@ export async function POST(request: NextRequest) {
         user_id: session.user!.id,
         date: item.date as string,
         activity: item.activity,
-        category: item.category ?? null,
+        // Sleep is no longer offered: nothing can create a sleep entry, also
+        // not an old cached copy of the app. It is stored as other.
+        category: item.category === 'sleep' ? 'other' : (item.category ?? null),
         duration_minutes: item.duration_minutes as number,
         start_time: (item.start_time as string) || null,
         end_time: (item.end_time as string) || null,
@@ -109,14 +111,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: date, activity, duration_minutes' }, { status: 400 })
     }
 
-    // Across midnight: sleep stays one row, anything else becomes two, one on
-    // each day (lib/overnight.ts). A planned entry has no category, so the
-    // client says whether it is a sleep with `overnight_sleep`, which is
-    // never stored. A null category without it is not a sleep. No model call.
-    const rows = built.flatMap(({ item, row }) => {
-      const isSleep = row.category === 'sleep' || (row.category === null && item.overnight_sleep === true)
-      return planOvernightSave(row, isSleep)
-    })
+    // Across midnight: every crossing entry becomes two, one on each day
+    // (lib/overnight.ts). An `overnight_sleep` field from an old copy of the
+    // app is ignored. No model call.
+    const rows = built.flatMap(({ row }) => planOvernightSave(row))
 
     const { data, error } = await supabase
       .from('time_entries')

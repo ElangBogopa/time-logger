@@ -1,8 +1,8 @@
 /**
  * The screens' side of entries across midnight: an overnight entry is not
- * dragged, the edit form's sleep hint and its refusal to save, the glance
- * and the timeline placing a night by the part on its own date, and the
- * neighbouring night's spill.
+ * dragged, the edit form saves a planned night without categorising it, the
+ * glance and the timeline place an older one-piece night by the part on its
+ * own date, and the neighbouring night's spill.
  */
 import { render, screen, fireEvent, waitFor, renderHook, act } from '@testing-library/react'
 
@@ -25,7 +25,7 @@ import { blocksForGlance } from '@/components/DayAtAGlance'
 import { useEntryAdjustment } from '@/hooks/useEntryAdjustment'
 import { useOvernightSpill } from '@/hooks/useOvernightSpill'
 import { useTimelineData } from '@/hooks/useTimelineData'
-import { fetchEntries, updateEntry } from '@/lib/api'
+import { fetchEntries, updateEntry, csrfFetch } from '@/lib/api'
 
 const night = {
   id: 'n1', user_id: 'u1', date: '2026-11-17', activity: 'Night in', category: null,
@@ -48,24 +48,19 @@ function saveNight() {
 }
 
 describe('the edit form with a planned night', () => {
-  it('tells the server it is a sleep when the categoriser says so', async () => {
+  it('saves it without asking the categoriser, and sends no sleep mark', async () => {
     saveNight()
     await waitFor(() => expect(updateEntry).toHaveBeenCalled())
-    expect((updateEntry as jest.Mock).mock.calls[0][1]).toMatchObject({ overnight_sleep: true })
+    expect(csrfFetch).not.toHaveBeenCalledWith('/api/categorize', expect.anything())
+    const sent = (updateEntry as jest.Mock).mock.calls[0][1]
+    expect(sent).not.toHaveProperty('overnight_sleep')
+    expect(sent).toMatchObject({ category: null, start_time: '23:00', end_time: '07:00' })
   })
 
-  it('tells the server it is not, when the categoriser says another thing', async () => {
-    categorizeResult = { ok: true, category: 'meals' }
-    saveNight()
-    await waitFor(() => expect(updateEntry).toHaveBeenCalled())
-    expect((updateEntry as jest.Mock).mock.calls[0][1]).toMatchObject({ overnight_sleep: false })
-  })
-
-  it('does not save when the categoriser fails', async () => {
+  it('saves even when the categoriser would fail', async () => {
     categorizeResult = { ok: false }
     saveNight()
-    await screen.findByText(/failed to categorize/i)
-    expect(updateEntry).not.toHaveBeenCalled()
+    await waitFor(() => expect(updateEntry).toHaveBeenCalled())
   })
 })
 

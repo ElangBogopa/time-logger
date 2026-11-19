@@ -21,7 +21,7 @@ import { calcBody, calcFocus, calcSocial, heartMinutes, METRIC_THRESHOLDS, type 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
 // Raise this when the coach prompt's voice changes, so old lines are not reused.
-const COACH_PROMPT_VERSION = 10
+const COACH_PROMPT_VERSION = 11
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
     const evaluatedDays = entriesByDay.size
 
     // The days with the most focused work. This counted everything except
-    // entertainment, so a night's sleep was seven hours of "focus" and the
+    // entertainment, so seven hours overnight counted as "focus" and the
     // best day was whichever one had the most written down.
     const FOCUS_CATEGORIES: TimeCategory[] = ['deep_work', 'learning', 'creating']
     const dayMinutes = new Map<string, number>()
@@ -336,11 +336,11 @@ export async function POST(request: NextRequest) {
       insights.push(`Best focus: ${bestDays.join(' & ')}, around ${bestHours.join(' and ')}`)
     }
 
-    // Sleep wins this every week for anyone who logs it, which is not news.
+    // Rows saved as sleep before it was removed are left out.
     const topCategory = categoryBreakdown.find((c) => c.category !== 'sleep')
     if (topCategory) {
       const hours = Math.round((topCategory.minutes / 60) * 10) / 10
-      insights.push(`Most waking time: ${topCategory.label} (${hours}h)`)
+      insights.push(`Most time: ${topCategory.label} (${hours}h)`)
     }
 
     // Calculate active days (days with at least one entry)

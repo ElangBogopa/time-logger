@@ -1,9 +1,11 @@
 /**
  * @jest-environment node
  *
- * What the entries routes write for times that cross midnight: sleep stays
- * one row, anything else becomes two, one on each day. The rule runs on a
- * save that moves the times and never on one that does not.
+ * What the entries routes write for times that cross midnight: every such
+ * entry becomes two, one on each day. There is no one-row exception, and
+ * nothing creates a sleep entry any more. The rule runs on a save that moves
+ * the times and never on one that does not, so an older one-piece sleep row
+ * is left as it is until its times change.
  */
 
 jest.mock('next/server', () => ({
@@ -117,19 +119,27 @@ describe('POST /api/entries across midnight', () => {
     expect(body.data).toMatchObject({ id: 'new-0', date: '2026-11-16' })
   })
 
-  it('keeps a sleep 23:00–07:00 as one row of 480 minutes', async () => {
+  it('splits "Sleep" 23:00–07:00 sent as sleep into two rows, both stored as other', async () => {
     await POST(request({ ...dinner, activity: 'Sleep', category: 'sleep', duration_minutes: 480, start_time: '23:00', end_time: '07:00' }))
     const rows = inserted()
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ start_time: '23:00', end_time: '07:00', duration_minutes: 480 })
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ date: '2026-11-16', start_time: '23:00', end_time: '24:00', duration_minutes: 60, category: 'other' })
+    expect(rows[1]).toMatchObject({ date: '2026-11-17', start_time: '00:00', end_time: '07:00', duration_minutes: 420, category: 'other' })
   })
 
-  it('keeps a planned entry marked overnight_sleep as one row, and never stores the mark', async () => {
+  it('stores a sleep inside one day as other too', async () => {
+    await POST(request({ ...dinner, activity: 'Nap', category: 'sleep', start_time: '14:00', end_time: '15:00', duration_minutes: 60 }))
+    expect(inserted()[0]).toMatchObject({ category: 'other' })
+  })
+
+  it('still splits a planned entry sent with overnight_sleep: true and no category, and never stores the mark', async () => {
     await POST(request({ ...dinner, activity: 'Sleep', category: null, status: 'pending', start_time: '23:00', end_time: '07:00', overnight_sleep: true }))
     const rows = inserted()
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).not.toHaveProperty('overnight_sleep')
-    expect(rows[0].duration_minutes).toBe(480)
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row).not.toHaveProperty('overnight_sleep')
+      expect(row.category).toBeNull()
+    }
   })
 
   it('splits a planned entry without the mark', async () => {
@@ -230,11 +240,35 @@ describe('PUT /api/entries/[id] across midnight', () => {
     expect(update).toHaveBeenCalledWith({ start_time: '23:00', end_time: '07:00', status: 'confirmed' })
   })
 
-  it('keeps a sleep whose times change as one row with the new duration', async () => {
+  it('writes just the words when only the words change on a stored one-piece sleep row', async () => {
     stored = storedRow({ activity: 'Sleep', category: 'sleep', start_time: '23:00:00', end_time: '07:00:00', duration_minutes: 480 })
-    await PUT(request({ start_time: '22:30', end_time: '06:30' }), params)
+    await PUT(request({ activity: 'Night', description: 'Early night' }), params)
     expect(insert).not.toHaveBeenCalled()
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ start_time: '22:30', end_time: '06:30', duration_minutes: 480 }))
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(update).toHaveBeenCalledWith({ activity: 'Night', description: 'Early night' })
+  })
+
+  it('lets a stored sleep row keep its category when the category is sent back unchanged', async () => {
+    stored = storedRow({ activity: 'Sleep', category: 'sleep', start_time: '23:00:00', end_time: '07:00:00', duration_minutes: 480 })
+    await PUT(request({ category: 'sleep' }), params)
+    expect(insert).not.toHaveBeenCalled()
+    expect(update).toHaveBeenCalledWith({ category: 'sleep' })
+  })
+
+  it('writes other when an entry that is not sleep is changed to sleep', async () => {
+    stored = storedRow()
+    await PUT(request({ category: 'sleep' }), params)
+    expect(update).toHaveBeenCalledWith({ category: 'other' })
+  })
+
+  it('splits a stored one-piece sleep row dated its wake day when its times change, evening on the day before', async () => {
+    // 23:00–07:00 dated Tuesday is Monday night.
+    stored = storedRow({ date: '2026-11-17', activity: 'Sleep', category: 'sleep', start_time: '23:00:00', end_time: '07:00:00', duration_minutes: 480 })
+    await PUT(request({ start_time: '22:30', end_time: '06:30' }), params)
+    expect(inserted()).toEqual([
+      expect.objectContaining({ date: '2026-11-16', start_time: '22:30', end_time: '24:00', duration_minutes: 90, category: 'sleep' }),
+    ])
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ start_time: '00:00', end_time: '06:30', duration_minutes: 390 }))
   })
 
   it('splits a wake-day night that is no longer a sleep with its evening on the day before', async () => {
@@ -268,12 +302,14 @@ describe('PUT /api/entries/[id] across midnight', () => {
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ start_time: '18:00', end_time: '24:00', duration_minutes: 360 }))
   })
 
-  it('keeps a planned entry marked overnight_sleep as one row, and never writes the mark', async () => {
+  it('splits a planned entry sent with overnight_sleep: true, and never writes the mark', async () => {
     stored = storedRow({ activity: 'Sleep', category: null, status: 'pending', start_time: '22:00:00', end_time: '23:00:00' })
     await PUT(request({ start_time: '23:00', end_time: '07:00', overnight_sleep: true }), params)
-    expect(insert).not.toHaveBeenCalled()
+    expect(inserted()).toEqual([
+      expect.objectContaining({ date: '2026-11-17', start_time: '00:00', end_time: '07:00', duration_minutes: 420 }),
+    ])
     const written = update.mock.calls[0][0]
     expect(written).not.toHaveProperty('overnight_sleep')
-    expect(written).toMatchObject({ end_time: '07:00', duration_minutes: 480 })
+    expect(written).toMatchObject({ start_time: '23:00', end_time: '24:00', duration_minutes: 60 })
   })
 })

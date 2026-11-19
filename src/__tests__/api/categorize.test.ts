@@ -129,3 +129,38 @@ it('rejects an unauthenticated caller', async () => {
   expect(res.status).toBe(401)
   expect(mockCreate).not.toHaveBeenCalled()
 })
+
+describe('sleep is no longer a category', () => {
+  const batch = (activities: string[]): NextRequest =>
+    ({
+      url: 'http://localhost/api/categorize',
+      method: 'POST',
+      headers: { get: () => null },
+      json: async () => ({ activities }),
+    }) as unknown as NextRequest
+
+  it('returns other when the model answers sleep', async () => {
+    nextAnswer = 'sleep'
+    const res = (await POST(request('Slept a unique eight hours'))) as unknown as Res
+    expect(res.body.category).toBe('other')
+
+    // and the answer it cached is other too
+    const again = (await POST(request('Slept a unique eight hours'))) as unknown as Res
+    expect(again.body.category).toBe('other')
+  })
+
+  it('returns other for a batch line the model answers sleep', async () => {
+    nextAnswer = 'sleep\ndeep_work'
+    const res = (await POST(batch(['Went to bed, batch', 'Coding, batch']))) as unknown as {
+      body: { categories: string[] }
+    }
+    expect(res.body.categories).toEqual(['other', 'deep_work'])
+  })
+
+  it('does not list sleep among the categories in the prompt', async () => {
+    await POST(request('a unique activity for the sleep prompt check'))
+    expect(lastPrompt).not.toMatch(/^- sleep:/m)
+    expect(lastPrompt).not.toMatch(/categories: [^\n]*\bsleep\b/)
+    expect(lastPrompt).toContain('SLEEP IS NOT A CATEGORY')
+  })
+})

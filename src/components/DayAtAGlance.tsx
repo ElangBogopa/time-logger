@@ -32,8 +32,9 @@ export interface GlanceBlock {
 
 /**
  * Entries, calendar events and planned tasks as one set of bands. Each entry
- * is drawn where it sits on this date (`onDayTimes`); a neighbouring day's
- * sleep spilling into this one (`covered`) is drawn in its entry's colour.
+ * is drawn where it sits on this date (`onDayTimes`); an older one-piece
+ * overnight row spilling in from a neighbouring day (`covered`) is drawn in
+ * its entry's colour.
  */
 export function blocksForGlance({
   entries,

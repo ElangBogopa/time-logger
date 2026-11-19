@@ -17,7 +17,7 @@ export interface UseTimelineDataParams {
   visibleEndHour?: number
   isToday?: boolean
   isFutureDay?: boolean
-  /** A neighbouring day's overnight sleep, where it spills into this day: occupied, not counted. */
+  /** An older one-piece overnight row on a neighbouring day, where it spills into this day: occupied, not counted. */
   covered?: CoveredBlock[]
 }
 
@@ -49,7 +49,7 @@ import { PIXELS_PER_MINUTE } from '@/components/timeline/constants'
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE // 90px per hour
 
 /**
- * Where an entry sits on this date, in minutes. A night's sleep logged as
+ * Where an entry sits on this date, in minutes. An older one-piece row of
  * 23:00–07:00 sits at 00:00–07:00 (lib/overnight.ts); with no end, it runs
  * for its duration.
  */
@@ -97,7 +97,7 @@ function smartPlaceEntries(
   const placed: PlacedEntry[] = []
 
   for (const entry of timedEntries) {
-    // The part on this date: an overnight sleep is drawn where it falls today.
+    // The part on this date: an older one-piece overnight row is drawn where it falls today.
     const onDay = onDayTimes(entry)!
     placed.push({
       ...entry,
@@ -314,8 +314,8 @@ export function useTimelineData({
       effectiveEnd = Math.max(rangeEnd, currentMinutes)
     }
 
-    // Build sorted list of occupied intervals (merge overlapping). A
-    // neighbouring day's sleep spilling into this one is occupied too.
+    // Build sorted list of occupied intervals (merge overlapping). An older
+    // one-piece overnight row spilling in from a neighbouring day is occupied too.
     const occupied = [
       ...sorted,
       ...covered.map(block => ({ start: timeToMinutes(block.startTime), end: timeToMinutes(block.endTime) })),

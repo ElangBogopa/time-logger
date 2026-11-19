@@ -19,7 +19,7 @@ function readCache(date: string): SpillRow[] | null {
 }
 
 /**
- * The parts of the neighbouring days' overnight sleeps that spill into
+ * The parts of the neighbouring days' older one-piece overnight rows that spill into
  * `date` (`coveredOn`): shown as covered, never counted here. Planned and
  * confirmed rows both count.
  *

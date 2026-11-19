@@ -65,10 +65,8 @@ const FOCUS_CATEGORY_INFO: Record<string, { label: string; weight: number; targe
 const BODY_CATEGORY_INFO: Record<string, { label: string }> = {
   exercise: { label: 'Exercise' },
   movement: { label: 'Movement' },
-  meals: { label: 'Meals' },
   rest: { label: 'Rest' },
   self_care: { label: 'Self-Care' },
-  sleep: { label: 'Sleep' },
 }
 
 // ── Social category labels ──
@@ -161,7 +159,7 @@ function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricC
         <h3 className="eyebrow mb-3">
           Today&apos;s Body
         </h3>
-        <p className="text-sm text-muted-foreground">No body care logged yet. Move, eat, or rest to fill this up.</p>
+        <p className="text-sm text-muted-foreground">Nothing for Body logged yet. Movement is what fills this ring.</p>
       </div>
     )
   }
@@ -180,7 +178,7 @@ function BodyBreakdown({ details, metricColor }: { details: BodyDetails; metricC
           </p>
           <p className="text-xs text-muted-foreground">
             {details.exerciseScore === 0
-              ? 'Looking after yourself gets Body into the high sixties; only exercise takes it past 70.'
+              ? 'Rest and self-care take Body to about 50 at most. Movement carries the rest.'
               : 'Vigorous minutes count double, light ones half — as the activity guidelines count them.'}
           </p>
         </div>

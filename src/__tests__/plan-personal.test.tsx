@@ -58,7 +58,10 @@ jest.mock('@/components/CommitTimeModal', () => ({
 
 import CalendarPage from '@/app/calendar/page'
 
-/** Four weeks in which this person ran at 6pm, three times a week, and slept until seven. */
+/**
+ * Four weeks in which this person ran at 6pm, three times a week. The sleep
+ * rows are as saved before sleep was removed: they never set the wake time.
+ */
 const history = (() => {
   const rows: Record<string, unknown>[] = []
   for (let back = 1; back <= 21; back++) {
@@ -76,6 +79,7 @@ let plans: Record<string, unknown>[] = []
 beforeEach(() => {
   jest.clearAllMocks()
   sessionStorage.clear()
+  window.localStorage.clear()
   plans = [{ id: 'p1', title: 'Run', date: TOMORROW, committed_start: null, committed_end: null, completed: false }]
   ;(fetchEntries as jest.Mock).mockImplementation(async (params: { dateFrom?: string }) => (params?.dateFrom ? history : []))
   ;(categorizeActivities as jest.Mock).mockResolvedValue(['exercise'])
@@ -101,9 +105,10 @@ it('proposes your usual hour and length, and says that is why', async () => {
   expect(reason).toHaveTextContent('When you usually do this — body temperature peaks')
 })
 
-it('never proposes anything before you are usually up', async () => {
+it('never proposes anything before half an hour after the wake time you have stated', async () => {
   // Take the evening away, so the habit is out of reach and the research
   // window for exercise is the early morning. Six would be in bed.
+  window.localStorage.setItem('wake-time', String(7 * 60))
   plans = [
     plans[0],
     { id: 'p2', title: 'Dinner out', date: TOMORROW, committed_start: '15:00', committed_end: '22:00', completed: false },
@@ -112,6 +117,17 @@ it('never proposes anything before you are usually up', async () => {
   fireEvent.click(await screen.findByRole('button', { name: /suggest times around my calendar/i }))
 
   expect(await screen.findByText(/7:30 AM\s+–\s+8:15 AM/)).toBeInTheDocument()
+})
+
+it('reads no wake time from the log: with none stated the day starts at six', async () => {
+  plans = [
+    plans[0],
+    { id: 'p2', title: 'Dinner out', date: TOMORROW, committed_start: '15:00', committed_end: '22:00', completed: false },
+  ]
+  render(<CalendarPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /suggest times around my calendar/i }))
+
+  expect(await screen.findByText(/6:00 AM\s+–\s+6:45 AM/)).toBeInTheDocument()
 })
 
 it('steps to a different time when asked for another', async () => {

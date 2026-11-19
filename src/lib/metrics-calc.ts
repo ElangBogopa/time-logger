@@ -29,38 +29,30 @@ export const FOCUS_WEIGHTS: Record<string, number> = {
 }
 
 // ── Body category groups ──
-// Body is "did you look after yourself", not "did you train". Sleeping,
-// eating and washing are how a body is kept, and leaving them out produced
-// days like 3 Nov 2026: showered, two meals, a haircut, seven hours of work,
-// and a Body of 22 labelled "Running on empty" because there was no gym.
-// sleep and meals also fed no metric at all before this — the same hole
-// meetings had in Mind.
+// Body is movement. Exercise and movement carry the ring; rest and self-care
+// are a small part of it. Meals and sleep count for nothing: meals stay
+// loggable, and sleep is no longer offered (rows saved as sleep before it was
+// removed are read like any other entry that feeds no ring).
 // 'movement' is merged into 'exercise' in scoring; old entries still work.
-export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care', 'sleep', 'meals']
+export const BODY_CATS = ['exercise', 'movement', 'rest', 'self_care']
 
 /**
  * ── Body ──
  *
- * Body is exercise, plus upkeep, and the two are not interchangeable. The
- * old version summed them into one pot: eight hours of sleep, three meals
- * and a shower came to 45 weighted minutes against a target of 48, which
- * scored 78 on a day with no exercise in it. A metric called Body should
- * not say that.
+ * Body is movement, plus a little care, and the two are not interchangeable.
+ * Rest and self-care are put on a curve of their own that *approaches* 50
+ * without ever passing it, and movement closes whatever gap is left to the
+ * top of the scale:
  *
- * So upkeep is put on a curve of its own that *approaches* a ceiling below
- * 70 without ever reaching it, and exercise closes whatever gap is left to
- * the top of the scale:
+ *   care part = 50 × curve(care minutes ÷ care target)
+ *   body      = care part + (100 − care part) × curve(movement ÷ target)
  *
- *   upkeep part = 69 × curve(upkeep minutes ÷ upkeep target)
- *   body        = upkeep part + (99 − upkeep part) × curve(exercise ÷ target)
- *
- * A first attempt capped upkeep's contribution at 45 instead, which is not
- * what "should not be able to get above 70" means: it took a flawless day
- * of looking after yourself and called it 43. Upkeep should be able to earn
- * a high-sixties day. What it must never do is reach the point where the
- * app says your body had a strong day when you did not move it.
+ * The headroom runs to 100, not 99, so the movement target alone lands on
+ * 80 exactly; the display is still clamped at 99. A day of only rest and
+ * self-care scores about 47 at best, because the app should not tell you
+ * your body had a strong day when you did not move it.
  */
-export const UPKEEP_CEILING = 69
+export const UPKEEP_CEILING = 50
 
 /**
  * Exercise is counted in moderate-equivalent minutes, the way the physical
@@ -110,16 +102,13 @@ export function exerciseMinutes(dayEntries: EntryRow[]): number {
 }
 
 /**
- * Upkeep: looking after yourself in the ways that are not training. The
- * relative weights are unchanged — a shower counts for more per minute than
- * a meal, and sleep is counted lightly because eight hours of it is normal
- * rather than an achievement.
+ * Care: looking after yourself in the ways that are not movement. Self-care
+ * counts for more per minute than rest. Meals and sleep have no weight: they
+ * add nothing to Body.
  */
 export const UPKEEP_WEIGHTS: Record<string, number> = {
   self_care: 0.40,
   rest: 0.25,
-  meals: 0.10,
-  sleep: 0.05,
 }
 
 export function upkeepMinutes(dayEntries: EntryRow[]): number {
@@ -310,9 +299,9 @@ export const METRIC_LABELS = {
 export const FOCUS_TARGET = 240 // 4 hours of deep work, or the weighted equivalent
 /** Moderate-equivalent minutes that score 80 on the exercise half. */
 export const EXERCISE_TARGET = 45
-/** Weighted upkeep minutes that score 80 on the upkeep half: roughly a
- *  night's sleep, three meals and half an hour of looking after yourself. */
-export const UPKEEP_TARGET = 48
+/** Weighted care minutes that reach 80% of the care ceiling: about 45
+ *  minutes of self-care and 45 of rest. */
+export const UPKEEP_TARGET = 30
 /** @deprecated kept so older callers still compile; Body no longer has one target. */
 export const BODY_TARGET = 48
 export const SOCIAL_TARGET = 60 // 1 hour with people, or in prayer
@@ -425,23 +414,24 @@ export function calcFocusDetails(dayEntries: EntryRow[]): { weightedMinutes: num
 }
 
 /**
- * Body = exercise, plus upkeep, with upkeep unable to carry a day on its own.
+ * Body = movement, plus a little care, with care unable to pass 50 on its own.
  *
- *   0.75 × exercise score + 0.45 × upkeep score, capped at MAX_SCORE
+ *   care = 50 × curve(care minutes ÷ 30)
+ *   body = care + (100 − care) × curve(movement ÷ 45), shown up to 99
  *
  * Worked examples:
- *   8h sleep, 3 meals, a shower, no exercise → 54   (was 78)
- *   a flawless day of upkeep, no exercise    → 66
- *   absurd upkeep — 12h sleep, 4h self-care  → 69   (the ceiling, approached)
- *   45 min walk, nothing else                → 55
- *   20 min run, nothing else                 → 75
- *   45 min gym, nothing else                 → 79
- *   45 min gym plus ordinary upkeep          → 90
+ *   45 min gym, nothing else                  → 80
+ *   45 min gym + 20 min shower                → 83
+ *   20 min run, nothing else                  → 76
+ *   45 min walk, nothing else                 → 55
+ *   60 min self-care + 2h rest, no movement   → 47
+ *   4h self-care, no movement                 → 50 at most
+ *   8h sleep + three meals, nothing else      → 0
  */
 export function calcBody(dayEntries: EntryRow[]): number {
-  const upkeepPart = UPKEEP_CEILING * curveFraction(upkeepMinutes(dayEntries), UPKEEP_TARGET)
-  const headroom = MAX_SCORE - upkeepPart
-  return Math.round(upkeepPart + headroom * curveFraction(exerciseMinutes(dayEntries), EXERCISE_TARGET))
+  const carePart = UPKEEP_CEILING * curveFraction(upkeepMinutes(dayEntries), UPKEEP_TARGET)
+  const score = carePart + (100 - carePart) * curveFraction(exerciseMinutes(dayEntries), EXERCISE_TARGET)
+  return Math.min(MAX_SCORE, Math.round(score))
 }
 
 /**
@@ -478,10 +468,10 @@ export function calcBodyDetails(dayEntries: EntryRow[]): {
 
   /**
    * What each row contributes to the headline, on the headline's own scale:
-   * upkeep earns its part on its own curve, and exercise closes a slice of
+   * care earns its part on its own curve, and movement closes a slice of
    * whatever headroom is left above it.
    *
-   * Upkeep's part is split between its categories in proportion to their
+   * Care's part is split between rest and self-care in proportion to their
    * weighted minutes, rather than each being curved on its own and the
    * results added: four categories each scored through a saturating curve
    * and then summed overshot the headline by more than fifty points, which
@@ -490,7 +480,7 @@ export function calcBodyDetails(dayEntries: EntryRow[]): {
   const upkeepContribution = UPKEEP_CEILING * curveFraction(upkeepMinutes(dayEntries), UPKEEP_TARGET)
   const categoryScores: Record<string, number> = {
     exercise: Math.round(
-      (MAX_SCORE - upkeepContribution) * curveFraction(moderateEquivalentMinutes, EXERCISE_TARGET)
+      (100 - upkeepContribution) * curveFraction(moderateEquivalentMinutes, EXERCISE_TARGET)
     ),
   }
   const totalUpkeepWeighted = upkeepMinutes(dayEntries)

@@ -163,22 +163,25 @@ describe('planOvernightSave', () => {
 
   it('leaves an entry inside one day as it is', () => {
     const row = { ...base, start_time: '18:00', end_time: '19:00', duration_minutes: 60 }
-    expect(planOvernightSave(row, false)).toEqual([row])
+    expect(planOvernightSave(row)).toEqual([row])
   })
 
   it('stores a midnight end as 24:00 without splitting', () => {
     const row = { ...base, start_time: '23:00', end_time: '00:00', duration_minutes: 60 }
-    expect(planOvernightSave(row, false)).toEqual([{ ...row, end_time: '24:00' }])
+    expect(planOvernightSave(row)).toEqual([{ ...row, end_time: '24:00' }])
   })
 
-  it('keeps a sleep as one row with its real duration', () => {
-    const row = { ...base, activity: 'Sleep', category: 'sleep', start_time: '23:00', end_time: '07:00', duration_minutes: 0 }
-    expect(planOvernightSave(row, true)).toEqual([{ ...row, duration_minutes: 480 }])
+  it('splits a sleep like anything else: there is no one-row exception', () => {
+    const row = { ...base, activity: 'Sleep', category: 'sleep', start_time: '23:00', end_time: '07:00', duration_minutes: 480 }
+    expect(planOvernightSave(row)).toEqual([
+      { ...row, start_time: '23:00', end_time: '24:00', duration_minutes: 60 },
+      { ...row, date: '2026-11-17', start_time: '00:00', end_time: '07:00', duration_minutes: 420 },
+    ])
   })
 
   it('splits anything else into two pieces carrying the other fields', () => {
     const row = { ...base, start_time: '23:00', end_time: '01:00' }
-    expect(planOvernightSave(row, false)).toEqual([
+    expect(planOvernightSave(row)).toEqual([
       { ...base, start_time: '23:00', end_time: '24:00', duration_minutes: 60 },
       { ...base, date: '2026-11-17', start_time: '00:00', end_time: '01:00', duration_minutes: 60 },
     ])
@@ -186,7 +189,7 @@ describe('planOvernightSave', () => {
 
   it('keeps the morning on a row dated its wake day, and puts the evening on the day before', () => {
     const row = { ...base, date: '2026-11-17', start_time: '23:00', end_time: '06:30' }
-    expect(planOvernightSave(row, false, { dateIsWakeDay: true })).toEqual([
+    expect(planOvernightSave(row, { dateIsWakeDay: true })).toEqual([
       { ...base, date: '2026-11-17', start_time: '00:00', end_time: '06:30', duration_minutes: 390 },
       { ...base, date: '2026-11-16', start_time: '23:00', end_time: '24:00', duration_minutes: 60 },
     ])
@@ -194,7 +197,7 @@ describe('planOvernightSave', () => {
 
   it('crosses a month start backwards', () => {
     const row = { ...base, date: '2026-12-01', start_time: '23:00', end_time: '06:30' }
-    const [, evening] = planOvernightSave(row, false, { dateIsWakeDay: true })
+    const [, evening] = planOvernightSave(row, { dateIsWakeDay: true })
     expect(evening.date).toBe('2026-11-30')
   })
 })

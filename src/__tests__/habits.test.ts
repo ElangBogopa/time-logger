@@ -5,7 +5,7 @@
  * for a habit, loose enough to recognise a thing by another name.
  */
 
-import { usualFor, usualWakeMinutes, recurringActivities, type HabitEntry } from '@/lib/habits'
+import { usualFor, recurringActivities, type HabitEntry } from '@/lib/habits'
 import type { TimeCategory } from '@/lib/types'
 
 const entry = (date: string, activity: string, category: TimeCategory, start: string, end: string): HabitEntry => {
@@ -70,39 +70,6 @@ describe('usualFor', () => {
   it('keeps the length within what a block can be', () => {
     const marathons = ['02', '03', '04'].map((d) => entry(`2026-11-${d}`, 'Hackathon', 'deep_work', '09:00', '17:00'))
     expect(usualFor('Hackathon', 'deep_work', marathons)?.durationMinutes).toBe(180)
-  })
-})
-
-describe('usualWakeMinutes', () => {
-  const slept = (date: string, end: string) => entry(date, 'Slept', 'sleep', '00:00', end)
-
-  it('is the usual end of the night', () => {
-    expect(usualWakeMinutes([slept('2026-11-02', '07:00'), slept('2026-11-03', '07:10'), slept('2026-11-04', '06:45')])).toBe(7 * 60)
-  })
-
-  it('needs a few mornings', () => {
-    expect(usualWakeMinutes([slept('2026-11-02', '07:00'), slept('2026-11-03', '07:00')])).toBeNull()
-  })
-
-  it('ignores an afternoon nap and the first half of a night', () => {
-    const entries = [
-      slept('2026-11-02', '07:00'),
-      slept('2026-11-03', '07:00'),
-      slept('2026-11-04', '07:00'),
-      entry('2026-11-04', 'Nap', 'sleep', '14:00', '15:00'),
-      entry('2026-11-04', 'Went to bed', 'sleep', '23:00', '23:59'),
-    ]
-    expect(usualWakeMinutes(entries)).toBe(7 * 60)
-  })
-
-  it('reads a night logged as one row across midnight by its end', () => {
-    const night = (date: string) => ({ ...entry(date, 'Sleep', 'sleep', '00:00', '07:00'), start_time: '23:00', duration_minutes: 480 })
-    expect(usualWakeMinutes([night('2026-11-02'), night('2026-11-03'), night('2026-11-04')])).toBe(7 * 60)
-  })
-
-  it('does not read a sleep mostly before midnight as a wake time', () => {
-    const early = (date: string) => ({ ...entry(date, 'Sleep', 'sleep', '00:00', '01:00'), start_time: '18:00', duration_minutes: 420 })
-    expect(usualWakeMinutes([early('2026-11-02'), early('2026-11-03'), early('2026-11-04')])).toBeNull()
   })
 })
 

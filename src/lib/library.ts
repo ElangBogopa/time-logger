@@ -130,7 +130,7 @@ export const LIBRARY: LibraryEntry[] = [
     finding:
       'Regular exercise improves executive function, memory and attention, and a single moderate session lifts cognitive performance for hours afterwards.',
     howWeUseIt:
-      'Why upkeep — sleep, meals, self-care — can carry Body into the high sixties on its own, and why only exercise takes it past 70. A flawless day of looking after yourself scores about 66; twenty minutes of running beats it.',
+      'Why movement carries Body. Rest and self-care can take it to about 50 on their own; reaching the movement target scores 80, and twenty minutes of running beats a whole day of looking after yourself.',
     link: 'https://doi.org/10.1038/nrn2298',
     metrics: ['body'],
   },

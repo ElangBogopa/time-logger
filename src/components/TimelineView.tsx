@@ -42,7 +42,7 @@ export interface TimelineViewProps {
   canLog?: boolean
   visibleStartHour?: number
   visibleEndHour?: number
-  /** A neighbouring day's overnight sleep, where it spills into this day (`useOvernightSpill`). */
+  /** An older one-piece overnight row on a neighbouring day, where it spills into this day (`useOvernightSpill`). */
   covered?: CoveredBlock[]
 }
 
@@ -500,7 +500,7 @@ export default function TimelineView({
               </div>
             )}
 
-            {/* A neighbouring day's sleep spilling into this one, under the entries */}
+            {/* An older one-piece overnight row spilling in from a neighbouring day, under the entries */}
             {covered?.map((block) => (
               <TimelineCovered
                 key={`covered-${block.entryId}`}

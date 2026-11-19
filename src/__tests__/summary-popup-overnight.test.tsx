@@ -1,4 +1,4 @@
-/** The Morning summary counts a night logged 23:00-07:00 (a Morning entry elsewhere). */
+/** The Morning summary counts an older one-piece night of 23:00-07:00 (a Morning entry elsewhere). */
 import { render, screen, act } from '@testing-library/react'
 import PeriodSummaryPopup from '@/components/PeriodSummaryPopup'
 

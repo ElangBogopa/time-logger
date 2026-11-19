@@ -43,7 +43,7 @@ describe('checkReviewLine', () => {
   })
 
   it('catches lists', () => {
-    expect(rules('- Deep work: 3h\n- Sleep: 8h')).toContain('list')
+    expect(rules('- Deep work: 3h\n- Rest: 8h')).toContain('list')
   })
 
   it('catches an empty line', () => {

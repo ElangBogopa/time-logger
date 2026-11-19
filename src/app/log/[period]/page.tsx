@@ -121,7 +121,7 @@ function LogPeriodContent() {
   // False when nothing is known about this date's entries (no cache and the fetch failed):
   // an empty list then means "could not look", not "nothing logged".
   const [entriesKnown, setEntriesKnown] = useState(!!cachedEntries)
-  // A neighbouring day's sleep where it spills into this one: not a gap.
+  // An older one-piece overnight row on a neighbouring day, where it spills into this one: not a gap.
   const covered = useOvernightSpill(selectedDate || null, entries)
   // When this person wakes, for the session comment's hours that suit each thing.
   const { wakeMinutes } = useMyWindows()

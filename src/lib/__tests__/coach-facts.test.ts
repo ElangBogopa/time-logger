@@ -83,10 +83,9 @@ describe('buildSessionFacts', () => {
 })
 
 describe('buildEntryFacts', () => {
-  it('Body reached for a 45-minute gym entry on a day with sleep and meals; no Heart ring for a solo run', () => {
+  it('Body reached for a 45-minute gym entry on a day with meals; no Heart ring for a solo run', () => {
     const gym = e('Gym', 'exercise', '07:00', '07:45', 45)
     const day = [
-      e('Sleep', 'sleep', '23:00', '07:00', 480),
       e('Breakfast', 'meals', '08:00', '08:30', 30),
       e('Lunch', 'meals', '12:00', '12:30', 30),
       gym,

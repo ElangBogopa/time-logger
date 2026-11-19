@@ -16,7 +16,11 @@ import { AGGREGATED_CLASSES } from '@/lib/palette'
  * Chips are ordered and tinted by bucket, so the colour tells you which of
  * the rings a choice will feed.
  */
-const ORDERED: TimeCategory[] = Object.values(ENERGY_VIEW).flatMap((group) => group.categories)
+// Sleep is no longer offered. An old sleep entry opened for editing simply
+// has no chip selected.
+const ORDERED: TimeCategory[] = Object.values(ENERGY_VIEW)
+  .flatMap((group) => group.categories)
+  .filter((category) => category !== 'sleep')
 
 interface CategoryPickerProps {
   value: TimeCategory | null

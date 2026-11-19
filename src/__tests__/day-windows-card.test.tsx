@@ -1,9 +1,11 @@
 /**
- * "Your windows" on Today: what this hour is best for, moved to when the
- * person wakes, with the whole day and its reasons behind a tap.
+ * "Your windows" on Today: what this hour is best for, moved to the wake
+ * time the person has stated, with the whole day and its reasons behind a
+ * tap. A wake time comes only from what they said (`localStorage['wake-time']`),
+ * never from the log.
  */
 
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, renderHook } from '@testing-library/react'
 import type { HabitEntry } from '@/lib/habits'
 
 let mockHour = 10
@@ -13,14 +15,18 @@ jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),
   getUserCurrentHour: () => mockHour,
 }))
+let mockHistory: HabitEntry[] = []
+jest.mock('@/hooks/useHabitHistory', () => ({ useHabitHistory: () => mockHistory }))
 jest.mock('@/components/SourceSheet', () => ({
   __esModule: true,
   default: ({ sourceId }: { sourceId: string | null }) => (sourceId ? <div data-testid="source">{sourceId}</div> : null),
 }))
 
 import DayWindowsCard from '@/components/DayWindowsCard'
+import { useMyWindows } from '@/hooks/useMyWindows'
+import { windowsForWake } from '@/lib/ideal-day'
 
-/** Mornings ending at the given time, enough of them to count as a habit. */
+/** Sleep rows saved before sleep was removed, ending at the given time. */
 const sleptUntil = (end: string): HabitEntry[] =>
   ['01', '02', '03', '04'].map((d) => ({
     date: `2026-11-${d}`, activity: 'Slept', category: 'sleep', start_time: '00:00', end_time: end, duration_minutes: 420,
@@ -28,13 +34,14 @@ const sleptUntil = (end: string): HabitEntry[] =>
 
 beforeEach(() => {
   localStorage.clear()
+  mockHistory = []
   mockHour = 10
   jest.spyOn(Date.prototype, 'getMinutes').mockReturnValue(0)
 })
 afterEach(() => jest.restoreAllMocks())
 
 it('says what this hour is best for, and what comes next', () => {
-  render(<DayWindowsCard history={[]} />)
+  render(<DayWindowsCard />)
   expect(screen.getByText('Peak focus')).toBeInTheDocument()
   expect(screen.getByText(/until 12:00 PM/)).toBeInTheDocument()
   expect(screen.getByText(/Peak cognitive hours/)).toBeInTheDocument()
@@ -42,14 +49,15 @@ it('says what this hour is best for, and what comes next', () => {
 })
 
 it('uses the reference day, and says so, until it knows when you wake', () => {
-  render(<DayWindowsCard history={[]} />)
+  render(<DayWindowsCard />)
   expect(screen.getByRole('button', { name: /set when you wake/i })).toBeInTheDocument()
 })
 
-it('moves the windows to when the log says you wake', () => {
+it('moves the windows to the wake time you have stated', () => {
   // Up at nine, everything is two and a half hours later: at ten this
   // person is in the morning-movement window, with peak focus still ahead.
-  render(<DayWindowsCard history={sleptUntil('09:00')} />)
+  localStorage.setItem('wake-time', String(9 * 60))
+  render(<DayWindowsCard />)
   expect(screen.getByRole('button', { name: /up at 9:00 AM/i })).toBeInTheDocument()
   expect(screen.getByText('Morning movement')).toBeInTheDocument()
   expect(screen.getByText(/until 10:30 AM/)).toBeInTheDocument()
@@ -57,7 +65,7 @@ it('moves the windows to when the log says you wake', () => {
 })
 
 it('lists the whole day with a reason and a source for each window', () => {
-  render(<DayWindowsCard history={[]} />)
+  render(<DayWindowsCard />)
   fireEvent.click(screen.getByRole('button', { name: /see all of today/i }))
 
   const sheet = screen.getByRole('dialog')
@@ -70,12 +78,26 @@ it('lists the whole day with a reason and a source for each window', () => {
   expect(screen.getByTestId('source')).toHaveTextContent('circadian')
 })
 
-it('lets you say when you wake, which wins over the log and is remembered', () => {
-  const { unmount } = render(<DayWindowsCard history={sleptUntil('09:00')} />)
+it('a log full of sleep entries does not move the windows and no "From your log" line is shown', () => {
+  mockHistory = sleptUntil('09:00')
+  render(<DayWindowsCard />)
+  expect(screen.getByRole('button', { name: /set when you wake/i })).toBeInTheDocument()
+  expect(screen.getByText('Peak focus')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: /see all of today/i }))
-  expect(screen.getByText(/From your log: you usually wake around 9:00 AM/)).toBeInTheDocument()
+  expect(screen.queryByText(/From your log/)).not.toBeInTheDocument()
+  expect(screen.getByText(/These are for someone who wakes at 6:30 AM/)).toBeInTheDocument()
 
-  fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+  const { result } = renderHook(() => useMyWindows())
+  expect(result.current.wakeMinutes).toBeNull()
+  expect(result.current.wakeSource).toBe('unknown')
+  expect(result.current.windows).toEqual(windowsForWake(null))
+})
+
+it('lets you say when you wake, and remembers it', () => {
+  const { unmount } = render(<DayWindowsCard />)
+  fireEvent.click(screen.getByRole('button', { name: /see all of today/i }))
+
+  fireEvent.click(screen.getByRole('button', { name: 'Set my wake time' }))
   fireEvent.change(screen.getByLabelText('When you wake'), { target: { value: '05:00' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -84,20 +106,21 @@ it('lets you say when you wake, which wins over the log and is remembered', () =
   expect(screen.getByText(/7:30 AM – 10:30 AM/)).toBeInTheDocument()
 
   unmount()
-  render(<DayWindowsCard history={sleptUntil('09:00')} />)
+  render(<DayWindowsCard />)
   expect(screen.getByRole('button', { name: /up at 5:00 AM/i })).toBeInTheDocument()
 })
 
-it('can go back to the log', () => {
+it('can clear a stated wake time, back to the reference day', () => {
   localStorage.setItem('wake-time', String(5 * 60))
-  render(<DayWindowsCard history={sleptUntil('09:00')} />)
+  render(<DayWindowsCard />)
   fireEvent.click(screen.getByRole('button', { name: /see all of today/i }))
-  fireEvent.click(screen.getByRole('button', { name: /use my log instead/i }))
-  expect(screen.getByText(/From your log: you usually wake around 9:00 AM/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+  expect(screen.getByText(/These are for someone who wakes at 6:30 AM/)).toBeInTheDocument()
+  expect(localStorage.getItem('wake-time')).toBeNull()
 })
 
 it('says when the day’s windows are over', () => {
   mockHour = 23
-  render(<DayWindowsCard history={[]} />)
+  render(<DayWindowsCard />)
   expect(screen.getByText(/windows are behind you/)).toBeInTheDocument()
 })

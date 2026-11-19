@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { fetchEntries, updateEntry, deleteEntry, csrfFetch } from '@/lib/api'
 import { TimeEntry, TimeCategory, CATEGORY_LABELS, getAggregatedCategory, isPendingEntryReadyToConfirm } from '@/lib/types'
 import { AGGREGATED_CLASSES } from '@/lib/palette'
-import { crossesMidnight } from '@/lib/overnight'
 import {
   Dialog,
   DialogContent,
@@ -171,23 +170,6 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
         }
       }
 
-      // A planned entry across midnight has no category to tell the server
-      // whether it is a sleep (kept as one row) or not (split at midnight).
-      // One call, only for that; the category is not stored.
-      let overnightSleep: { overnight_sleep: boolean } | null = null
-      if (newCategory === null && crossesMidnight(startTime, endTime)) {
-        const categoryResponse = await csrfFetch('/api/categorize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity }),
-        })
-        if (!categoryResponse.ok) {
-          throw new Error('Failed to categorize activity')
-        }
-        const { category: planned } = await categoryResponse.json()
-        overnightSleep = { overnight_sleep: planned === 'sleep' }
-      }
-
       const updatedEntry = {
         date,
         activity,
@@ -198,7 +180,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
         description: description || null,
       }
 
-      await updateEntry(entry.id, { ...updatedEntry, ...overnightSleep })
+      await updateEntry(entry.id, updatedEntry)
 
       // Only regenerate commentary if activity or description changed
       // This saves ~1790 tokens per edit that only changes time/duration

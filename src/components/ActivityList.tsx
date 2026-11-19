@@ -86,7 +86,7 @@ export default function ActivityList({ entries, onEntryClick, emptyMessage }: Ac
     )
   }
 
-  // Sort by where each starts on this date: a night's sleep logged as
+  // Sort by where each starts on this date: an older one-piece row of
   // 23:00–07:00 comes first, at midnight (lib/overnight.ts)
   const sorted = [...entries].sort((a, b) => {
     const aStart = onDayTimes(a)?.start

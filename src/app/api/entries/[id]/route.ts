@@ -54,11 +54,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
     }
 
+    // Sleep is no longer offered: an entry cannot be changed into one. A row
+    // saved as sleep before it was removed keeps its category.
+    if (updates.category === 'sleep' && stored.category !== 'sleep') {
+      updates.category = 'other'
+    }
+
     // Across midnight (lib/overnight.ts), only when this save moves the
     // times. A save of the category, status, date or words alone is written
     // as it is: it neither splits nor rejoins, and confirming a plan changes
-    // nothing about its times. `overnight_sleep` says a planned (category
-    // null) entry is a sleep; it is never written.
+    // nothing about its times, so an older one-piece row is left as it is.
+    // One whose times change is split like any other.
     const timesChange =
       ('start_time' in updates && clock(updates.start_time) !== clock(stored.start_time)) ||
       ('end_time' in updates && clock(updates.end_time) !== clock(stored.end_time))
@@ -66,14 +72,12 @@ export async function PUT(
     let inserted: { id: string } | null = null
     if (timesChange) {
       const merged = { ...stored, ...updates }
-      const isSleep =
-        merged.category === 'sleep' || (merged.category == null && body.overnight_sleep === true)
-      // A stored one-piece night placed on its wake day is dated the morning
+      // An older one-piece night placed on its wake day is dated the morning
       // it ended: if it now splits, its evening is the day before.
       const dateIsWakeDay =
         crossesMidnight(stored.start_time, stored.end_time) &&
         overnightPlacement(stored.start_time, stored.end_time) === 'wake-day'
-      const pieces = planOvernightSave(merged, isSleep, { dateIsWakeDay })
+      const pieces = planOvernightSave(merged, { dateIsWakeDay })
       const [first, second] = pieces
 
       updates.start_time = first.start_time

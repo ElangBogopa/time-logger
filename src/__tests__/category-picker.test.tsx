@@ -8,13 +8,21 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import CategoryPicker from '@/components/CategoryPicker'
 import { CATEGORY_LABELS, TimeCategory } from '@/lib/types'
 
-it('offers every category exactly once', () => {
+it('offers every category but sleep exactly once', () => {
   render(<CategoryPicker value="deep_work" onChange={() => {}} />)
   const options = screen.getAllByRole('radio')
-  expect(options).toHaveLength(Object.keys(CATEGORY_LABELS).length)
-  for (const label of Object.values(CATEGORY_LABELS)) {
+  expect(options).toHaveLength(Object.keys(CATEGORY_LABELS).length - 1)
+  for (const [category, label] of Object.entries(CATEGORY_LABELS)) {
+    if (category === 'sleep') continue
     expect(screen.getByRole('radio', { name: label })).toBeInTheDocument()
   }
+})
+
+it('has no Sleep chip, and an old sleep entry has no chip selected', () => {
+  render(<CategoryPicker value="sleep" onChange={() => {}} />)
+  expect(screen.queryByRole('radio', { name: CATEGORY_LABELS.sleep })).not.toBeInTheDocument()
+  const checked = screen.getAllByRole('radio').filter((el) => el.getAttribute('aria-checked') === 'true')
+  expect(checked).toHaveLength(0)
 })
 
 it('marks the current category, and only that one', () => {

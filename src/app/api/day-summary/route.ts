@@ -129,8 +129,8 @@ function buildTimeline(entries: TimeEntry[]): TimelineBlock[] {
     timeline.push({ hour, entries: [], totalMinutes: 0 })
   }
 
-  // Place entries into hours based on where they start on this date: a
-  // night's sleep logged as 23:00–07:00 sits at midnight (lib/overnight.ts)
+  // Place entries into hours based on where they start on this date: an
+  // older one-piece row of 23:00–07:00 sits at midnight (lib/overnight.ts)
   for (const entry of entries) {
     const onDayStart = onDayTimes(entry)?.start
     if (!entry.start_time || !onDayStart) continue

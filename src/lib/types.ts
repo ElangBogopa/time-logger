@@ -16,7 +16,7 @@ export type TimeCategory =
   | 'exercise'        // Intentional workout
   | 'movement'        // Light activity (walks, stretching)
   | 'meals'           // Eating, food prep
-  | 'sleep'           // Sleep tracking
+  | 'sleep'           // No longer offered. Kept for rows saved before sleep was removed; feeds no ring.
 
   // MIND
   | 'rest'            // Intentional downtime, naps
@@ -367,12 +367,14 @@ export const ENERGY_VIEW: CategoryView = {
     // categoriser could not place, and scoring an unknown as leisure counts
     // real work against the person — a bare "Work" was landing in escape
     // alongside television.
-    categories: ['shallow_work', 'meetings', 'admin', 'errands', 'chores', 'commute', 'other'],
+    // 'sleep' is here too: it is no longer offered, and a row saved as sleep
+    // before it was removed is painted like any other uncounted entry.
+    categories: ['shallow_work', 'meetings', 'admin', 'errands', 'chores', 'commute', 'other', 'sleep'],
   },
   body: {
     label: 'Body',
     color: 'green',
-    categories: ['exercise', 'movement', 'meals', 'sleep'],
+    categories: ['exercise', 'movement', 'meals'],
   },
   recovery: {
     label: 'Recovery',
@@ -646,15 +648,9 @@ export const CATEGORY_DEFINITIONS: Record<TimeCategory, {
     ],
   },
   sleep: {
-    definition: 'Sleep and nap time. Track if you want to monitor sleep patterns.',
-    includes: [
-      'Night sleep',
-      'Naps',
-      'Rest in bed',
-    ],
-    excludes: [
-      'Relaxing awake (→ Rest)',
-    ],
+    definition: 'No longer offered. Entries saved as sleep before it was removed keep this category.',
+    includes: [],
+    excludes: [],
   },
 
   // MIND
@@ -669,7 +665,6 @@ export const CATEGORY_DEFINITIONS: Record<TimeCategory, {
       'Meditation breaks',
     ],
     excludes: [
-      'Sleeping (→ Sleep)',
       'Scrolling (→ Entertainment)',
     ],
     source: 'Burnout prevention research',
@@ -686,7 +681,6 @@ export const CATEGORY_DEFINITIONS: Record<TimeCategory, {
     ],
     excludes: [
       'Exercise (→ Exercise)',
-      'Sleep (→ Sleep)',
     ],
     source: 'Self-care and burnout prevention research',
   },
@@ -768,6 +762,10 @@ export const CATEGORY_DEFINITIONS: Record<TimeCategory, {
 }
 
 export const CATEGORIES = Object.keys(CATEGORY_LABELS) as TimeCategory[]
+
+// What a person or the categoriser may choose. Sleep is left out: it is no
+// longer offered. CATEGORIES stays the full list, for reading saved rows.
+export const LOGGABLE_CATEGORIES: TimeCategory[] = CATEGORIES.filter((c) => c !== 'sleep')
 
 /**
  * Returns a date string in YYYY-MM-DD format using the user's local timezone.

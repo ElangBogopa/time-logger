@@ -71,7 +71,7 @@ const h = (n: number) => n * 60
 const DAY_SCENARIOS: DayScenario[] = [
   day(
     'focus-heavy',
-    [{ label: 'Deep Work', minutes: 240 }, { label: 'Meals', minutes: 60 }, { label: 'Sleep', minutes: 450 }],
+    [{ label: 'Deep Work', minutes: 240 }, { label: 'Meals', minutes: 60 }],
     {
       metrics: { body: 52, focus: 84, social: 20 },
       longestFocusSession: { activity: 'Essay draft', minutes: 150 },
@@ -86,14 +86,13 @@ const DAY_SCENARIOS: DayScenario[] = [
       { label: 'Exercise', minutes: 60 },
       { label: 'Social', minutes: 120 },
       { label: 'Meals', minutes: 90 },
-      { label: 'Sleep', minutes: 480 },
     ],
     { metrics: { body: 88, focus: 82, social: 85 }, mood: 'great' }
   ),
   day('thin', [{ label: 'Shallow Work', minutes: 45 }], { metrics: { body: 20, focus: 25, social: 5 } }),
   day(
     'leisure',
-    [{ label: 'Entertainment', minutes: 300 }, { label: 'Meals', minutes: 60 }, { label: 'Sleep', minutes: 540 }],
+    [{ label: 'Entertainment', minutes: 300 }, { label: 'Meals', minutes: 60 }],
     { metrics: { body: 35, focus: 5, social: 5 } }
   ),
   day('low-mood', [{ label: 'Deep Work', minutes: 60 }, { label: 'Entertainment', minutes: 240 }], {
@@ -111,7 +110,7 @@ const DAY_SCENARIOS: DayScenario[] = [
     metrics: { body: 25, focus: 90, social: 0 },
     longestFocusSession: { activity: 'Quarterly model', minutes: 200 },
   }),
-  day('sleep-only', [{ label: 'Sleep', minutes: 480 }], { metrics: { body: 40, focus: 0, social: 0 } }),
+  day('rest-only', [{ label: 'Rest', minutes: 240 }], { metrics: { body: 40, focus: 0, social: 0 } }),
   day('even', [{ label: 'Learning', minutes: 150 }, { label: 'Movement', minutes: 30 }, { label: 'Social', minutes: 60 }, { label: 'Rest', minutes: 60 }], {
     metrics: { body: 45, focus: 55, social: 50 },
     mood: 'okay',
@@ -139,37 +138,37 @@ function week(
 }
 
 const WEEK_SCENARIOS: WeekScenario[] = [
-  week('full-week', [['Sleep', 52], ['Deep Work', 22], ['Meetings', 8], ['Exercise', 4], ['Social', 6], ['Meals', 9], ['Entertainment', 7]]),
-  week('focus-only', [['Deep Work', 38], ['Shallow Work', 10], ['Sleep', 44], ['Meals', 5]], {
+  week('full-week', [['Deep Work', 22], ['Meetings', 8], ['Exercise', 4], ['Social', 6], ['Meals', 9], ['Entertainment', 7]]),
+  week('focus-only', [['Deep Work', 38], ['Shallow Work', 10], ['Meals', 5]], {
     bestHours: ['8 AM', '9 AM'],
   }),
-  week('partial', [['Deep Work', 9], ['Sleep', 22], ['Exercise', 1]], {
+  week('partial', [['Deep Work', 9], ['Exercise', 1]], {
     isPartialWeek: true,
     bestDays: ['Monday'],
   }),
-  week('leisure-week', [['Entertainment', 30], ['Sleep', 60], ['Meals', 10], ['Shallow Work', 6]], {
+  week('leisure-week', [['Entertainment', 30], ['Meals', 10], ['Shallow Work', 6]], {
     bestDays: ['Wednesday'],
     bestHours: ['2 PM'],
   }),
   // The games and dinners were with friends, so Heart counted them.
-  week('friends-in-leisure', [['Sleep', 54], ['Entertainment', 14], ['Meals', 9], ['Deep Work', 12]], {
+  week('friends-in-leisure', [['Entertainment', 14], ['Meals', 9], ['Deep Work', 12]], {
     heartMinutes: h(6),
   }),
   week('thin-week', [['Deep Work', 3], ['Meals', 1]], {
     bestDays: ['Monday'],
     bestHours: ['10 AM'],
   }),
-  week('sleep-heavy', [['Sleep', 63], ['Rest', 10], ['Calls', 3], ['Chores', 6]], {
+  week('rest-heavy', [['Rest', 10], ['Calls', 3], ['Chores', 6]], {
     bestDays: [],
     bestHours: [],
   }),
-  // No best focus, and the largest activity apart from sleep is not rest.
-  week('no-focus-home', [['Sleep', 56], ['Chores', 12], ['Errands', 7], ['Social', 5], ['Rest', 4]], {
+  // No best focus, and the largest activity is not rest.
+  week('no-focus-home', [['Chores', 12], ['Errands', 7], ['Social', 5], ['Rest', 4]], {
     bestDays: [],
     bestHours: [],
   }),
-  week('meetings-week', [['Sleep', 50], ['Deep Work', 20], ['Meetings', 14], ['Meals', 7]]),
-  week('faith-week', [['Sleep', 52], ['Deep Work', 18], ['Faith', 5], ['Meals', 8]]),
+  week('meetings-week', [['Deep Work', 20], ['Meetings', 14], ['Meals', 7]]),
+  week('faith-week', [['Deep Work', 18], ['Faith', 5], ['Meals', 8]]),
 ]
 
 const JUDGE_BOTH = [
@@ -199,19 +198,15 @@ const RECORD_KINDS = {
     'remarks on the record itself: how many days or hours were written down or logged, how complete, full or thin the log or the data is, or what that suggests. "You logged all seven days." "This week held three days of logging." "There were only 2 days with any time logged." "There is not enough data to determine your best focus days." "Only two days had any time logged, indicating limited activity."',
   suggests_recording:
     'suggests logging, recording, tracking or writing something down. "You might consider logging more focused work next week." "You could consider logging some time with friends."',
-  sleep_was_the_largest:
-    'says in words that sleep was the largest, biggest or main part of the week. "Sleep took up most of your week." "Sleep was the biggest category."',
-  sleep_hours:
-    'gives the hours of sleep and nothing more. "Sleep came to 40 hours." "You slept 45 hours."',
   what_the_time_went_to:
-    'states what the time went to, an activity and its hours, which activity other than sleep took the most time (rest is not sleep), or a pattern such as which days or hours, even if it uses the word "logged". "You spent 22 hours on deep work." "You also logged 8 hours in meetings and 9 hours for meals." "Your best focus days were Tuesday and Thursday."',
+    'states what the time went to, an activity and its hours, which activity took the most time, or a pattern such as which days or hours, even if it uses the word "logged". "You spent 22 hours on deep work." "You also logged 8 hours in meetings and 9 hours for meals." "Your best focus days were Tuesday and Thursday."',
   no_time_with_people:
     'says there was no time with friends or family, however it is worded and even if it uses "logged" or "log". "No time with friends or family was logged this week." "You did not log any time with friends or family."',
   suggests_doing:
     'suggests doing or scheduling an activity. "You could schedule more deep work at 9 AM on Tuesday." "Consider scheduling some time with friends on Saturday."',
   other: 'anything else.',
 } as const
-const RECORD_BREAKS = ['about_the_record', 'suggests_recording', 'sleep_was_the_largest']
+const RECORD_BREAKS = ['about_the_record', 'suggests_recording']
 
 async function judgeRecord(openai: OpenAI, line: string): Promise<{ kept: boolean; note: string }> {
   const res = await openai.chat.completions.create({
@@ -308,8 +303,7 @@ Respond with JSON only: {${rules.map(([k]) => `"${k}": bool`).join(', ')}, "note
 // the report shows whether the judge can tell them apart. "Keeps" lines are
 // from the run of 2026-11-15 (6a8f7e3), which the owner read and found do
 // not remark on the log; "breaks" lines are from the run before it
-// (3a15c1e), some trimmed, or are the owner's examples, and the sleep one
-// was written for this check. A line marked * quotes one
+// (3a15c1e), some trimmed, or are the owner's examples. A line marked * quotes one
 // of the examples in the rule itself, so it is a weaker test.
 const CALIBRATION: { scenario: string; keeps: boolean; quoted?: boolean; line: string }[] = [
   { scenario: 'full-week', keeps: true, quoted: true, line: 'You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 8 hours in meetings and 9 hours for meals. Best focus days were Tuesday and Thursday. You might consider scheduling more deep work during the 9 AM hour on those days.' },
@@ -320,19 +314,16 @@ const CALIBRATION: { scenario: string; keeps: boolean; quoted?: boolean; line: s
   { scenario: 'leisure-week', keeps: true, quoted: true, line: 'This week held 30 hours of entertainment and 6 hours of shallow work. You spent your best focus day on Wednesday, with your best focus hour at 2 PM. You did not log any time with friends or family. You could consider scheduling a focused work session on Wednesday at 2 PM.' },
   { scenario: 'meetings-week', keeps: true, quoted: true, line: 'You spent 20 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. No time with friends or family was logged this week. You could plan to schedule more time for meals on Tuesday.' },
   { scenario: 'faith-week', keeps: true, line: 'You spent 18 hours on deep work, with your best focus days being Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. You also spent 8 hours on meals and 5 hours on faith. Consider scheduling more deep work during your best focus hours next week.' },
-  // These two were graded broken in the first run with the sorted judge: a
-  // sentence giving sleep's hours, and rest (not sleep) taking the most time.
-  { scenario: 'faith-week', keeps: true, quoted: true, line: 'You spent 18 hours on deep work this week. Your best focus days were Tuesday and Thursday, with your best focus hours at 9 AM and 10 AM. You logged 8 hours for meals and 5 hours for faith. You had 52 hours of sleep.' },
-  { scenario: 'sleep-heavy', keeps: true, line: 'You spent 10 hours resting, 6 hours on chores, and 3 hours on calls. The most time was dedicated to rest. You could consider scheduling more calls on Tuesday.' },
+  // Graded broken in the first run with the sorted judge: rest taking the most time.
+  { scenario: 'rest-heavy', keeps: true, line: 'You spent 10 hours resting, 6 hours on chores, and 3 hours on calls. The most time was dedicated to rest. You could consider scheduling more calls on Tuesday.' },
   { scenario: 'full-week', keeps: false, quoted: true, line: 'This week held 22 hours of deep work, with best focus days on Tuesday and Thursday. The best focus hours were at 9 AM and 10 AM. You logged all seven days, with no hours unaccounted for. Consider scheduling more deep work during your best focus hours next week.' },
   { scenario: 'focus-only', keeps: false, line: 'This week included 38 hours of deep work and 10 hours of shallow work, with all seven days logged. The best focus days were Tuesday and Thursday, with the best focus hours at 8 AM and 9 AM. You could consider scheduling some shallow work during your best focus hours on Tuesday.' },
   { scenario: 'partial', keeps: false, quoted: true, line: 'This week held three days of logging, with 9 hours of deep work recorded. The best focus day was Monday, with focused hours at 9 AM and 10 AM. You might consider scheduling additional focused work on Monday during the best focus hours.' },
-  { scenario: 'partial', keeps: false, line: 'This week held 9 hours of deep work, all on Monday during the best focus hours of 9 AM and 10 AM. Sleep accounted for 22 hours, and there was 1 hour of exercise. You could consider logging additional activities on Tuesday or Wednesday.' },
+  { scenario: 'partial', keeps: false, line: 'This week held 9 hours of deep work, all on Monday during the best focus hours of 9 AM and 10 AM. There was 1 hour of exercise. You could consider logging additional activities on Tuesday or Wednesday.' },
   { scenario: 'thin-week', keeps: false, quoted: true, line: 'This week included 3 hours of deep work, all logged on Monday during the best focus hour of 10 AM. You logged 1 hour for meals. There were only 2 days with any time logged. You could consider adding more activities on Wednesday, as it currently has no logged hours.' },
   { scenario: 'thin-week', keeps: false, quoted: true, line: 'This week held 3 hours of deep work and 1 hour for meals. Only two days had any time logged, indicating limited activity. You could schedule deep work on Monday at 10 AM.' },
-  { scenario: 'sleep-heavy', keeps: false, quoted: true, line: 'You spent 10 hours resting, 6 hours on chores and 3 hours on calls. There is not enough data to determine your best focus days or hours. You might consider recording focused work next week to capture more details.' },
+  { scenario: 'rest-heavy', keeps: false, quoted: true, line: 'You spent 10 hours resting, 6 hours on chores and 3 hours on calls. There is not enough data to determine your best focus days or hours. You might consider recording focused work next week to capture more details.' },
   { scenario: 'leisure-week', keeps: false, line: 'This week held 30 hours of entertainment and 10 hours for meals. Wednesday was the best focus day. You might consider logging some time with friends or family on a day like Saturday.' },
-  { scenario: 'sleep-heavy', keeps: false, line: 'Sleep was the biggest part of your week at 63 hours, well ahead of 10 hours of rest and 6 hours of chores. You could schedule a call on Wednesday evening.' },
   // Written after the review found that 9 of 19 lines above quote the rule.
   // None of these repeats an example from RECORD_KINDS; same kinds of line.
   { scenario: 'meetings-week', keeps: true, line: 'Meetings took 14 hours and deep work 20 hours. Focus clustered on Tuesday and Thursday, mostly around 9 AM and 10 AM. Friends and family do not appear in the week. You could book a call on Wednesday evening.' },
@@ -340,14 +331,12 @@ const CALIBRATION: { scenario: string; keeps: boolean; quoted?: boolean; line: s
   { scenario: 'faith-week', keeps: true, line: 'Faith took 5 hours this week, next to 18 hours of deep work and 8 hours of meals. Late mornings on Tuesday and Thursday held the most focus. You might add a short walk on Friday afternoon.' },
   { scenario: 'leisure-week', keeps: true, line: 'Entertainment filled 30 hours, with 10 hours going to meals and 6 to shallow work. Wednesday around 2 PM held the most focus. An hour of deep work there on Wednesday is one option.' },
   { scenario: 'partial', keeps: true, line: 'So far this week, deep work has taken 9 hours and exercise 1 hour. Monday at 9 AM was where focus landed. You could try a second focus block on Tuesday at 9 AM.' },
-  { scenario: 'sleep-heavy', keeps: true, line: 'Chores took 6 hours and rest 10 hours, with 3 hours of calls. Apart from sleep, rest took the most time. A call on Saturday morning is one option.' },
+  { scenario: 'rest-heavy', keeps: true, line: 'Chores took 6 hours and rest 10 hours, with 3 hours of calls. Rest took the most time. A call on Saturday morning is one option.' },
   { scenario: 'full-week', keeps: false, line: 'Deep work took 22 hours across the week, and every day has an entry. Nothing is missing from the record. You could try a morning workout on Friday.' },
   { scenario: 'thin-week', keeps: false, line: 'Deep work took 3 hours and meals 1 hour. Most of the week is blank, so the picture is incomplete. You could schedule deep work on Monday at 10 AM.' },
   { scenario: 'partial', keeps: false, line: 'Deep work took 9 hours so far. You have written down just one day of this week. Try noting your afternoons too, starting Tuesday.' },
   { scenario: 'meetings-week', keeps: false, line: 'Meetings took 14 hours and deep work 20 hours. Track your evenings next week so the totals are fuller.' },
-  { scenario: 'leisure-week', keeps: false, line: 'Sleep made up most of the week at 60 hours, with entertainment next at 30. You could schedule a walk on Wednesday.' },
-  { scenario: 'faith-week', keeps: false, line: 'Sleep took the largest share of the week, at 52 hours, ahead of 18 hours of deep work. You could schedule deep work on Tuesday at 9 AM.' },
-  { scenario: 'sleep-heavy', keeps: false, line: 'Rest took 10 hours, chores 6 and calls 3. The log is too sparse to say when focus happens. You might add your work hours on Monday.' },
+  { scenario: 'rest-heavy', keeps: false, line: 'Rest took 10 hours, chores 6 and calls 3. The log is too sparse to say when focus happens. You might add your work hours on Monday.' },
 ]
 
 async function calibrate(openai: OpenAI) {

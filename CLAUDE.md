@@ -105,7 +105,7 @@ type TimeCategory =
   | 'exercise'        // Intentional workout
   | 'movement'        // Light activity (walks, stretching)
   | 'meals'           // Eating, food prep
-  | 'sleep'           // Sleep tracking
+  | 'sleep'           // No longer offered; kept for rows saved before it was removed, feeds no ring
   // MIND
   | 'rest'            // Intentional downtime, naps
   | 'self_care'       // Hygiene, meditation, health
@@ -120,6 +120,12 @@ type TimeCategory =
   | 'other'           // Anything that doesn't fit
 ```
 
+Nineteen are offered (`LOGGABLE_CATEGORIES`). Sleep was removed from the app:
+nothing offers it, the categoriser never returns it (typed sleep becomes
+Other), and no screen, reminder, review, planner or prompt mentions or
+expects it. Saved sleep entries are never deleted or rewritten; they show on
+the timeline as ordinary entries.
+
 For display, these roll up into six `AggregatedCategory` buckets —
 `focus | ops | body | recovery | connection | escape` (see `ENERGY_VIEW`).
 
@@ -133,10 +139,6 @@ For display, these roll up into six `AggregatedCategory` buckets —
 ### AI API Calls
 - **DO**: Call `/api/categorize` and `/api/commentary` only for confirmed entries
 - **DON'T**: Categorize pending/future entries - wastes API calls
-  - One exception, approved by the owner: a planned entry whose times cross
-    midnight is categorised once at save, only to tell sleep from the rest
-    (sleep is kept as one row, anything else is split). The category is not
-    stored; the plan is saved with none, as any plan is.
 - **DO**: Use the batch forms when acting on a set — `/api/categorize` takes
   `{ activities: string[] }` and answers in one model call, `/api/entries`
   takes `{ entries: [...] }` and inserts in one statement. Confirming four
@@ -163,28 +165,28 @@ For display, these roll up into six `AggregatedCategory` buckets —
 
 ### Entries across midnight
 - An entry whose end is earlier than its start crosses midnight (an end of
-  `00:00` or `24:00` ends exactly at midnight and does not). Anything that
-  is not sleep is split at midnight into two ordinary entries, one on each
-  day, and nothing links them afterwards. Sleep stays one row on the date
-  it was logged on, so its `end_time` may be earlier than its `start_time`.
-- Which day a one-piece overnight row belongs to: the day that holds more
-  of it, and a tie goes to the wake-up day. 23:00–07:00 dated Tuesday is
-  Monday 23:00 to Tuesday 07:00; 18:00–01:00 dated Monday is Monday 18:00 to
-  Tuesday 01:00. Its whole `duration_minutes` counts on its own date.
+  `00:00` or `24:00` ends exactly at midnight and does not). Every such
+  entry is split at midnight into two ordinary entries, one on each day,
+  and nothing links them afterwards. There is no one-row exception.
+- Rows saved before sleep was removed may still be one piece (an overnight
+  sleep, `end_time` earlier than `start_time`). They are left as they are.
+  Such a row belongs to the day that holds more of it, and a tie goes to
+  the wake-up day: 23:00–07:00 dated Tuesday is Monday 23:00 to Tuesday
+  07:00. Its whole `duration_minutes` counts on its own date.
 - Anything that places an entry in a day — a session, an hour, a gap, the
   timeline, a sort — uses `onDayTimes` from `lib/overnight.ts`, never the
-  raw times. The part that spills into the neighbouring day is `coveredOn`
-  (`useOvernightSpill` on a screen): display only, never summed.
+  raw times. The part of an older one-piece row that spills into the
+  neighbouring day is `coveredOn` (`useOvernightSpill` on a screen):
+  display only, never summed.
 - The rule runs when a save changes the times (`planOvernightSave`, in
   `POST /api/entries` and `PUT /api/entries/[id]`). A save of the category,
-  status or words alone neither splits nor rejoins, and nothing reaches back
-  to rewrite older rows.
-- The add sheet asks two questions, only on today: "Did this start
-  yesterday?" for a crossing entry whose start is still ahead, and "Is this
-  tonight's sleep?" for a night typed from 6pm. Nothing else asks.
-- A plan has no category, so the client says whether it is a sleep with
-  `overnight_sleep`, which is never stored. The server never calls the
-  model.
+  status or words alone neither splits nor rejoins, and nothing reaches
+  back to rewrite older rows. An older one-piece row whose times the
+  person changes is split like any other.
+- The add sheet asks one question, only on today: "Did this start
+  yesterday?" for a crossing entry whose start is still ahead.
+- The server never calls the model to save an entry, and a plan is never
+  categorised.
 
 ### Calendar API Caching
 - CalendarContext caches events for ±7/14 days from today
@@ -307,7 +309,7 @@ src/
 │   ├── types.ts              # TimeEntry, TimeCategory, date + domain helpers
 │   ├── palette.ts            # Every data colour, defined once
 │   ├── time-utils.ts         # Time formatting, calculations
-│   ├── overnight.ts          # Entries across midnight: split, placement, the part on each day
+│   ├── overnight.ts          # Entries across midnight: the split, and placement of older one-piece rows
 │   ├── supabase-server.ts    # Supabase client (server-side; the only one)
 │   ├── auth.ts               # NextAuth options
 │   ├── session.ts            # getAppSession(): who is asking, for every API route
@@ -339,9 +341,9 @@ time_entries (
 )
 ```
 
-`end_time` may be earlier than `start_time`: that is an overnight sleep, one
-row on the date it was logged on (see "Entries across midnight"). An end at
-midnight is stored as `24:00`.
+`end_time` may be earlier than `start_time` only on rows saved before every
+crossing entry was split (see "Entries across midnight"). An end at midnight
+is stored as `24:00`.
 
 ## What the app is for
 
@@ -427,15 +429,17 @@ Android gets the browser's own install prompt where it has offered one.
    in `globals.css`. Nothing a person has to read is under 12px, and
    secondary text is `text-muted-foreground` at full strength — not dimmed
    further with an opacity suffix.
-6. **Body needs exercise**: upkeep earns its way up a curve that approaches
-   69 and never reaches it; exercise closes the gap from there to 99.
-   `body = upkeep + (99 − upkeep) × curve(exercise)`. So a flawless day of
-   looking after yourself scores about 66 — a good day — and no amount of
-   sleep, food or self-care reaches 70, because the app should not tell you
-   your body had a strong day when you did not move it. Exercise is counted
-   in moderate-equivalent minutes: vigorous double, light half, as the WHO
-   guidelines count them, with the intensity read from the activity text by
-   `classifyIntensity`. `UPKEEP_CEILING` is where you move the line.
+6. **Body is movement**: movement and exercise carry the ring, counted in
+   moderate-equivalent minutes — vigorous double, light half, as the WHO
+   guidelines count them, with the intensity read from the activity text
+   by `classifyIntensity`. 45 of them is the target and scores 80. Rest
+   and self-care are a small part on a curve of their own that approaches
+   50 and never passes it (`UPKEEP_CEILING` is where you move the line),
+   and movement closes the gap from there:
+   `body = care + (100 − care) × curve(movement)`, shown up to 99. So a
+   flawless day of rest and self-care scores about 47, and the movement
+   target alone scores 80. Meals and sleep count for nothing in Body;
+   meals stay loggable.
 7. **One scoring system**: Body / Mind / Heart, from `lib/metrics-calc.ts`,
    on a saturating curve where the target scores 80 and 100 is unreachable.
    Anywhere that wants "a number for this day or week" shows those three
@@ -480,11 +484,12 @@ Android gets the browser's own install prompt where it has offered one.
     except a popup people skip. The popup can still tick tasks.
 11. **Your habit outranks the textbook**: The planner reads the last four
     weeks of the log (`lib/habits.ts`) for your usual hour and length for a
-    thing, when you get up, and what you do often. `suggestTimes` proposes
+    thing, and what you do often. `suggestTimes` proposes
     your usual hour first and quotes the research only where it agrees; with
     no habit it falls back to `IDEAL_DAY`. A habit needs three separate
     days, and an hour that wanders more than 90 minutes is not a usual hour.
-    Nothing is proposed before half an hour after you usually wake. Plans
+    Nothing is proposed before half an hour after the wake time you have
+    stated (6am when you have stated none). Plans
     are stored without a category, so the categoriser's answer is kept per
     session (`plan-task-categories`) — it is what colours a proposal and
     lets "If the day goes to plan" score it with the ordinary `calcBody` /
@@ -492,8 +497,9 @@ Android gets the browser's own install prompt where it has offered one.
 12. **The windows follow the person**: `IDEAL_DAY` is written in clock time
     for someone who wakes at 6:30. `windowsForWake` moves the body's
     windows (focus, the dip, the physical peak, wind-down) to when this
-    person wakes — a time they state (`useWakeTime`, kept on the device) or
-    that the log shows — and leaves the two about other people (midday,
+    person wakes — a time they state (`useWakeTime`, kept on the device),
+    never one read from the log; with none stated the windows are the
+    reference day — and leaves the two about other people (midday,
     evening) on the clock. The shift is capped at two hours earlier and
     four later: the findings are averages and should not be stretched to a
     3am riser. Anything that reasons about "the right hour" must take the

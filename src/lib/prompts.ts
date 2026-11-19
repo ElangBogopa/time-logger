@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_LABELS, TimeCategory, TimeEntry } from '@/lib/types'
+import { LOGGABLE_CATEGORIES, CATEGORY_LABELS, TimeCategory, TimeEntry } from '@/lib/types'
 import { formatDurationLong } from '@/lib/time-utils'
 import { SOCIAL_CATS } from '@/lib/metrics-calc'
 
@@ -182,25 +182,23 @@ export interface WeekReviewContextInput {
 // No day counts are sent: the model turned them into remarks about how much was logged.
 export function buildWeekReviewContext(input: WeekReviewContextInput): string {
   const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
+  // Sleep is no longer offered; a week holding rows saved as sleep before it
+  // was removed tells the model nothing about them.
+  const categories = input.categories.filter((c) => c.label !== CATEGORY_LABELS.sleep)
   // Only a finished week can have had none: one still in progress has not.
   const noneThisWeek =
-    !input.isPartialWeek && input.categories.length > 0 && (input.heartMinutes ?? peopleMinutes(input.categories)) === 0
-  // Sleep last: it is the largest category for anyone who logs it, and a
-  // line that opens with it presents it as the week's finding.
-  const sleep = CATEGORY_LABELS.sleep
-  const ordered = [...input.categories].sort(
-    (a, b) => Number(a.label === sleep) - Number(b.label === sleep) || b.minutes - a.minutes
-  )
-  // A week with no best focus days or hours gets the largest activity apart
-  // from sleep stated for it. Asked to find it, the model named the wrong
-  // one twice: rest was 10h, and it said chores (6h) took the most.
+    !input.isPartialWeek && categories.length > 0 && (input.heartMinutes ?? peopleMinutes(categories)) === 0
+  const ordered = [...categories].sort((a, b) => b.minutes - a.minutes)
+  // A week with no best focus days or hours gets the largest activity stated
+  // for it. Asked to find it, the model named the wrong one twice: rest was
+  // 10h, and it said chores (6h) took the most.
   const noFocus = input.bestDays.length === 0 && input.bestHours.length === 0
-  const waking = input.categories.filter((c) => c.label !== sleep && c.minutes > 0)
-  const topMinutes = Math.max(0, ...waking.map((c) => c.minutes))
-  const top = waking.filter((c) => c.minutes === topMinutes)
+  const nonEmpty = categories.filter((c) => c.minutes > 0)
+  const topMinutes = Math.max(0, ...nonEmpty.map((c) => c.minutes))
+  const top = nonEmpty.filter((c) => c.minutes === topMinutes)
   const most =
     noFocus && top.length > 0
-      ? `- Most hours apart from sleep: ${top.map((c) => c.label).join(' and ')} (${hoursOf(topMinutes)}h${top.length > 1 ? ' each' : ''})`
+      ? `- Most hours: ${top.map((c) => c.label).join(' and ')} (${hoursOf(topMinutes)}h${top.length > 1 ? ' each' : ''})`
       : ''
   const head = [
     'Weekly Review Data:',
@@ -222,7 +220,7 @@ ${noneThisWeek ? `\n${NO_FRIENDS_OR_FAMILY}` : ''}
 // A week with no best focus days or hours is told nothing about them: told
 // to call them "best focus", the model wrote that there was no focused work
 // and suggested using best focus hours that did not exist. Its pattern points
-// at the stated "Most hours apart from sleep" fact, so nothing is ranked here.
+// at the stated "Most hours" fact, so nothing is ranked here.
 export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 'bestDays' | 'bestHours'>): string {
   const days = focus.bestDays.length > 0
   const hours = focus.bestHours.length > 0
@@ -230,7 +228,7 @@ export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 
   const pattern =
     days || hours
       ? `such as the ${named} where the focused work fell`
-      : 'such as the activity the data gives as taking the most hours apart from sleep, named as the data names it'
+      : 'such as the activity the data gives as taking the most hours, named as the data names it'
   const bestFocus =
     days || hours
       ? `\nCall the ${named} in the data "best focus" ${named}, as the data does; never call them productive.`
@@ -249,7 +247,7 @@ ${REVIEW_VOICE}
 Don't use bullet points - write in flowing prose.
 Keep it concise - no more than 4 sentences total.
 The person's scores are on screen above your words: do not mention scores or targets, and do not sum the week up with a verdict.
-Write about what the time went to, never about the record of it. Say "you spent" or name the activity and its hours. Say nothing about how many days or hours the data covers, and do not suggest writing more down. Sleep is listed last and is not a finding.
+Write about what the time went to, never about the record of it. Say "you spent" or name the activity and its hours. Say nothing about how many days or hours the data covers, and do not suggest writing more down.
 If the week is still in progress, say "so far" and do not compare it with a full week.${bestFocus}`
 }
 
@@ -266,7 +264,7 @@ export function describeEntries(entries: TimeEntry[]): string {
 }
 
 export function buildCategorizeSystemPrompt(): string {
-  return `You are a time tracking assistant. Categorize the given activity into exactly one of these categories: ${CATEGORIES.join(', ')}.
+  return `You are a time tracking assistant. Categorize the given activity into exactly one of these categories: ${LOGGABLE_CATEGORIES.join(', ')}.
 
 Category definitions:
 
@@ -286,7 +284,6 @@ MAINTENANCE (life logistics):
 BODY (physical):
 - exercise: ANY physical activity - gym, running, sports, yoga, cycling, strength training, HIIT, walking, stretching, standing, light yoga, playing with kids
 - meals: Eating (not cooking) - breakfast, lunch, dinner, snacks, coffee breaks
-- sleep: Sleep tracking - night sleep, naps
 
 MIND (mental recovery):
 - rest: Intentional downtime - relaxing, reading for pleasure, listening to music, sitting in nature
@@ -349,9 +346,13 @@ IMPORTANT RULES:
    with people from your congregation is social or meals; a Shabbat or iftar
    meal observed as practice is faith.
 
-9. USE 'other' ONLY AS A LAST RESORT: it means the activity fits no category at
-   all. If it plausibly belongs somewhere, put it there. Anything describing
-   work, study, exercise, food, rest or people has a home above.
+9. USE 'other' ONLY AS A LAST RESORT, apart from sleep: it means the activity
+   fits no category at all. If it plausibly belongs somewhere, put it there.
+   Anything describing work, study, exercise, food, rest or people has a home
+   above.
+
+10. SLEEP IS NOT A CATEGORY: night sleep, "Sleep", "Slept 8 hours", "Went to
+   bed" → other. A nap → rest.
 
 Respond with ONLY the category name, nothing else.`
 }

@@ -130,7 +130,6 @@ const nap = e('Nap', 'rest', '14:00', '14:45', 45)
 const tv = e('Watching TV', 'entertainment', '15:00', '16:30', 90)
 const dinner = e('Dinner with family', 'social', '18:30', '20:00', 90)
 const gym = e('Gym', 'exercise', '07:00', '07:45', 45)
-const sleep = e('Sleep', 'sleep', '23:00', '07:00', 480)
 const meals = [e('Breakfast', 'meals', '07:50', '08:15', 25), e('Lunch', 'meals', '12:30', '13:00', 30)]
 
 const SCENARIOS: Scenario[] = [
@@ -144,7 +143,7 @@ const SCENARIOS: Scenario[] = [
   session('thin-evening', 'evening', [e('Tidying', 'chores', '19:00', '19:20', 20)], { nowMinutes: at(21) }),
   session('earlier-day', 'afternoon', [e('Study', 'learning', '13:00', '15:00', 120), tv], { nowMinutes: null }),
   entry('entry-tv', tv, [tv]),
-  entry('entry-gym-takes-body-to-target', gym, [sleep, ...meals, gym]),
+  entry('entry-gym-takes-body-to-target', gym, [...meals, gym]),
   entry('entry-nap', nap, [nap]),
   (() => {
     const sync = e('Project sync', 'meetings', '15:00', '16:00', 60)

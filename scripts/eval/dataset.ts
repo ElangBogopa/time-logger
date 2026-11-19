@@ -56,7 +56,7 @@ const SPECS: Spec[] = [
   ['exercise', ['exercise'], ['Gym: Leg Day', 'Morning run', 'Swimming', 'Football match', 'Weight training', 'Spin class', 'Boxing']],
   ['movement', ['movement', 'exercise'], ['Short walk', 'Stretching', 'Walking the dog', 'Pacing while on a call']],
   ['meals', ['meals'], ['Lunch', 'Breakfast', 'Dinner with the family', 'Coffee and a sandwich', 'Eating out']],
-  ['sleep', ['sleep', 'rest'], ['Sleep', 'Slept 8 hours', 'Went to bed early', 'Overnight']],
+  ['sleep', ['other'], ['Sleep', 'Slept 8 hours', 'Went to bed early', 'Overnight'], 'Sleep is no longer a category: typed sleep becomes other. Only a nap goes to rest.'],
   ['rest', ['rest'], ['Nap', 'Lying down', 'Unwinding', 'Quiet time', 'Doing nothing on purpose']],
   ['self_care', ['self_care'], ['Shower', 'Skincare routine', 'Therapy session', 'Dentist', 'Taking medication', 'Journalling']],
   ['social', ['social'], ['Dinner with friends', 'Family time', 'Birthday party', 'Catching up with a mate', 'Date night']],

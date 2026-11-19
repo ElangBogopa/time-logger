@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import OpenAI from 'openai'
-import { CATEGORIES, TimeCategory } from '../../src/lib/types'
+import { LOGGABLE_CATEGORIES, TimeCategory } from '../../src/lib/types'
 import { buildCategorizeSystemPrompt } from '../../src/lib/prompts'
 import { buildDataset, Case } from './dataset'
 
@@ -62,7 +62,7 @@ async function run(): Promise<Result[]> {
         })
         const raw = completion.choices[0]?.message?.content?.trim().toLowerCase() || ''
         // The route applies the same guard: anything unrecognised becomes other.
-        const answer = (CATEGORIES as readonly string[]).includes(raw) ? raw : 'other'
+        const answer = (LOGGABLE_CATEGORIES as readonly string[]).includes(raw) ? raw : 'other'
         results[i] = {
           ...c,
           answer,

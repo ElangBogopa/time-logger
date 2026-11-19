@@ -2,13 +2,13 @@
  * What your own log says about when you do things.
  *
  * The suggester knew the research and nothing about you. It proposed the
- * gym at 6am to someone whose log showed a run at 6pm every time and sleep
- * until seven; it made every block an hour; and it waited for you to type
+ * gym at 6am to someone whose log showed a run at 6pm every time; it made
+ * every block an hour; and it waited for you to type
  * "gym" again each evening. The guide the research comes from ends on the
  * line that settles it: the best schedule is the one you actually follow.
  *
- * So: the usual hour and length of a thing, when you wake, and what you do
- * often enough to be worth offering. All of it read from entries already
+ * So: the usual hour and length of a thing, and what you do often enough
+ * to be worth offering. All of it read from entries already
  * in the log, with thresholds strict enough that a coincidence is not
  * mistaken for a habit.
  */
@@ -16,7 +16,6 @@
 import type { TimeCategory } from './types'
 import { activityMatch, activityKey } from './plan-adherence'
 import { timeToMinutes } from './time-utils'
-import { crossesMidnight, overnightPlacement } from './overnight'
 
 export interface HabitEntry {
   activity: string
@@ -93,32 +92,8 @@ function summarise(matches: HabitEntry[], basis: Usual['basis']): Usual | null {
 }
 
 /**
- * When you usually get up: the end of the sleep that finishes in the
- * morning. Null until there are a few mornings to go on.
- */
-export function usualWakeMinutes(entries: HabitEntry[]): number | null {
-  const perDay = new Map<string, number>()
-  for (const entry of entries) {
-    if (entry.category !== 'sleep' || !entry.start_time || !entry.end_time) continue
-    const start = timeToMinutes(entry.start_time)
-    const end = timeToMinutes(entry.end_time)
-    if (end > 12 * 60) continue
-    // A night's sleep as it is logged here: begins after midnight (or is
-    // the tail of the night) and ends before noon — or one row across
-    // midnight, dated the day it ended, whose end is that day's wake time.
-    const overnightNight =
-      crossesMidnight(entry.start_time, entry.end_time) &&
-      overnightPlacement(entry.start_time, entry.end_time) === 'wake-day'
-    if (end <= start && !overnightNight) continue
-    perDay.set(entry.date, Math.max(perDay.get(entry.date) ?? 0, end))
-  }
-  if (perDay.size < MIN_DAYS) return null
-  return roundTo(median([...perDay.values()]), SLOT)
-}
-
-/**
  * The kinds of thing the planner exists for: what has no owner and no
- * time unless you give it one. Sleep and meals happen anyway, meetings
+ * time unless you give it one. Meals happen anyway, meetings
  * belong to the calendar, and nobody needs reminding to watch television.
  */
 const PLANNABLE: TimeCategory[] = [

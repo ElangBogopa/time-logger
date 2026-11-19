@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import OpenAI from 'openai'
-import { CATEGORIES, TimeCategory } from '@/lib/types'
+import { LOGGABLE_CATEGORIES, TimeCategory } from '@/lib/types'
 import { buildCategorizeSystemPrompt } from '@/lib/prompts'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
@@ -12,6 +12,12 @@ const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
 
 // One confirm-all should not be able to ask for a hundred categories.
 const MAX_BATCH = 25
+
+// Sleep is no longer offered. A cached answer of sleep, from before it was
+// removed, is read as other, like a model answer of sleep.
+function loggable(category: TimeCategory): TimeCategory {
+  return LOGGABLE_CATEGORIES.includes(category) ? category : 'other'
+}
 
 // Normalize activity text for cache lookup
 function normalizeActivity(activity: string): string {
@@ -55,7 +61,7 @@ async function categorizeMany(input: unknown[], openai: OpenAI) {
     if (resolved.has(key) || toAsk.includes(key)) continue
     const cached = categoryCache.get(key)
     if (cached && now - cached.timestamp < CACHE_TTL) {
-      resolved.set(key, cached.category)
+      resolved.set(key, loggable(cached.category))
     } else {
       toAsk.push(key)
     }
@@ -85,7 +91,7 @@ async function categorizeMany(input: unknown[], openai: OpenAI) {
 
     toAsk.forEach((activity, i) => {
       const answer = lines[i] as TimeCategory
-      const category = CATEGORIES.includes(answer) ? answer : 'other'
+      const category = LOGGABLE_CATEGORIES.includes(answer) ? answer : 'other'
       resolved.set(activity, category)
       categoryCache.set(activity, { category, timestamp: Date.now() })
     })
@@ -140,7 +146,7 @@ export async function POST(request: NextRequest) {
     const cached = categoryCache.get(normalizedActivity)
 
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return NextResponse.json({ category: cached.category, cached: true })
+      return NextResponse.json({ category: loggable(cached.category), cached: true })
     }
 
     // Clean expired entries occasionally (1% of requests)
@@ -167,7 +173,7 @@ export async function POST(request: NextRequest) {
     const categoryResponse = completion.choices[0]?.message?.content?.trim().toLowerCase() as TimeCategory
 
     // Validate the response is a valid category
-    const category = CATEGORIES.includes(categoryResponse) ? categoryResponse : 'other'
+    const category = LOGGABLE_CATEGORIES.includes(categoryResponse) ? categoryResponse : 'other'
 
     // Cache the result for future requests
     categoryCache.set(normalizedActivity, { category, timestamp: Date.now() })

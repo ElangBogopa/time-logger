@@ -127,7 +127,7 @@ const EVENING_BLOCKS: TimingBlock[] = [
   { time: '5–6 PM', activity: 'Wrap-up + Exercise', icon: Dumbbell, iconColor: 'text-[#7D9B8A]', reason: 'Body temp peaks — best physical performance window. Or wind down work.' },
   { time: '7–9 PM', activity: 'Social + Connection', icon: Users, iconColor: 'text-[#A8706A]', reason: 'Dinner, family, meaningful conversations. Relationships compound.' },
   { time: '9–10 PM', activity: 'Leisure', icon: Gamepad2, iconColor: 'text-[#8A7CA8]', reason: 'Natural wind-down. Prefer active leisure (hobbies, reading) over scrolling.' },
-  { time: '10 PM', activity: 'Sleep Prep', icon: Moon, iconColor: 'text-[#AFA3C8]', reason: 'No screens, dim lights. Your next day starts with tonight\'s sleep.' },
+  { time: '10 PM', activity: 'Wind down', icon: Moon, iconColor: 'text-[#AFA3C8]', reason: 'No screens, dim lights.' },
 ]
 
 // ── Research citations ──
@@ -289,7 +289,7 @@ export default function GuidePage() {
         {/* Section 1: Time Allocation */}
         <section className="mb-10">
           <h2 className="text-lg font-bold text-foreground mb-1">How to Split Your Time</h2>
-          <p className="text-xs text-muted-foreground mb-5">Based on a 16-hour waking day (8 hours sleep)</p>
+          <p className="text-xs text-muted-foreground mb-5">Based on a 16-hour waking day</p>
           <div className="space-y-5">
             {TIME_BLOCKS.map((block) => (
               <AllocationBar key={block.label} block={block} />
@@ -306,7 +306,7 @@ export default function GuidePage() {
               <p className="text-xs text-foreground/70 leading-relaxed">
                 Attention tends to run in cycles of roughly 90 minutes. A focused block of about that length,
                 then a 15–20 minute break, suits most people. The evidence for these cycles in waking hours is
-                thinner than it is for sleep, so treat it as a starting point.
+                thin, so treat it as a starting point.
               </p>
             </div>
           </div>

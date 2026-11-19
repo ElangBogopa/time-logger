@@ -70,7 +70,7 @@ describe('time with friends or family in the review prompts', () => {
 
   it('tells a finished week that had none, in a sentence', () => {
     const context = week([
-      { label: 'Sleep', minutes: 3000 },
+      { label: 'Rest', minutes: 3000 },
       { label: 'Meetings', minutes: 840 },
     ])
     expect(context).toContain(NO_FRIENDS_OR_FAMILY)
@@ -79,17 +79,17 @@ describe('time with friends or family in the review prompts', () => {
 
   it('says nothing when the week had some, is still in progress, or has no breakdown', () => {
     expect(week([{ label: 'Faith', minutes: 300 }])).not.toContain(NO_FRIENDS_OR_FAMILY)
-    expect(week([{ label: 'Calls', minutes: 180 }, { label: 'Sleep', minutes: 3000 }])).not.toContain(NO_FRIENDS_OR_FAMILY)
-    expect(week([{ label: 'Sleep', minutes: 1300 }], { isPartialWeek: true })).not.toContain(
+    expect(week([{ label: 'Calls', minutes: 180 }, { label: 'Rest', minutes: 3000 }])).not.toContain(NO_FRIENDS_OR_FAMILY)
+    expect(week([{ label: 'Rest', minutes: 1300 }], { isPartialWeek: true })).not.toContain(
       NO_FRIENDS_OR_FAMILY
     )
     expect(week([])).not.toContain(NO_FRIENDS_OR_FAMILY)
   })
 
   it('nowhere uses the old label', () => {
-    expect(week([{ label: 'Sleep', minutes: 3000 }])).not.toContain('Time with people')
+    expect(week([{ label: 'Rest', minutes: 3000 }])).not.toContain('Time with people')
     expect(week([{ label: 'Social', minutes: 300 }])).not.toContain('Time with people')
-    expect(week([{ label: 'Sleep', minutes: 1300 }], { isPartialWeek: true })).not.toContain(
+    expect(week([{ label: 'Rest', minutes: 1300 }], { isPartialWeek: true })).not.toContain(
       'Time with people'
     )
   })
@@ -120,7 +120,7 @@ describe('time with friends or family in the review prompts', () => {
     const dayLabels = labelsIn(dayLines.slice(start + 1))
 
     const cats = [
-      { label: 'Sleep', minutes: 3000 },
+      { label: 'Rest', minutes: 3000 },
       { label: 'Self Care', minutes: 120 },
     ]
     const extra = { bestDays: ['Tuesday'], bestHours: ['9 AM'] }
@@ -131,7 +131,7 @@ describe('time with friends or family in the review prompts', () => {
 
     // The test is worth nothing if the pattern stops finding labels.
     expect(dayLabels).toEqual(expect.arrayContaining(['Time by category', 'Time tracked', 'Plan', 'Noted', 'Evening mood', 'Longest focus session', 'Deep Work']))
-    expect(weekLabels).toEqual(expect.arrayContaining(['Weekly Review Data', 'Best focus days', 'Best focus hours', 'Hours by category', 'Sleep']))
+    expect(weekLabels).toEqual(expect.arrayContaining(['Weekly Review Data', 'Best focus days', 'Best focus hours', 'Hours by category', 'Rest']))
     for (const label of [...dayLabels, ...weekLabels]) expect(known).toContain(label)
   })
 })

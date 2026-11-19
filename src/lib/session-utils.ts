@@ -79,8 +79,8 @@ export function getYesterdayDateString(): string {
 
 /**
  * Filter entries to a specific period based on where they start on this date
- * (`onDayTimes`): a night's sleep logged on Tuesday as 23:00–07:00 is a
- * Morning entry, not an Evening one.
+ * (`onDayTimes`): an older one-piece row logged on Tuesday as 23:00–07:00 is
+ * a Morning entry, not an Evening one.
  */
 export function getEntriesForPeriod(entries: TimeEntry[], period: TimePeriod): TimeEntry[] {
   const range = PERIOD_TIME_RANGES[period]

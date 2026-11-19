@@ -1,9 +1,9 @@
 /**
  * The add sheet with times that cross midnight. On today they can mean two
- * days, so the sheet asks which — "Did this start yesterday?" for anything
- * whose start is still ahead, "Is this tonight's sleep?" for a night typed
- * in the evening — and otherwise saves on the day it is on. The category is
- * fetched exactly once, also for a plan, to tell sleep from the rest.
+ * days, so the sheet asks one question — "Did this start yesterday?" for
+ * anything whose start is still ahead — and otherwise saves on the day it is
+ * on. The server splits every crossing entry. A confirmed entry is
+ * categorised once; a plan never is. Nothing asks about sleep.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
@@ -29,14 +29,14 @@ import { createEntry, csrfFetch } from '@/lib/api'
 const categorizeCalls = () =>
   (csrfFetch as jest.Mock).mock.calls.filter(([url]) => url === '/api/categorize').length
 
-function open(activity: string, start: string, end: string) {
+function open(activity: string, start: string, end: string, date = '2026-11-17') {
   const onClose = jest.fn()
   render(
     <QuickLogModal
       isOpen
       onClose={onClose}
       onEntryAdded={jest.fn()}
-      selectedDate="2026-11-17"
+      selectedDate={date}
       userId="u1"
       lastEntryEndTime={null}
       disablePostSubmit
@@ -70,7 +70,7 @@ describe('a dinner 23:00–01:00 typed on today in the morning', () => {
     open('Dinner', '23:00', '01:00')
     expect(await screen.findByText('Did this start yesterday?')).toBeInTheDocument()
     expect(createEntry).not.toHaveBeenCalled()
-    expect(categorizeCalls()).toBe(1)
+    expect(categorizeCalls()).toBe(0)
   })
 
   it('Yes posts yesterday as confirmed with the category', async () => {
@@ -87,41 +87,41 @@ describe('a dinner 23:00–01:00 typed on today in the morning', () => {
     await waitFor(() => expect(createEntry).toHaveBeenCalledTimes(1))
     expect(posted()).toMatchObject({ date: '2026-11-17', status: 'pending', category: null })
     expect(posted()).not.toHaveProperty('overnight_sleep')
-    expect(categorizeCalls()).toBe(1)
+    expect(categorizeCalls()).toBe(0)
   })
 })
 
 describe('a sleep 23:00–07:00 typed on today', () => {
   beforeEach(() => {
-    category = 'sleep'
+    category = 'other'
   })
 
-  it('in the morning asks nothing and posts confirmed sleep on today', async () => {
-    at(8)
+  it('never asks about tonight\'s sleep', async () => {
+    at(20)
     open('Sleep', '23:00', '07:00')
-    await waitFor(() => expect(createEntry).toHaveBeenCalledTimes(1))
-    expect(posted()).toMatchObject({ date: '2026-11-17', status: 'confirmed', category: 'sleep' })
+    expect(await screen.findByText('Did this start yesterday?')).toBeInTheDocument()
     expect(screen.queryByText("Is this tonight's sleep?")).not.toBeInTheDocument()
-    expect(categorizeCalls()).toBe(1)
+    expect(screen.queryByRole('button', { name: "No, last night's" })).not.toBeInTheDocument()
   })
 
-  it('in the evening asks "Is this tonight\'s sleep?" and Yes plans it on tomorrow', async () => {
+  it('"No, it\'s tonight" plans it on today with no category and no sleep mark', async () => {
     at(20)
     open('Sleep', '23:00', '07:00')
-    expect(await screen.findByText("Is this tonight's sleep?")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
+    fireEvent.click(await screen.findByRole('button', { name: "No, it's tonight" }))
     await waitFor(() => expect(createEntry).toHaveBeenCalledTimes(1))
-    expect(posted()).toMatchObject({ date: '2026-11-18', status: 'pending', category: null, overnight_sleep: true })
-    expect(categorizeCalls()).toBe(1)
+    expect(posted()).toMatchObject({ date: '2026-11-17', status: 'pending', category: null })
+    expect(posted()).not.toHaveProperty('overnight_sleep')
   })
+})
 
-  it('in the evening, "No, last night\'s" posts confirmed sleep on today', async () => {
+describe('a planned crossing entry', () => {
+  it('is not categorised', async () => {
     at(20)
-    open('Sleep', '23:00', '07:00')
-    fireEvent.click(await screen.findByRole('button', { name: "No, last night's" }))
+    open('Night shift', '22:00', '06:00', '2026-11-19')
     await waitFor(() => expect(createEntry).toHaveBeenCalledTimes(1))
-    expect(posted()).toMatchObject({ date: '2026-11-17', status: 'confirmed', category: 'sleep' })
-    expect(categorizeCalls()).toBe(1)
+    expect(posted()).toMatchObject({ date: '2026-11-19', status: 'pending', category: null })
+    expect(posted()).not.toHaveProperty('overnight_sleep')
+    expect(categorizeCalls()).toBe(0)
   })
 })
 

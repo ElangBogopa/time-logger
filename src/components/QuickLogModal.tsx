@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { fetchEntries, createEntry, updateEntry, csrfFetch } from '@/lib/api'
-import { getUserToday, getRealToday, TimeEntry, PENDING_COMMENTARY, TimeCategory, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR, getUserCurrentHour, shiftDateString } from '@/lib/types'
+import { getUserToday, getRealToday, TimeEntry, PENDING_COMMENTARY, TimeCategory, TimePeriod, PERIOD_LABELS, getLoggingPeriod, DAY_ROLLOVER_HOUR, shiftDateString } from '@/lib/types'
 import { getCurrentTime, calculateDuration, timeToMinutes, formatTimeDisplay, findMostlyOverlapping } from '@/lib/time-utils'
 import { sameActivityName } from '@/lib/repeat-session'
-import { crossesMidnight, overnightPlacement } from '@/lib/overnight'
+import { crossesMidnight } from '@/lib/overnight'
 import { parseTimeFromText, ParseResult, isMealWordDetection } from '@/lib/time-parser'
 import TimeRangePicker from './TimeRangePicker'
 import { CalendarEvent } from './TimelineView'
@@ -89,8 +89,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
   // Times that cross midnight on today can mean two days; this asks which,
   // in place of the form. Closing the sheet while it shows saves nothing.
   const [overnightQuestion, setOvernightQuestion] = useState<{
-    kind: 'tonight-sleep' | 'started-yesterday'
-    category: TimeCategory
+    kind: 'started-yesterday'
     entryDate: string
   } | null>(null)
 
@@ -539,9 +538,9 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     }
   }
 
-  // A plan: no category, the static planned line. `overnightSleep` tells the
-  // server to keep a sleep as one row; anything else it splits at midnight.
-  const savePlanned = async (date: string, overnightSleep: boolean) => {
+  // A plan: no category, the static planned line. Never categorised; the
+  // server splits it at midnight like any crossing entry.
+  const savePlanned = async (date: string) => {
     await createEntry({
       date,
       activity,
@@ -552,7 +551,6 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       description: notes || null,
       commentary: PENDING_COMMENTARY.planned,
       status: 'pending',
-      ...(overnightSleep ? { overnight_sleep: true } : {}),
     })
     finishPlanned()
   }
@@ -571,22 +569,22 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
     await finishConfirmed(insertedEntry)
   }
 
-  // A sleep that is not tonight's: a plan on a future day, or on today when
-  // a start-day sleep has not begun yet; otherwise last night's, confirmed
-  // on this date even though its start reads as later than now.
-  const saveSleepNotTonight = async (entryDate: string) => {
-    const startDayAhead = overnightPlacement(startTime, endTime) === 'start-day' && isFutureStartTime
-    if (isFutureDay || startDayAhead) {
-      await savePlanned(entryDate, true)
-    } else {
-      await saveConfirmed(entryDate, 'sleep')
-    }
-  }
-
-  // Times that cross midnight (lib/overnight.ts). The category is needed to
-  // tell sleep from the rest, so it is fetched once, also for a plan; the
-  // server keeps a sleep as one row and splits anything else.
+  // Times that cross midnight (lib/overnight.ts). The server splits every
+  // such entry at midnight. Only on today, with the start still ahead, can
+  // it mean two days, so that is the one case that asks.
   const submitOvernight = async (entryDate: string, isOnTodayView: boolean) => {
+    const onToday = !isFutureDay && !isPastDay && isOnTodayView
+
+    if (onToday && isFutureStartTime) {
+      setOvernightQuestion({ kind: 'started-yesterday', entryDate })
+      return
+    }
+
+    if (isPlanningMode) {
+      await savePlanned(entryDate)
+      return
+    }
+
     let category: TimeCategory
     try {
       category = await resolveCategory()
@@ -594,46 +592,20 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
       setError('Failed to categorize activity')
       return
     }
-
-    const onToday = !isFutureDay && !isPastDay && isOnTodayView
-
-    if (category === 'sleep') {
-      if (onToday && overnightPlacement(startTime, endTime) === 'wake-day' && getUserCurrentHour() >= 18) {
-        setOvernightQuestion({ kind: 'tonight-sleep', category, entryDate })
-        return
-      }
-      await saveSleepNotTonight(entryDate)
-      return
-    }
-
-    if (onToday && isFutureStartTime) {
-      setOvernightQuestion({ kind: 'started-yesterday', category, entryDate })
-      return
-    }
-
-    if (isPlanningMode) {
-      await savePlanned(entryDate, false)
-    } else {
-      await saveConfirmed(entryDate, category)
-    }
+    await saveConfirmed(entryDate, category)
   }
 
   const answerOvernight = async (yes: boolean) => {
     if (!overnightQuestion) return
-    const { kind, category, entryDate } = overnightQuestion
+    const { entryDate } = overnightQuestion
     setError(null)
     setIsSubmitting(true)
     try {
-      if (kind === 'tonight-sleep') {
-        if (yes) {
-          await savePlanned(shiftDateString(entryDate, 1), true)
-        } else {
-          await saveSleepNotTonight(entryDate)
-        }
-      } else if (yes) {
+      if (yes) {
+        const category = await resolveCategory()
         await saveConfirmed(shiftDateString(entryDate, -1), category)
       } else {
-        await savePlanned(entryDate, false)
+        await savePlanned(entryDate)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -708,7 +680,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
           <>
             <DialogHeader>
               <DialogTitle>
-                {overnightQuestion.kind === 'tonight-sleep' ? 'Is this tonight\'s sleep?' : 'Did this start yesterday?'}
+                Did this start yesterday?
               </DialogTitle>
               <DialogDescription>
                 {activity}, {formatTimeDisplay(startTime)}–{formatTimeDisplay(endTime)}
@@ -734,7 +706,7 @@ export default function QuickLogModal({ isOpen, onClose, onEntryAdded, lastEntry
                 disabled={isSubmitting}
                 onClick={() => answerOvernight(false)}
               >
-                {overnightQuestion.kind === 'tonight-sleep' ? 'No, last night\'s' : 'No, it\'s tonight'}
+                No, it&apos;s tonight
               </Button>
               {error && (
                 <p className="text-sm text-destructive">{error}</p>

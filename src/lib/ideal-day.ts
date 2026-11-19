@@ -150,7 +150,7 @@ export function windowsFor(category: TimeCategory): IdealWindow[] {
    The table above is in clock time, for someone up at half past six. A
    person who wakes at five, or at ten, was being handed somebody else's
    day: peak focus at nine whether they had been up four hours or were
-   still asleep. The body's windows follow the body, so they move with the
+   not up yet. The body's windows follow the body, so they move with the
    wake time; the windows that are about other people stay where other
    people are. */
 

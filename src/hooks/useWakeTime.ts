@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
-import { usualWakeMinutes, type HabitEntry } from '@/lib/habits'
+import { useCallback, useState } from 'react'
 
 const KEY = 'wake-time'
 
@@ -15,21 +14,18 @@ function readSet(): number | null {
   }
 }
 
-export type WakeSource = 'set' | 'log' | 'unknown'
+export type WakeSource = 'set' | 'unknown'
 
 /**
- * When this person wakes: what they have said, else what their log shows,
- * else nothing — in which case the windows are the reference day and the
- * screen says so.
+ * When this person wakes: what they have said, kept on the device. It is
+ * never read from the log. With none stated, the windows are the reference
+ * day and the screen says so.
  *
- * A stated time wins because it is a statement: someone who is moving their
- * mornings earlier wants tomorrow's windows, not the average of last
- * month's. It is kept on the device; there is nowhere on the server to put
- * it without a schema change.
+ * It is kept on the device because there is nowhere on the server to put it
+ * without a schema change.
  */
-export function useWakeTime(history: HabitEntry[]) {
+export function useWakeTime() {
   const [set, setSet] = useState<number | null>(readSet)
-  const learned = useMemo(() => usualWakeMinutes(history), [history])
 
   const setWake = useCallback((minutes: number | null) => {
     setSet(minutes)
@@ -41,8 +37,7 @@ export function useWakeTime(history: HabitEntry[]) {
     }
   }, [])
 
-  const wakeMinutes = set ?? learned
-  const source: WakeSource = set !== null ? 'set' : learned !== null ? 'log' : 'unknown'
+  const source: WakeSource = set !== null ? 'set' : 'unknown'
 
-  return { wakeMinutes, source, learnedMinutes: learned, setWake }
+  return { wakeMinutes: set, source, setWake }
 }

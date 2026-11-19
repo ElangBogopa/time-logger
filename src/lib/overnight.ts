@@ -1,14 +1,15 @@
 /**
  * Entries whose times cross midnight.
  *
- * Anything that is not sleep is split at midnight into two ordinary entries,
- * one on each day (`splitAtMidnight`, applied by the entries API through
- * `planOvernightSave`). Sleep stays one row on the date it was logged on, and
- * its end may be earlier than its start.
+ * Every crossing entry is split on save at midnight into two ordinary
+ * entries, one on each day (`splitAtMidnight`, applied by the entries API
+ * through `planOvernightSave`). There is no one-row exception.
  *
- * Which side of midnight a one-piece row sits on is worked out from its own
- * date and times: the day that holds more of it is its day, and a tie goes to
- * the wake-up day.
+ * The placement helpers below exist for one-piece rows saved earlier: an
+ * overnight sleep logged before sleep was removed is still one row, and its
+ * end may be earlier than its start. Which side of midnight such a row sits
+ * on is worked out from its own date and times: the day that holds more of
+ * it is its day, and a tie goes to the wake-up day.
  *
  * - wake-day: the entry's date is the day it ended; it began the evening
  *   before. 23:00–07:00 on Tuesday is Monday 23:00 to Tuesday 07:00.
@@ -93,7 +94,7 @@ export interface MidnightPiece {
   duration_minutes: number
 }
 
-/** The two pieces of a non-sleep entry that crosses midnight. */
+/** The two pieces of an entry that crosses midnight. */
 export function splitAtMidnight(
   date: string,
   start: string,
@@ -162,18 +163,17 @@ interface SavableRow {
 
 /**
  * What a save writes: the row as it is (with a typed 00:00 end stored as
- * 24:00), one overnight sleep with its real duration, or two pieces split at
- * midnight, each carrying the row's other fields. The first is what the row
- * itself becomes and keeps the row's date.
+ * 24:00), or two pieces split at midnight, each carrying the row's other
+ * fields. Every crossing row is split. The first is what the row itself
+ * becomes and keeps the row's date.
  *
- * `dateIsWakeDay` says the row's date is the morning it ended, as for a
- * stored one-piece night placed on its wake day: the evening piece then goes
+ * `dateIsWakeDay` says the row's date is the morning it ended, as for an
+ * older one-piece night placed on its wake day: the evening piece then goes
  * on the day before and the row keeps the morning piece. Otherwise the date
  * is the evening and the morning piece goes on the day after.
  */
 export function planOvernightSave<T extends SavableRow>(
   row: T,
-  isSleep: boolean,
   { dateIsWakeDay = false }: { dateIsWakeDay?: boolean } = {}
 ): T[] {
   const start = row.start_time ?? null
@@ -181,10 +181,6 @@ export function planOvernightSave<T extends SavableRow>(
   const normalized: T = end === (row.end_time ?? null) ? row : { ...row, end_time: end }
 
   if (!crossesMidnight(start, end)) return [normalized]
-
-  if (isSleep) {
-    return [{ ...normalized, duration_minutes: overnightDuration(start as string, end as string) }]
-  }
 
   if (dateIsWakeDay) {
     const [evening, morning] = splitAtMidnight(shiftDateString(row.date, -1), start as string, end as string)

@@ -10,15 +10,16 @@
  * also when nothing is logged yet, so any hour of them can be answered from
  * the session screen. The Morning searches from the first thing logged,
  * because it begins at midnight and nobody wants to be asked to account for
- * being asleep. The far end is now, on today, so it never asks about time
+ * the night. The far end is now, on today, so it never asks about time
  * that has not happened. A row running up to now opens an entry ending at the
  * last half hour passed (`entryEndForGap`), so it never fills in time that has
  * not happened.
  *
- * An entry counts only for the part of it on this date (`onDayTimes`): a
- * night's sleep logged on Tuesday as 23:00–07:00 holds Tuesday's 00:00–07:00,
- * not its evening. The part of a neighbouring day's sleep that spills into
- * this one comes in as `covered` and is never offered as a gap.
+ * An entry counts only for the part of it on this date (`onDayTimes`): an
+ * older one-piece row logged on Tuesday as 23:00–07:00 holds Tuesday's
+ * 00:00–07:00, not its evening. The part of a neighbouring day's older
+ * one-piece row that spills into this one comes in as `covered` and is never
+ * offered as a gap.
  */
 
 import { TimeEntry } from './types'
@@ -40,7 +41,7 @@ export interface FindGapsParams {
   entries: TimeEntry[]
   /** Calendar events count as accounted for: confirming them is their own flow. */
   events?: { startTime: string; endTime: string }[]
-  /** A neighbouring day's overnight sleep, where it spills into this day (`coveredOn`). */
+  /** An older one-piece overnight row on a neighbouring day, where it spills into this day (`coveredOn`). */
   covered?: { startTime: string; endTime: string }[]
   /** The session's bounds, in hours. */
   periodStart: number

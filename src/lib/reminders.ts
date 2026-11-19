@@ -129,7 +129,7 @@ export function alreadyLogged(
 ): boolean {
   if (completions.some((completion) => completion.period === period)) return true
   return entries.some((entry) => {
-    // Where it starts on this date: a night's sleep logged as 23:00–07:00 is
+    // Where it starts on this date: an older one-piece row of 23:00–07:00 is
     // this morning's, not this evening's (lib/overnight.ts).
     const start = onDayTimes({ start_time: entry.start_time, end_time: entry.end_time ?? null })?.start
     if (!start) return false

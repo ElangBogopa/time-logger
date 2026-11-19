@@ -1,8 +1,9 @@
 /**
  * A calendar event that runs past midnight, once confirmed, is answered
  * everywhere: Next up stops offering it and the confirm sheet refuses a
- * second confirm. Last night's sleep, stored on the morning it ended, answers
- * nothing that evening. The rule is in lib/calendar-match.ts.
+ * second confirm. An older one-piece night (a sleep saved before every
+ * crossing entry was split), stored on the morning it ended, answers nothing
+ * that evening. The rule is in lib/calendar-match.ts.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
@@ -62,7 +63,7 @@ describe('an event 22:00-01:00 confirmed as two entries', () => {
   })
 })
 
-describe('last night\'s sleep, 22:30-06:30 on the morning\'s date', () => {
+describe('an older one-piece night, 22:30-06:30 on the morning\'s date', () => {
   const lastNight = [row('Sleep', '22:30:00', '06:30:00')]
 
   it.each([
@@ -79,12 +80,16 @@ describe('last night\'s sleep, 22:30-06:30 on the morning\'s date', () => {
   })
 })
 
-describe('a sleep confirmed from an event that crosses midnight', () => {
+describe('an older one-piece row saved from an event that crosses midnight', () => {
   const event = calendarEvent('23:00', '07:00', 'Sleep')
   const saved = [row('Sleep', '23:00:00', '07:00:00')]
 
   it('is not offered again', () => {
     expect(offered(event, saved)).toEqual([])
+  })
+
+  it('is not offered again once confirmed as two pieces either', () => {
+    expect(offered(event, [row('Sleep', '23:00:00', '24:00:00')])).toEqual([])
   })
 
   it('adds no second row on a second confirm', async () => {

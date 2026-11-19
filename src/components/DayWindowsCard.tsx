@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import SourceSheet from '@/components/SourceSheet'
 import { useWakeTime } from '@/hooks/useWakeTime'
 import { windowsForWake, windowsOpenAt, REFERENCE_WAKE_MINUTES, type DayWindow } from '@/lib/ideal-day'
-import type { HabitEntry } from '@/lib/habits'
 import { AGGREGATED_HEX } from '@/lib/palette'
 import { CATEGORY_LABELS, getUserCurrentHour } from '@/lib/types'
 import { formatTimeDisplay, minutesToTime } from '@/lib/time-utils'
@@ -27,8 +26,8 @@ const at = (minutes: number) => formatTimeDisplay(minutesToTime(minutes))
 const bestFor = (window: DayWindow) =>
   window.categories.map((category) => CATEGORY_LABELS[category].toLowerCase()).join(', ')
 
-export default function DayWindowsCard({ history }: { history: HabitEntry[] }) {
-  const { wakeMinutes, source, learnedMinutes, setWake } = useWakeTime(history)
+export default function DayWindowsCard() {
+  const { wakeMinutes, source, setWake } = useWakeTime()
   const windows = useMemo(() => windowsForWake(wakeMinutes), [wakeMinutes])
 
   const [now, setNow] = useState(clockMinutes)
@@ -152,7 +151,6 @@ export default function DayWindowsCard({ history }: { history: HabitEntry[] }) {
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm text-foreground">
               {source === 'set' && <>Set for waking at {wakeLabel}.</>}
-              {source === 'log' && <>From your log: you usually wake around {wakeLabel}.</>}
               {source === 'unknown' && (
                 <>These are for someone who wakes at {wakeLabel}. Say when you do and they will move to you.</>
               )}
@@ -168,7 +166,7 @@ export default function DayWindowsCard({ history }: { history: HabitEntry[] }) {
                 </Button>
                 {source === 'set' && (
                   <Button size="sm" variant="ghost" onClick={() => setWake(null)}>
-                    {learnedMinutes !== null ? 'Use my log instead' : 'Clear'}
+                    Clear
                   </Button>
                 )}
               </div>

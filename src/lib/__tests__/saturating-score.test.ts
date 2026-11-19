@@ -73,11 +73,10 @@ describe('all three metrics use it', () => {
   it('scores 80 at each target', () => {
     expect(calcFocus([entry('deep_work', FOCUS_TARGET)])).toBe(80)
     expect(calcSocial([entry('social', SOCIAL_TARGET)])).toBe(80)
-    // Body is the exception, and deliberately so: it is two scores, and
-    // exercise carries 0.75 of the total, so hitting the exercise target
-    // puts the half at 80 and the headline at 60. A strong Body day needs
-    // training and upkeep, which is the whole point of the split.
+    // Body is movement plus a little care; the movement target alone puts
+    // both the movement half and the headline on 80.
     expect(calcBodyDetails([entry('exercise', EXERCISE_TARGET)]).exerciseScore).toBe(80)
+    expect(calcBody([entry('exercise', EXERCISE_TARGET)])).toBe(80)
   })
 
   it('leaves none of them able to hit 100', () => {

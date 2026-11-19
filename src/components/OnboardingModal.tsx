@@ -46,7 +46,7 @@ const MAX_PICKS = 3
 const STEPS = 4
 
 const SCORES: { key: keyof typeof METRIC_TEXT_HEX; name: string; what: string }[] = [
-  { key: 'body', name: 'Body', what: 'Sleep, meals and looking after yourself — and exercise, which is the only thing that takes it past 70.' },
+  { key: 'body', name: 'Body', what: 'Movement and exercise. About 45 minutes at a moderate effort is the target; rest and self-care add a little.' },
   { key: 'focus', name: 'Mind', what: 'Focused work, counted above meetings and admin. About four hours is the target, not eight.' },
   { key: 'social', name: 'Heart', what: 'Time with people. An hour is the target.' },
 ]

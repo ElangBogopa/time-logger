@@ -51,8 +51,8 @@ function eventOnDay(event: EventTimes): Span | null {
 
 /**
  * The part of an entry on its own date, by `onDayTimes` and never the raw
- * times: last night's sleep, 22:30-06:30 on the morning's date, sits at
- * 00:00-06:30 and says nothing about that evening.
+ * times: an older one-piece row of 22:30-06:30 on the morning's date sits
+ * at 00:00-06:30 and says nothing about that evening.
  */
 function entryOnDay(entry: EntryTimes): Span | null {
   const times = onDayTimes(entry)
@@ -64,18 +64,19 @@ function entryOnDay(entry: EntryTimes): Span | null {
 /**
  * Whether an entry is the one row a confirm of this event saved.
  *
- * A sleep confirmed from an event that crosses midnight is one row on the
- * event's date with the event's times. When more of it lies after midnight,
+ * An older row confirmed from an event that crosses midnight, saved as one
+ * piece before every crossing entry was split, is one row on the event's
+ * date with the event's times. When more of it lies after midnight,
  * `onDayTimes` reads that row as the night before, so its part on the day
  * never meets the event's evening and the day comparison cannot see it. Here
  * the two are compared as whole nights instead. Only an event shaped like
  * that is asked (22:00-01:00 saves a row the day comparison already sees),
- * and each has to cover more than half of the other, so a night's sleep does
+ * and each has to cover more than half of the other, so a whole night does
  * not answer a shorter late event inside it.
  *
- * A row made this way and last night's sleep typed in by hand are the same
- * row: with a nightly sleep event in the calendar, the morning's own log
- * answers that date's event. A second sleep row on the date would be counted
+ * A row made this way and an older one-piece night typed in by hand are the
+ * same row: with a nightly event in the calendar, the morning's own log
+ * answers that date's event. A second such row on the date would be counted
  * on the same day, so refusing it is the right answer for both.
  */
 function isRowOfEvent(event: EventTimes, entry: EntryTimes): boolean {
