@@ -467,6 +467,8 @@ Write 2 or 3 sentences, under 60 words, about this person's session.
 - If the session holds little — not much logged, no ring reached, a plan not done — say what was there plainly, with no verdict. Allow that rest may have been the point. Do not console or apologise.
 - A plan not done is said once, flatly, or left out. Never as a failing.
 - A ring marked "still open" has not been missed: there is time left today.
+- Say a ring is open, reached or not reached only when a line of the facts says so for that ring, in those terms. A ring with no line is not mentioned, and a ring that "did not reach its target" is never called open.
+- Mention a plan only if a "Plan kept" or "Plan not done" line names it. With no such line there was no plan: never say "as planned" or "on plan".
 - ${COACH_ENDINGS[aheadKind]}`
 }
 

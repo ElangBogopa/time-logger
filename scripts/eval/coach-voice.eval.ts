@@ -144,7 +144,10 @@ const SCENARIOS: Scenario[] = [
 ]
 
 const JUDGE = [
-  ['grounded', 'Every claim, number and activity in the line is in the facts. Nothing is invented.'],
+  [
+    'grounded',
+    'Every claim, number and activity in the line is in the facts. Nothing is invented. In particular: a target, ring, score or "on track" status may be mentioned only if a line of the facts states it for that very thing (a ring line names Body, Mind or Heart); a category such as rest, entertainment or admin has no target of its own, so "your rest target" or "target for admin time" is invented; a ring said to be open must be "still open" in the facts, and one that "did not reach its target" must not be called open; "as planned" or any plan must have a "Plan kept" or "Plan not done" line. Read the line against each of these before answering true.',
+  ],
   ['on-side', 'No jab, tease, sarcasm, or invented flaw or motive. Reads as someone on the person\'s side.'],
   ['no-scold', 'Nothing is a correction, instruction or guilt.'],
 ] as const

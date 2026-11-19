@@ -32,6 +32,7 @@ import {
   EntryRow as MetricRow,
 } from '@/lib/metrics-calc'
 import { comparePlanToActual, PlanRow } from '@/lib/plan-adherence'
+import { timeToMinutes } from '@/lib/time-utils'
 import { windowAlignment, AlignmentFact } from '@/lib/window-alignment'
 import type { DayWindow } from '@/lib/ideal-day'
 
@@ -212,7 +213,11 @@ export function buildSessionFacts(input: SessionFactsInput): SessionFacts {
     start: c.committedStart.slice(0, 5),
   })
   const plansKept = inPeriod.filter((c) => c.outcome === 'kept' || c.outcome === 'moved').map(planLine)
-  const plansNotDone = inPeriod.filter((c) => c.outcome === 'missed').map(planLine)
+  // A plan whose hour is still running is not missed yet (it has time left),
+  // so it is in neither list; the comparison only knows its start has passed.
+  const stillRunning = (c: { committedEnd: string }) =>
+    nowMinutes !== null && nowMinutes < timeToMinutes(c.committedEnd)
+  const plansNotDone = inPeriod.filter((c) => c.outcome === 'missed' && !stillRunning(c)).map(planLine)
 
   const windowFacts = windowAlignment(sessionEntries, windows)
 

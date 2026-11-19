@@ -62,6 +62,18 @@ describe('buildSessionFacts', () => {
     expect(facts.ahead.plans.map((p) => p.title)).toEqual(['Read'])
   })
 
+  it('a plan whose hour is still running is not "not done"; once it ends unlogged it is', () => {
+    const sess = e('Emails', 'admin', '13:00', '13:45', 45)
+    const plans = [plan('Call Mum', '15:00', '16:00')]
+    const at = (now: number) =>
+      buildSessionFacts({ period: 'afternoon', sessionEntries: [sess], dayEntries: [sess], plans, windows, nowMinutes: now })
+    const during = at(15 * 60 + 30)
+    expect(during.plansNotDone).toEqual([])
+    expect(during.ahead.plans).toEqual([])
+    expect(at(16 * 60).plansNotDone.map((p) => p.title)).toEqual(['Call Mum'])
+    expect(at(18 * 60).plansNotDone.map((p) => p.title)).toEqual(['Call Mum'])
+  })
+
   it('categories sum to the total', () => {
     const entries = [e('A', 'deep_work', '09:00', '10:00', 60), e('B', 'meals', '10:00', '10:30', 30), e('C', 'other', '10:30', '10:40', 10)]
     const facts = buildSessionFacts({ period: 'morning', sessionEntries: entries, dayEntries: [], plans: [], windows, nowMinutes: null })

@@ -26,6 +26,14 @@ describe('session system prompt', () => {
   })
 })
 
+describe('session prompt grounding', () => {
+  it('limits ring and plan talk to what the facts say', () => {
+    const prompt = buildSessionCommentarySystemPrompt('tomorrow')
+    expect(prompt).toContain('only when a line of the facts says so')
+    expect(prompt).toContain('never say "as planned"')
+  })
+})
+
 describe('describeSessionFacts', () => {
   const windows = windowsForWake(null)
   it('says "still open" for an open ring, and has no Still ahead line for none', () => {
