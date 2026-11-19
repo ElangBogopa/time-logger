@@ -459,17 +459,31 @@ const COACH_ENDINGS: Record<AheadKind, string> = {
   none: "This session's day is over. Do not look ahead; end on what the session showed.",
 }
 
+/**
+ * What the prompt says about the time left in the day, by where the session
+ * sits. "There is time left today" used to go to every prompt, and the
+ * comment for a day already over repeated it. Only a session with later
+ * today ahead of it is told so.
+ */
+const COACH_DAY_STATE: Record<AheadKind, string> = {
+  'later-today': 'A ring marked "still open" has not been missed: there is time left today.',
+  tomorrow:
+    'Today\'s sessions are over. A ring that "did not reach its target" is closed for today: never say there is time left today.',
+  none: 'This session is from a day that has ended, and where the facts say "today" they mean that day. Nothing of it is left: never say there is time left or that anything can still be done, in any words.',
+}
+
 export function buildSessionCommentarySystemPrompt(aheadKind: AheadKind): string {
   return `${COACH_VOICE}
 
 Write 2 or 3 sentences, under 60 words, about this person's session.
 - Lead with the most real thing in the facts: a ring that reached its target in this session, a plan kept, time that landed in the hours that suit it. Pick one or two; do not list everything.
 - If the session holds little — not much logged, no ring reached, a plan not done — say what was there plainly, with no verdict. Allow that rest may have been the point. Do not console or apologise.
-- A plan not done is said once, flatly, or left out. Never as a failing.
-- A ring marked "still open" has not been missed: there is time left today.
+- A plan not done is said once, flatly, or left out. Never as a failing. Its time has passed: never say it can still be done.
+- ${COACH_DAY_STATE[aheadKind]}
 - Only Body, Mind and Heart have targets. No activity and no kind of activity has a target of its own: never write "its target for admin", "your rest target" or the like.
 - Say a ring is open, reached or not reached only when a line of the facts says so for that ring, in those terms. A ring with no line is not mentioned, and a ring that "did not reach its target" is never called open.
-- Mention a plan only if a "Plan kept" or "Plan not done" line names it. With no such line there was no plan: never say "as planned" or "on plan".
+- Mention a plan only if a "Plan kept" or "Plan not done" line names it. With no such line the facts say nothing about a plan either way: never say "as planned" or "on plan", and never say there was no plan.
+- Point ahead only at what a "Still ahead" line names. Nothing else is ahead.
 - ${COACH_ENDINGS[aheadKind]}`
 }
 
@@ -517,7 +531,7 @@ export function describeSessionFacts(facts: SessionFacts): string {
   }
   for (const ring of facts.rings) lines.push(ringLine(ring, 'session'))
   for (const p of facts.plansKept) lines.push(`Plan kept: "${p.title}" (${p.start}).`)
-  for (const p of facts.plansNotDone) lines.push(`Plan not done: "${p.title}" (${p.start}).`)
+  for (const p of facts.plansNotDone) lines.push(`Plan not done: "${p.title}" (${p.start}). Its time has passed.`)
   for (const w of facts.windowFacts) {
     if (w.inWindowMinutes > 0) {
       lines.push(
@@ -535,6 +549,8 @@ export function describeSessionFacts(facts: SessionFacts): string {
     if (parts.length > 0) {
       lines.push(`Still ahead ${ahead.kind === 'tomorrow' ? 'tomorrow' : 'later today'}: ${parts.join('; ')}.`)
     }
+  } else {
+    lines.push('The day of this session is over. No time is left in it.')
   }
   return lines.join('\n')
 }
