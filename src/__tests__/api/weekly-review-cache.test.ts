@@ -92,6 +92,7 @@ jest.mock('openai', () => ({
 import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { POST } from '@/app/api/weekly-review/route'
+import { buildReadSystemPrompt, NO_FRIENDS_OR_FAMILY } from '@/lib/prompts'
 
 function request(body: unknown): NextRequest {
   return {
@@ -118,8 +119,29 @@ it('generates a summary and returns its fingerprint on a cold call', async () =>
   expect(res.body.coachSummary).toBe('A strong week of focus.')
   expect(res.body.coachFingerprint).toEqual(expect.any(String))
   expect(res.body.coachSummaryUnchanged).toBe(false)
-  const insights = (res.body as unknown as { insights: string[] }).insights
-  expect(insights.some((i) => i.startsWith('Logged '))).toBe(false)
+})
+
+it('carries the read, the ring comparisons and the finding, and no insights or highlights', async () => {
+  const res = (await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))) as unknown as {
+    body: Record<string, unknown> & {
+      read: { scope: string; kind: string; rule: string; facts: string[] }
+      comparisons: { loggedDays: number }
+    }
+  }
+  expect(res.body.read).toMatchObject({ scope: 'week', kind: expect.any(String), rule: expect.any(String) })
+  expect(res.body.read.facts.length).toBeGreaterThan(0)
+  expect(res.body.comparisons).toEqual(expect.objectContaining({ loggedDays: expect.any(Number) }))
+  expect(res.body).toHaveProperty('finding')
+  expect(res.body).not.toHaveProperty('insights')
+  expect(res.body).not.toHaveProperty('highlights')
+  expect(res.body).not.toHaveProperty('bestDays')
+})
+
+it('sends a finished week with no friends or family the sentence, as the last fact', async () => {
+  await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))
+  const calls = mockCreate.mock.calls as unknown as Array<[{ messages: Array<{ role: string; content: string }> }]>
+  const user = calls[0][0].messages.find((m) => m.role === 'user')?.content ?? ''
+  expect(user.trim().split('\n').pop()).toBe(NO_FRIENDS_OR_FAMILY)
 })
 
 it('skips the model when the caller already holds that summary', async () => {
@@ -202,8 +224,10 @@ describe('a week still in progress', () => {
   })
 })
 
-it('says which one sentence may be a suggestion, with no evaluation and no scores', async () => {
-  await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))
+it('asks the model with the read prompt and the facts alone, with no scores', async () => {
+  const res = (await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))) as unknown as {
+    body: { read: { kind: 'keep' | 'change' | 'nothing'; facts: string[] } }
+  }
 
   const calls = mockCreate.mock.calls as unknown as Array<
     [{ temperature: number; messages: Array<{ role: string; content: string }> }]
@@ -211,10 +235,10 @@ it('says which one sentence may be a suggestion, with no evaluation and no score
   const args = calls[0][0]
   const system = args.messages.find((m) => m.role === 'system')?.content ?? ''
   const user = args.messages.find((m) => m.role === 'user')?.content ?? ''
-  expect(system).toContain('only sentence that is not a statement')
-  expect(system).not.toContain('What to watch')
-  expect(system).not.toContain('needing attention')
+  expect(system).toBe(buildReadSystemPrompt('week', res.body.read.kind))
+  for (const fact of res.body.read.facts) expect(user).toContain(fact)
   expect(user).not.toContain('/100')
+  expect(user).not.toMatch(/Hours by category|Best focus/)
   expect(args.temperature).toBe(0.4)
 })
 
@@ -230,10 +254,10 @@ it('a week holding old sleep rows tells the model nothing about sleep', async ()
     end_time: '07:00',
   }))
   const res = (await POST(request({ weekStart: '2026-10-26', timezone: 'America/Toronto' }))) as unknown as {
-    body: { insights: string[] }
+    body: { read: { facts: string[]; evidence: { value: string }[] } }
   }
 
   const calls = mockCreate.mock.calls as unknown as Array<[{ messages: Array<{ role: string; content: string }> }]>
   for (const message of calls[0][0].messages) expect(message.content).not.toMatch(/sleep/i)
-  expect(res.body.insights.join(' ')).not.toMatch(/sleep/i)
+  expect(JSON.stringify(res.body.read)).not.toMatch(/sleep/i)
 })

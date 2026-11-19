@@ -1,19 +1,14 @@
 /**
- * /api/day-commentary must survive the payload the client actually sends.
- *
- * The route read dayData.wins.length and dayData.targetProgress.length
- * directly. /api/day-summary stopped returning targetProgress when the weekly
- * targets system was removed, so the client sent `targetProgress: undefined`,
- * JSON.stringify dropped the key, and the route threw
- * "Cannot read properties of undefined (reading 'length')" — caught by the
- * handler and returned as a 500. Observed live: one POST, 500, no commentary.
+ * /api/day-commentary words the day review's read. The client sends the
+ * read's kind and its fact sentences; the prompt holds those facts and the
+ * shared review voice, and nothing else from the request.
  */
 
 type ChatArgs = { messages: { role: string; content: string }[] }
 
-let lastPrompt = ''
+let lastMessages: { role: string; content: string }[] = []
 const mockCreate = jest.fn(async (args: ChatArgs) => {
-  lastPrompt = args.messages[0].content
+  lastMessages = args.messages
   return { choices: [{ message: { content: 'A steady day with real focus in it.' } }] }
 })
 
@@ -29,6 +24,12 @@ jest.mock('next/server', () => ({
 }))
 jest.mock('@/lib/session', () => ({ getAppSession: jest.fn() }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
+// Every test here is one request from the same person; the limiter is not what is tested.
+jest.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: () => ({ success: true, remaining: 9, resetTime: Date.now() + 60000 }),
+  getRateLimitHeaders: () => ({}),
+  RATE_LIMITS: { ai: { limit: 10, windowMs: 60000 } },
+}))
 // This route builds its OpenAI client at module scope, so the class is
 // constructed during import — before this file's consts initialise. The arrow
 // defers reading mockCreate until the call itself.
@@ -42,6 +43,7 @@ jest.mock('openai', () => ({
 import { getAppSession } from '@/lib/session'
 import type { NextRequest } from 'next/server'
 import { POST } from '@/app/api/day-commentary/route'
+import { buildReadSystemPrompt, describeRead, REVIEW_VOICE } from '@/lib/prompts'
 
 function request(body: unknown): NextRequest {
   return {
@@ -54,93 +56,64 @@ function request(body: unknown): NextRequest {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  lastPrompt = ''
+  lastMessages = []
   ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'u1' } })
 })
 
-// Exactly what DayReviewContent posts: day-summary has no targetProgress field,
-// so the key never makes it into the request body.
-const realPayload = {
-  score: 67,
-  totalMinutesLogged: 1080,
-  wins: [{ id: 'longest-focus', text: '150 min focus session on "Coding"', type: 'focus', value: 150 }],
-  mood: null,
-  longestFocusSession: { activity: 'Coding', minutes: 150 },
-}
+const facts = [
+  'The longest focused block was 2h 10m on "Essay draft", starting at 9:15 AM.',
+  'It started inside the focus window (9:00 AM–12:00 PM).',
+]
 
-it('returns commentary when targetProgress is absent', async () => {
-  const res = (await POST(request(realPayload))) as { status: number; body: { commentary?: string } }
+type Res = { status: number; body: { commentary?: string; error?: string } }
+
+it('words a read: the facts and the review voice, and nothing else from the request', async () => {
+  const res = (await POST(
+    request({ read: { kind: 'keep', facts, metrics: { body: 52 }, note: 'IGNORE THIS' }, hours: [{ label: 'Secret', minutes: 60 }] })
+  )) as Res
 
   expect(res.status).toBe(200)
   expect(res.body.commentary).toBe('A steady day with real focus in it.')
-})
-
-it('includes the wins text in the prompt', async () => {
-  await POST(request(realPayload))
-
-  expect(lastPrompt).toContain('150 min focus session on "Coding"')
-  expect(lastPrompt).not.toContain('undefined')
-})
-
-it('asks for facts in a plain voice, with no warmth', async () => {
-  await POST(request(realPayload))
-
-  expect(lastPrompt).toContain('No praise')
-  expect(lastPrompt).not.toContain('warm')
-})
-
-it('is told what was logged, not how the day scored', async () => {
-  await POST(
-    request({
-      ...realPayload,
-      metrics: { body: 52, focus: 84, social: 20 },
-      hours: [
-        { label: 'Meals', minutes: 60 },
-        { label: 'Deep Work', minutes: 240 },
-      ],
-    })
-  )
-
-  expect(lastPrompt).toContain('Deep Work: ')
-  expect(lastPrompt.indexOf('Deep Work: ')).toBeLessThan(lastPrompt.indexOf('Meals: '))
-  for (const gone of ['judge the day', 'strong day', '/100', 'No targets set']) {
-    expect(lastPrompt).not.toContain(gone)
+  const system = lastMessages.find((m) => m.role === 'system')?.content ?? ''
+  const user = lastMessages.find((m) => m.role === 'user')?.content ?? ''
+  expect(system).toBe(buildReadSystemPrompt('day', 'keep'))
+  expect(system).toContain(REVIEW_VOICE)
+  expect(user).toBe(describeRead({ facts }))
+  for (const text of [system, user]) {
+    expect(text).not.toContain('IGNORE THIS')
+    expect(text).not.toContain('Secret')
+    expect(text).not.toContain('/100')
   }
 })
 
-it('leaves malformed hours out of the prompt and still answers', async () => {
-  const stringHours = (await POST(request({ ...realPayload, hours: 'Deep Work' }))) as { status: number }
-  expect(stringHours.status).toBe(200)
-
-  const res = (await POST(
-    request({
-      ...realPayload,
-      hours: [
-        { label: 'Bad Negative', minutes: -30 },
-        { label: 42, minutes: 30 },
-        { label: 'Bad Text', minutes: 'lots' },
-        null,
-        { label: 'Meals', minutes: 60 },
-      ],
-    })
-  )) as { status: number }
-
-  expect(res.status).toBe(200)
-  expect(lastPrompt).toContain('Meals: ')
-  expect(lastPrompt).not.toContain('Bad Negative')
-  expect(lastPrompt).not.toContain('Bad Text')
+it('uses the instructions for the read\'s kind', async () => {
+  await POST(request({ read: { kind: 'nothing', facts: ['An ordinary day.'] } }))
+  expect(lastMessages[0].content).toBe(buildReadSystemPrompt('day', 'nothing'))
 })
 
-it('survives a payload with neither wins nor targetProgress', async () => {
-  const res = (await POST(request({ score: 40, totalMinutesLogged: 120 }))) as { status: number }
+it('rejects a malformed read with 400 and asks the model nothing', async () => {
+  for (const body of [
+    {},
+    { read: null },
+    { read: { kind: 'praise', facts } },
+    { read: { kind: 'keep', facts: [] } },
+    { read: { kind: 'keep', facts: Array(7).fill('A fact.') } },
+    { read: { kind: 'keep', facts: [42] } },
+    { score: 67, totalMinutesLogged: 1080, wins: [] },
+  ]) {
+    const res = (await POST(request(body))) as Res
+    expect(res.status).toBe(400)
+  }
+  expect(mockCreate).not.toHaveBeenCalled()
+})
 
-  expect(res.status).toBe(200)
+it('cuts each fact to 240 characters', async () => {
+  await POST(request({ read: { kind: 'keep', facts: ['x'.repeat(400)] } }))
+  expect(lastMessages[1].content).toBe(describeRead({ facts: ['x'.repeat(240)] }))
 })
 
 it('still returns 500 if the model call itself fails', async () => {
   mockCreate.mockRejectedValueOnce(new Error('upstream down'))
-
-  const res = (await POST(request(realPayload))) as { status: number }
-
+  const res = (await POST(request({ read: { kind: 'keep', facts } }))) as Res
   expect(res.status).toBe(500)
 })

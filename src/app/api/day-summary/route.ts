@@ -97,7 +97,7 @@ function generateWins(
 ): Win[] {
   const wins: Win[] = []
 
-  // Longest focus session
+  // The longest focused block
   if (longestFocus && longestFocus.minutes >= 60) {
     wins.push({
       id: 'longest-focus',

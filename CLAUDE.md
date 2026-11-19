@@ -144,7 +144,7 @@ For display, these roll up into six `AggregatedCategory` buckets —
   takes `{ entries: [...] }` and inserts in one statement. Confirming four
   calendar events one at a time was four prompts and four inserts.
 - **DON'T**: Generate per-entry commentary for a bulk action
-- **DO**: Run `npm run eval:voice` after changing what the day or week review is told (`REVIEW_VOICE` and the builders beside it in `lib/prompts.ts`). It asks the real model for lines and checks each against the voice; the last run is in `docs/voice-lines/after.md`. Raise `PROMPT_VERSION` and `COACH_PROMPT_VERSION` in the same change.
+- **DO**: Run `npm run eval:voice` after changing what the day or week review is told (`buildReadSystemPrompt` and `describeRead` in `lib/prompts.ts`). It asks the real model for lines and checks each against the voice; the last run is in `docs/voice-lines/after.md`. Raise `PROMPT_VERSION` and `COACH_PROMPT_VERSION` in the same change.
 - Time with friends or family is what the Heart ring counts: Social, Calls
   and Faith, plus any entry whose words say it was with friends, family or a
   partner (`withFriendsOrFamily` in `lib/metrics-calc.ts`). Such an entry
@@ -154,6 +154,7 @@ For display, these roll up into six `AggregatedCategory` buckets —
   family. The ring, the reviews, the plan prediction and the windows card
   all count it this way. The day review never says there was none; a
   finished week with none is told so in a sentence (`NO_FRIENDS_OR_FAMILY`),
+  which travels as the last fact of the week's read,
   never a label and a colon.
 - Pending entries use static `PENDING_COMMENTARY.planned` message
 
@@ -364,7 +365,8 @@ The four tabs are Today (capture), Review (what happened), Plan (what is
 next) and More. They are one loop — plan, do, record, review, plan again —
 and each hands off to the next: Today leads with *Next up*, the day's plan
 and calendar with a line for now; Review opens on the last finished day,
-yesterday until 9pm; and both reviews end by pointing at the planner. The research lives in More and is cited from the places it
+yesterday until 9pm; and both reviews lead with one read and end on one button into the
+planner. The research lives in More and is cited from the places it
 explains — every scheduling suggestion carries the library entry that
 backs it.
 
@@ -512,6 +514,21 @@ Android gets the browser's own install prompt where it has offered one.
     under itself that a person's own log is the better authority. The
     weekly one asks for its own seven days (`useWeekEntries`); the habit
     history stops at yesterday.
+13. **A review leads with a decision**: each review is the three rings
+    with a line against the person's last four weeks, one read, the
+    evidence behind it and one button into the planner. The read is
+    Keep (something worked, why, and the same slot if it is free),
+    Change (only with three or more days behind it, never one off day;
+    it names an hour and its button puts that into the plan) or
+    Nothing (an ordinary day, said plainly, no advice). The app picks
+    the kind and the facts by fixed rules (`lib/review-read.ts`); the
+    model is given only those fact sentences and words them, and if it
+    fails the facts are shown as they are. The weekly read is about
+    the week's shape, and may show one "what your log shows" finding
+    from a fixed list (`lib/log-findings.ts`): five days with and five
+    without in the last three months, both counts stated, never worded
+    as a cause, never a score. No totals paragraph, no judging labels,
+    no fourth number — principle 7.
 
 ## Quick Commands
 

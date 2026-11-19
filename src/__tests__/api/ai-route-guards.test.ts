@@ -65,7 +65,7 @@ const ROUTES: { name: string; load: () => Promise<AiRoute>; body: unknown }[] = 
   {
     name: '/api/day-commentary',
     load: () => import('@/app/api/day-commentary/route'),
-    body: { score: 80, totalMinutesLogged: 300, wins: [], targetProgress: [] },
+    body: { read: { kind: 'nothing', facts: ['An ordinary day.'] } },
   },
   {
     name: '/api/period-commentary',

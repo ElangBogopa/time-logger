@@ -1,93 +1,63 @@
 import {
-  commentaryFingerprint,
+  readFingerprint,
   readCachedCommentary,
   writeCachedCommentary,
   clearCachedCommentary,
-  type CommentaryInputs,
 } from '../commentary-cache'
 
-const base: CommentaryInputs = {
+const base = {
   date: '2026-11-01',
-  // The prompt is written from the three scores and the plan outcome now,
-  // not the retired sessions-wrapped-up score, so those are what must
-  // invalidate the cache.
-  metrics: { body: 62, focus: 75, social: 40 },
-  planAdherence: { kept: 2, moved: 0, missed: 1 },
-  totalMinutesLogged: 1080,
-  wins: [{ id: 'longest-focus', text: '150 min focus session on "Coding"' }],
-  mood: null,
-  longestFocusSession: { activity: 'Coding', minutes: 150 },
+  read: {
+    rule: 'keep-long-focus',
+    facts: [
+      'The longest focused block was 2h 30m on "Coding", starting at 9:00 AM.',
+      'It started inside the focus window (9:00 AM–12:00 PM).',
+    ],
+  },
 }
 
 beforeEach(() => clearCachedCommentary())
 
-describe('commentaryFingerprint', () => {
-  it('is stable for the same inputs', () => {
-    expect(commentaryFingerprint(base)).toBe(commentaryFingerprint({ ...base }))
+describe('readFingerprint', () => {
+  it('is stable for the same read', () => {
+    expect(readFingerprint(base.read)).toBe(readFingerprint({ ...base.read, facts: [...base.read.facts] }))
   })
 
-  it('ignores the date, which is the cache key, not prompt input', () => {
-    expect(commentaryFingerprint({ ...base, date: '2026-12-25' })).toBe(commentaryFingerprint(base))
+  it('changes when a fact changes', () => {
+    const changed = { ...base.read, facts: [base.read.facts[0].replace('2h 30m', '2h 45m'), base.read.facts[1]] }
+    expect(readFingerprint(changed)).not.toBe(readFingerprint(base.read))
   })
 
-  it.each([
-    ['a score', { metrics: { body: 62, focus: 76, social: 40 } }],
-    ['the plan outcome', { planAdherence: { kept: 3, moved: 0, missed: 0 } }],
-    ['minutes logged', { totalMinutesLogged: 1081 }],
-    ['wins', { wins: [{ id: 'balance', text: 'Good balance of focus and rest' }] }],
-    ['mood', { mood: 'great' }],
-    ['longest focus session', { longestFocusSession: { activity: 'Coding', minutes: 151 } }],
-  ])('changes when %s changes', (_label, patch) => {
-    expect(commentaryFingerprint({ ...base, ...patch } as CommentaryInputs)).not.toBe(commentaryFingerprint(base))
+  it('changes when the rule changes, the facts held equal', () => {
+    expect(readFingerprint({ ...base.read, rule: 'keep-movement-target' })).not.toBe(readFingerprint(base.read))
   })
 
-  it('changes when a category moves minutes with the total held equal, and not otherwise', () => {
-    const a = {
-      ...base,
-      categoryBreakdown: [
-        { category: 'deep_work', minutes: 120 },
-        { category: 'meals', minutes: 60 },
-      ],
-    }
-    const moved = {
-      ...base,
-      categoryBreakdown: [
-        { category: 'deep_work', minutes: 90 },
-        { category: 'meals', minutes: 90 },
-      ],
-    }
-    expect(commentaryFingerprint(moved)).not.toBe(commentaryFingerprint(a))
-    expect(commentaryFingerprint({ ...a })).toBe(commentaryFingerprint(a))
-  })
-
-  it('tolerates missing wins and a null focus session', () => {
-    expect(() =>
-      commentaryFingerprint({ date: '2026-11-01', totalMinutesLogged: 0, wins: [], longestFocusSession: null })
-    ).not.toThrow()
+  it('changes when a fact is added or dropped', () => {
+    expect(readFingerprint({ ...base.read, facts: base.read.facts.slice(0, 1) })).not.toBe(readFingerprint(base.read))
   })
 })
 
 describe('storage', () => {
   it('returns what was written for a matching fingerprint', () => {
-    const fp = commentaryFingerprint(base)
+    const fp = readFingerprint(base.read)
     writeCachedCommentary(base.date, fp, 'A steady day.')
     expect(readCachedCommentary(base.date, fp)).toBe('A steady day.')
   })
 
   it('misses once the day data changes', () => {
-    writeCachedCommentary(base.date, commentaryFingerprint(base), 'A steady day.')
-    const afterLogging = commentaryFingerprint({ ...base, totalMinutesLogged: 1200 })
+    writeCachedCommentary(base.date, readFingerprint(base.read), 'A steady day.')
+    const afterLogging = readFingerprint({ ...base.read, facts: ['Something new was logged.'] })
     expect(readCachedCommentary(base.date, afterLogging)).toBeNull()
   })
 
   it('misses for a different day', () => {
-    const fp = commentaryFingerprint(base)
+    const fp = readFingerprint(base.read)
     writeCachedCommentary(base.date, fp, 'A steady day.')
     expect(readCachedCommentary('2026-11-02', fp)).toBeNull()
   })
 
   it('survives a page reload (it is localStorage, not module state)', () => {
-    const fp = commentaryFingerprint(base)
+    const fp = readFingerprint(base.read)
     writeCachedCommentary(base.date, fp, 'Persisted.')
     // a reload keeps localStorage but resets every module-level variable
     jest.resetModules()
@@ -96,7 +66,7 @@ describe('storage', () => {
   })
 
   it('does not store an empty commentary', () => {
-    const fp = commentaryFingerprint(base)
+    const fp = readFingerprint(base.read)
     writeCachedCommentary(base.date, fp, '')
     expect(readCachedCommentary(base.date, fp)).toBeNull()
   })

@@ -1,5 +1,6 @@
 /**
- * Regression: the AI commentary effect must not retry forever.
+ * Regression: the AI commentary effect must not retry forever. The line
+ * now words the day's read (lib/review-read.ts); the rule is the same.
  *
  * DayReviewContent gated its commentary fetch on the state that fetch itself
  * sets:
@@ -19,7 +20,8 @@
 
 import { render, screen, waitFor } from '@testing-library/react'
 import { useAccount } from '@/hooks/useAccount'
-import { csrfFetch } from '@/lib/api'
+import { csrfFetch, fetchEntries } from '@/lib/api'
+import { getUserToday } from '@/lib/types'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -36,6 +38,9 @@ jest.mock('next/navigation', () => ({
 }))
 jest.mock('@/lib/api', () => ({ csrfFetch: jest.fn(), fetchEntries: jest.fn(async () => []) }))
 jest.mock('@/lib/client-cache', () => ({ cacheGet: jest.fn(() => null), cacheSet: jest.fn() }))
+const NO_EVENTS: never[] = []
+jest.mock('@/contexts/CalendarContext', () => ({ useCalendar: () => ({ getEventsForDate: () => NO_EVENTS }) }))
+jest.mock('sonner', () => ({ toast: { error: jest.fn() } }))
 jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),
   getUserCurrentHour: () => 22, // past the 9pm unlock, so the review renders
@@ -43,8 +48,17 @@ jest.mock('@/lib/types', () => ({
 
 import DayReviewContent from '@/components/review/DayReviewContent'
 
+const TODAY = getUserToday()
+// The day's log, read by the screen: one long focused block, a Keep.
+const block = (minutes: number) => [{
+  id: 'e1', date: TODAY, activity: 'Coding', category: 'deep_work', status: 'confirmed',
+  start_time: '09:00', end_time: '11:30', duration_minutes: minutes,
+}]
+const commentaryCalls = () =>
+  (csrfFetch as jest.Mock).mock.calls.filter(([url]) => url === '/api/day-commentary').length
+
 const summary = {
-  date: '2026-11-01',
+  date: TODAY,
   score: 72,
   scoreColor: 'green',
   sessionsLogged: 2,
@@ -64,16 +78,19 @@ beforeEach(() => {
   jest.clearAllMocks()
   window.localStorage.clear()
   ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
+  ;(fetchEntries as jest.Mock).mockResolvedValue(block(150))
   // It asks /api/day-review first (is this day saved?), then /api/day-summary.
   global.fetch = jest.fn(async (url: string) =>
     String(url).includes('/api/day-review')
       ? { ok: true, json: async () => ({ source: 'live', review: null }) }
-      : { ok: true, json: async () => summary }
+      : String(url).includes('/api/plans')
+        ? { ok: true, json: async () => ({ plans: [] }) }
+        : { ok: true, json: async () => summary }
   ) as unknown as typeof fetch
 })
 
 async function settle() {
-  await waitFor(() => expect(screen.getByText("5h logged")).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText('Behind this')).toBeInTheDocument())
   // Long enough for many cycles of a 30ms request: the pre-fix component reached
   // ~20 calls in this window.
   for (let i = 0; i < 8; i++) await delay(100)
@@ -88,7 +105,7 @@ it('requests commentary once when the endpoint is rate limited', async () => {
   render(<DayReviewContent />)
   await settle()
 
-  expect(csrfFetch).toHaveBeenCalledTimes(1)
+  expect(commentaryCalls()).toBe(1)
 })
 
 it('requests commentary once when the route returns empty commentary', async () => {
@@ -101,7 +118,7 @@ it('requests commentary once when the route returns empty commentary', async () 
   render(<DayReviewContent />)
   await settle()
 
-  expect(csrfFetch).toHaveBeenCalledTimes(1)
+  expect(commentaryCalls()).toBe(1)
 })
 
 it('requests commentary once when the request throws', async () => {
@@ -113,7 +130,7 @@ it('requests commentary once when the request throws', async () => {
   render(<DayReviewContent />)
   await settle()
 
-  expect(csrfFetch).toHaveBeenCalledTimes(1)
+  expect(commentaryCalls()).toBe(1)
 })
 
 it('no longer lists the wins on the screen', async () => {
@@ -125,7 +142,7 @@ it('no longer lists the wins on the screen', async () => {
   })
 
   render(<DayReviewContent />)
-  await waitFor(() => expect(screen.getByText("5h logged")).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText('Good day.')).toBeInTheDocument())
 
   expect(screen.queryByText('150 min focus session on "Coding"')).not.toBeInTheDocument()
 })
@@ -140,7 +157,7 @@ it('renders the commentary and stops requesting on success', async () => {
   await settle()
 
   expect(screen.getByText('Strong focus today.')).toBeInTheDocument()
-  expect(csrfFetch).toHaveBeenCalledTimes(1)
+  expect(commentaryCalls()).toBe(1)
 })
 
 describe('reusing commentary between visits', () => {
@@ -162,7 +179,7 @@ describe('reusing commentary between visits', () => {
     await waitFor(() => expect(screen.getByText('A steady day.')).toBeInTheDocument())
     await delay(120)
 
-    expect(csrfFetch).toHaveBeenCalledTimes(1)
+    expect(commentaryCalls()).toBe(1)
   })
 
   it('regenerates once after the day data changes', async () => {
@@ -172,19 +189,14 @@ describe('reusing commentary between visits', () => {
     await waitFor(() => expect(screen.getByText('A steady day.')).toBeInTheDocument())
     first.unmount()
 
-    // same date, but another entry has been logged since
-    const later = { ...summary, totalMinutesLogged: summary.totalMinutesLogged + 45, score: 71 }
-    global.fetch = jest.fn(async (url: string) =>
-      String(url).includes('/api/day-review')
-        ? { ok: true, json: async () => ({ source: 'live', review: null }) }
-        : { ok: true, json: async () => later }
-    ) as unknown as typeof fetch
+    // same date, but the block has grown since: the read's facts change
+    ;(fetchEntries as jest.Mock).mockResolvedValue(block(180))
     ;(csrfFetch as jest.Mock).mockImplementation(ok('Even better after that session.'))
 
     render(<DayReviewContent />)
     await waitFor(() => expect(screen.getByText('Even better after that session.')).toBeInTheDocument())
     await delay(120)
 
-    expect(csrfFetch).toHaveBeenCalledTimes(2)
+    expect(commentaryCalls()).toBe(2)
   })
 })

@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import OpenAI from 'openai'
-import { buildDayReviewPrompt, DAY_REVIEW_PARAMS, type DayReviewPromptInput } from '@/lib/prompts'
+import { buildReadSystemPrompt, describeRead, DAY_REVIEW_PARAMS } from '@/lib/prompts'
+import { sanitiseRead } from '@/lib/review-read'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-type DayData = DayReviewPromptInput
-
+/**
+ * The words for the day review's read. The client has chosen the read by
+ * fixed rules (lib/review-read.ts) and sends only its kind and its fact
+ * sentences; nothing else from the request reaches the prompt.
+ */
 export async function POST(request: NextRequest) {
   const session = await getAppSession()
   if (!session?.user?.id) {
@@ -28,28 +32,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  let read: ReturnType<typeof sanitiseRead> = null
   try {
-    const body: DayData = await request.json()
-    // `hours` is request input that goes into a prompt: keep only well-formed
-    // entries, cap the count and the label length.
-    const hours = (Array.isArray(body.hours) ? body.hours : [])
-      .filter(
-        (c) =>
-          c &&
-          typeof c.label === 'string' &&
-          typeof c.minutes === 'number' &&
-          Number.isFinite(c.minutes) &&
-          c.minutes > 0
-      )
-      .slice(0, 19)
-      .map((c) => ({ label: c.label.slice(0, 40), minutes: c.minutes }))
-    const dayData: DayData = { ...body, hours }
+    const body = await request.json()
+    read = sanitiseRead(body?.read)
+  } catch {
+    read = null
+  }
+  if (!read) {
+    return NextResponse.json({ error: 'A read with a kind and one to six facts is required' }, { status: 400 })
+  }
 
-    const prompt = buildDayReviewPrompt(dayData)
-
+  try {
     const completion = await openai.chat.completions.create({
       ...DAY_REVIEW_PARAMS,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: buildReadSystemPrompt('day', read.kind) },
+        { role: 'user', content: describeRead(read) },
+      ],
     })
 
     const commentary = completion.choices[0]?.message?.content?.trim() || ''

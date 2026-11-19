@@ -12,7 +12,8 @@
 
 import { render, screen, waitFor } from '@testing-library/react'
 import { useAccount } from '@/hooks/useAccount'
-import { csrfFetch } from '@/lib/api'
+import { csrfFetch, fetchEntries } from '@/lib/api'
+import { getUserToday } from '@/lib/types'
 
 jest.mock('@/hooks/useAccount', () => ({ useAccount: jest.fn() }))
 const stableRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() }
@@ -23,6 +24,9 @@ jest.mock('next/navigation', () => ({
 }))
 jest.mock('@/lib/api', () => ({ csrfFetch: jest.fn(), fetchEntries: jest.fn(async () => []) }))
 jest.mock('@/lib/client-cache', () => ({ cacheGet: jest.fn(() => null), cacheSet: jest.fn() }))
+const NO_EVENTS: never[] = []
+jest.mock('@/contexts/CalendarContext', () => ({ useCalendar: () => ({ getEventsForDate: () => NO_EVENTS }) }))
+jest.mock('sonner', () => ({ toast: { error: jest.fn() } }))
 jest.mock('@/lib/types', () => ({
   ...jest.requireActual('@/lib/types'),
   getUserCurrentHour: () => 22, // past the 9pm unlock, so the review renders
@@ -30,8 +34,9 @@ jest.mock('@/lib/types', () => ({
 
 import DayReviewContent from '@/components/review/DayReviewContent'
 
+const TODAY = getUserToday()
 const summary = {
-  date: '2026-11-01',
+  date: TODAY,
   score: 72,
   scoreColor: 'green',
   sessionsLogged: 2,
@@ -50,15 +55,20 @@ beforeEach(() => {
   jest.clearAllMocks()
   window.localStorage.clear()
   ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
+  ;(fetchEntries as jest.Mock).mockResolvedValue([
+    { id: 'e1', date: TODAY, activity: 'Coding', category: 'deep_work', status: 'confirmed', start_time: '09:00', end_time: '11:30', duration_minutes: 150 },
+  ])
   global.fetch = jest.fn(async (url: string) =>
     String(url).includes('/api/day-review')
       ? { ok: true, json: async () => ({ source: 'live', review: null }) }
-      : { ok: true, json: async () => summary }
+      : String(url).includes('/api/plans')
+        ? { ok: true, json: async () => ({ plans: [] }) }
+        : { ok: true, json: async () => summary }
   ) as unknown as typeof fetch
   ;(csrfFetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ commentary: 'A steady day.' }) })
 })
 
-const ready = () => waitFor(() => expect(screen.getByText("5h logged")).toBeInTheDocument())
+const ready = () => waitFor(() => expect(screen.getByText('A steady day.')).toBeInTheDocument())
 
 describe('standalone /day-review', () => {
   it('draws its own heading and Back button, because the page has none', async () => {
@@ -84,7 +94,8 @@ describe('embedded in the review tab', () => {
     await ready()
 
     expect(screen.getByText('A steady day.')).toBeInTheDocument()
-    expect(screen.getByText('5h logged')).toBeInTheDocument()
-    expect(screen.getByText(/November 1/)).toBeInTheDocument()
+    expect(screen.getByText('Mind')).toBeInTheDocument()
+    expect(screen.getByText('Behind this')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Plan / })).toHaveLength(1)
   })
 })

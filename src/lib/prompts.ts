@@ -1,6 +1,6 @@
 import { LOGGABLE_CATEGORIES, CATEGORY_LABELS, TimeCategory, TimeEntry } from '@/lib/types'
 import { formatDurationLong } from '@/lib/time-utils'
-import { SOCIAL_CATS } from '@/lib/metrics-calc'
+import type { ReadKind, ReviewRead } from '@/lib/review-read'
 
 /**
  * Prompts shared by the API routes and the evaluation harness in scripts/eval.
@@ -12,11 +12,13 @@ import { SOCIAL_CATS } from '@/lib/metrics-calc'
 
 /**
  * The voice of the day and week reviews: facts, no praise, no consolation.
- * Raise PROMPT_VERSION in commentary-cache.ts (day line) and
- * COACH_PROMPT_VERSION in api/weekly-review/route.ts (week line) when this
+ * It is part of what `buildReadSystemPrompt` sends for both reads. Raise
+ * PROMPT_VERSION in commentary-cache.ts (day line) and COACH_PROMPT_VERSION
+ * in api/weekly-review/route.ts (week line) when this or the read prompt
  * changes, or lines written in the old voice keep being shown.
- * `npm run eval:voice` is how a wording change is checked: it asks the real
- * model for lines and reads each against this voice.
+ * `npm run eval:voice` is how a wording change is checked: it builds reads
+ * with `dayRead` / `weekRead`, asks the real model for lines and reads each
+ * against this voice and the facts it was given.
  */
 export const REVIEW_BANNED_WORDS = [
   'impressive',
@@ -48,207 +50,65 @@ Example of the register, from someone else's day (its facts are not this person'
  * What the reviews say about time with friends and family.
  *
  * It is counted as the Heart ring counts it: Social, Calls and Faith, plus
- * any entry whose words say it was with friends or family. Work
- * meetings are left out on purpose; a day of meetings is not a day with
- * friends or loved ones, and saying "no time with people" about it was false.
+ * any entry whose words say it was with friends or family. Work meetings are
+ * left out on purpose; a day of meetings is not a day with friends or loved
+ * ones.
  *
  * The day review never says there was none: one day without it is not a
- * finding. A finished week that had none is told so, once, in a sentence in
- * the data (NO_FRIENDS_OR_FAMILY); a week still in progress is told nothing.
- * The voice carries no wording about it at all, because an example sentence
- * in the voice is what the model copied onto almost every line.
+ * finding. A finished week that had none is told so in this sentence, as the
+ * last fact of the week's read (`weekRead`); a week still in progress is told
+ * nothing. A sentence, not a label: a label and a colon was pasted back whole.
  */
-const PEOPLE_LABELS: readonly string[] = SOCIAL_CATS.map((c) => CATEGORY_LABELS[c as TimeCategory])
-
-/**
- * Minutes of what the Heart ring counts by category label: Social, Calls and
- * Faith. Work meetings are left out on purpose. It sums labels only; the week
- * route passes `heartMinutes` so an entry's words count too.
- */
-export function peopleMinutes(categories: { label: string; minutes: number }[]): number {
-  return categories
-    .filter((c) => PEOPLE_LABELS.includes(c.label) && c.minutes > 0)
-    .reduce((n, c) => n + c.minutes, 0)
-}
-
-/** A sentence, not a label: a label and a colon was pasted back whole. */
 export const NO_FRIENDS_OR_FAMILY = 'No time with friends or family was logged this week.'
 
 /**
- * The labels the builders below write before a colon, so the checker can
- * recognise one pasted back into a line. review-people-line.test.ts fails if
- * a builder writes a label that is not listed here.
+ * The labels the review prompts write before a colon, so the checker can
+ * recognise one pasted back into a line. The read's facts are sentences, so
+ * there are none; the list stays for the checker.
  */
-export const REVIEW_DATA_LABELS = [
-  'Time by category', 'Time tracked', 'Plan', 'Noted', 'Evening mood',
-  'Longest focus session', 'Weekly Review Data', 'Days covered',
-  'Days with anything logged', 'Best focus days', 'Best focus hours',
-  'Hours by category',
-] as const
+export const REVIEW_DATA_LABELS: readonly string[] = []
 
-export const DAY_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 150, temperature: 0.4 } as const
-export const WEEK_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 200, temperature: 0.4 } as const
+export const DAY_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 120, temperature: 0.4 } as const
+export const WEEK_REVIEW_PARAMS = { model: 'gpt-4o-mini', max_tokens: 160, temperature: 0.4 } as const
 
-export interface DayReviewPromptInput {
-  /** Body / Mind / Heart, each 0–99. */
-  metrics?: { body: number; focus: number; social: number } | null
-  /** Planned blocks with a time: how many were kept, moved or missed. */
-  plan?: { kept: number; moved: number; missed: number } | null
-  totalMinutesLogged: number
-  // Optional: /api/day-summary stopped returning targetProgress when the
-  // weekly targets system was removed, so the client omits it entirely.
-  wins?: { text: string }[]
-  targetProgress?: {
-    label: string
-    todayMinutes: number
-    dailyTarget: number
-    progress: number
-    direction: 'at_least' | 'at_most'
-    trend: 'up' | 'down' | 'same'
-  }[]
-  mood?: 'low' | 'okay' | 'great' | null
-  longestFocusSession?: { activity: string; minutes: number } | null
-  hours?: { label: string; minutes: number }[]
+const READ_KIND: Record<'day' | 'week', Record<ReadKind, string>> = {
+  day: {
+    keep: `Two sentences at most, counting everything. Say what worked and the reason the facts give for it, joining facts into one sentence rather than adding another. You may end the second sentence by saying the same hour is there to use again; that is an option, never "should", "need to" or "must". Never a third sentence.`,
+    change: `Two sentences at most, counting everything. The first says how many days the facts name and what happened on them; the second gives the "One option" fact as an option, with its hour. Never a third sentence. Never a correction: no "should", "need to" or "must".`,
+    nothing: `One sentence, two at most. Say plainly that it was an ordinary day. No advice, no suggestion, nothing to do: never "could", "option", "plan", "try" or "consider".`,
+  },
+  week: {
+    keep: `Write one or two sentences. Say what worked and the reason the facts give for it. You may end by saying the same hour is there to use again; that is an option, never "should", "need to" or "must".`,
+    change: `Write two or three sentences. Say how many days the facts name, then give the "One option" fact as an option, with its hour. Never a correction: no "should", "need to" or "must".`,
+    nothing: `Write one sentence, two at most. Say plainly that it was an ordinary week. No advice, no suggestion, nothing to do: never "could", "option", "plan", "try" or "consider".`,
+  },
 }
 
-export function buildDayReviewPrompt(dayData: DayReviewPromptInput): string {
-  // `metrics` and `targetProgress` are accepted and deliberately not put in
-  // the prompt: the scores are on screen beside the line, and a model that
-  // sees them can only turn them into a verdict.
-  const wins = dayData.wins ?? []
-  const winsText = wins.length > 0 ? `Noted: ${wins.map((w) => w.text).join(', ')}.` : ''
-  const moodText = dayData.mood ? `Evening mood: ${dayData.mood}.` : ''
-  const focusText = dayData.longestFocusSession
-    ? `Longest focus session: ${dayData.longestFocusSession.minutes} minutes on "${dayData.longestFocusSession.activity}".`
-    : ''
+const READ_SCOPE: Record<'day' | 'week', string> = {
+  day: `This may be read on the day itself or days later, so never write "today", "yesterday" or "tomorrow": say "the day", or name a day as the facts name it.`,
+  week: `If the facts contain a sentence saying something was not logged this week, include that sentence once, in its own words. If the facts say the week is still in progress, say "so far".`,
+}
 
-  const plan = dayData.plan
-  const planned = plan ? plan.kept + plan.moved + plan.missed : 0
-  const planText = plan && planned > 0
-    ? `Plan: ${planned} timed ${planned === 1 ? 'block' : 'blocks'} — ${plan.kept} kept, ${plan.moved} done at another time, ${plan.missed} not done.`
-    : ''
-
-  const hours = Math.floor(dayData.totalMinutesLogged / 60)
-  const minutes = dayData.totalMinutesLogged % 60
-
-  const hoursList = (dayData.hours ?? [])
-    .filter((c) => c.minutes > 0)
-    .sort((a, b) => b.minutes - a.minutes)
-    .map((c) => `- ${c.label}: ${formatDurationLong(c.minutes)}`)
-  const hoursText = hoursList.length > 0 ? hoursList.join('\n') : 'Nothing was broken down by category.'
-
-  const logged = [
-    'Time by category:',
-    hoursText,
-    `Time tracked: ${hours}h ${minutes}m (this only says how much was written down — do not praise or criticise it)`,
-    planText,
-    winsText,
-    moodText,
-    focusText,
-  ]
-    .filter((l) => l !== '')
-    .join('\n')
-
-  // What the model is told is what the person can see. It used to get a
-  // "Day Score" that was sessions wrapped up ÷ sessions passed — not shown
-  // anywhere — plus "if it was a tough day, acknowledge that", and so it
-  // consoled people for days that had gone well. It was then given the three
-  // scores and told to grade the day by them while forbidden to grade it; the
-  // scores are now left out and the model is given facts to state instead.
-  return `You are reviewing someone's day from their time log. Write 2 sentences, 3 at most. Name what actually happened. Never describe the day as hard, tough or challenging unless their mood says so.
+/**
+ * The instructions for the line a review leads with. The app has chosen the
+ * read and written its facts (lib/review-read.ts); the model only words them.
+ */
+export function buildReadSystemPrompt(scope: 'day' | 'week', kind: ReadKind): string {
+  return `You are writing the one line that opens a ${scope} review in someone's time log. The app has already decided what the line says. You put its facts into plain words, and nothing else.
 
 ${REVIEW_VOICE}
 
-This may be read on the day itself or days later, so never write "today", "yesterday" or "tomorrow": say "the day". You know nothing about any other day, so make no comparisons such as "lower than usual". Give no advice and suggest nothing. The person's scores are on screen above your words: do not mention scores or targets, and do not sum the day up with a verdict. Three sentences is the limit: join the smaller facts into one sentence instead of adding a fourth.
-
-WHAT WAS LOGGED. Write only from this:
-${logged}
-
-Write the 2-3 sentences now:`
+RULES:
+- ${READ_KIND[scope][kind]}
+- Every number, hour, day and activity name must come from the facts, written as the facts write them. Add no fact, no reason and no cause of your own: never "because", "thanks to", "leads to", "led to" or "as a result".
+- ${READ_SCOPE[scope]}
+- Do not mention scores. Do not remark on how much was logged.
+- Plain sentences: no list, no label followed by a colon.`
 }
 
-export interface WeekReviewContextInput {
-  isPartialWeek: boolean
-  bestDays: string[]
-  bestHours: string[]
-  categories: { label: string; minutes: number }[]
-  /**
-   * Minutes the Heart ring counts this week, from the entries. When given, it
-   * decides the no-friends-or-family sentence instead of the category labels.
-   */
-  heartMinutes?: number
-}
-
-// No day counts are sent: the model turned them into remarks about how much was logged.
-export function buildWeekReviewContext(input: WeekReviewContextInput): string {
-  const hoursOf = (minutes: number) => Math.round((minutes / 60) * 10) / 10
-  // Sleep is no longer offered; a week holding rows saved as sleep before it
-  // was removed tells the model nothing about them.
-  const categories = input.categories.filter((c) => c.label !== CATEGORY_LABELS.sleep)
-  // Only a finished week can have had none: one still in progress has not.
-  const noneThisWeek =
-    !input.isPartialWeek && categories.length > 0 && (input.heartMinutes ?? peopleMinutes(categories)) === 0
-  const ordered = [...categories].sort((a, b) => b.minutes - a.minutes)
-  // A week with no best focus days or hours gets the largest activity stated
-  // for it. Asked to find it, the model named the wrong one twice: rest was
-  // 10h, and it said chores (6h) took the most.
-  const noFocus = input.bestDays.length === 0 && input.bestHours.length === 0
-  const nonEmpty = categories.filter((c) => c.minutes > 0)
-  const topMinutes = Math.max(0, ...nonEmpty.map((c) => c.minutes))
-  const top = nonEmpty.filter((c) => c.minutes === topMinutes)
-  const most =
-    noFocus && top.length > 0
-      ? `- Most hours: ${top.map((c) => c.label).join(' and ')} (${hoursOf(topMinutes)}h${top.length > 1 ? ' each' : ''})`
-      : ''
-  const head = [
-    'Weekly Review Data:',
-    input.isPartialWeek ? 'The week is still in progress.' : '',
-    input.bestDays.length > 0 ? `- Best focus days: ${input.bestDays.join(', ')}` : '',
-    input.bestHours.length > 0 ? `- Best focus hours: ${input.bestHours.join(', ')}` : '',
-    most,
-  ].filter((l) => l !== '')
-  return `
-${head.join('\n')}
-
-Hours by category${input.isPartialWeek ? ' so far' : ''}:
-${ordered.map((c) => `- ${c.label}: ${hoursOf(c.minutes)}h`).join('\n')}
-${noneThisWeek ? `\n${NO_FRIENDS_OR_FAMILY}` : ''}
-
-`
-}
-
-// A week with no best focus days or hours is told nothing about them: told
-// to call them "best focus", the model wrote that there was no focused work
-// and suggested using best focus hours that did not exist. Its pattern points
-// at the stated "Most hours" fact, so nothing is ranked here.
-export function buildWeekReviewSystemPrompt(focus: Pick<WeekReviewContextInput, 'bestDays' | 'bestHours'>): string {
-  const days = focus.bestDays.length > 0
-  const hours = focus.bestHours.length > 0
-  const named = days && hours ? 'days and hours' : days ? 'days' : 'hours'
-  const pattern =
-    days || hours
-      ? `such as the ${named} where the focused work fell`
-      : 'such as the activity the data gives as taking the most hours, named as the data names it'
-  const bestFocus =
-    days || hours
-      ? `\nCall the ${named} in the data "best focus" ${named}, as the data does; never call them productive.`
-      : ''
-  return `You are writing a brief weekly reflection from the week's hours (3-4 sentences max).
-
-Write it in this order:
-1. What the week held: two or three specific things from the data, with their hours.
-2. One pattern in the data, stated as a fact, ${pattern}. Leave this out if the data shows none.
-3. One option for next week, in a single plain sentence that starts from a fact in the data and names a day, an hour or an activity. It is about something to do, not about something to record. This is the only sentence that is not a statement of what happened. It is an option, not a correction: no "should", no "need to", no "must".
-
-Use "you" language. Reference specific data from their week.
-
-${REVIEW_VOICE}
-
-Don't use bullet points - write in flowing prose.
-Keep it concise - no more than 4 sentences total.
-The person's scores are on screen above your words: do not mention scores or targets, and do not sum the week up with a verdict.
-Write about what the time went to, never about the record of it. Say "you spent" or name the activity and its hours. Say nothing about how many days or hours the data covers, and do not suggest writing more down.
-If the week is still in progress, say "so far" and do not compare it with a full week.${bestFocus}`
+/** The read's facts, one per line: the only thing the model is given. */
+export function describeRead(read: Pick<ReviewRead, 'facts'>): string {
+  return `THE FACTS. Write only from these:\n${read.facts.join('\n')}`
 }
 
 /** One line per activity, with the category the classifier assigned. */

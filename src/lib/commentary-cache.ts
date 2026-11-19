@@ -6,8 +6,8 @@
  * had not changed. It was also keyed on the date alone, so within a session
  * the opposite happened: log a new entry and the stale line was reused.
  *
- * This keys on a fingerprint of exactly the fields that go into the prompt, and
- * stores it in localStorage. Same day, same data → same text, no API call;
+ * This keys on a fingerprint of exactly what goes into the prompt — the
+ * read's rule and facts — and stores it in localStorage. Same day, same data → same text, no API call;
  * anything that would change the prompt produces a new key and one new call.
  *
  * The storage itself lives in ai-text-cache, shared with the weekly review.
@@ -18,40 +18,15 @@ import { readCachedText, writeCachedText, clearCachedText, stableHash } from './
 const NAMESPACE = 'day'
 
 // Raise this when the prompt's voice changes, so lines written by the old prompt are not reused.
-const PROMPT_VERSION = 7
-
-export interface CommentaryInputs {
-  date: string
-  metrics?: { body: number; focus: number; social: number } | null
-  planAdherence?: { kept: number; moved: number; missed: number } | null
-  totalMinutesLogged: number
-  wins: { id?: string; text?: string }[]
-  mood?: string | null
-  longestFocusSession?: { activity: string; minutes: number } | null
-  categoryBreakdown?: { category: string; minutes: number }[]
-}
+const PROMPT_VERSION = 8
 
 /**
- * A fingerprint of the prompt inputs. Anything the model is told about must be
- * in here, or a real change would silently reuse the old commentary.
+ * A fingerprint of what the model is told: the read's rule and its facts.
+ * The facts are written from the log, so anything that changes them — a new
+ * entry, an edited one — produces a new key and one new call.
  */
-export function commentaryFingerprint(inputs: CommentaryInputs): string {
-  return stableHash(
-    JSON.stringify([
-      PROMPT_VERSION,
-      inputs.metrics ? [inputs.metrics.body, inputs.metrics.focus, inputs.metrics.social] : null,
-      inputs.planAdherence
-        ? [inputs.planAdherence.kept, inputs.planAdherence.moved, inputs.planAdherence.missed]
-        : null,
-      inputs.totalMinutesLogged,
-      (inputs.wins ?? []).map((w) => w.id ?? w.text ?? ''),
-      inputs.mood ?? null,
-      inputs.longestFocusSession
-        ? [inputs.longestFocusSession.activity, inputs.longestFocusSession.minutes]
-        : null,
-      (inputs.categoryBreakdown ?? []).map((c) => [c.category, c.minutes]),
-    ])
-  )
+export function readFingerprint(read: { rule: string; facts: string[] }): string {
+  return stableHash(JSON.stringify([PROMPT_VERSION, read.rule, read.facts]))
 }
 
 /** The stored commentary for this day, but only if the day's data still matches. */

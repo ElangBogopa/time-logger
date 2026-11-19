@@ -136,11 +136,14 @@ export function MetricRingRow({
   values,
   size = 72,
   caption,
+  notes,
   srLabel,
 }: {
   values: Record<MetricKey, number>
   size?: number
   caption?: string
+  /** A short line under each ring's label, such as how it compares with the person's usual. */
+  notes?: Partial<Record<MetricKey, string>>
   /** What these numbers are, for anyone not looking at the rings. */
   srLabel: string
 }) {
@@ -148,14 +151,23 @@ export function MetricRingRow({
     <div className="flex flex-col items-center">
       <p className="sr-only">
         {srLabel}:{' '}
-        {METRIC_ORDER.map((metric) => `${METRIC_LABELS[metric]} ${values[metric]}`).join(', ')}
+        {METRIC_ORDER.map(
+          (metric) => `${METRIC_LABELS[metric]} ${values[metric]}${notes?.[metric] ? ` (${notes[metric]})` : ''}`
+        ).join(', ')}
       </p>
-      <div className="flex items-end justify-center gap-6">
+      <div className="flex items-start justify-center gap-6">
         {METRIC_ORDER.map((metric) => (
-          <MetricRing key={metric} metric={metric} value={values[metric]} size={size} />
+          <div key={metric} className="flex flex-col items-center">
+            <MetricRing metric={metric} value={values[metric]} size={size} />
+            {notes?.[metric] && (
+              <p className="mt-1 max-w-[6.5rem] text-center text-xs text-muted-foreground" aria-hidden="true">
+                {notes[metric]}
+              </p>
+            )}
+          </div>
         ))}
       </div>
-      {caption && <p className="text-sm text-muted-foreground mt-3">{caption}</p>}
+      {caption && <p className="mt-3 text-center text-sm text-muted-foreground">{caption}</p>}
     </div>
   )
 }

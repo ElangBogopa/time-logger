@@ -1,602 +1,269 @@
-import { render, screen, waitFor } from '@testing-library/react'
+/**
+ * The day review: the three rings with a line each against the person's
+ * last four weeks, one read worded from its facts, the evidence behind it,
+ * and one button into the planner.
+ */
+
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { useAccount } from '@/hooks/useAccount'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { csrfFetch, fetchEntries } from '@/lib/api'
+import { getUserToday, shiftDateString } from '@/lib/types'
+import { toast } from 'sonner'
 
-// Mock next-auth
-jest.mock('@/hooks/useAccount', () => ({
-  useAccount: jest.fn(),
-}))
-
-// Mock next/navigation
+jest.mock('@/hooks/useAccount', () => ({ useAccount: jest.fn() }))
+const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() }
+let mockParams = new URLSearchParams('')
 jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(),
-  useSearchParams: jest.fn(),
+  useRouter: () => mockRouter,
+  useSearchParams: () => mockParams,
+}))
+jest.mock('@/lib/api', () => ({ csrfFetch: jest.fn(), fetchEntries: jest.fn(async () => []) }))
+jest.mock('@/lib/client-cache', () => ({ cacheGet: jest.fn(() => null), cacheSet: jest.fn(), cacheDelete: jest.fn() }))
+const NO_EVENTS: never[] = []
+jest.mock('@/contexts/CalendarContext', () => ({ useCalendar: () => ({ getEventsForDate: () => NO_EVENTS }) }))
+jest.mock('sonner', () => ({ toast: { error: jest.fn() } }))
+jest.mock('@/lib/types', () => ({
+  ...jest.requireActual('@/lib/types'),
+  getUserCurrentHour: () => 22, // past the 9pm unlock, so the review renders
 }))
 
-// Mock fetch
-const mockFetch = jest.fn()
-global.fetch = mockFetch
+import DayReviewContent from '@/components/review/DayReviewContent'
 
-// Import after mocks
-import DayReviewPage from '@/app/day-review/page'
+const TODAY = getUserToday()
+const YESTERDAY = shiftDateString(TODAY, -1)
+const TOMORROW = shiftDateString(TODAY, 1)
 
-// Mock day summary response
-const createMockDaySummary = (overrides = {}) => ({
-  score: 75,
-  scoreColor: 'green' as const,
+function row(date: string, activity: string, category: string, start: string, minutes: number) {
+  const [h, m] = start.split(':').map(Number)
+  const end = h * 60 + m + minutes
+  return {
+    id: `${date}-${activity}-${start}`,
+    date,
+    activity,
+    category,
+    start_time: start,
+    end_time: `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`,
+    duration_minutes: minutes,
+    status: 'confirmed',
+  }
+}
+
+const summary = (date: string, extra: Record<string, unknown> = {}) => ({
+  date,
+  score: 72,
+  scoreColor: 'green',
   sessionsLogged: 2,
   totalSessions: 3,
-  totalMinutesLogged: 420,
-  hasEveningPassed: false,
-  date: '2024-01-15',
-  targetProgress: [
-    {
-      targetId: '1',
-      targetType: 'deep_focus',
-      label: 'Deep Work',
-      todayMinutes: 180,
-      yesterdayMinutes: 120,
-      sameDayLastWeekMinutes: 150,
-      dailyTarget: 180,
-      weeklyTarget: 1260,
-      weekMinutes: 600,
-      progress: 100,
-      direction: 'at_least' as const,
-      trend: 'up' as const,
-      vsLastWeekTrend: 'up' as const,
-    },
-  ],
-  wins: [
-    { id: 'win1', text: 'Hit your deep work goal', type: 'goal_met' as const, value: 180 },
-  ],
-  timeline: Array.from({ length: 24 }, (_, i) => ({
-    hour: i,
-    entries: [],
-    totalMinutes: 0,
-  })),
-  longestFocusSession: { activity: 'Coding', minutes: 90 },
-  categoryBreakdown: [
-    { category: 'deep_work' as const, label: 'Deep Work', minutes: 180, percentage: 43 },
-    { category: 'meetings' as const, label: 'Meetings', minutes: 60, percentage: 14 },
-    { category: 'exercise' as const, label: 'Exercise', minutes: 45, percentage: 11 },
-    { category: 'meals' as const, label: 'Meals', minutes: 60, percentage: 14 },
-    { category: 'social' as const, label: 'Social', minutes: 45, percentage: 11 },
-    { category: 'entertainment' as const, label: 'Entertainment', minutes: 30, percentage: 7 },
-  ],
-  aggregatedBreakdown: [
-    { category: 'focus' as const, label: 'Focus', minutes: 180, percentage: 43, isTargetLinked: true },
-    { category: 'ops' as const, label: 'Ops', minutes: 60, percentage: 14, isTargetLinked: false },
-    { category: 'body' as const, label: 'Body', minutes: 105, percentage: 25, isTargetLinked: false },
-    { category: 'connection' as const, label: 'Connection', minutes: 45, percentage: 11, isTargetLinked: false },
-    { category: 'escape' as const, label: 'Escape', minutes: 30, percentage: 7, isTargetLinked: false },
-  ],
+  totalMinutesLogged: 300,
+  wins: [],
+  categoryBreakdown: [],
+  aggregatedBreakdown: [],
+  timeline: [],
   todayMood: null,
-  entries: [],
-  ...overrides,
+  longestFocusSession: { activity: 'Essay draft', minutes: 130 },
+  productivityScore: null,
+  ...extra,
 })
 
-describe('DayReviewPage', () => {
-  const mockRouter = {
-    push: jest.fn(),
-    back: jest.fn(),
-  }
+/** The routes the screen asks with plain fetch: the review's status, the summary, the plans. */
+function serve(daySummary: Record<string, unknown>) {
+  global.fetch = jest.fn(async (url: string) => {
+    const target = String(url)
+    if (target.includes('/api/day-review')) return { ok: true, json: async () => ({ source: 'live', review: null }) }
+    if (target.includes('/api/day-summary')) return { ok: true, json: async () => daySummary }
+    if (target.includes('/api/plans')) return { ok: true, json: async () => ({ plans: [] }) }
+    return { ok: false, json: async () => ({}) }
+  }) as unknown as typeof fetch
+}
 
-  /**
-   * Routed by URL rather than by call order. The page asks for the review
-   * status, the summary, the day's metrics and the commentary; which of
-   * them resolves first is not part of its contract, and an ordered queue
-   * of mockResolvedValueOnce broke the moment the metrics fetch was added.
-   */
-  const routeFetch = (
-    summary: unknown,
-    metrics = { body: 61, focus: 84, social: 42 },
-    commentary = 'Test commentary'
-  ) =>
-    mockFetch.mockImplementation(async (url: unknown) => {
-      const target = String(url)
-      if (target.includes('/api/day-review')) {
-        return { ok: true, json: async () => ({ source: 'live', review: null }) }
-      }
-      if (target.includes('/api/day-summary')) return { ok: true, json: async () => summary }
-      if (target.includes('/api/metrics/trend')) {
-        return {
-          ok: true,
-          json: async () => ({
-            body: { current: metrics.body, average: metrics.body },
-            focus: { current: metrics.focus, average: metrics.focus },
-            social: { current: metrics.social, average: metrics.social },
-          }),
-        }
-      }
-      if (target.includes('/api/day-commentary')) {
-        return { ok: true, json: async () => ({ commentary }) }
-      }
+const commentaryCalls = () =>
+  (csrfFetch as jest.Mock).mock.calls.filter(([url]) => String(url) === '/api/day-commentary')
+
+function wordsFromModel(text: string) {
+  ;(csrfFetch as jest.Mock).mockImplementation(async (url: string) => {
+    if (url === '/api/day-commentary') return { ok: true, json: async () => ({ commentary: text }) }
+    return { ok: false, json: async () => ({}) }
+  })
+}
+
+// A long focused block on the reviewed day, with no history: keep-long-focus.
+const longFocus = (date: string) => [row(date, 'Essay draft', 'deep_work', '09:15', 130)]
+
+function show(date: string, rows: unknown[], extra: Record<string, unknown> = {}) {
+  mockParams = new URLSearchParams(`date=${date}`)
+  ;(fetchEntries as jest.Mock).mockResolvedValue(rows)
+  serve(summary(date, extra))
+  return render(<DayReviewContent />)
+}
+
+beforeEach(() => {
+  jest.clearAllMocks()
+  window.localStorage.clear()
+  window.sessionStorage.clear()
+  ;(useAccount as jest.Mock).mockReturnValue({ status: 'authenticated', data: { user: { id: 'u1' } } })
+  wordsFromModel('The essay ran 2h 10m from 9:15 AM.')
+})
+
+describe('the read', () => {
+  it('shows the read in the model\'s words, with "Ask about this" under them', async () => {
+    show(YESTERDAY, longFocus(YESTERDAY))
+    const words = await screen.findByText('The essay ran 2h 10m from 9:15 AM.')
+    expect(within(words.parentElement as HTMLElement).getByRole('button', { name: 'Ask about this' })).toBeInTheDocument()
+    // The model is given the read's kind and facts and nothing else.
+    const [, init] = commentaryCalls()[0]
+    expect(JSON.parse(init.body)).toEqual({
+      read: {
+        kind: 'keep',
+        facts: ['The longest focused block was 2h 10m on "Essay draft", starting at 9:15 AM.', 'It started inside the focus window (9:00 AM–12:00 PM).'],
+      },
+    })
+  })
+
+  it('shows the facts themselves when the model fails', async () => {
+    ;(csrfFetch as jest.Mock).mockResolvedValue({ ok: false, json: async () => ({}) })
+    show(YESTERDAY, longFocus(YESTERDAY))
+    expect(
+      await screen.findByText(
+        'The longest focused block was 2h 10m on "Essay draft", starting at 9:15 AM. It started inside the focus window (9:00 AM–12:00 PM).'
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('asks the model once for an unchanged day, and again when the facts change', async () => {
+    const first = show(YESTERDAY, longFocus(YESTERDAY))
+    await screen.findByText('The essay ran 2h 10m from 9:15 AM.')
+    first.unmount()
+
+    const second = show(YESTERDAY, longFocus(YESTERDAY))
+    await screen.findByText('The essay ran 2h 10m from 9:15 AM.')
+    expect(commentaryCalls()).toHaveLength(1)
+    second.unmount()
+
+    wordsFromModel('The essay ran 2h 30m from 9:15 AM.')
+    show(YESTERDAY, [row(YESTERDAY, 'Essay draft', 'deep_work', '09:15', 150)])
+    await screen.findByText('The essay ran 2h 30m from 9:15 AM.')
+    expect(commentaryCalls()).toHaveLength(2)
+  })
+
+  it('never asks the model about a day with nothing logged', async () => {
+    show(YESTERDAY, [], { totalMinutesLogged: 0, longestFocusSession: null })
+    expect(await screen.findByText('Nothing was logged on this day')).toBeInTheDocument()
+    // and the empty day still ends on the plain button
+    expect(await screen.findByRole('button', { name: 'Plan tomorrow' })).toBeInTheDocument()
+    expect(commentaryCalls()).toHaveLength(0)
+  })
+
+  it('never asks the model when the log holds nothing for the day', async () => {
+    show(YESTERDAY, [])
+    expect(
+      await screen.findByText('An ordinary day. There is too little history yet to say what is usual.')
+    ).toBeInTheDocument()
+    expect(commentaryCalls()).toHaveLength(0)
+  })
+
+  it('has no longest-focus-session card and no "… logged" caption', async () => {
+    show(YESTERDAY, longFocus(YESTERDAY))
+    await screen.findByText('The essay ran 2h 10m from 9:15 AM.')
+    expect(screen.queryByText(/longest focus session/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^\d+h( \d+m)? logged$/)).not.toBeInTheDocument()
+  })
+})
+
+describe('the evidence', () => {
+  it('shows "Behind this" and "In your windows" for a read about timing', async () => {
+    show(YESTERDAY, longFocus(YESTERDAY))
+    expect(await screen.findByText('Behind this')).toBeInTheDocument()
+    expect(screen.getByText('Longest focused block')).toBeInTheDocument()
+    expect(screen.getByText('2h 10m, from 9:15 AM')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'In your windows' })).toBeInTheDocument()
+  })
+
+  it('shows neither for an ordinary day', async () => {
+    wordsFromModel('An ordinary day, mostly email.')
+    show(YESTERDAY, [row(YESTERDAY, 'Email', 'shallow_work', '10:00', 60)])
+    await screen.findByText('An ordinary day, mostly email.')
+    expect(screen.queryByText('Behind this')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'In your windows' })).not.toBeInTheDocument()
+  })
+})
+
+describe('the button', () => {
+  it('is exactly one, and goes to the planner', async () => {
+    wordsFromModel('An ordinary day, mostly email.')
+    show(shiftDateString(TODAY, -4), [row(shiftDateString(TODAY, -4), 'Email', 'shallow_work', '10:00', 60)])
+    await screen.findByText('An ordinary day, mostly email.')
+    const buttons = screen.getAllByRole('button', { name: /^Plan / })
+    expect(buttons).toHaveLength(1)
+    fireEvent.click(buttons[0])
+    expect(mockRouter.push).toHaveBeenCalledWith(`/calendar?date=${TOMORROW}`)
+    expect(csrfFetch).not.toHaveBeenCalledWith('/api/plans', expect.anything())
+  })
+
+  it('names a free slot, and on a tap puts it into the plan and opens the planner', async () => {
+    ;(csrfFetch as jest.Mock).mockImplementation(async (url: string, init?: { method?: string }) => {
+      if (url === '/api/day-commentary') return { ok: true, json: async () => ({ commentary: 'The essay ran 2h 10m from 9:15 AM.' }) }
+      if (url === '/api/plans' && init?.method === 'POST') return { ok: true, json: async () => ({ plan: { id: 'p1' } }) }
+      if (url === '/api/plans' && init?.method === 'PATCH') return { ok: true, json: async () => ({ plan: { id: 'p1' } }) }
       return { ok: false, json: async () => ({}) }
     })
+    show(YESTERDAY, longFocus(YESTERDAY))
 
+    const button = await screen.findByRole('button', { name: 'Plan "Essay draft" at 9:15 AM tomorrow' })
+    expect(csrfFetch).not.toHaveBeenCalledWith('/api/plans', expect.anything())
+    fireEvent.click(button)
 
-  beforeEach(() => {
-    jest.clearAllMocks()
-    ;(useRouter as jest.Mock).mockReturnValue(mockRouter)
-    ;(useAccount as jest.Mock).mockReturnValue({
-      status: 'authenticated',
-      data: { user: { id: 'user1', email: 'test@test.com' } },
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith(`/calendar?date=${TOMORROW}`))
+    const plans = (csrfFetch as jest.Mock).mock.calls.filter(([url]) => url === '/api/plans')
+    expect(JSON.parse(plans[0][1].body)).toEqual({ date: TOMORROW, title: 'Essay draft' })
+    expect(plans[0][1].method).toBe('POST')
+    expect(JSON.parse(plans[1][1].body)).toEqual({ id: 'p1', committed_start: '09:15', committed_end: '11:30' })
+    expect(plans[1][1].method).toBe('PATCH')
+  })
+
+  it('stays, and says so, when the plan cannot be added', async () => {
+    ;(csrfFetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (url === '/api/day-commentary') return { ok: true, json: async () => ({ commentary: 'The essay ran 2h 10m from 9:15 AM.' }) }
+      return { ok: false, json: async () => ({}) }
     })
-    // Mock useSearchParams
-    const mockSearchParams = new URLSearchParams('date=2024-01-15')
-    ;(useSearchParams as jest.Mock).mockReturnValue(mockSearchParams)
+    show(YESTERDAY, longFocus(YESTERDAY))
+    fireEvent.click(await screen.findByRole('button', { name: 'Plan "Essay draft" at 9:15 AM tomorrow' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't add that to the plan. Try again."))
+    expect(mockRouter.push).not.toHaveBeenCalled()
+  })
+})
+
+describe('the ring lines', () => {
+  it('says under each ring how it compares with the last four weeks', async () => {
+    // Seven days of a two-hour block: Mind 55 each, Body and Heart 0. The
+    // reviewed day: 2h 10m (about the same), no movement, two hours with family.
+    const history = Array.from({ length: 7 }, (_, i) => row(shiftDateString(YESTERDAY, -(i + 1)), 'Desk', 'deep_work', '09:00', 120))
+    show(YESTERDAY, [...history, row(YESTERDAY, 'Dinner with family', 'social', '19:00', 120), row(YESTERDAY, 'Desk', 'deep_work', '09:00', 130)])
+    expect(await screen.findAllByText('About your usual')).toHaveLength(2)
+    expect(screen.getByText('Above your usual 0')).toBeInTheDocument()
+    expect(screen.queryByText(/Too little history/)).not.toBeInTheDocument()
   })
 
-  it('renders loading state initially', () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}))
-    ;(useAccount as jest.Mock).mockReturnValue({ status: 'loading' })
-
-    render(<DayReviewPage />)
-
-    const spinner = document.querySelector('.animate-spin')
-    expect(spinner).toBeInTheDocument()
+  it('says once, under the row, when there is too little history to compare', async () => {
+    const history = Array.from({ length: 4 }, (_, i) => row(shiftDateString(YESTERDAY, -(i + 1)), 'Desk', 'deep_work', '09:00', 60))
+    show(YESTERDAY, [...history, ...longFocus(YESTERDAY)])
+    expect(
+      await screen.findByText('Too little history to compare yet: 4 of the last 28 days have anything logged.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/your usual/)).not.toBeInTheDocument()
   })
+})
 
+describe('the page around it', () => {
   it('redirects to login if not authenticated', () => {
     ;(useAccount as jest.Mock).mockReturnValue({ status: 'unauthenticated' })
-    mockFetch.mockImplementation(() => new Promise(() => {}))
-
-    render(<DayReviewPage />)
-
+    show(YESTERDAY, [])
     expect(mockRouter.push).toHaveBeenCalledWith('/login')
   })
 
-  it('renders day review page with summary data', async () => {
-    routeFetch(createMockDaySummary())
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Day in Review')).toBeInTheDocument()
-    })
-  })
-
-  it("leads with the day's three metrics, not a logging percentage", async () => {
-    // The hero used to be summary.score — sessionsLogged ÷ sessionsPassed,
-    // which reads 100 whenever every session has something in it. It is now
-    // Body / Mind / Heart for that date, on the same scale as the dashboard.
-    routeFetch(createMockDaySummary({ score: 75 }), { body: 61, focus: 84, social: 42 })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('61')).toBeInTheDocument()
-    })
-    expect(screen.getByText('84')).toBeInTheDocument()
-    expect(screen.getByText('42')).toBeInTheDocument()
-    // the time logged survives as a caption: a fact, not a score
-    expect(screen.getByText('7h logged')).toBeInTheDocument()
-    expect(screen.queryByText(/sessions/)).not.toBeInTheDocument()
-    expect(screen.queryByText('75')).not.toBeInTheDocument()
-  })
-
-  // The assertions below cover the Energy Breakdown, Category Breakdown, Mood,
-  // Wins and AI commentary sections, which are commented out of the page render
-  // (see src/app/day-review/page.tsx — "commented out until science-based
-  // measurement is ready"). Un-skip these once those sections come back.
-  it.skip('displays energy breakdown section with aggregated categories', async () => {
-    const mockSummary = createMockDaySummary()
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test commentary' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Energy Breakdown')).toBeInTheDocument()
-    })
-
-    // Should show aggregated category labels
-    expect(screen.getByText('Focus')).toBeInTheDocument()
-    expect(screen.getByText('Ops')).toBeInTheDocument()
-    expect(screen.getByText('Body')).toBeInTheDocument()
-    expect(screen.getByText('Connection')).toBeInTheDocument()
-    expect(screen.getByText('Escape')).toBeInTheDocument()
-  })
-
-  it.skip('shows target-linked indicator for Focus category', async () => {
-    const mockSummary = createMockDaySummary({
-      aggregatedBreakdown: [
-        { category: 'focus', label: 'Focus', minutes: 180, percentage: 43, isTargetLinked: true },
-        { category: 'body', label: 'Body', minutes: 60, percentage: 14, isTargetLinked: false },
-      ],
-    })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test commentary' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Focus')).toBeInTheDocument()
-    })
-
-    // The Target icon should be rendered for target-linked categories
-    // We can check the container has the expected structure
-    const focusLabel = screen.getByText('Focus')
-    expect(focusLabel).toBeInTheDocument()
-  })
-
-  it.skip('displays wins section when wins exist', async () => {
-    const mockSummary = createMockDaySummary({
-      wins: [
-        { id: 'win1', text: 'Hit your deep work goal', type: 'goal_met', value: 180 },
-        { id: 'win2', text: '90 min focus session', type: 'focus', value: 90 },
-      ],
-    })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test commentary' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText("What stood out")).toBeInTheDocument()
-    })
-
-    expect(screen.getByText('Hit your deep work goal')).toBeInTheDocument()
-    expect(screen.getByText('90 min focus session')).toBeInTheDocument()
-  })
-
-  it.skip('displays target progress cards', async () => {
-    const mockSummary = createMockDaySummary({
-      targetProgress: [
-        {
-          targetId: '1',
-          targetType: 'deep_focus',
-          label: 'Deep Work Goal',
-          todayMinutes: 180,
-          yesterdayMinutes: 120,
-          sameDayLastWeekMinutes: 150,
-          dailyTarget: 180,
-          weeklyTarget: 1260,
-          weekMinutes: 600,
-          progress: 100,
-          direction: 'at_least',
-          trend: 'up',
-          vsLastWeekTrend: 'up',
-        },
-        {
-          targetId: '2',
-          targetType: 'exercise',
-          label: 'Exercise Goal',
-          todayMinutes: 45,
-          yesterdayMinutes: 60,
-          sameDayLastWeekMinutes: 30,
-          dailyTarget: 30,
-          weeklyTarget: 210,
-          weekMinutes: 150,
-          progress: 150,
-          direction: 'at_least',
-          trend: 'down',
-          vsLastWeekTrend: 'up',
-        },
-      ],
-    })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test commentary' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Goal Progress')).toBeInTheDocument()
-    })
-
-    expect(screen.getByText('Deep Work Goal')).toBeInTheDocument()
-    expect(screen.getByText('Exercise Goal')).toBeInTheDocument()
-  })
-
-  it.skip('displays longest focus session when significant', async () => {
-    const mockSummary = createMockDaySummary({
-      longestFocusSession: { activity: 'Writing report', minutes: 90 },
-    })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test commentary' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Longest focus session')).toBeInTheDocument()
-    })
-
-    expect(screen.getByText(/90 min on "Writing report"/)).toBeInTheDocument()
-  })
-
-  it.skip('does not show longest focus session if under 30 minutes', async () => {
-    const mockSummary = createMockDaySummary({
-      longestFocusSession: { activity: 'Quick task', minutes: 20 },
-    })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test commentary' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Day in Review')).toBeInTheDocument()
-    })
-
-    expect(screen.queryByText('Longest focus session')).not.toBeInTheDocument()
-  })
-
-  it.skip('displays AI commentary', async () => {
-    const mockSummary = createMockDaySummary()
-    const commentary = 'Solid day of focused work. You hit your deep work target and stayed active.'
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText(commentary)).toBeInTheDocument()
-    })
-  })
-
-  it('handles back button click', async () => {
-    routeFetch(createMockDaySummary())
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Back')).toBeInTheDocument()
-    })
-
-    // Find and click the back button
-    const backButton = screen.getByText('Back')
-    backButton.click()
-
+  it('goes back from its own Back button', async () => {
+    show(YESTERDAY, longFocus(YESTERDAY))
+    fireEvent.click(await screen.findByRole('button', { name: /back/i }))
     expect(mockRouter.back).toHaveBeenCalled()
   })
-
-  it.skip('shows error state when API fails', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ error: 'Failed to fetch' }),
-    })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Unable to load day review')).toBeInTheDocument()
-    })
-  })
-
-  it.skip('formats minutes correctly', async () => {
-    const mockSummary = createMockDaySummary({
-      totalMinutesLogged: 135, // 2h 15m
-      aggregatedBreakdown: [
-        { category: 'focus', label: 'Focus', minutes: 135, percentage: 100, isTargetLinked: false },
-      ],
-    })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('2h 15m')).toBeInTheDocument()
-    })
-  })
-
-  it.skip('shows categories with 0 minutes if target-linked', async () => {
-    const mockSummary = createMockDaySummary({
-      aggregatedBreakdown: [
-        { category: 'focus', label: 'Focus', minutes: 120, percentage: 80, isTargetLinked: true },
-        { category: 'body', label: 'Body', minutes: 30, percentage: 20, isTargetLinked: false },
-        { category: 'connection', label: 'Connection', minutes: 0, percentage: 0, isTargetLinked: true },
-      ],
-    })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockSummary,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ commentary: 'Test' }),
-      })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Focus')).toBeInTheDocument()
-      expect(screen.getByText('Body')).toBeInTheDocument()
-      // Connection should show even with 0 minutes because it's target-linked
-      expect(screen.getByText('Connection')).toBeInTheDocument()
-    })
-  })
-  /**
-   * Joining the loop: a review now leads somewhere, can be paged by day,
-   * and does not spend a model call narrating a day with nothing in it.
-   */
-  it('ends by pointing at the planner', async () => {
-    routeFetch(createMockDaySummary())
-    render(<DayReviewPage />)
-    expect(await screen.findByText(/^Plan (tomorrow|the rest of today)$/)).toBeInTheDocument()
-  })
-
-  it('has exactly one Plan tomorrow when reviewing today after 9pm', async () => {
-    jest.useFakeTimers({
-      doNotFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'setImmediate',
-        'clearImmediate', 'nextTick', 'queueMicrotask', 'requestAnimationFrame',
-        'cancelAnimationFrame', 'performance', 'hrtime', 'requestIdleCallback', 'cancelIdleCallback'],
-      now: new Date(2024, 1, 20, 21, 30),
-    })
-    try {
-      ;(useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams('date=2024-02-20'))
-      routeFetch(createMockDaySummary({ date: '2024-02-20' }))
-      render(<DayReviewPage />)
-
-      expect(await screen.findByText('7h logged')).toBeInTheDocument()
-      expect(screen.getAllByText(/^Plan tomorrow$/)).toHaveLength(1)
-    } finally {
-      jest.useRealTimers()
-    }
-  })
-
-  it('does not show the Your Day strip or What stood out, nor the win text', async () => {
-    ;(useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams('date=2024-01-10'))
-    routeFetch(createMockDaySummary({
-      date: '2024-01-10',
-      timeline: Array.from({ length: 24 }, (_, i) => ({
-        hour: i,
-        entries: i === 9 ? [{ activity: 'Coding', category: 'deep_work' }] : [],
-        totalMinutes: i === 9 ? 60 : 0,
-      })),
-      wins: [{ id: 'longest-focus', text: 'A very particular win', type: 'focus' }],
-    }))
-    render(<DayReviewPage />)
-
-    expect(await screen.findByText('7h logged')).toBeInTheDocument()
-    expect(screen.queryByText('Your Day')).not.toBeInTheDocument()
-    expect(screen.queryByText('What stood out')).not.toBeInTheDocument()
-    expect(screen.queryByText('A very particular win')).not.toBeInTheDocument()
-  })
-
-  it('says so plainly when nothing was logged, and asks the model for nothing', async () => {
-    // Its own date: reviews are cached per day, and the other tests here
-    // have already filled the cache for the default one.
-    ;(useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams('date=2024-01-09'))
-    routeFetch(createMockDaySummary({ date: '2024-01-09', totalMinutesLogged: 0, wins: [], longestFocusSession: null }))
-    render(<DayReviewPage />)
-
-    expect(await screen.findByText('Nothing was logged on this day')).toBeInTheDocument()
-    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/api/day-commentary'))).toBe(false)
-  })
-})
-
-// Skipped with the rest of the breakdown assertions above: the score colors
-// live in a section currently commented out of the page render.
-describe.skip('DayReviewPage score colors', () => {
-  const mockRouter = { push: jest.fn(), back: jest.fn() }
-
-  beforeEach(() => {
-    jest.clearAllMocks()
-    ;(useRouter as jest.Mock).mockReturnValue(mockRouter)
-    ;(useAccount as jest.Mock).mockReturnValue({
-      status: 'authenticated',
-      data: { user: { id: 'user1' } },
-    })
-  })
-
-  it('shows green score for 70+', async () => {
-    const mockSummary = createMockDaySummary({ score: 85, scoreColor: 'green' })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => mockSummary })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ commentary: 'Test' }) })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('85')).toBeInTheDocument()
-    })
-  })
-
-  it('shows orange score for 40-69', async () => {
-    const mockSummary = createMockDaySummary({ score: 55, scoreColor: 'orange' })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => mockSummary })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ commentary: 'Test' }) })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('55')).toBeInTheDocument()
-    })
-  })
-
-  it('shows red score for under 40', async () => {
-    const mockSummary = createMockDaySummary({ score: 25, scoreColor: 'red' })
-
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ source: 'live', review: null }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => mockSummary })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ commentary: 'Test' }) })
-
-    render(<DayReviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('25')).toBeInTheDocument()
-    })
-  })
-
 })

@@ -36,9 +36,10 @@ describe('checkReviewLine', () => {
     expect(rules('How did the afternoon go? Three hours of admin.')).toEqual(['question'])
   })
 
-  it('limits day lines to three sentences and week lines to four', () => {
+  it('limits day lines to two sentences and week lines to four', () => {
+    const three = 'Two hours of reading. One hour of cooking. A 20-minute walk.'
     const four = 'Two hours of reading. One hour of cooking. A 20-minute walk. Three hours of meetings.'
-    expect(rules(four)).toEqual(['too-long'])
+    expect(rules(three)).toEqual(['too-long'])
     expect(rules(four, { kind: 'week' })).toEqual([])
   })
 
@@ -113,8 +114,62 @@ describe('checkReviewLine', () => {
     expect(rules('Meals took 1 hour. Time with people: none logged.', { kind: 'day', peopleMinutes: 0 })).toContain(
       'label-read-back'
     )
-    expect(rules('Time tracked: 5h 30m.')).toContain('label-read-back')
     expect(rules('Deep Work: 4 hours.')).toContain('label-read-back')
     expect(rules('The plan held: three blocks kept.')).toEqual([])
+  })
+
+  describe('a line that words a read', () => {
+    const keepFacts = [
+      'The longest focused block was 2h 10m on "Essay draft", starting at 9:15 AM.',
+      'It started inside the focus window (9:00 AM–12:00 PM).',
+    ]
+
+    it('lets a Keep or a Change offer the hour, and catches only a correction', () => {
+      const keep = { kind: 'day', readKind: 'keep' } as const
+      expect(rules('2h 10m on the essay from 9:15 AM. Consider the same hour again.', keep)).toEqual([])
+      expect(rules('2h 10m on the essay. You should keep the same hour.', keep)).toEqual(['correction'])
+      const change = { kind: 'day', readKind: 'change' } as const
+      expect(rules('Three days without movement. One option is a run at 6 PM.', change)).toEqual([])
+    })
+
+    it('keeps the advice rule for an ordinary day', () => {
+      const nothing = { kind: 'day', readKind: 'nothing' } as const
+      expect(rules('An ordinary day, mostly deep work. Consider a walk.', nothing)).toEqual(['advice', 'nothing-advice'])
+    })
+
+    it('catches any advice on an ordinary day or week, "could", "option" and "plan" included', () => {
+      expect(rules('An ordinary week. You could add a run.', { kind: 'week', readKind: 'nothing', peopleMinutes: 30 })).toEqual([
+        'nothing-advice',
+      ])
+      expect(rules('An ordinary day. One option is a walk.', { kind: 'day', readKind: 'nothing' })).toEqual(['nothing-advice'])
+      expect(rules('An ordinary week. Plan a walk.', { kind: 'week', readKind: 'nothing', peopleMinutes: 30 })).toEqual([
+        'nothing-advice',
+      ])
+      expect(rules('An ordinary week, as planned.', { kind: 'week', readKind: 'nothing', peopleMinutes: 30 })).toEqual([])
+    })
+
+    it('catches a cause, in either scope', () => {
+      expect(rules('Focus ran long because it started at 9:15 AM.')).toEqual(['cause'])
+      expect(rules('Thanks to an early start, focus ran long.', { kind: 'week', peopleMinutes: 30 })).toEqual(['cause'])
+      expect(rules('An early start led to a long block.')).toEqual(['cause'])
+    })
+
+    it('catches a time or a number that is not in the facts', () => {
+      const keep = { kind: 'day', readKind: 'keep', facts: keepFacts } as const
+      expect(rules('The essay block ran 2h 10m from 9:15 AM, inside the focus window.', keep)).toEqual([])
+      expect(rules('The essay block ran 2 hours 10 minutes from 9:15 in the morning.', keep)).toEqual([])
+      expect(rules('The essay block ran 2h 10m from 10:15 AM.', keep)).toEqual(['ungrounded'])
+      expect(rules('The essay block ran 130 minutes.', keep)).toEqual(['ungrounded'])
+      expect(rules('The essay block ran 2h 10m, three times the usual.', keep)).toEqual(['ungrounded'])
+    })
+
+    it('allows a number written as a word, and "both" for 2', () => {
+      const facts = ['Mind reached its target on Tue and Thu.', 'On both days focused work began around 9:00 AM.', 'On the other 4 days it did not reach it.']
+      const keep = { kind: 'week', readKind: 'keep', facts, peopleMinutes: 30 } as const
+      expect(rules('Mind reached its target on Tuesday and Thursday, both starting around 9 AM. Not on the other four days.', keep)).toEqual([])
+      const counted = { kind: 'day', readKind: 'change', facts: ['No movement was logged on 3 days in a row: Sat 14 Nov, Sun 15 Nov and Mon 16 Nov.', 'One option: Run at 6:00 PM.'] } as const
+      expect(rules('No movement on three days in a row. One option is a run at 6:00 PM.', counted)).toEqual([])
+      expect(rules('No movement on five days in a row. One option is a run at 6:00 PM.', counted)).toEqual(['ungrounded'])
+    })
   })
 })

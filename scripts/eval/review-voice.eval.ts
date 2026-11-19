@@ -1,30 +1,36 @@
 /**
  * @jest-environment node
  *
- * Voice evaluation for the day and week review lines.
+ * Voice evaluation for the line each review leads with.
  *
- * Asks the real model for lines across invented days and weeks, using the
- * prompts production sends (src/lib/prompts.ts), checks each line against
- * the rules a machine can check (checkReviewLine) and has a second model
- * grade the rest. The numbers point at where to look; every line is printed
- * because the point is that they get read.
+ * The scenarios are reads made by `dayRead` / `weekRead` from invented logs,
+ * so the eval measures exactly what production sends: the read prompt
+ * (`buildReadSystemPrompt`) and its facts (`describeRead`). Each line is
+ * checked against the rules a machine can check (checkReviewLine, given the
+ * read's kind and facts) and a second model grades the rest. Every line is
+ * printed, because the point is that they get read.
  *
  *   EVAL_SAMPLES=3 EVAL_REPORT=docs/voice-lines/after.md npm run eval:voice
+ *
+ * It fails when any line breaches ungrounded, nothing-advice, cause, empty
+ * or absence-unsaid, or when more than 5% of lines breach any other checker
+ * rule. Tune the prompt, not these thresholds.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import OpenAI from 'openai'
 import {
-  buildDayReviewPrompt,
-  buildWeekReviewContext,
-  buildWeekReviewSystemPrompt,
-  peopleMinutes,
+  buildReadSystemPrompt,
+  describeRead,
   DAY_REVIEW_PARAMS,
   WEEK_REVIEW_PARAMS,
-  type DayReviewPromptInput,
-  type WeekReviewContextInput,
 } from '../../src/lib/prompts'
+import { dayRead, weekRead, type ReviewRead, type Row } from '../../src/lib/review-read'
+import { heartMinutes } from '../../src/lib/metrics-calc'
+import { windowsForWake } from '../../src/lib/ideal-day'
+import { shiftDateString } from '../../src/lib/types'
+import { minutesToTime, timeToMinutes } from '../../src/lib/time-utils'
 import { checkReviewLine, type VoiceBreach } from '../../src/lib/review-voice-check'
 
 const CONCURRENCY = Number(process.env.EVAL_CONCURRENCY || 6)
@@ -39,207 +45,172 @@ function loadEnv() {
   }
 }
 
-type Hours = { label: string; minutes: number }[]
-const mins = (h: Hours) => h.reduce((n, c) => n + c.minutes, 0)
+// ─── Invented logs ────────────────
 
-interface DayScenario {
-  kind: 'day'
-  id: string
-  input: DayReviewPromptInput
-}
-interface WeekScenario {
-  kind: 'week'
-  id: string
-  input: WeekReviewContextInput
-}
-type Scenario = DayScenario | WeekScenario
+const windows = windowsForWake(null)
+const D = '2026-11-16' // a Monday: the reviewed day
+const MON = '2026-11-09' // a finished week
+const back = (n: number) => shiftDateString(D, -n)
+const weekDay = (i: number) => shiftDateString(MON, i)
+const beforeWeek = (n: number) => shiftDateString(MON, -n)
 
-function day(
-  id: string,
-  hours: Hours,
-  extra: Partial<DayReviewPromptInput> = {}
-): DayScenario {
+function r(date: string, activity: string, category: string, start: string, minutes: number): Row {
   return {
-    kind: 'day',
-    id,
-    input: { totalMinutesLogged: mins(hours), hours, ...extra },
+    date,
+    activity,
+    category,
+    start_time: start,
+    end_time: minutesToTime(Math.min(24 * 60, timeToMinutes(start) + minutes)),
+    duration_minutes: minutes,
   }
 }
+const days = (from: (n: number) => string, list: number[], make: (date: string) => Row[]) =>
+  list.flatMap((n) => make(from(n)))
 
-const h = (n: number) => n * 60
+interface Scenario {
+  id: string
+  read: ReviewRead
+  /** What Heart counted, for the checker's absence rules. */
+  peopleMinutes: number
+  isPartialWeek?: boolean
+}
 
-const DAY_SCENARIOS: DayScenario[] = [
-  day(
-    'focus-heavy',
-    [{ label: 'Deep Work', minutes: 240 }, { label: 'Meals', minutes: 60 }],
-    {
-      metrics: { body: 52, focus: 84, social: 20 },
-      longestFocusSession: { activity: 'Essay draft', minutes: 150 },
-      wins: [{ text: '2h 30m focus session on "Essay draft"' }],
-      plan: { kept: 3, moved: 0, missed: 0 },
-    }
-  ),
-  day(
-    'full-day',
-    [
-      { label: 'Deep Work', minutes: 180 },
-      { label: 'Exercise', minutes: 60 },
-      { label: 'Social', minutes: 120 },
-      { label: 'Meals', minutes: 90 },
-    ],
-    { metrics: { body: 88, focus: 82, social: 85 }, mood: 'great' }
-  ),
-  day('thin', [{ label: 'Shallow Work', minutes: 45 }], { metrics: { body: 20, focus: 25, social: 5 } }),
-  day(
-    'leisure',
-    [{ label: 'Entertainment', minutes: 300 }, { label: 'Meals', minutes: 60 }],
-    { metrics: { body: 35, focus: 5, social: 5 } }
-  ),
-  day('low-mood', [{ label: 'Deep Work', minutes: 60 }, { label: 'Entertainment', minutes: 240 }], {
-    metrics: { body: 20, focus: 40, social: 5 },
-    mood: 'low',
-  }),
-  day('plan-missed', [{ label: 'Meetings', minutes: 240 }, { label: 'Admin', minutes: 90 }], {
-    metrics: { body: 15, focus: 30, social: 10 },
-    plan: { kept: 0, moved: 1, missed: 3 },
-  }),
-  day('body-day', [{ label: 'Exercise', minutes: 120 }, { label: 'Chores', minutes: 120 }, { label: 'Calls', minutes: 45 }], {
-    metrics: { body: 80, focus: 10, social: 45 },
-  }),
-  day('work-only', [{ label: 'Deep Work', minutes: 360 }, { label: 'Shallow Work', minutes: 120 }, { label: 'Meals', minutes: 30 }], {
-    metrics: { body: 25, focus: 90, social: 0 },
-    longestFocusSession: { activity: 'Quarterly model', minutes: 200 },
-  }),
-  day('rest-only', [{ label: 'Rest', minutes: 240 }], { metrics: { body: 40, focus: 0, social: 0 } }),
-  day('even', [{ label: 'Learning', minutes: 150 }, { label: 'Movement', minutes: 30 }, { label: 'Social', minutes: 60 }, { label: 'Rest', minutes: 60 }], {
-    metrics: { body: 45, focus: 55, social: 50 },
-    mood: 'okay',
-  }),
-  day('faith-day', [{ label: 'Faith', minutes: 60 }, { label: 'Deep Work', minutes: 180 }, { label: 'Meals', minutes: 60 }]),
-  day('meetings-and-faith', [{ label: 'Meetings', minutes: 240 }, { label: 'Faith', minutes: 30 }]),
-]
+function day(id: string, expected: string, rows: Row[], history: Row[]): Scenario {
+  const read = dayRead({ date: D, rows, history, windows })
+  if (read.rule !== expected) throw new Error(`${id}: expected ${expected}, made ${read.rule}`)
+  return { id, read, peopleMinutes: heartMinutes(rows) }
+}
 
 function week(
   id: string,
-  cats: [string, number][],
-  extra: Partial<WeekReviewContextInput> = {}
-): WeekScenario {
-  return {
-    kind: 'week',
-    id,
-    input: {
-      isPartialWeek: false,
-      bestDays: ['Tuesday', 'Thursday'],
-      bestHours: ['9 AM', '10 AM'],
-      categories: cats.map(([label, hours]) => ({ label, minutes: h(hours) })),
-      ...extra,
-    },
-  }
+  expected: string,
+  byDay: Record<number, Row[]>,
+  history: Row[],
+  opts: { isPartialWeek?: boolean; length?: number } = {}
+): Scenario {
+  const weekDays = Array.from({ length: opts.length ?? 7 }, (_, i) => ({ date: weekDay(i), rows: byDay[i] ?? [] }))
+  const weekHeartMinutes = heartMinutes(weekDays.flatMap((d) => d.rows))
+  const read = weekRead({ days: weekDays, history, windows, isPartialWeek: !!opts.isPartialWeek, weekHeartMinutes })
+  if (read.rule !== expected) throw new Error(`${id}: expected ${expected}, made ${read.rule}`)
+  return { id, read, peopleMinutes: weekHeartMinutes, isPartialWeek: opts.isPartialWeek }
 }
 
-const WEEK_SCENARIOS: WeekScenario[] = [
-  week('full-week', [['Deep Work', 22], ['Meetings', 8], ['Exercise', 4], ['Social', 6], ['Meals', 9], ['Entertainment', 7]]),
-  week('focus-only', [['Deep Work', 38], ['Shallow Work', 10], ['Meals', 5]], {
-    bestHours: ['8 AM', '9 AM'],
-  }),
-  week('partial', [['Deep Work', 9], ['Exercise', 1]], {
-    isPartialWeek: true,
-    bestDays: ['Monday'],
-  }),
-  week('leisure-week', [['Entertainment', 30], ['Meals', 10], ['Shallow Work', 6]], {
-    bestDays: ['Wednesday'],
-    bestHours: ['2 PM'],
-  }),
-  // The games and dinners were with friends, so Heart counted them.
-  week('friends-in-leisure', [['Entertainment', 14], ['Meals', 9], ['Deep Work', 12]], {
-    heartMinutes: h(6),
-  }),
-  week('thin-week', [['Deep Work', 3], ['Meals', 1]], {
-    bestDays: ['Monday'],
-    bestHours: ['10 AM'],
-  }),
-  week('rest-heavy', [['Rest', 10], ['Calls', 3], ['Chores', 6]], {
-    bestDays: [],
-    bestHours: [],
-  }),
-  // No best focus, and the largest activity is not rest.
-  week('no-focus-home', [['Chores', 12], ['Errands', 7], ['Social', 5], ['Rest', 4]], {
-    bestDays: [],
-    bestHours: [],
-  }),
-  week('meetings-week', [['Deep Work', 20], ['Meetings', 14], ['Meals', 7]]),
-  week('faith-week', [['Deep Work', 18], ['Faith', 5], ['Meals', 8]]),
+const desk = (date: string) => [r(date, 'Client report', 'deep_work', '09:00', 120), r(date, 'Lunch', 'meals', '12:30', 30)]
+const runs = (from: (n: number) => string, list: number[]) => days(from, list, (d) => [r(d, 'Run', 'exercise', '18:00', 30)])
+const steadyHistory = days(back, [1, 2, 4, 5, 6, 8, 9, 11, 12], (d) => [
+  r(d, 'Desk work', 'deep_work', '09:00', 60),
+  r(d, 'Email', 'shallow_work', '13:00', 45),
+  r(d, 'Call with mum', 'calls', '20:00', 20),
+])
+
+const DAY_SCENARIOS: Scenario[] = [
+  day('no-movement-three-days', 'change-no-movement', desk(D), [...runs(back, [20, 18, 16, 14, 12]), ...days(back, [1, 2], desk)]),
+  day(
+    'focus-in-the-evenings',
+    'change-focus-outside-window',
+    [r(D, 'Essay draft', 'deep_work', '19:00', 120)],
+    days(back, [1, 2], (d) => [r(d, 'Essay draft', 'deep_work', '19:30', 105)])
+  ),
+  day('long-focus-block', 'keep-long-focus', [r(D, 'Thesis chapter', 'deep_work', '09:15', 150), r(D, 'Lunch', 'meals', '12:30', 30)], steadyHistory),
+  day('movement-target-reached', 'keep-movement-target', [r(D, 'Run', 'exercise', '17:30', 35), ...desk(D)], steadyHistory),
+  day('evening-with-family', 'keep-people-time', [r(D, 'Dinner with family', 'social', '19:00', 150), ...desk(D)], steadyHistory),
+  day('ordinary-day', 'nothing-ordinary', [r(D, 'Desk work', 'deep_work', '09:00', 60), r(D, 'Email', 'shallow_work', '13:00', 45)], steadyHistory),
+  day('ordinary-day-thin-history', 'nothing-ordinary', [r(D, 'Email', 'shallow_work', '10:00', 90), r(D, 'Groceries', 'errands', '17:00', 40)], []),
 ]
 
-const JUDGE_BOTH = [
-  ['no_evaluation', 'The line does not say or imply the day, the week or the person was good, bad, strong, weak, enough or not enough (for a week line, ignore its one suggestion sentence).'],
-  ['grounded', 'Every number, activity and category in the line appears in the input. Nothing is invented.'],
+const weekHistory = days(beforeWeek, [2, 3, 5, 6, 8, 9, 10, 12, 13, 15], (d) => [
+  r(d, 'Desk work', 'deep_work', '09:00', 90),
+  r(d, 'Call with mum', 'calls', '20:00', 20),
+])
+
+const WEEK_SCENARIOS: Scenario[] = [
+  week(
+    'movement-on-one-day',
+    'week-change-movement-few-days',
+    {
+      0: desk(weekDay(0)),
+      1: desk(weekDay(1)),
+      2: [...desk(weekDay(2)), r(weekDay(2), 'Walk', 'movement', '12:00', 20)],
+      3: desk(weekDay(3)),
+      4: desk(weekDay(4)),
+      5: [r(weekDay(5), 'Lunch with friends', 'social', '13:00', 90)],
+    },
+    [...weekHistory, ...runs(beforeWeek, [20, 18, 16, 14, 4])]
+  ),
+  week(
+    'focus-outside-on-three-days',
+    'week-change-focus-outside-window',
+    {
+      0: [r(weekDay(0), 'Essay draft', 'deep_work', '18:00', 120)],
+      2: [r(weekDay(2), 'Essay draft', 'deep_work', '19:00', 150)],
+      3: [r(weekDay(3), 'Essay draft', 'deep_work', '20:00', 90), r(weekDay(3), 'Call with dad', 'calls', '17:00', 30)],
+      4: desk(weekDay(4)),
+    },
+    weekHistory
+  ),
+  week(
+    'mind-on-target-early-starts',
+    'week-keep-focus-start',
+    {
+      0: [r(weekDay(0), 'Email', 'shallow_work', '10:00', 60)],
+      1: [r(weekDay(1), 'Thesis chapter', 'deep_work', '09:00', 240), r(weekDay(1), 'Dinner with friends', 'social', '19:00', 90)],
+      3: [r(weekDay(3), 'Thesis chapter', 'deep_work', '09:30', 250)],
+      4: desk(weekDay(4)),
+    },
+    weekHistory
+  ),
+  week(
+    'movement-target-four-days',
+    'week-keep-movement-days',
+    {
+      0: [r(weekDay(0), 'Run', 'exercise', '18:00', 30), ...desk(weekDay(0))],
+      2: [r(weekDay(2), 'Run', 'exercise', '18:15', 35), ...desk(weekDay(2))],
+      4: [r(weekDay(4), 'Run', 'exercise', '17:45', 30)],
+      5: [r(weekDay(5), 'Long run', 'exercise', '09:00', 60), r(weekDay(5), 'Brunch with friends', 'social', '11:00', 90)],
+    },
+    weekHistory
+  ),
+  week(
+    'ordinary-week',
+    'week-nothing-ordinary',
+    { 0: desk(weekDay(0)), 1: [r(weekDay(1), 'Call with mum', 'calls', '20:00', 60)], 2: desk(weekDay(2)), 3: desk(weekDay(3)) },
+    weekHistory
+  ),
+  // A finished week with no time with friends or family: the read must carry the sentence.
+  week(
+    'keep-week-no-friends-or-family',
+    'week-keep-movement-days',
+    {
+      0: [r(weekDay(0), 'Run', 'exercise', '18:00', 30), ...desk(weekDay(0))],
+      2: [r(weekDay(2), 'Run', 'exercise', '18:00', 30), ...desk(weekDay(2))],
+      4: [r(weekDay(4), 'Run', 'exercise', '18:30', 30), ...desk(weekDay(4))],
+    },
+    weekHistory
+  ),
+  week(
+    'nothing-week-no-friends-or-family',
+    'week-nothing-ordinary',
+    { 0: desk(weekDay(0)), 2: desk(weekDay(2)), 3: [r(weekDay(3), 'Email', 'shallow_work', '10:00', 120)] },
+    weekHistory
+  ),
+  week(
+    'week-in-progress',
+    'week-nothing-ordinary',
+    { 0: desk(weekDay(0)), 1: [r(weekDay(1), 'Email', 'shallow_work', '10:00', 120)], 2: desk(weekDay(2)) },
+    weekHistory,
+    { isPartialWeek: true, length: 3 }
+  ),
+]
+
+// ─── The judge ────────────────
+
+const JUDGE_ALL = [
+  ['grounded', 'Every number, hour, day and activity in the line appears in the facts. Nothing is invented: no extra fact, reason or cause.'],
+  ['no_evaluation', 'The line does not say or imply the day, the week or the person was good, bad, strong, weak, enough or not enough.'],
   ['no_consolation', 'No reassurance, sympathy or encouragement.'],
 ] as const
-const JUDGE_DAY = [['no_advice', 'Nothing is suggested or recommended.']] as const
-const JUDGE_WEEK = [
-  ['one_suggestion', 'At most one sentence suggests something, and it names a specific day, hour or activity.'],
-] as const
-
-const judgeRules = (k: 'day' | 'week') => [...JUDGE_BOTH, ...(k === 'day' ? JUDGE_DAY : JUDGE_WEEK)]
-
-// total_not_judged is graded on its own, one sentence at a time. It used to
-// be one more rule in the call above ("The total hours logged are not praised
-// or criticised"), and the judge failed nearly every week line that stated
-// hours, with the stock note "total hours logged are judged". Given a fuller
-// rule in that same call it still failed all eight CALIBRATION lines that
-// keep it; asked yes or no of each sentence it read every "consider
-// scheduling" as a breach. Sorting each sentence into a kind separates the
-// two sets. CALIBRATION below is graded before every run and printed with it.
-const RECORD_RULE = 'total_not_judged'
-// Each sentence is put in one of these kinds; the first three break the rule.
-const RECORD_KINDS = {
-  about_the_record:
-    'remarks on the record itself: how many days or hours were written down or logged, how complete, full or thin the log or the data is, or what that suggests. "You logged all seven days." "This week held three days of logging." "There were only 2 days with any time logged." "There is not enough data to determine your best focus days." "Only two days had any time logged, indicating limited activity."',
-  suggests_recording:
-    'suggests logging, recording, tracking or writing something down. "You might consider logging more focused work next week." "You could consider logging some time with friends."',
-  what_the_time_went_to:
-    'states what the time went to, an activity and its hours, which activity took the most time, or a pattern such as which days or hours, even if it uses the word "logged". "You spent 22 hours on deep work." "You also logged 8 hours in meetings and 9 hours for meals." "Your best focus days were Tuesday and Thursday."',
-  no_time_with_people:
-    'says there was no time with friends or family, however it is worded and even if it uses "logged" or "log". "No time with friends or family was logged this week." "You did not log any time with friends or family."',
-  suggests_doing:
-    'suggests doing or scheduling an activity. "You could schedule more deep work at 9 AM on Tuesday." "Consider scheduling some time with friends on Saturday."',
-  other: 'anything else.',
-} as const
-const RECORD_BREAKS = ['about_the_record', 'suggests_recording']
-
-async function judgeRecord(openai: OpenAI, line: string): Promise<{ kept: boolean; note: string }> {
-  const res = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content: `You are sorting the sentences of a weekly review written from a time log. Answer strictly as JSON.
-
-Split the review into its sentences and give each the one kind that fits it best:
-${Object.entries(RECORD_KINDS).map(([k, d]) => `- ${k}: ${d}`).join('\n')}
-
-If any clause of a sentence remarks on how much was recorded or how complete it is, the sentence is about_the_record even when the rest of it states hours. A fact introduced by "the data shows" or "the week held" is still what_the_time_went_to. A sentence that suggests doing an activity is suggests_doing, not suggests_recording, unless it asks for something to be logged or recorded. Judge only what each sentence is about; ignore its tone and accuracy.
-Respond with JSON only: {"sentences": [{"text": "the sentence", "kind": "one of the kinds"}]}`,
-      },
-      { role: 'user', content: line },
-    ],
-    temperature: 0,
-    max_tokens: 500,
-    response_format: { type: 'json_object' },
-  })
-  let parsed: { sentences?: { text?: unknown; kind?: unknown }[] } = {}
-  try {
-    parsed = JSON.parse(res.choices[0]?.message?.content || '{}')
-  } catch {
-    parsed = {}
-  }
-  if (!Array.isArray(parsed.sentences) || parsed.sentences.length === 0) {
-    return { kept: false, note: 'record judge gave no answer' }
-  }
-  const broken = parsed.sentences.filter((x) => RECORD_BREAKS.includes(String(x.kind)))
-  return { kept: broken.length === 0, note: broken.map((x) => `${String(x.kind)}: "${String(x.text ?? '')}"`).join(' ') }
-}
+const JUDGE_NOTHING = [['no_advice', 'Nothing is suggested or recommended.']] as const
+const judgeRules = (read: ReviewRead) => [...JUDGE_ALL, ...(read.kind === 'nothing' ? JUDGE_NOTHING : [])]
 
 interface Line {
   scenario: Scenario
@@ -252,137 +223,44 @@ interface Line {
 
 const out = (s = '') => process.stdout.write(s + '\n')
 
-async function judgeLine(
-  openai: OpenAI,
-  kind: 'day' | 'week',
-  input: string,
-  line: string
-): Promise<{ judge: Record<string, boolean>; note: string }> {
-  const rules = judgeRules(kind)
-  const [judge, record] = await Promise.all([
-    openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are grading one ${kind} review line written from a time log. Answer strictly as JSON.
+async function judgeLine(openai: OpenAI, read: ReviewRead, line: string) {
+  const rules = judgeRules(read)
+  const res = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are grading one ${read.scope} review line written from a list of facts. Answer strictly as JSON.
 
-THE EXACT INPUT THE WRITER HAD:
-${input}
+THE FACTS THE WRITER HAD:
+${read.facts.join('\n')}
 
 Grade each rule true (kept) or false (broken):
 ${rules.map(([k, d]) => `- ${k}: ${d}`).join('\n')}
 
 Respond with JSON only: {${rules.map(([k]) => `"${k}": bool`).join(', ')}, "note": "one short sentence on the worst problem, or 'fine'"}`,
-        },
-        { role: 'user', content: line },
-      ],
-      temperature: 0,
-      max_tokens: 250,
-      response_format: { type: 'json_object' },
-    }),
-    kind === 'week' ? judgeRecord(openai, line) : null,
-  ])
+      },
+      { role: 'user', content: line },
+    ],
+    temperature: 0,
+    max_tokens: 200,
+    response_format: { type: 'json_object' },
+  })
   let parsed: Record<string, unknown> = {}
   try {
-    parsed = JSON.parse(judge.choices[0]?.message?.content || '{}')
+    parsed = JSON.parse(res.choices[0]?.message?.content || '{}')
   } catch {
     parsed = {}
   }
-  const verdicts: Record<string, boolean> = {}
-  for (const [k] of rules) verdicts[k] = parsed[k] === true
-  let note = String(parsed.note ?? '')
-  if (record) {
-    verdicts[RECORD_RULE] = record.kept
-    if (!record.kept) note += ` ${RECORD_RULE}: ${record.note}`
-  }
-  return { judge: verdicts, note }
-}
-
-// Week lines with a known total_not_judged answer, graded before the run so
-// the report shows whether the judge can tell them apart. "Keeps" lines are
-// from the run of 2026-11-15 (6a8f7e3), which the owner read and found do
-// not remark on the log; "breaks" lines are from the run before it
-// (3a15c1e), some trimmed, or are the owner's examples. A line marked * quotes one
-// of the examples in the rule itself, so it is a weaker test.
-const CALIBRATION: { scenario: string; keeps: boolean; quoted?: boolean; line: string }[] = [
-  { scenario: 'full-week', keeps: true, quoted: true, line: 'You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 8 hours in meetings and 9 hours for meals. Best focus days were Tuesday and Thursday. You might consider scheduling more deep work during the 9 AM hour on those days.' },
-  { scenario: 'full-week', keeps: true, quoted: true, line: 'You spent 22 hours on deep work, with best focus hours at 9 AM and 10 AM on Tuesday and Thursday. You also logged 8 hours in meetings and 9 hours for meals. The data shows that your best focus days were Tuesday and Thursday. You could schedule more deep work during your best focus hours next week.' },
-  { scenario: 'focus-only', keeps: true, quoted: true, line: 'You spent 38 hours on deep work and 10 hours on shallow work. Your best focus days were Tuesday and Thursday, with your best focus hours at 8 AM and 9 AM. You logged no time with friends or family this week. You might consider scheduling some shallow work during your best focus hours on Tuesday.' },
-  { scenario: 'partial', keeps: true, line: 'You spent 9 hours on deep work, with best focus hours at 9 AM and 10 AM on Monday. You also logged 1 hour of exercise. The data shows that your best focus day was Monday. You might consider scheduling another deep work session on Monday morning at 9 AM.' },
-  { scenario: 'thin-week', keeps: true, line: 'This week held 3 hours of deep work and 1 hour for meals. Your best focus day was Monday, with the best focus hour at 10 AM. You could consider scheduling more deep work sessions on Monday at 10 AM.' },
-  { scenario: 'leisure-week', keeps: true, quoted: true, line: 'This week held 30 hours of entertainment and 6 hours of shallow work. You spent your best focus day on Wednesday, with your best focus hour at 2 PM. You did not log any time with friends or family. You could consider scheduling a focused work session on Wednesday at 2 PM.' },
-  { scenario: 'meetings-week', keeps: true, quoted: true, line: 'You spent 20 hours on deep work, with best focus days on Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. No time with friends or family was logged this week. You could plan to schedule more time for meals on Tuesday.' },
-  { scenario: 'faith-week', keeps: true, line: 'You spent 18 hours on deep work, with your best focus days being Tuesday and Thursday. Your best focus hours were at 9 AM and 10 AM. You also spent 8 hours on meals and 5 hours on faith. Consider scheduling more deep work during your best focus hours next week.' },
-  // Graded broken in the first run with the sorted judge: rest taking the most time.
-  { scenario: 'rest-heavy', keeps: true, line: 'You spent 10 hours resting, 6 hours on chores, and 3 hours on calls. The most time was dedicated to rest. You could consider scheduling more calls on Tuesday.' },
-  { scenario: 'full-week', keeps: false, quoted: true, line: 'This week held 22 hours of deep work, with best focus days on Tuesday and Thursday. The best focus hours were at 9 AM and 10 AM. You logged all seven days, with no hours unaccounted for. Consider scheduling more deep work during your best focus hours next week.' },
-  { scenario: 'focus-only', keeps: false, line: 'This week included 38 hours of deep work and 10 hours of shallow work, with all seven days logged. The best focus days were Tuesday and Thursday, with the best focus hours at 8 AM and 9 AM. You could consider scheduling some shallow work during your best focus hours on Tuesday.' },
-  { scenario: 'partial', keeps: false, quoted: true, line: 'This week held three days of logging, with 9 hours of deep work recorded. The best focus day was Monday, with focused hours at 9 AM and 10 AM. You might consider scheduling additional focused work on Monday during the best focus hours.' },
-  { scenario: 'partial', keeps: false, line: 'This week held 9 hours of deep work, all on Monday during the best focus hours of 9 AM and 10 AM. There was 1 hour of exercise. You could consider logging additional activities on Tuesday or Wednesday.' },
-  { scenario: 'thin-week', keeps: false, quoted: true, line: 'This week included 3 hours of deep work, all logged on Monday during the best focus hour of 10 AM. You logged 1 hour for meals. There were only 2 days with any time logged. You could consider adding more activities on Wednesday, as it currently has no logged hours.' },
-  { scenario: 'thin-week', keeps: false, quoted: true, line: 'This week held 3 hours of deep work and 1 hour for meals. Only two days had any time logged, indicating limited activity. You could schedule deep work on Monday at 10 AM.' },
-  { scenario: 'rest-heavy', keeps: false, quoted: true, line: 'You spent 10 hours resting, 6 hours on chores and 3 hours on calls. There is not enough data to determine your best focus days or hours. You might consider recording focused work next week to capture more details.' },
-  { scenario: 'leisure-week', keeps: false, line: 'This week held 30 hours of entertainment and 10 hours for meals. Wednesday was the best focus day. You might consider logging some time with friends or family on a day like Saturday.' },
-  // Written after the review found that 9 of 19 lines above quote the rule.
-  // None of these repeats an example from RECORD_KINDS; same kinds of line.
-  { scenario: 'meetings-week', keeps: true, line: 'Meetings took 14 hours and deep work 20 hours. Focus clustered on Tuesday and Thursday, mostly around 9 AM and 10 AM. Friends and family do not appear in the week. You could book a call on Wednesday evening.' },
-  { scenario: 'full-week', keeps: true, line: 'Exercise came to 4 hours and social time to 6 hours, against 22 hours of deep work. Entertainment took 7 hours. Next week, you could move a workout to Wednesday at 7 AM.' },
-  { scenario: 'faith-week', keeps: true, line: 'Faith took 5 hours this week, next to 18 hours of deep work and 8 hours of meals. Late mornings on Tuesday and Thursday held the most focus. You might add a short walk on Friday afternoon.' },
-  { scenario: 'leisure-week', keeps: true, line: 'Entertainment filled 30 hours, with 10 hours going to meals and 6 to shallow work. Wednesday around 2 PM held the most focus. An hour of deep work there on Wednesday is one option.' },
-  { scenario: 'partial', keeps: true, line: 'So far this week, deep work has taken 9 hours and exercise 1 hour. Monday at 9 AM was where focus landed. You could try a second focus block on Tuesday at 9 AM.' },
-  { scenario: 'rest-heavy', keeps: true, line: 'Chores took 6 hours and rest 10 hours, with 3 hours of calls. Rest took the most time. A call on Saturday morning is one option.' },
-  { scenario: 'full-week', keeps: false, line: 'Deep work took 22 hours across the week, and every day has an entry. Nothing is missing from the record. You could try a morning workout on Friday.' },
-  { scenario: 'thin-week', keeps: false, line: 'Deep work took 3 hours and meals 1 hour. Most of the week is blank, so the picture is incomplete. You could schedule deep work on Monday at 10 AM.' },
-  { scenario: 'partial', keeps: false, line: 'Deep work took 9 hours so far. You have written down just one day of this week. Try noting your afternoons too, starting Tuesday.' },
-  { scenario: 'meetings-week', keeps: false, line: 'Meetings took 14 hours and deep work 20 hours. Track your evenings next week so the totals are fuller.' },
-  { scenario: 'rest-heavy', keeps: false, line: 'Rest took 10 hours, chores 6 and calls 3. The log is too sparse to say when focus happens. You might add your work hours on Monday.' },
-]
-
-async function calibrate(openai: OpenAI) {
-  const rows = await Promise.all(
-    CALIBRATION.map(async (c) => {
-      const { kept, note } = await judgeRecord(openai, c.line)
-      return { ...c, got: kept, note: note || 'fine' }
-    })
-  )
-  const right = (keeps: boolean, q?: boolean) =>
-    rows.filter((r) => r.keeps === keeps && r.got === keeps && (q === undefined || !!r.quoted === q)).length
-  const total = (keeps: boolean, q?: boolean) =>
-    rows.filter((r) => r.keeps === keeps && (q === undefined || !!r.quoted === q)).length
-  const L: string[] = []
-  L.push('## Judge check: total_not_judged on lines with a known answer')
-  L.push('')
-  L.push(`Lines NOT quoted in the rule (the real test): kept graded kept ${right(true, false)} of ${total(true, false)}; broken graded broken ${right(false, false)} of ${total(false, false)}.`)
-  L.push(`Lines that quote the rule (*, weaker): kept graded kept ${right(true, true)} of ${total(true, true)}; broken graded broken ${right(false, true)} of ${total(false, true)}.`)
-  L.push(`All lines: kept ${right(true)} of ${total(true)}; broken ${right(false)} of ${total(false)}. (* repeats an example given in the rule.)`)
-  L.push('')
-  for (const r of rows) {
-    const ok = r.got === r.keeps
-    L.push(`- ${ok ? 'right' : 'WRONG'} · should ${r.keeps ? 'keep' : 'break'}${r.quoted ? ' *' : ''} · ${r.scenario} · "${r.line}" · note: ${r.note}`)
-  }
-  return L.join('\n')
-}
-
-function promptFor(s: Scenario): { messages: OpenAI.Chat.ChatCompletionMessageParam[]; input: string } {
-  if (s.kind === 'day') {
-    const p = buildDayReviewPrompt(s.input)
-    return { messages: [{ role: 'user', content: p }], input: p }
-  }
-  const context = buildWeekReviewContext(s.input)
-  return {
-    messages: [
-      { role: 'system', content: buildWeekReviewSystemPrompt(s.input) },
-      { role: 'user', content: context },
-    ],
-    input: context,
-  }
+  const judge: Record<string, boolean> = {}
+  for (const [k] of rules) judge[k] = parsed[k] === true
+  return { judge, note: String(parsed.note ?? '') }
 }
 
 async function run(): Promise<Line[]> {
   loadEnv()
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  const all: Scenario[] = [...DAY_SCENARIOS, ...WEEK_SCENARIOS]
+  const all = [...DAY_SCENARIOS, ...WEEK_SCENARIOS]
   const jobs = all.flatMap((scenario) => Array.from({ length: SAMPLES }, (_, sample) => ({ scenario, sample })))
   const results: Line[] = new Array(jobs.length)
 
@@ -392,24 +270,27 @@ async function run(): Promise<Line[]> {
       const i = next++
       if (i >= jobs.length) return
       const { scenario, sample } = jobs[i]
-      const { messages, input } = promptFor(scenario)
-      const params = scenario.kind === 'day' ? DAY_REVIEW_PARAMS : WEEK_REVIEW_PARAMS
+      const { read } = scenario
+      const params = read.scope === 'day' ? DAY_REVIEW_PARAMS : WEEK_REVIEW_PARAMS
       const line =
-        (await openai.chat.completions.create({ ...params, messages })).choices[0]?.message?.content?.trim() || ''
+        (
+          await openai.chat.completions.create({
+            ...params,
+            messages: [
+              { role: 'system', content: buildReadSystemPrompt(read.scope, read.kind) },
+              { role: 'user', content: describeRead(read) },
+            ],
+          })
+        ).choices[0]?.message?.content?.trim() || ''
 
-      const mood = scenario.kind === 'day' ? scenario.input.mood ?? null : null
-      const withPeople =
-        scenario.kind === 'week' && scenario.input.heartMinutes !== undefined
-          ? scenario.input.heartMinutes
-          : peopleMinutes(scenario.kind === 'day' ? scenario.input.hours ?? [] : scenario.input.categories)
       const breaches = checkReviewLine(line, {
-        kind: scenario.kind,
-        mood,
-        peopleMinutes: withPeople,
-        isPartialWeek: scenario.kind === 'week' ? scenario.input.isPartialWeek : undefined,
+        kind: read.scope,
+        peopleMinutes: scenario.peopleMinutes,
+        isPartialWeek: read.scope === 'week' ? !!scenario.isPartialWeek : undefined,
+        readKind: read.kind,
+        facts: read.facts,
       })
-
-      const { judge, note } = await judgeLine(openai, scenario.kind, input, line)
+      const { judge, note } = await judgeLine(openai, read, line)
       results[i] = { scenario, sample, line, breaches, judge, note }
     }
   }
@@ -417,68 +298,50 @@ async function run(): Promise<Line[]> {
   return results
 }
 
+/** Any one line breaching these fails the run. */
+const HARD_RULES = ['ungrounded', 'nothing-advice', 'cause', 'empty', 'absence-unsaid']
+/** The share of lines that may breach any other checker rule. */
+const SOFT_LIMIT = 0.05
+
 const CHECKER_RULES = [
+  ...HARD_RULES,
   'banned-word', 'verdict', 'exclamation', 'question', 'emoji', 'score-talk',
   'relative-day', 'advice', 'correction', 'hard-day', 'false-absence', 'day-absence', 'absence-wording',
-  'absence-unsaid', 'partial-week-absence', 'label-read-back', 'too-long', 'list', 'empty',
+  'partial-week-absence', 'label-read-back', 'too-long', 'list',
 ]
-const JUDGE_RULES = [...[...JUDGE_BOTH, ...JUDGE_DAY, ...JUDGE_WEEK].map(([k]) => k as string), RECORD_RULE]
+const JUDGE_RULES = [...JUDGE_ALL, ...JUDGE_NOTHING].map(([k]) => k as string)
 
-function describeInput(s: Scenario): string[] {
-  if (s.kind === 'day') {
-    const i = s.input
-    const l = (i.hours ?? []).map((c) => `${c.label} ${c.minutes} min`)
-    return [
-      `hours: ${l.join(', ')}`,
-      i.mood ? `mood: ${i.mood}` : '',
-      i.longestFocusSession ? `focus session: ${i.longestFocusSession.minutes} min on "${i.longestFocusSession.activity}"` : '',
-      i.plan ? `plan: ${i.plan.kept} kept, ${i.plan.moved} moved, ${i.plan.missed} missed` : '',
-      i.metrics ? `scores (not shown to the model after the rewrite): Body ${i.metrics.body}, Mind ${i.metrics.focus}, Heart ${i.metrics.social}` : '',
-    ].filter(Boolean)
-  }
-  const i = s.input
-  return [
-    `week: ${i.isPartialWeek ? 'in progress' : 'finished'}`,
-    `hours: ${i.categories.map((c) => `${c.label} ${c.minutes / 60}h`).join(', ')}`,
-    i.heartMinutes !== undefined ? `with friends or family (Heart): ${i.heartMinutes / 60}h` : '',
-    `best days: ${i.bestDays.join(', ') || 'none'}; best hours: ${i.bestHours.join(', ') || 'none'}`,
-  ].filter(Boolean)
-}
-
-function report(results: Line[]): { text: string; checkerCounts: Record<string, number>; judgeCounts: Record<string, number>; judgeFailLines: number } {
+function report(results: Line[]) {
   const checkerCounts: Record<string, number> = {}
   for (const r of CHECKER_RULES) checkerCounts[r] = results.filter((x) => x.breaches.some((b) => b.rule === r)).length
   const judgeCounts: Record<string, number> = {}
-  for (const r of JUDGE_RULES) {
-    const applicable = results.filter((x) => r in x.judge)
-    judgeCounts[r] = applicable.filter((x) => !x.judge[r]).length
-  }
-  const judgeFailLines = results.filter((x) => Object.values(x.judge).some((v) => !v)).length
+  for (const r of JUDGE_RULES) judgeCounts[r] = results.filter((x) => r in x.judge && !x.judge[r]).length
+  const hardLines = results.filter((x) => x.breaches.some((b) => HARD_RULES.includes(b.rule))).length
+  const softLines = results.filter((x) => x.breaches.some((b) => !HARD_RULES.includes(b.rule))).length
 
   const L: string[] = []
-  L.push(`# Review voice lines`)
+  L.push('# Review voice lines')
   L.push('')
-  L.push(`Date: ${new Date().toISOString().slice(0, 10)}. ${results.length} lines, ${SAMPLES} per scenario.`)
+  L.push(
+    `Date: ${new Date().toISOString().slice(0, 10)}. ${results.length} lines, ${SAMPLES} per scenario. Each scenario is a read made by \`dayRead\` / \`weekRead\` from an invented log; the model was given \`buildReadSystemPrompt\` and \`describeRead\`.`
+  )
   L.push('')
   L.push(`Day params: \`${JSON.stringify(DAY_REVIEW_PARAMS)}\``)
   L.push(`Week params: \`${JSON.stringify(WEEK_REVIEW_PARAMS)}\``)
   L.push('')
   L.push('| rule | kind | lines breaching |')
   L.push('|---|---|---|')
-  for (const r of CHECKER_RULES) L.push(`| ${r} | checker | ${checkerCounts[r]} |`)
+  for (const r of CHECKER_RULES) L.push(`| ${r} | checker${HARD_RULES.includes(r) ? ' (any line fails)' : ''} | ${checkerCounts[r]} |`)
   for (const r of JUDGE_RULES) L.push(`| ${r} | judge | ${judgeCounts[r]} |`)
   L.push('')
-  L.push(`Lines with any checker breach: ${results.filter((x) => x.breaches.length > 0).length}. Lines failing any judge rule: ${judgeFailLines}.`)
-  L.push('')
-  const noneWeeks = results.filter(
-    (x) => x.scenario.kind === 'week' && !x.scenario.input.isPartialWeek && (x.scenario.input.heartMinutes ?? peopleMinutes(x.scenario.input.categories)) === 0
+  L.push(
+    `Lines breaching a rule that fails the run: ${hardLines}. Lines breaching any other checker rule: ${softLines} of ${results.length} (limit ${Math.floor(results.length * SOFT_LIMIT)}). Lines failing any judge rule: ${results.filter((x) => Object.values(x.judge).some((v) => !v)).length}.`
   )
-  L.push(`Full-week lines with no time with friends or family in the input: ${noneWeeks.length}. Of those, lines that say "friends or family": ${noneWeeks.filter((x) => /friends or family/i.test(x.line)).length}.`)
   L.push('')
   for (const s of Array.from(new Set(results.map((x) => x.scenario)))) {
-    L.push(`## ${s.kind}: ${s.id}`)
+    L.push(`## ${s.read.scope}: ${s.id} (${s.read.rule})`)
     L.push('')
-    for (const d of describeInput(s)) L.push(`- ${d}`)
+    for (const fact of s.read.facts) L.push(`- fact: ${fact}`)
     L.push('')
     for (const r of results.filter((x) => x.scenario === s)) {
       L.push(`> ${r.line.replace(/\n/g, '\n> ')}`)
@@ -490,22 +353,14 @@ function report(results: Line[]): { text: string; checkerCounts: Record<string, 
       L.push('')
     }
   }
-  return { text: L.join('\n'), checkerCounts, judgeCounts, judgeFailLines }
+  return { text: L.join('\n'), hardLines, softLines }
 }
 
-it('reads the review lines against the voice', async () => {
-  loadEnv()
-  const check = await calibrate(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }))
-  // EVAL_CALIBRATE_ONLY=1 grades the known lines and stops: a cheap way to
-  // try a change to the judge before spending a full run on it.
-  if (process.env.EVAL_CALIBRATE_ONLY) {
-    out(check)
-    return
-  }
+it('reads the review lines against the voice and the facts', async () => {
   const results = await run()
-  const { text: lines } = report(results)
-  const text = lines.replace(/\n## day: /, `\n${check}\n\n## day: `)
+  const { text, hardLines, softLines } = report(results)
   out(text)
   if (process.env.EVAL_REPORT) writeFileSync(path.join(process.cwd(), process.env.EVAL_REPORT), text + '\n')
-  expect(results.every((r) => r.line.length > 0)).toBe(true)
+  expect(hardLines).toBe(0)
+  expect(softLines).toBeLessThanOrEqual(Math.floor(results.length * SOFT_LIMIT))
 }, 1_800_000)

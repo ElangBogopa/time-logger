@@ -12,29 +12,30 @@
 
 import { csrfFetch } from '@/lib/api'
 import CommentaryThread from '@/components/CommentaryThread'
-import { commentaryFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
+import { readFingerprint, readCachedCommentary, writeCachedCommentary } from '@/lib/commentary-cache'
 import { cacheGet, cacheSet, cacheDelete } from '@/lib/client-cache'
 import { markFirstRun } from '@/lib/first-run'
 import { useMyWindows } from '@/hooks/useMyWindows'
-import { windowAlignment } from '@/lib/window-alignment'
 import WindowAlignmentCard from '@/components/WindowAlignmentCard'
+import { useLogRange } from '@/hooks/useLogRange'
+import { useReadAction } from '@/hooks/useReadAction'
+import { calcBody, calcFocus, calcSocial } from '@/lib/metrics-calc'
+import {
+  alignmentOnDay,
+  dayRead,
+  plainReadText,
+  ringComparisons,
+  ringNotes,
+  type ReviewRead,
+} from '@/lib/review-read'
+import { Button } from '@/components/ui/button'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/hooks/useAccount'
-import {
-  ArrowLeft,
-  CalendarClock,
-  Check,
-  ChevronRight,
-  Circle,
-  Clock,
-  Sparkles,
-  Lock,
-  Loader2,
-} from 'lucide-react'
+import { ArrowLeft, Check, Circle, Sparkles, Lock, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatTimeDisplay, formatDuration } from '@/lib/time-utils'
+import { formatTimeDisplay } from '@/lib/time-utils'
 import {
   TimeCategory,
   CATEGORY_LABELS,
@@ -169,41 +170,6 @@ function formatDate(dateStr: string): string {
     month: 'long',
     day: 'numeric',
   })
-}
-
-// Wins Section
-/**
- * The step after a review: plan the next day that can still be planned.
- * Reviewing today (after 9pm) that is tomorrow. Reviewing an earlier day it
- * is the rest of today, until the evening, when it becomes tomorrow too.
- */
-function PlanNextCard({ reviewDate }: { reviewDate: string }) {
-  const router = useRouter()
-  const today = getUserToday()
-  const planToday = reviewDate < today && getUserCurrentHour() < 18
-  const target = planToday ? today : shiftDateString(today, 1)
-
-  return (
-    <section className="mt-6">
-      <button
-        onClick={() => router.push(planToday ? '/calendar' : `/calendar?date=${target}`)}
-        className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 text-left transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]"
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
-          <CalendarClock className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">
-            {planToday ? 'Plan the rest of today' : 'Plan tomorrow'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Give what matters a time, around your calendar
-          </p>
-        </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </button>
-    </section>
-  )
 }
 
 // Productivity Plan Card — shows plan completion in Goal Progress
@@ -421,64 +387,96 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
   const [summary, setSummary] = useState<DaySummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [commentary, setCommentary] = useState<string | null>(null)
-  const [metrics, setMetrics] = useState<Record<MetricKey, number> | null>(null)
+  // A locked day seen for the first time is saved once its read has words.
+  const [needsFinalization, setNeedsFinalization] = useState(false)
 
-  // How much of the day landed in the hours that suit it. A live review
-  // carries its entries; a saved one does not, so the last four weeks of
-  // the log stand in for it.
-  const { windows: myWindows, history: habitHistory } = useMyWindows(status === 'authenticated')
-  const alignment = useMemo(() => {
-    if (!summary) return []
-    const own = summary.entries ?? []
-    const dayEntries = own.length > 0 ? own : habitHistory.filter((entry) => entry.date === summary.date)
-    return windowAlignment(dayEntries, myWindows)
-  }, [summary, habitHistory, myWindows])
-  const [isLoadingCommentary, setIsLoadingCommentary] = useState(false)
+  // Check if reviewing today or future — block access before 9pm
+  // Computed eagerly to avoid extra render cycle
+  const [currentHour] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null
+    return getUserCurrentHour(new Date())
+  })
+  const [clientToday] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return getUserToday(new Date())
+  })
 
-  // Generate AI commentary from summary data (with cache)
-  const generateCommentary = useCallback(async (summaryData: DaySummary): Promise<string | null> => {
-    // Keyed on the day's data, not just the date, and held in localStorage —
-    // so reopening the app reuses the line and logging something new earns a
-    // fresh one. The in-memory cache this replaced died on every page load.
-    const fingerprint = commentaryFingerprint({
-      ...summaryData,
-      mood: summaryData.todayMood?.mood ?? null,
-    })
-    const cached = readCachedCommentary(summaryData.date, fingerprint)
-    if (cached) return cached
+  // Lock if: reviewing today (or no date) and before 9pm, OR reviewing a future date
+  const isTodayReview = clientToday !== null && (!dateParam || dateParam === clientToday)
+  const isFutureReview = clientToday !== null && dateParam !== null && dateParam > clientToday
+  const isLocked = (isTodayReview && currentHour !== null && currentHour < 21) || isFutureReview
 
-    try {
-      const response = await csrfFetch('/api/day-commentary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          metrics: summaryData.metrics ?? null,
-          plan: summaryData.planAdherence
-            ? {
-                kept: summaryData.planAdherence.kept,
-                moved: summaryData.planAdherence.moved,
-                missed: summaryData.planAdherence.missed,
-              }
-            : null,
-          totalMinutesLogged: summaryData.totalMinutesLogged,
-          wins: summaryData.wins,
-          mood: summaryData.todayMood?.mood || null,
-          longestFocusSession: summaryData.longestFocusSession,
-          hours: (summaryData.categoryBreakdown ?? []).map((c) => ({ label: c.label, minutes: c.minutes })),
-        }),
-      })
-      if (response.ok) {
-        const data = await response.json()
-        const text = data.commentary || null
-        if (text) writeCachedCommentary(summaryData.date, fingerprint, text)
-        return text
-      }
-    } catch (err) {
-      console.error('Failed to fetch commentary:', err)
+  // The day and the four weeks before it, from one range of the log: a saved
+  // review carries no entries, and the read is worked out from the log the
+  // same way for a saved day and a live one.
+  const reviewDate = dateParam || clientToday || getUserToday()
+  const range = useLogRange(shiftDateString(reviewDate, -28), reviewDate, status === 'authenticated' && !isLocked)
+  const { windows } = useMyWindows(status === 'authenticated')
+  const dayRows = useMemo(() => range.rows.filter((row) => row.date === reviewDate), [range.rows, reviewDate])
+  const history = useMemo(() => range.rows.filter((row) => row.date < reviewDate), [range.rows, reviewDate])
+
+  // The day's Body / Mind / Heart, each against this person's last four weeks.
+  const scores = useMemo<Record<MetricKey, number>>(
+    () => ({ body: calcBody(dayRows), focus: calcFocus(dayRows), social: calcSocial(dayRows) }),
+    [dayRows]
+  )
+  const ringLines = useMemo(() => ringNotes(ringComparisons(scores, history)), [scores, history])
+
+  // The one read, chosen by fixed rules; the model only words it.
+  const read = useMemo(
+    () => (range.loaded ? dayRead({ date: reviewDate, rows: dayRows, history, windows }) : null),
+    [range.loaded, reviewDate, dayRows, history, windows]
+  )
+  const alignment = useMemo(() => alignmentOnDay(dayRows, windows), [dayRows, windows])
+  const fingerprint = read ? readFingerprint(read) : null
+
+  // Words for the read: the stored line for these facts, else one model
+  // call, else the facts themselves. A day with nothing logged is never
+  // sent to the model.
+  const [words, setWords] = useState<{ fingerprint: string; text: string } | null>(null)
+  const latestFingerprint = useRef<string | null>(null)
+  const askedFor = useRef<string | null>(null)
+  useEffect(() => {
+    latestFingerprint.current = fingerprint
+    if (!read || !fingerprint) return
+    const settle = (text: string) => {
+      if (latestFingerprint.current !== fingerprint) return
+      setWords((prev) => (prev && prev.fingerprint === fingerprint && prev.text === text ? prev : { fingerprint, text }))
     }
-    return null
-  }, [])
+    if (dayRows.length === 0) {
+      settle(plainReadText(read))
+      return
+    }
+    const cached = readCachedCommentary(reviewDate, fingerprint)
+    if (cached) {
+      settle(cached)
+      return
+    }
+    if (askedFor.current === fingerprint) return
+    askedFor.current = fingerprint
+    csrfFetch('/api/day-commentary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ read: { kind: read.kind, facts: read.facts } }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const text = typeof data?.commentary === 'string' ? data.commentary.trim() : ''
+        if (text) writeCachedCommentary(reviewDate, fingerprint, text)
+        settle(text || plainReadText(read))
+      })
+      .catch((err) => {
+        console.error('Failed to fetch commentary:', err)
+        settle(plainReadText(read))
+      })
+  }, [read, fingerprint, dayRows.length, reviewDate])
+  const shownWords = words && words.fingerprint === fingerprint ? words.text : null
+
+  const fallbackRead = useMemo<ReviewRead>(
+    () => ({ scope: 'day', kind: 'nothing', rule: 'nothing-ordinary', facts: [], evidence: [], slot: null, timing: false }),
+    []
+  )
+  const { action, run, isSaving } = useReadAction(read ?? fallbackRead, { reviewDate }, status === 'authenticated')
 
   // Save a finalized review to the database
   const saveReview = useCallback(async (summaryData: DaySummary, commentaryText: string | null) => {
@@ -507,16 +505,20 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
     }
   }, [])
 
+  useEffect(() => {
+    if (!needsFinalization || !summary || shownWords === null) return
+    setNeedsFinalization(false)
+    saveReview(summary, shownWords)
+  }, [needsFinalization, summary, shownWords, saveReview])
+
   // Main fetch logic — checks persistence layer first (with cache)
   const fetchData = useCallback(async () => {
     const dateKey = dateParam || 'today'
     const reviewCacheKey = `day-review:${dateKey}`
 
-    // Check if we have a fully cached review (summary + commentary)
-    const cachedReview = cacheGet<{ summary: DaySummary; commentary: string | null }>(reviewCacheKey)
+    const cachedReview = cacheGet<{ summary: DaySummary }>(reviewCacheKey)
     if (cachedReview) {
       setSummary(cachedReview.summary)
-      setCommentary(cachedReview.commentary)
       setIsLoading(false)
       return
     }
@@ -529,13 +531,11 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
       const reviewData = await reviewRes.json()
 
       if (reviewData.source === 'saved') {
-        // Locked & finalized — use saved data directly
+        // Locked & finalized — its saved numbers stand; the read comes from the log.
         const saved = reviewData.review
         setSummary(saved)
-        setCommentary(saved.commentary || null)
         setIsLoading(false)
-        // Cache finalized reviews permanently (they don't change)
-        cacheSet(reviewCacheKey, { summary: saved, commentary: saved.commentary || null })
+        cacheSet(reviewCacheKey, { summary: saved })
         return
       }
 
@@ -544,45 +544,26 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
       // The server cannot know the user's clock (it runs in UTC), so the
       // client says how far through the day it is. No `now` means a day
       // that is over, which includes "today" in the hours after midnight.
-      const reviewDate = dateParam || getUserToday()
+      const summaryDate = dateParam || getUserToday()
       const clock = new Date()
       const nowQuery =
-        reviewDate === getLocalDateString() ? `&now=${clock.getHours() * 60 + clock.getMinutes()}` : ''
-      const summaryUrl = `/api/day-summary?date=${reviewDate}${nowQuery}`
-      const summaryRes = await fetch(summaryUrl)
+        summaryDate === getLocalDateString() ? `&now=${clock.getHours() * 60 + clock.getMinutes()}` : ''
+      const summaryRes = await fetch(`/api/day-summary?date=${summaryDate}${nowQuery}`)
       if (!summaryRes.ok) throw new Error('Failed to fetch summary')
       const summaryData: DaySummary = await summaryRes.json()
       setSummary(summaryData)
       setIsLoading(false)
+      cacheSet(reviewCacheKey, { summary: summaryData })
 
-      // A day with nothing logged has nothing to say anything about. Now
-      // that the review can be paged day by day, every blank day passed
-      // through would otherwise cost a model call for a paragraph of filler
-      // and save it as that day's review.
-      if (summaryData.totalMinutesLogged === 0) {
-        setCommentary(null)
-        cacheSet(reviewCacheKey, { summary: summaryData, commentary: null })
-        return
-      }
-
-      // Fetch AI commentary
-      setIsLoadingCommentary(true)
-      const commentaryText = await generateCommentary(summaryData)
-      setCommentary(commentaryText)
-      setIsLoadingCommentary(false)
-
-      // Cache the complete review
-      cacheSet(reviewCacheKey, { summary: summaryData, commentary: commentaryText })
-
-      // If needs finalization (locked date, first view), save to DB
-      if (reviewData.source === 'needs_finalization') {
-        await saveReview(summaryData, commentaryText)
+      // A locked day seen for the first time is saved, with the read's words.
+      if (reviewData.source === 'needs_finalization' && summaryData.totalMinutesLogged > 0) {
+        setNeedsFinalization(true)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
       setIsLoading(false)
     }
-  }, [dateParam, generateCommentary, saveReview])
+  }, [dateParam])
 
   /** "That was it": what was logged in a plan's hour was the plan. */
   const [confirmingPlanId, setConfirmingPlanId] = useState<string | null>(null)
@@ -612,42 +593,6 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
     [dateParam, fetchData]
   )
 
-  // The day's Body / Mind / Heart, which is what the review leads with now.
-  // The old hero was sessionsLogged ÷ sessionsPassed × 100 — a measure of
-  // how diligently the day was logged, shown on the same dial as the three
-  // real scores, and at 100 whenever all three sessions had anything in them.
-  useEffect(() => {
-    if (status !== 'authenticated') return
-    let cancelled = false
-    const date = dateParam || getUserToday()
-    fetch(`/api/metrics/trend?period=7d&date=${date}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return
-        setMetrics({ body: data.body.current, focus: data.focus.current, social: data.social.current })
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [status, dateParam])
-
-  // Check if reviewing today or future — block access before 9pm
-  // Computed eagerly to avoid extra render cycle
-  const [currentHour, setCurrentHour] = useState<number | null>(() => {
-    if (typeof window === 'undefined') return null
-    return getUserCurrentHour(new Date())
-  })
-  const [clientToday, setClientToday] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null
-    return getUserToday(new Date())
-  })
-
-  // Lock if: reviewing today (or no date) and before 9pm, OR reviewing a future date
-  const isTodayReview = clientToday !== null && (!dateParam || dateParam === clientToday)
-  const isFutureReview = clientToday !== null && dateParam !== null && dateParam > clientToday
-  const isLocked = (isTodayReview && currentHour !== null && currentHour < 21) || isFutureReview
-
   // A review with something in it, on screen: the last step of a first run.
   const hasReviewOnScreen = !isLocked && !isLoading && (summary?.totalMinutesLogged ?? 0) > 0
   useEffect(() => {
@@ -661,6 +606,17 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
       router.push('/login')
     }
   }, [status, fetchData, router, isLocked])
+
+  const planButton = action && (
+    <Button
+      className="mt-6 h-auto min-h-11 w-full whitespace-normal py-2.5"
+      onClick={run}
+      disabled={isSaving}
+    >
+      {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+      {action.label}
+    </Button>
+  )
 
   if (status === 'loading') {
     return (
@@ -750,11 +706,13 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
             <p className="text-sm text-foreground">Nothing was logged on this day</p>
             <p className="mt-1 text-xs text-muted-foreground">There is nothing to review until something is.</p>
           </div>
-          <PlanNextCard reviewDate={summary.date} />
+          {planButton}
         </div>
       </div>
     )
   }
+
+  const showEvidence = !!read && (read.evidence.length > 0 || (read.timing && alignment.length > 0))
 
   return (
     <div className={shellClass}>
@@ -778,50 +736,62 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
           {!dateProp && <p className="text-muted-foreground">{formatDate(summary.date)}</p>}
         </header>
 
-        {/* How the day actually went, on the app's one scale */}
+        {/* How the day went on the app's one scale, against this person's own usual */}
         <section className="py-6 mb-6">
-          {metrics ? (
+          {range.loaded ? (
             <MetricRingRow
-              values={metrics}
+              values={scores}
               size={84}
               srLabel="Scores for this day"
-              caption={`${formatMinutes(summary.totalMinutesLogged)} logged`}
+              notes={ringLines.notes}
+              caption={ringLines.caption}
             />
           ) : (
-            <p className="text-center text-sm text-muted-foreground">
-              {formatMinutes(summary.totalMinutesLogged)} logged
-            </p>
+            <div className="mx-auto h-28 w-64 animate-pulse rounded-xl bg-secondary" />
           )}
         </section>
 
-        {/* AI Commentary */}
-        {(commentary || isLoadingCommentary) && (
-          <section className="mb-6">
-            {/* Was an indigo→purple gradient with an indigo-500 icon, which
-                made the one piece of writing on the page shout. The muted
-                violet is the same hue, from the palette. */}
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-start gap-3">
-                <Sparkles className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  {isLoadingCommentary ? (
-                    <div className="space-y-2 animate-pulse">
-                      <div className="h-4 bg-secondary rounded w-full" />
-                      <div className="h-4 bg-secondary rounded w-3/4" />
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-sm text-foreground leading-relaxed">{commentary}</p>
-                      <CommentaryThread
-                        subjectType="day"
-                        subjectKey={summary.date}
-                        commentary={commentary}
-                      />
-                    </>
-                  )}
-                </div>
+        {/* The read: one decision, worded from its facts */}
+        <section className="mb-6">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                {shownWords === null ? (
+                  <div className="space-y-2 animate-pulse" aria-label="Loading the review">
+                    <div className="h-4 bg-secondary rounded w-full" />
+                    <div className="h-4 bg-secondary rounded w-3/4" />
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-foreground leading-relaxed">{shownWords}</p>
+                    <CommentaryThread subjectType="day" subjectKey={summary.date} commentary={shownWords} />
+                  </>
+                )}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* What the read rests on */}
+        {showEvidence && read && (
+          <section className="mb-6">
+            <h2 className="eyebrow mb-3">Behind this</h2>
+            {read.evidence.length > 0 && (
+              <div className="divide-y divide-border rounded-xl border border-border bg-card">
+                {read.evidence.map((item) => (
+                  <div key={`${item.label}-${item.value}`} className="flex items-baseline justify-between gap-3 px-4 py-3 text-sm">
+                    <span className="text-muted-foreground">{item.label}</span>
+                    <span className="text-right text-foreground tabular-nums">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {read.timing && alignment.length > 0 && (
+              <div className={read.evidence.length > 0 ? 'mt-3' : ''}>
+                <WindowAlignmentCard facts={alignment} />
+              </div>
+            )}
           </section>
         )}
 
@@ -836,14 +806,6 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
             />
           </section>
         )}
-
-        {/* Whether things landed where they go best */}
-        {alignment.length > 0 && (
-          <div className="mb-6">
-            <WindowAlignmentCard facts={alignment} />
-          </div>
-        )}
-
 
         {/* Energy Breakdown, Category Breakdown, and Mood — commented out until science-based measurement is ready
         {summary.aggregatedBreakdown && summary.aggregatedBreakdown.length > 0 && (
@@ -863,25 +825,8 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
         )}
         */}
 
-        {/* Longest Focus */}
-        {summary.longestFocusSession && summary.longestFocusSession.minutes >= 30 && (
-          <section className="rounded-xl border border-border bg-card p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Longest focus session</p>
-                <p className="font-medium text-foreground">
-                  {formatDuration(summary.longestFocusSession.minutes)} on &quot;{summary.longestFocusSession.activity}&quot;
-                </p>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Where a review leads. It used to simply end: the one moment you
-            are looking at how a day went, and nothing pointed at the next
-            one. */}
-        <PlanNextCard reviewDate={summary.date} />
+        {/* Where a review leads: one button into the planner. */}
+        {planButton}
       </div>
     </div>
   )

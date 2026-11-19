@@ -3,56 +3,29 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
-import { ChevronLeft, ChevronRight, Loader2, Sparkles, BarChart3, Grid3X3, ArrowRight, CalendarClock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Sparkles, BarChart3, Grid3X3, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { getLocalDateString, getWeekStartForDate, shiftDateString, getUserToday } from '@/lib/types'
+import { getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
 import { MetricRingRow } from '@/components/MetricRings'
-import type { MetricKey } from '@/lib/chart-colors'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
-import { METRIC_THRESHOLDS } from '@/lib/metrics-calc'
 import { useMyWindows } from '@/hooks/useMyWindows'
 import { useWeekEntries } from '@/hooks/useWeekEntries'
-import { windowAlignment, alignmentShare } from '@/lib/window-alignment'
+import { useReadAction } from '@/hooks/useReadAction'
 import WindowAlignmentCard from '@/components/WindowAlignmentCard'
+import CommentaryThread from '@/components/CommentaryThread'
+import { Button } from '@/components/ui/button'
+import {
+  alignmentOnDay,
+  plainReadText,
+  ringNotes,
+  type ReviewRead,
+  type RingComparisons,
+  type Row,
+} from '@/lib/review-read'
+import type { LogFinding } from '@/lib/log-findings'
 
 // ─── Types matching API route response ────────────────
-
-interface WeekHighlight {
-  type: string
-  text: string
-  subtext?: string
-}
-
-interface TargetProgressItem {
-  target: { id: string; target_type: string; weekly_target_minutes: number }
-  label: string
-  currentMinutes: number
-  targetMinutes: number
-  percentage: number | null
-  trend: 'up' | 'down' | 'same' | null
-  previousMinutes: number | null
-  isLimitTarget: boolean
-  changeMinutes: number | null
-  feedbackMessage: string | null
-  feedbackTone: 'success' | 'warning' | 'neutral' | 'danger' | null
-}
-
-interface TargetDayScore {
-  date: string
-  day: string
-  rating: 'good' | 'neutral' | 'rough' | 'no_data'
-  targetMinutes: number
-}
-
-interface TargetScorecard {
-  targetId: string
-  targetLabel: string
-  isLimitTarget: boolean
-  days: TargetDayScore[]
-  goodDays: number
-  roughDays: number
-}
 
 interface CategoryBreakdownItem {
   category: string
@@ -65,23 +38,19 @@ interface CategoryBreakdownItem {
 interface WeeklyReviewData {
   weekStart: string
   weekEnd: string
-  /** The week's own averages; absent on responses cached before it existed. */
-  averages?: { body: number; focus: number; social: number } | null
+  averages: { body: number; focus: number; social: number } | null
   activeDays: number
   evaluatedDays?: number
-  highlights: WeekHighlight[]
   totalMinutes: number
   entryCount: number
   previousWeekMinutes: number | null
   previousWeekEntryCount: number
   hasEnoughData: boolean
   hasPreviousWeekData: boolean
-  targetProgress: TargetProgressItem[]
-  targetScorecards: TargetScorecard[]
   categoryBreakdown: CategoryBreakdownItem[]
-  bestDays: string[]
-  bestHours: string[]
-  insights: string[]
+  read: ReviewRead
+  comparisons: RingComparisons
+  finding: LogFinding | null
   coachSummary: string | null
 }
 
@@ -100,15 +69,6 @@ function formatWeekRange(start: string, end: string) {
   return `${s.toLocaleDateString('en-US', opts)} – ${e.toLocaleDateString('en-US', opts)}`
 }
 
-const RATING_STYLES = {
-  good: 'bg-[#7D9B8A] text-[#7D9B8A] dark:bg-[#7D9B8A]/30 dark:text-[#9BB5A6]',
-  neutral: 'bg-[#B5A07A] text-[#B5A07A] dark:bg-[#B5A07A]/30 dark:text-[#CBB894]',
-  rough: 'bg-[#A8706A] text-[#A8706A] dark:bg-[#A8706A]/30 dark:text-[#C79089]',
-  no_data: 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500',
-}
-
-const RATING_ICONS = { good: '✓', neutral: '~', rough: '✗', no_data: '—' }
-
 // ─── Component ────────────────
 
 export default function WeeklyReviewContent() {
@@ -116,20 +76,24 @@ export default function WeeklyReviewContent() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))
-  const [metrics, setMetrics] = useState<Record<MetricKey, number> | null>(null)
 
   // The week against the person's own windows. The week's entries are asked
   // for by themselves: the habit history stops at yesterday and at four
   // weeks back, and a week is neither.
-  const { windows: myWindows } = useMyWindows(status === 'authenticated')
+  const { windows: myWindows, wakeMinutes } = useMyWindows(status === 'authenticated')
   const weekEntries = useWeekEntries(weekStart, status === 'authenticated')
-  const alignment = useMemo(() => windowAlignment(weekEntries, myWindows), [weekEntries, myWindows])
+  const alignment = useMemo(
+    () => alignmentOnDay(weekEntries.filter((e) => e.category) as unknown as Row[], myWindows),
+    [weekEntries, myWindows]
+  )
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const fetchReview = useCallback(async () => {
     setError(null)
-    const cacheKey = `weekly-review:${weekStart}`
+    // The read is worked out against the person's windows, so a new wake
+    // time is a different review.
+    const cacheKey = `weekly-review:${weekStart}:${wakeMinutes ?? 'ref'}`
     const cached = cacheGet<WeeklyReviewData>(cacheKey)
     if (cached) {
       setReviewData(cached)
@@ -140,14 +104,13 @@ export default function WeeklyReviewContent() {
     setIsLoading(true)
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      // Tell the server which coach summary we already hold. If the week's
-      // numbers still hash to the same thing it skips the model entirely —
-      // this used to generate a fresh summary on every view of this tab.
+      // Tell the server which summary we already hold. If the week's read
+      // still hashes to the same thing it skips the model entirely.
       const knownCoachFingerprint = storedFingerprint(CACHE_NAMESPACE, weekStart) ?? undefined
       const response = await csrfFetch('/api/weekly-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ weekStart, timezone, knownCoachFingerprint }),
+        body: JSON.stringify({ weekStart, timezone, knownCoachFingerprint, wakeMinutes }),
       })
       if (!response.ok) {
         const errBody = await response.text().catch(() => '')
@@ -170,32 +133,21 @@ export default function WeeklyReviewContent() {
     } finally {
       setIsLoading(false)
     }
-  }, [weekStart])
+  }, [weekStart, wakeMinutes])
 
   useEffect(() => {
     if (status === 'authenticated') fetchReview()
   }, [status, fetchReview])
 
-  // The week's Body / Mind / Heart, averaged over its seven days. The ring
-  // here used to be a weekScore: 50 points for active days ÷ evaluated days,
-  // plus 50 for averaging three entries a day. Log three things daily and it
-  // read 100, whatever those things were.
-  useEffect(() => {
-    if (status !== 'authenticated') return
-    let cancelled = false
-    const weekEnd = shiftDateString(weekStart, 6)
-    const today = getUserToday()
-    fetch(`/api/metrics/trend?period=7d&date=${weekEnd > today ? today : weekEnd}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return
-        setMetrics({ body: data.body.average, focus: data.focus.average, social: data.social.average })
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [status, weekStart])
+  const fallbackRead = useMemo<ReviewRead>(
+    () => ({ scope: 'week', kind: 'nothing', rule: 'week-nothing-ordinary', facts: [], evidence: [], slot: null, timing: false }),
+    []
+  )
+  const { action, run, isSaving } = useReadAction(
+    reviewData?.read ?? fallbackRead,
+    { weekStart },
+    status === 'authenticated'
+  )
 
   const goToPreviousWeek = () => {
     setWeekStart(shiftDateString(weekStart, -7))
@@ -242,32 +194,10 @@ export default function WeeklyReviewContent() {
     )
   }
 
-  // The line under the rings, read off the rings. It was a label for a
-  // retired score built from active days and entries per day, which said
-  // "Exceptional week" with none of the three on target.
-  // The rings show this week, from the same per-day scores the summary is
-  // written from. They were fed by a separate request for the trailing
-  // seven days ending today — a different window — so the rings could read
-  // Body 57 while the paragraph beneath them praised a Body of 92.
-  const ringValues: Record<MetricKey, number> | null = reviewData.averages ?? metrics
-
-  const weekLabel = (() => {
-    if (!ringValues) return ''
-    const onTarget = (Object.values(ringValues) as number[]).filter((v) => v >= METRIC_THRESHOLDS.green).length
-    const phrase =
-      onTarget === 3
-        ? 'all three on target'
-        : onTarget === 2
-          ? 'two of three on target'
-          : onTarget === 1
-            ? 'one of three on target'
-            : 'none on target yet'
-    if (isCurrentWeek) return `So far: ${phrase}`
-    const finished = onTarget === 0 ? 'none on target' : phrase
-    return finished.charAt(0).toUpperCase() + finished.slice(1)
-  })()
-
-  const isRecentWeek = isCurrentWeek || weekStart === shiftDateString(getWeekStart(new Date()), -7)
+  const read = reviewData.read
+  const ringLines = reviewData.comparisons ? ringNotes(reviewData.comparisons) : { notes: {} }
+  const words = reviewData.coachSummary ?? (read ? plainReadText(read) : null)
+  const showEvidence = !!read && (read.evidence.length > 0 || (read.timing && alignment.length > 0))
 
   return (
     <div>
@@ -285,85 +215,75 @@ export default function WeeklyReviewContent() {
         </button>
       </div>
 
-      {/* The week on the app's one scale, averaged across its days */}
-      <div className="mb-5">
-        {ringValues ? (
+      {/* The week on the app's one scale, averaged across its days, against the person's usual */}
+      {reviewData.averages && (
+        <div className="mb-5">
           <MetricRingRow
-            values={ringValues}
+            values={reviewData.averages}
             size={76}
             srLabel="Average scores for this week"
-            caption={weekLabel}
-          />
-        ) : null}
-      </div>
-
-      {/* Highlights */}
-      {reviewData.highlights.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 mb-5">
-          {reviewData.highlights.map((h, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-3">
-              <p className="text-sm font-medium">{h.text}</p>
-              {h.subtext && <p className="text-xs text-muted-foreground">{h.subtext}</p>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Whether the week's work landed where it goes best */}
-      {alignment.length > 0 && (
-        <div className="mb-5">
-          <WindowAlignmentCard
-            facts={alignment}
-            heading="In your windows this week"
-            lead={(() => {
-              const focus = alignment.find((fact) => fact.key === 'focus')
-              return focus
-                ? `${alignmentShare(focus)}% of your focused work fell inside your focus windows.`
-                : undefined
-            })()}
+            notes={ringLines.notes}
+            caption={ringLines.caption}
           />
         </div>
       )}
 
-      {/* AI Coach Summary */}
-      {reviewData.coachSummary && (
+      {/* The read: one decision, worded from its facts */}
+      {words && (
         <section className="mb-5">
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-start gap-3">
               <Sparkles className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-foreground leading-relaxed">{reviewData.coachSummary}</p>
+              <div className="flex-1">
+                <p className="text-sm text-foreground leading-relaxed">{words}</p>
+                <CommentaryThread subjectType="week" subjectKey={weekStart} commentary={words} />
+              </div>
             </div>
           </div>
-          {/* The summary ends on a suggestion for the days ahead. This is the
-              way to act on it: it used to be advice with nowhere to go. Only
-              on a recent week — a suggestion from a month ago is history. */}
-          {isRecentWeek && (
-            <button
-              onClick={() => router.push(`/calendar?date=${shiftDateString(getUserToday(), 1)}`)}
-              className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm text-foreground transition-all duration-150 hover:border-foreground/25 active:scale-[0.99]"
-            >
-              <CalendarClock className="h-4 w-4 text-muted-foreground" />
-              Plan tomorrow
-            </button>
+        </section>
+      )}
+
+      {/* What the read rests on */}
+      {showEvidence && (
+        <section className="mb-5">
+          <h2 className="eyebrow mb-3">Behind this</h2>
+          {read.evidence.length > 0 && (
+            <div className="divide-y divide-border rounded-xl border border-border bg-card">
+              {read.evidence.map((item) => (
+                <div key={`${item.label}-${item.value}`} className="flex items-baseline justify-between gap-3 px-4 py-3 text-sm">
+                  <span className="text-muted-foreground">{item.label}</span>
+                  <span className="text-right text-foreground tabular-nums">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {read.timing && alignment.length > 0 && (
+            <div className={read.evidence.length > 0 ? 'mt-3' : ''}>
+              <WindowAlignmentCard facts={alignment} heading="In your windows this week" />
+            </div>
           )}
         </section>
       )}
 
-      {/* Target Scorecards, Goal Progress, Category Breakdown — removed (old weekly targets, not meaningful) */}
-
-      {/* Insights */}
-      {reviewData.insights.length > 0 && (
+      {/* One pattern from the person's own log, never worded as a cause */}
+      {reviewData.finding && (
         <section className="mb-5">
-          <h2 className="font-semibold text-foreground text-sm mb-3">Insights</h2>
-          <div className="space-y-2">
-            {reviewData.insights.map((insight, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                <span className="text-primary mt-0.5">•</span>
-                <span>{insight}</span>
-              </div>
-            ))}
+          <h2 className="eyebrow mb-3">What your log shows</h2>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-sm text-foreground leading-relaxed">{reviewData.finding.sentence}</p>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            From your last three months. A pattern in the log, not a cause.
+          </p>
         </section>
+      )}
+
+      {/* Where a review leads: one button into the planner. */}
+      {action && (
+        <Button className="mb-5 h-auto min-h-11 w-full whitespace-normal py-2.5" onClick={run} disabled={isSaving}>
+          {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+          {action.label}
+        </Button>
       )}
 
       {/* Year in Pixels */}

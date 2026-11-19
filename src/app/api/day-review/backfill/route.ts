@@ -77,31 +77,9 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Generate AI commentary
-        let commentary: string | null = null
-        try {
-          const commentaryRes = await fetch(`${baseUrl}/api/day-commentary`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              cookie: request.headers.get('cookie') || '',
-            },
-            body: JSON.stringify({
-              score: summary.score,
-              totalMinutesLogged: summary.totalMinutesLogged,
-              wins: summary.wins,
-              targetProgress: summary.targetProgress,
-              mood: summary.todayMood?.mood || null,
-              longestFocusSession: summary.longestFocusSession,
-            }),
-          })
-          if (commentaryRes.ok) {
-            const commentaryData = await commentaryRes.json()
-            commentary = commentaryData.commentary || null
-          }
-        } catch {
-          // Commentary is optional — save without it
-        }
+        // No line is written here. The day review's read is worked out from
+        // the log when the day is opened, and its words come then.
+        const commentary: string | null = null
 
         // Save to day_reviews
         const { error: saveError } = await supabase

@@ -2,33 +2,31 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 import OpenAI from 'openai'
-import {
-  TimeEntry,
-  TimeCategory,
-  CATEGORY_LABELS,
-  shiftDateString,
-  getWeekStartForDate,
-} from '@/lib/types'
+import { TimeCategory, CATEGORY_LABELS, shiftDateString, getWeekStartForDate } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
 import { stableHash } from '@/lib/ai-text-cache'
-import {
-  buildWeekReviewContext,
-  buildWeekReviewSystemPrompt,
-  WEEK_REVIEW_PARAMS,
-} from '@/lib/prompts'
-import { calcBody, calcFocus, calcSocial, heartMinutes, METRIC_THRESHOLDS, type EntryRow } from '@/lib/metrics-calc'
+import { buildReadSystemPrompt, describeRead, WEEK_REVIEW_PARAMS } from '@/lib/prompts'
+import { calcBody, calcFocus, calcSocial, heartMinutes } from '@/lib/metrics-calc'
+import { windowsForWake } from '@/lib/ideal-day'
+import { ringComparisons, weekRead, type ReviewRead, type RingComparisons, type Row } from '@/lib/review-read'
+import { logFinding, type LogFinding } from '@/lib/log-findings'
 
 const MIN_ENTRIES_FOR_REVIEW = 7
 
-// Raise this when the coach prompt's voice changes, so old lines are not reused.
-const COACH_PROMPT_VERSION = 11
+// Raise this when the read prompt's voice changes, so old lines are not reused.
+const COACH_PROMPT_VERSION = 12
+
+/** What the rules read of an entry. */
+const ROW_FIELDS = 'date, activity, category, start_time, end_time, duration_minutes'
 
 interface WeeklyReviewRequest {
   weekStart: string // YYYY-MM-DD of the week's Monday
   timezone?: string // IANA timezone (e.g., 'America/New_York')
   // Fingerprint of the coach summary the caller already has. When it matches
-  // this week's prompt inputs the summary is not regenerated.
+  // this week's read the summary is not regenerated.
   knownCoachFingerprint?: string
+  /** When this person wakes, as they have stated it: moves their windows. */
+  wakeMinutes?: number | null
 }
 
 interface CategoryBreakdown {
@@ -39,25 +37,16 @@ interface CategoryBreakdown {
   entryCount: number
 }
 
-interface WeekHighlight {
-  type: 'streak' | 'improvement' | 'target_hit' | 'personal_best' | 'consistency'
-  text: string
-  subtext?: string
-}
-
 interface WeeklyReviewData {
   weekStart: string
   weekEnd: string
   /**
    * Body / Mind / Heart averaged over the days of this week that have
-   * anything logged — the same numbers the coach summary is written from.
-   * Null when nothing is logged.
+   * anything logged. Null when nothing is logged.
    */
   averages: { body: number; focus: number; social: number } | null
   activeDays: number // Days with entries
   evaluatedDays: number // Days included in review (excludes today for current week)
-  highlights: WeekHighlight[]
-  // Existing
   totalMinutes: number
   entryCount: number
   previousWeekMinutes: number | null
@@ -65,11 +54,15 @@ interface WeeklyReviewData {
   hasEnoughData: boolean // Current week has >= 7 entries
   hasPreviousWeekData: boolean // Previous week has >= 7 entries
   categoryBreakdown: CategoryBreakdown[]
-  bestDays: string[]
-  bestHours: string[]
-  insights: string[]
+  /** The one read the review leads with, chosen by fixed rules (lib/review-read.ts). */
+  read: ReviewRead
+  /** Each ring's average against the person's last four weeks. */
+  comparisons: RingComparisons
+  /** At most one "what your log shows" finding, from the last three months. */
+  finding: LogFinding | null
+  /** The read in the model's words; the client shows the facts when it is null. */
   coachSummary: string | null
-  // Fingerprint of the inputs behind coachSummary, so the client can tell us
+  // Fingerprint of the read behind coachSummary, so the client can tell us
   // next time whether the one it holds is still current.
   coachFingerprint: string | null
   // True when the caller's fingerprint matched and no summary was generated.
@@ -98,31 +91,6 @@ function getWeekEnd(weekStart: string): string {
   return `${y}-${m}-${d}`
 }
 
-// Get the previous week's Sunday
-function getPreviousWeekStart(weekStart: string): string {
-  const [year, month, day] = weekStart.split('-').map(Number)
-  const date = new Date(year, month - 1, day)
-  date.setDate(date.getDate() - 7)
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-// Format hour to readable string
-function formatHour(hour: number): string {
-  if (hour === 0) return '12 AM'
-  if (hour === 12) return '12 PM'
-  if (hour < 12) return `${hour} AM`
-  return `${hour - 12} PM`
-}
-
-// Get day name from date
-function getDayName(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  return date.toLocaleDateString('en-US', { weekday: 'long' })
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await getAppSession()
@@ -143,8 +111,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { weekStart: requestedWeekStart, timezone, knownCoachFingerprint }: WeeklyReviewRequest =
-      await request.json()
+    const {
+      weekStart: requestedWeekStart,
+      timezone,
+      knownCoachFingerprint,
+      wakeMinutes: requestedWake,
+    }: WeeklyReviewRequest = await request.json()
 
     // Require timezone from client - no defaults
     if (!timezone) {
@@ -154,12 +126,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // The person's windows: moved to the wake time they have stated, or the
+    // reference day. Anything but a whole minute of the day is no wake time.
+    const wakeMinutes =
+      typeof requestedWake === 'number' && Number.isInteger(requestedWake) && requestedWake >= 1 && requestedWake <= 1439
+        ? requestedWake
+        : null
+    const windows = windowsForWake(wakeMinutes)
+
     const today = getTodayInTimezone(timezone)
     // Weeks run Monday to Sunday, as they do everywhere else in the app.
     const weekStart = requestedWeekStart || getWeekStartForDate(today, 1)
     const weekEnd = getWeekEnd(weekStart)
-    const previousWeekStart = getPreviousWeekStart(weekStart)
-    const previousWeekEnd = getWeekEnd(previousWeekStart)
 
     // For the week in progress, leave today out: the day has not ended.
     //
@@ -176,27 +154,33 @@ export async function POST(request: NextRequest) {
       effectiveEndDate = yesterday >= weekStart ? yesterday : today
     }
 
-    // Fetch current week entries (up to effectiveEndDate)
+    // This week's entries, up to its last finished day.
     const { data: currentWeekEntries } = await supabase
       .from('time_entries')
-      .select('*')
+      .select(ROW_FIELDS)
       .eq('user_id', session.user.id)
       .eq('status', 'confirmed')
       .gte('date', weekStart)
       .lte('date', effectiveEndDate)
       .order('date', { ascending: true })
 
-    // Fetch previous week entries
-    const { data: previousWeekEntries } = await supabase
+    // One history query: the thirteen weeks before this one. The last seven
+    // days are the week before; the last 28 are what "usual" is read from;
+    // all of it, with this week, is what the log finding looks across.
+    // Newest first, so a long log keeps its most recent weeks.
+    const { data: historyEntries } = await supabase
       .from('time_entries')
-      .select('*')
+      .select(ROW_FIELDS)
       .eq('user_id', session.user.id)
       .eq('status', 'confirmed')
-      .gte('date', previousWeekStart)
-      .lte('date', previousWeekEnd)
+      .gte('date', shiftDateString(weekStart, -91))
+      .lte('date', shiftDateString(weekStart, -1))
+      .order('date', { ascending: false })
 
-    const entries = (currentWeekEntries || []) as TimeEntry[]
-    const prevEntries = (previousWeekEntries || []) as TimeEntry[]
+    const entries = (currentWeekEntries || []) as Row[]
+    const historyAll = (historyEntries || []) as Row[]
+    const previousWeekStart = shiftDateString(weekStart, -7)
+    const prevEntries = historyAll.filter((e) => e.date >= previousWeekStart)
 
     const entryCount = entries.length
     const previousWeekEntryCount = prevEntries.length
@@ -225,8 +209,9 @@ export async function POST(request: NextRequest) {
     const categoryMap = new Map<TimeCategory, { minutes: number; count: number }>()
     entries.forEach((entry) => {
       if (entry.category) {
-        const current = categoryMap.get(entry.category) || { minutes: 0, count: 0 }
-        categoryMap.set(entry.category, {
+        const category = entry.category as TimeCategory
+        const current = categoryMap.get(category) || { minutes: 0, count: 0 }
+        categoryMap.set(category, {
           minutes: current.minutes + entry.duration_minutes,
           count: current.count + 1,
         })
@@ -243,155 +228,55 @@ export async function POST(request: NextRequest) {
       }))
       .sort((a, b) => b.minutes - a.minutes)
 
-    // Calculate previous week category totals
-    const prevCategoryMap = new Map<TimeCategory, number>()
-    prevComparable.forEach((entry) => {
-      if (entry.category) {
-        const current = prevCategoryMap.get(entry.category) || 0
-        prevCategoryMap.set(entry.category, current + entry.duration_minutes)
-      }
-    })
-
-    // Calculate entries by day for scorecard
-    // Only include days up to effectiveEndDate (excludes today for current week)
-    const entriesByDay = new Map<string, TimeEntry[]>()
+    // The week's days up to its last finished one, logged or not.
+    const rows = entries.filter((e) => e.category)
+    const days: { date: string; rows: Row[] }[] = []
     for (let i = 0; i < 7; i++) {
-      const dateStr = shiftDateString(weekStart, i)
-      if (dateStr > effectiveEndDate) break
-      entriesByDay.set(dateStr, [])
+      const date = shiftDateString(weekStart, i)
+      if (date > effectiveEndDate) break
+      days.push({ date, rows: rows.filter((e) => e.date === date) })
     }
-    entries.forEach((entry) => {
-      const dayEntries = entriesByDay.get(entry.date)
-      if (dayEntries) {
-        dayEntries.push(entry)
-      }
-    })
+    const evaluatedDays = days.length
+    const activeDays = days.filter((d) => d.rows.length > 0).length
 
-    // Calculate evaluatedDays
-    const evaluatedDays = entriesByDay.size
-
-    // The days with the most focused work. This counted everything except
-    // entertainment, so seven hours overnight counted as "focus" and the
-    // best day was whichever one had the most written down.
-    const FOCUS_CATEGORIES: TimeCategory[] = ['deep_work', 'learning', 'creating']
-    const dayMinutes = new Map<string, number>()
-    Array.from(entriesByDay.entries()).forEach(([date, dayEntries]) => {
-      const focusMinutes = dayEntries
-        .filter((e) => e.category && FOCUS_CATEGORIES.includes(e.category))
-        .reduce((sum, e) => sum + e.duration_minutes, 0)
-      dayMinutes.set(date, focusMinutes)
-    })
-
-    // Each day on the app's one scale.
-    const dayScores = Array.from(entriesByDay.entries())
-      .filter(([, dayEntries]) => dayEntries.length > 0)
-      .map(([date, dayEntries]) => {
-        const rows = dayEntries.filter((e) => e.category) as unknown as EntryRow[]
-        const body = calcBody(rows)
-        const mind = calcFocus(rows)
-        const heart = calcSocial(rows)
-        const onTarget = [body, mind, heart].filter((v) => v >= METRIC_THRESHOLDS.green).length
-        return { date, body, mind, heart, onTarget }
-      })
+    // Each day on the app's one scale, averaged over the days with anything logged.
+    const dayScores = days
+      .filter((d) => d.rows.length > 0)
+      .map((d) => ({ body: calcBody(d.rows), focus: calcFocus(d.rows), social: calcSocial(d.rows) }))
     const average = (pick: (d: (typeof dayScores)[number]) => number) =>
       dayScores.length > 0 ? Math.round(dayScores.reduce((sum, d) => sum + pick(d), 0) / dayScores.length) : 0
+    const averages =
+      dayScores.length > 0
+        ? { body: average((d) => d.body), focus: average((d) => d.focus), social: average((d) => d.social) }
+        : null
 
-    const bestDays = Array.from(dayMinutes.entries())
-      .filter(([, minutes]) => minutes > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 2)
-      .map(([date]) => getDayName(date))
-
-    // Calculate time-of-day patterns for best hours
-    const hourMap = new Map<number, { minutes: number; categories: Map<TimeCategory, number> }>()
-    entries.forEach((entry) => {
-      if (entry.start_time) {
-        const hour = parseInt(entry.start_time.split(':')[0], 10)
-        const hourData = hourMap.get(hour) || { minutes: 0, categories: new Map() }
-        hourData.minutes += entry.duration_minutes
-        if (entry.category) {
-          const catMinutes = hourData.categories.get(entry.category) || 0
-          hourData.categories.set(entry.category, catMinutes + entry.duration_minutes)
-        }
-        hourMap.set(hour, hourData)
-      }
+    // The read, its ring lines and the finding, all by fixed rules.
+    const historyRows = historyAll.filter((e) => e.category)
+    const history28 = historyRows.filter((e) => e.date >= shiftDateString(weekStart, -28))
+    const comparisons = ringComparisons(averages ?? { body: 0, focus: 0, social: 0 }, history28)
+    const read = weekRead({
+      days,
+      history: history28,
+      windows,
+      isPartialWeek,
+      weekHeartMinutes: heartMinutes(rows),
+    })
+    const findingFrom = shiftDateString(effectiveEndDate, -89)
+    const finding = logFinding({
+      rows: [...historyRows, ...rows].filter((e) => e.date >= findingFrom && e.date <= effectiveEndDate),
+      windows,
     })
 
-    const bestHours = Array.from(hourMap.entries())
-      .filter(([, data]) => {
-        const deepWork = data.categories.get('deep_work') || 0
-        const learning = data.categories.get('learning') || 0
-        return deepWork + learning > data.minutes * 0.3 // At least 30% productive
-      })
-      .sort((a, b) => b[1].minutes - a[1].minutes)
-      .slice(0, 2)
-      .map(([hour]) => formatHour(hour))
-
-    // Generate insights
-    const insights: string[] = []
-
-    if (bestDays.length > 0 && bestHours.length > 0) {
-      // The hours are the two busiest, not the ends of a range: joined with
-      // a dash, "9 AM" and "3 PM" read as nine to three.
-      insights.push(`Best focus: ${bestDays.join(' & ')}, around ${bestHours.join(' and ')}`)
-    }
-
-    // Rows saved as sleep before it was removed are left out.
-    const topCategory = categoryBreakdown.find((c) => c.category !== 'sleep')
-    if (topCategory) {
-      const hours = Math.round((topCategory.minutes / 60) * 10) / 10
-      insights.push(`Most time: ${topCategory.label} (${hours}h)`)
-    }
-
-    // Calculate active days (days with at least one entry)
-    const activeDays = Array.from(entriesByDay.values()).filter(dayEntries => dayEntries.length > 0).length
-    // evaluatedDays already calculated above (before scorecards)
-
-    // There was a Week Score here — 50 points for active days, 50 for
-    // averaging three entries a day — and the label under the rings came
-    // from it: "Exceptional week" over Body 63, Mind 51, Heart 47. It was
-    // the last of the showing-up scores. The label is now read off the
-    // rings themselves, by the client that draws them.
-
-    const highlights: WeekHighlight[] = []
-
-    // Best day: the one that put most of the three on target, then the
-    // highest scores. It was the day with the most minutes logged.
-    const bestDay = [...dayScores].sort(
-      (a, b) => b.onTarget - a.onTarget || b.body + b.mind + b.heart - (a.body + a.mind + a.heart)
-    )[0]
-    if (bestDay) {
-      highlights.push({
-        type: 'personal_best',
-        text: `Best day: ${getDayName(bestDay.date)}`,
-        subtext: `Body ${bestDay.body} · Mind ${bestDay.mind} · Heart ${bestDay.heart}`,
-      })
-    }
-
-    // Limit to top 4 highlights
-    const topHighlights = highlights.slice(0, 4)
-
-    // Generate AI coach summary only if enough data.
-    //
-    // The context below is the whole prompt input, so hashing it answers the
-    // only question that matters: would the model be asked the same thing
-    // again? If the caller already holds the answer to this exact question it
-    // says so with knownCoachFingerprint, and we skip the call — this used to
-    // regenerate on every single view of the weekly tab.
+    // The read in words. The model is given the read's facts and nothing
+    // else, so hashing them answers the only question that matters: would
+    // it be asked the same thing again? If the caller already holds the
+    // answer it says so with knownCoachFingerprint, and the call is skipped.
     let coachSummary: string | null = null
     let coachFingerprint: string | null = null
     let coachSummaryUnchanged = false
 
     if (hasEnoughData && entries.length > 0) {
-      const context = buildWeekReviewContext({
-        isPartialWeek,
-        bestDays,
-        bestHours,
-        categories: categoryBreakdown,
-        heartMinutes: heartMinutes(entries.filter((e) => e.category) as unknown as EntryRow[]),
-      })
-
-      coachFingerprint = stableHash(`${COACH_PROMPT_VERSION}\n${context}`)
+      coachFingerprint = stableHash(`${COACH_PROMPT_VERSION}\n${read.rule}\n${read.facts.join('\n')}`)
       coachSummaryUnchanged = knownCoachFingerprint === coachFingerprint
 
       if (!coachSummaryUnchanged) {
@@ -400,8 +285,8 @@ export async function POST(request: NextRequest) {
           const completion = await openai.chat.completions.create({
             ...WEEK_REVIEW_PARAMS,
             messages: [
-              { role: 'system', content: buildWeekReviewSystemPrompt({ bestDays, bestHours }) },
-              { role: 'user', content: context },
+              { role: 'system', content: buildReadSystemPrompt('week', read.kind) },
+              { role: 'user', content: describeRead(read) },
             ],
           })
 
@@ -415,14 +300,9 @@ export async function POST(request: NextRequest) {
     const reviewData: WeeklyReviewData = {
       weekStart,
       weekEnd,
-      averages:
-        dayScores.length > 0
-          ? { body: average((d) => d.body), focus: average((d) => d.mind), social: average((d) => d.heart) }
-          : null,
+      averages,
       activeDays,
       evaluatedDays,
-      highlights: topHighlights,
-      // Existing
       totalMinutes,
       entryCount,
       previousWeekMinutes,
@@ -430,9 +310,9 @@ export async function POST(request: NextRequest) {
       hasEnoughData,
       hasPreviousWeekData,
       categoryBreakdown,
-      bestDays,
-      bestHours,
-      insights,
+      read,
+      comparisons,
+      finding,
       coachSummary,
       coachFingerprint,
       coachSummaryUnchanged,
