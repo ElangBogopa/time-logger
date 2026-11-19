@@ -417,3 +417,140 @@ RULES:
 - Cheeky is fine. Preachy is not, and condescending never is.
 - 1-3 sentences. No emojis, no bullet points, no preamble.`
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// The coach: the session comment and the per-entry remark
+// ─────────────────────────────────────────────────────────────────────────
+
+import type { SessionFacts, EntryFacts, AheadKind, RingFact } from '@/lib/coach-facts'
+
+export const COACH_BANNED_WORDS = [
+  'crushed', 'crushing', 'killing it', 'nailed', 'beast', 'legend',
+  'amazing', 'incredible', 'awesome', 'fantastic', 'epic', 'superstar',
+  'keep it up', "you've got this", 'proud of you', 'great job', 'well done',
+  'journey', 'lazy', 'slacking', 'wasted', 'unproductive', 'procrastinating',
+  'procrastination', 'distraction', 'come on', 'we both know', 'avoiding',
+  'guilty',
+] as const
+
+/**
+ * The voice of the session comment and the per-entry remark: a sharp coach on
+ * the person's side. The two share it. It is separate from REVIEW_VOICE on
+ * purpose (the reviews state facts; the coach also looks ahead). Check a
+ * wording change with `npm run eval:coach`. Session comments are not cached
+ * and saved entry remarks are never rewritten, so no version number is needed.
+ */
+export const COACH_VOICE = `VOICE: a sharp coach who is on this person's side. Warm, direct and specific. Wit is welcome when it is about the situation, never at the person's expense.
+- Every claim must come from the facts given: what was logged, Body / Mind / Heart against their targets, the plan, and the hours that suit each kind of activity. If it is not in the facts, do not say it.
+- Use the real activity names and the real minutes from the facts. Never quote a score as a number; say a ring reached its target, or how many minutes are left to it.
+- Never tease, mock, or guess at motives. Never invent a flaw, a habit or a temptation. Take every activity as the person named it; leisure, rest and screens are time they chose.
+- Never scold or correct: no "should", "should have", "need to", "must", "next time", "try to", no guilt.
+- No hype and no filler. Never use these words or anything like them: ${COACH_BANNED_WORDS.join(', ')}.
+- No emoji. At most one exclamation mark.`
+
+export const SESSION_COMMENT_PARAMS = { model: 'gpt-4o-mini', max_tokens: 150, temperature: 0.7 } as const
+export const ENTRY_REMARK_PARAMS = { model: 'gpt-4o-mini', max_tokens: 40, temperature: 0.7 } as const
+
+const COACH_ENDINGS: Record<AheadKind, string> = {
+  'later-today':
+    'End by pointing at one thing still possible later today, from the "Still ahead" facts only.',
+  tomorrow:
+    'End by pointing at one thing tomorrow makes possible, from the "Still ahead" facts only. Say nothing more about today\'s rings than the facts state.',
+  none: "This session's day is over. Do not look ahead; end on what the session showed.",
+}
+
+export function buildSessionCommentarySystemPrompt(aheadKind: AheadKind): string {
+  return `${COACH_VOICE}
+
+Write 2 or 3 sentences, under 60 words, about this person's session.
+- Lead with the most real thing in the facts: a ring that reached its target in this session, a plan kept, time that landed in the hours that suit it. Pick one or two; do not list everything.
+- If the session holds little — not much logged, no ring reached, a plan not done — say what was there plainly, with no verdict. Allow that rest may have been the point. Do not console or apologise.
+- A plan not done is said once, flatly, or left out. Never as a failing.
+- A ring marked "still open" has not been missed: there is time left today.
+- ${COACH_ENDINGS[aheadKind]}`
+}
+
+function ringLine(ring: RingFact, scope: 'session' | 'entry'): string {
+  const progress = `${ring.done} of ${ring.target} ${ring.unit}`
+  const today = scope === 'session' ? 'in this session' : 'for today'
+  switch (ring.state) {
+    case 'reached':
+      return scope === 'session'
+        ? `${ring.label} reached its target in this session (${progress}).`
+        : `With this, ${ring.label} reached its target ${today}.`
+    case 'already':
+      return scope === 'session'
+        ? `${ring.label} was already on target before this session.`
+        : `${ring.label} was already on target today.`
+    case 'open':
+      return scope === 'session'
+        ? `${ring.label} is still open: ${progress} so far.`
+        : `Toward ${ring.label}: ${progress} today.`
+    default:
+      return `${ring.label} did not reach its target today: ${progress}.`
+  }
+}
+
+export function describeSessionFacts(facts: SessionFacts): string {
+  const lines: string[] = []
+  const n = facts.entryCount
+  lines.push(
+    `Session: ${facts.periodLabel}. Logged: ${formatDurationLong(facts.totalMinutes)} across ${n} ${n === 1 ? 'activity' : 'activities'}.`
+  )
+  if (facts.activities.length > 0) {
+    lines.push(
+      'Activities: ' +
+        facts.activities
+          .map((a) => {
+            const when = a.start && a.end ? ` ${a.start}–${a.end},` : ','
+            return `"${a.activity}" (${a.label})${when} ${formatDurationLong(a.minutes)}`
+          })
+          .join('; ') +
+        '.'
+    )
+  }
+  if (facts.categories.length > 0) {
+    lines.push('Time by kind: ' + facts.categories.map((c) => `${c.label} ${formatDurationLong(c.minutes)}`).join(', ') + '.')
+  }
+  for (const ring of facts.rings) lines.push(ringLine(ring, 'session'))
+  for (const p of facts.plansKept) lines.push(`Plan kept: "${p.title}" (${p.start}).`)
+  for (const p of facts.plansNotDone) lines.push(`Plan not done: "${p.title}" (${p.start}).`)
+  for (const w of facts.windowFacts) {
+    if (w.inWindowMinutes > 0) {
+      lines.push(
+        `Hours that suit it: ${formatDurationLong(w.inWindowMinutes)} of ${formatDurationLong(w.totalMinutes)} of ${w.label.toLowerCase()} fell in the hours that suit it.`
+      )
+    }
+  }
+
+  const { ahead } = facts
+  if (ahead.kind !== 'none') {
+    const parts: string[] = []
+    for (const s of ahead.nextSessions) parts.push(`the ${s} session`)
+    for (const p of ahead.plans) parts.push(`planned "${p.title}" at ${p.start}`)
+    for (const w of ahead.windows) parts.push(`${w.label} ${w.start}–${w.end}`)
+    if (parts.length > 0) {
+      lines.push(`Still ahead ${ahead.kind === 'tomorrow' ? 'tomorrow' : 'later today'}: ${parts.join('; ')}.`)
+    }
+  }
+  return lines.join('\n')
+}
+
+export function buildEntryRemarkSystemPrompt(): string {
+  return `${COACH_VOICE}
+
+Write ONE sentence, under 15 words, about this one activity.
+- Say something true about it: what it added (a ring it brought to target, minutes toward one), when it happened, or how it sits in the day so far.
+- Speak only about this entry and what it added. Never mention what the day lacks.`
+}
+
+export function describeEntryFacts(facts: EntryFacts): string {
+  const lines: string[] = []
+  const when = facts.start && facts.end ? ` ${facts.start}–${facts.end},` : ','
+  lines.push(`Activity: "${facts.activity}" (${facts.label})${when} ${formatDurationLong(facts.minutes)}.`)
+  if (facts.description) lines.push(`The person's notes: "${facts.description}"`)
+  lines.push(`Logged today so far: ${formatDurationLong(facts.dayTotalMinutes)}.`)
+  lines.push(`${facts.label} entries today, this one included: ${facts.sameCategoryToday}.`)
+  for (const ring of facts.rings) lines.push(ringLine(ring, 'entry'))
+  return lines.join('\n')
+}

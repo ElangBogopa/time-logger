@@ -17,10 +17,12 @@ type Completion = { choices: { message: { content: string } }[] }
 
 let started = 0
 let shouldFail = false
+let lastArgs: { messages: { role: string; content: string }[] } | null = null
 
 // hoisted so the jest.mock factory can reach it
-function createCompletion(): Promise<Completion> {
+function createCompletion(args?: unknown): Promise<Completion> {
   started += 1
+  lastArgs = (args as typeof lastArgs) ?? null
   if (shouldFail) return Promise.reject(new Error('generation failed'))
   return Promise.resolve({ choices: [{ message: { content: 'A steady morning.' } }] })
 }
@@ -45,7 +47,7 @@ jest.mock('openai', () => {
   }
   class FakeOpenAI {
     static APIError = FakeAPIError
-    chat = { completions: { create: () => createCompletion() } }
+    chat = { completions: { create: (args: unknown) => createCompletion(args) } }
   }
   return { __esModule: true, default: FakeOpenAI }
 })
@@ -76,6 +78,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   started = 0
   shouldFail = false
+  lastArgs = null
   ;(getAppSession as jest.Mock).mockResolvedValue({ user: { id: 'user-1' } })
 })
 
@@ -110,5 +113,26 @@ it('rejects an unauthenticated caller before generating anything', async () => {
   const res = (await POST(request())) as unknown as { status: number }
 
   expect(res.status).toBe(401)
+  expect(started).toBe(0)
+})
+
+it('writes the prompt from the session\'s activities and sends one call', async () => {
+  await POST(request())
+  expect(started).toBe(1)
+  const user = lastArgs?.messages.find((m) => m.role === 'user')?.content ?? ''
+  expect(user).toContain('Coding')
+})
+
+it('ignores a malformed plans, wakeMinutes and nowMinutes rather than rejecting', async () => {
+  const res = (await POST(
+    request({ ...body, dayEntries: 'nope', plans: [{ title: 5 }, 'x'], wakeMinutes: 'late', nowMinutes: 99999 })
+  )) as unknown as { status: number }
+  expect(res.status).toBe(200)
+  expect(started).toBe(1)
+})
+
+it('rejects a body without entries', async () => {
+  const res = (await POST(request({ ...body, entries: [] }))) as unknown as { status: number }
+  expect(res.status).toBe(400)
   expect(started).toBe(0)
 })

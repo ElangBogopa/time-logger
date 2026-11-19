@@ -8,6 +8,7 @@ import { findRepeatCandidate, entriesForRepeat, repeatRowsLeft, retimeAfterClash
 import { PERIOD_CLASSES } from '@/lib/palette'
 import { findUnaccountedGaps, entryEndForGap, type Gap } from '@/lib/gaps'
 import { useOvernightSpill } from '@/hooks/useOvernightSpill'
+import { useMyWindows } from '@/hooks/useMyWindows'
 import { unconfirmedEvents } from '@/lib/calendar-match'
 import NextUp from '@/components/NextUp'
 import { getCachedEntries, setCachedEntries, getCachedCompletions, setCachedCompletion, removeCachedCompletion } from '@/hooks/useSessionData'
@@ -122,6 +123,8 @@ function LogPeriodContent() {
   const [entriesKnown, setEntriesKnown] = useState(!!cachedEntries)
   // A neighbouring day's sleep where it spills into this one: not a gap.
   const covered = useOvernightSpill(selectedDate || null, entries)
+  // When this person wakes, for the session comment's hours that suit each thing.
+  const { wakeMinutes } = useMyWindows()
   const [showSummary, setShowSummary] = useState(false)
   const [summaryCommentary, setSummaryCommentary] = useState<string | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false)
@@ -420,15 +423,33 @@ function LogPeriodContent() {
     setShowSummary(true)
     setIsSummaryLoading(true)
 
-    // Fetch the session commentary
+    // Fetch the session commentary. The plans are fetched fresh: one may have
+    // just been ticked in Next up.
+    let plans: unknown[] = []
+    try {
+      const plansRes = await fetch(`/api/plans?date=${selectedDate}`)
+      if (plansRes.ok) {
+        const data = await plansRes.json()
+        if (Array.isArray(data.plans)) plans = data.plans
+      }
+    } catch {
+      plans = []
+    }
+    const nowMinutes =
+      selectedDate === getUserToday() ? getUserCurrentHour() * 60 + new Date().getMinutes() : null
+
     try {
       const response = await csrfFetch('/api/period-commentary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           period,
-          entries: periodEntries,
           date: selectedDate,
+          entries: periodEntries,
+          dayEntries: visibleEntries.filter((e) => e.status !== 'pending'),
+          plans,
+          wakeMinutes,
+          nowMinutes,
         }),
       })
 
@@ -839,7 +860,6 @@ function LogPeriodContent() {
         isOpen={showSummary}
         onClose={handleSummaryClose}
         period={period}
-        date={selectedDate}
         entries={periodEntries}
         commentary={summaryCommentary}
         isLoading={isSummaryLoading}

@@ -8,7 +8,7 @@ import { csrfFetch } from '@/lib/api'
  * Follow-up conversation on a piece of AI commentary.
  *
  * One component for every surface that generates commentary — the day review
- * and the session summary today, entries and the weekly review later. The
+ * today, the weekly review later. The
  * subject is just a key, so adding a surface is a prop, not a second copy of
  * this logic.
  *
@@ -16,7 +16,7 @@ import { csrfFetch } from '@/lib/api'
  * screen that nobody asks a question on costs no extra request.
  */
 
-export type CommentarySubject = 'day' | 'session' | 'entry' | 'week'
+export type CommentarySubject = 'day' | 'entry' | 'week'
 
 interface Message {
   seq: number
@@ -26,19 +26,16 @@ interface Message {
 
 interface CommentaryThreadProps {
   subjectType: CommentarySubject
-  /** day/week: YYYY-MM-DD · session: YYYY-MM-DD:period · entry: uuid */
+  /** day/week: YYYY-MM-DD · entry: uuid */
   subjectKey: string
   /** The commentary being replied to, snapshotted server-side on the first send. */
   commentary: string | null
-  /** 'dark' for the session popup, which sits on a dark sheet. */
-  tone?: 'card' | 'dark'
 }
 
 export default function CommentaryThread({
   subjectType,
   subjectKey,
   commentary,
-  tone = 'card',
 }: CommentaryThreadProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
@@ -51,8 +48,6 @@ export default function CommentaryThread({
   // One load per subject per mount. A failed load must not re-fire — that is
   // the shape of the flicker bug the day review had.
   const loadedFor = useRef<string | null>(null)
-
-  const dark = tone === 'dark'
 
   const open = useCallback(async () => {
     setIsOpen(true)
@@ -118,9 +113,7 @@ export default function CommentaryThread({
     return (
       <button
         onClick={open}
-        className={`mt-3 inline-flex min-h-11 items-center gap-1.5 text-xs transition-colors ${
-          dark ? 'text-zinc-400 hover:text-zinc-200' : 'text-muted-foreground hover:text-foreground'
-        }`}
+        className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
         <MessageCircle className="h-3.5 w-3.5" />
         Ask about this
@@ -129,7 +122,7 @@ export default function CommentaryThread({
   }
 
   return (
-    <div className={`mt-3 space-y-3 border-t pt-3 ${dark ? 'border-zinc-700/50' : 'border-border'}`}>
+    <div className="mt-3 space-y-3 border-t border-border pt-3">
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
@@ -142,8 +135,8 @@ export default function CommentaryThread({
                 key={m.seq}
                 className={
                   m.role === 'user'
-                    ? `text-xs font-medium ${dark ? 'text-zinc-200' : 'text-foreground'}`
-                    : `text-sm leading-relaxed ${dark ? 'text-zinc-300' : 'text-muted-foreground'}`
+                    ? 'text-xs font-medium text-foreground'
+                    : 'text-sm leading-relaxed text-muted-foreground'
                 }
               >
                 {m.role === 'user' ? `You: ${m.content}` : m.content}
@@ -160,7 +153,7 @@ export default function CommentaryThread({
       )}
 
       {atLimit ? (
-        <p className={`text-xs ${dark ? 'text-zinc-400' : 'text-muted-foreground'}`}>
+        <p className="text-xs text-muted-foreground">
           That&rsquo;s as far as this conversation goes.
         </p>
       ) : (
@@ -181,19 +174,13 @@ export default function CommentaryThread({
             placeholder="Why do you say that?"
             maxLength={2000}
             disabled={isSending}
-            className={`min-h-11 flex-1 rounded-lg border px-3 text-sm outline-none disabled:opacity-60 ${
-              dark
-                ? 'border-zinc-700 bg-zinc-800 text-zinc-100 placeholder:text-zinc-500'
-                : 'border-border bg-background text-foreground placeholder:text-muted-foreground'
-            }`}
+            className="min-h-11 flex-1 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
           />
           <button
             onClick={send}
             disabled={isSending || draft.trim().length === 0}
             aria-label="Send question"
-            className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${
-              dark ? 'bg-zinc-700 text-zinc-100' : 'bg-secondary text-foreground'
-            }`}
+            className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary text-foreground transition-colors disabled:opacity-40"
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>

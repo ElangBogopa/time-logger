@@ -1,84 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppSession } from '@/lib/session'
 import OpenAI from 'openai'
-import {
-  TimeEntry,
-  TimeCategory,
-  CATEGORY_LABELS,
-  TimePeriod,
-  PERIOD_LABELS,
-} from '@/lib/types'
-import { formatDurationLong } from '@/lib/time-utils'
+import { CATEGORIES, TimeCategory, TimePeriod } from '@/lib/types'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
+import { buildSessionFacts, CoachEntry } from '@/lib/coach-facts'
+import type { PlanRow } from '@/lib/plan-adherence'
+import { windowsForWake } from '@/lib/ideal-day'
+import {
+  SESSION_COMMENT_PARAMS,
+  buildSessionCommentarySystemPrompt,
+  describeSessionFacts,
+} from '@/lib/prompts'
 
-interface PeriodCommentaryRequest {
-  period: TimePeriod
-  entries: TimeEntry[]
-  date: string
+const PERIODS: readonly string[] = ['morning', 'afternoon', 'evening']
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+type Raw = Record<string, unknown>
+const isObject = (v: unknown): v is Raw => typeof v === 'object' && v !== null
+
+/** An integer minute past midnight, or null for anything else. */
+function minuteOrNull(v: unknown): number | null {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1439 ? v : null
 }
 
-function buildPeriodContext(
-  period: TimePeriod,
-  entries: TimeEntry[],
-): string {
-  const periodLabel = PERIOD_LABELS[period]
-  const totalMinutes = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
-
-  // Group by category
-  const categoryBreakdown: Record<string, { count: number; minutes: number; activities: string[] }> = {}
-  entries.forEach(entry => {
-    const cat = entry.category || 'other'
-    if (!categoryBreakdown[cat]) {
-      categoryBreakdown[cat] = { count: 0, minutes: 0, activities: [] }
-    }
-    categoryBreakdown[cat].count++
-    categoryBreakdown[cat].minutes += entry.duration_minutes
-    categoryBreakdown[cat].activities.push(entry.activity)
-  })
-
-  // Sort by time spent
-  const sortedCategories = Object.entries(categoryBreakdown)
-    .sort(([, a], [, b]) => b.minutes - a.minutes)
-
-  let context = `Time period: ${periodLabel}
-Total activities logged: ${entries.length}
-Total time: ${formatDurationLong(totalMinutes)}
-
-BREAKDOWN BY CATEGORY:
-`
-
-  sortedCategories.forEach(([cat, data]) => {
-    context += `- ${CATEGORY_LABELS[cat as TimeCategory]}: ${formatDurationLong(data.minutes)} (${data.count} ${data.count === 1 ? 'entry' : 'entries'})
-  Activities: ${data.activities.join(', ')}
-`
-  })
-
-  // Notable patterns
-  const deepWorkMinutes = categoryBreakdown['deep_work']?.minutes || 0
-  const entertainmentMinutes = categoryBreakdown['entertainment']?.minutes || 0
-  const meetingMinutes = categoryBreakdown['meetings']?.minutes || 0
-
-  context += `
-NOTABLE PATTERNS:
-`
-  if (deepWorkMinutes >= 120) {
-    context += `- Strong focus: ${formatDurationLong(deepWorkMinutes)} of deep work
-`
+/** The client's entries are only ever read for what they say, so each is checked and trimmed. */
+function cleanEntries(list: unknown, max: number): CoachEntry[] {
+  if (!Array.isArray(list)) return []
+  const out: CoachEntry[] = []
+  for (const raw of list.slice(0, max)) {
+    if (!isObject(raw)) continue
+    const { id, activity, category, duration_minutes, start_time, end_time, description } = raw
+    if (typeof activity !== 'string') continue
+    if (typeof duration_minutes !== 'number' || !Number.isFinite(duration_minutes)) continue
+    if (duration_minutes < 0 || duration_minutes > 1440) continue
+    if (category !== null && category !== undefined && !CATEGORIES.includes(category as TimeCategory)) continue
+    out.push({
+      id: typeof id === 'string' ? id : `entry-${out.length}`,
+      activity: activity.slice(0, 80),
+      category: (category as TimeCategory | null | undefined) ?? null,
+      duration_minutes,
+      start_time: typeof start_time === 'string' ? start_time : null,
+      end_time: typeof end_time === 'string' ? end_time : null,
+      description: typeof description === 'string' ? description.slice(0, 200) : null,
+    })
   }
-  if (entertainmentMinutes >= 60) {
-    context += `- High entertainment: ${formatDurationLong(entertainmentMinutes)} logged as entertainment/leisure
-`
-  }
-  if (meetingMinutes >= 120) {
-    context += `- Meeting-heavy: ${formatDurationLong(meetingMinutes)} in meetings
-`
-  }
-  if (entries.length >= 5) {
-    context += `- Busy period: ${entries.length} different activities logged
-`
-  }
+  return out
+}
 
-  return context
+function cleanPlans(list: unknown): PlanRow[] {
+  if (!Array.isArray(list)) return []
+  const out: PlanRow[] = []
+  for (const raw of list.slice(0, 40)) {
+    if (!isObject(raw)) continue
+    const { id, title, completed, committed_start, committed_end } = raw
+    if (typeof title !== 'string' || typeof completed !== 'boolean') continue
+    if (committed_start !== null && typeof committed_start !== 'string') continue
+    if (committed_end !== null && typeof committed_end !== 'string') continue
+    out.push({
+      id: typeof id === 'string' ? id : `plan-${out.length}`,
+      title: title.slice(0, 80),
+      completed,
+      committed_start,
+      committed_end,
+    })
+  }
+  return out
 }
 
 export async function POST(request: NextRequest) {
@@ -101,95 +87,48 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { period, entries, date }: PeriodCommentaryRequest = await request.json()
+    const body: unknown = await request.json()
+    const input = isObject(body) ? body : {}
+    const { period, date } = input
 
-    if (!period || !entries || entries.length === 0) {
+    if (typeof period !== 'string' || !PERIODS.includes(period)) {
       return NextResponse.json({ error: 'Period and entries are required' }, { status: 400 })
     }
+    if (typeof date !== 'string' || !DATE.test(date)) {
+      return NextResponse.json({ error: 'A date is required' }, { status: 400 })
+    }
+    if (!Array.isArray(input.entries) || input.entries.length === 0) {
+      return NextResponse.json({ error: 'Period and entries are required' }, { status: 400 })
+    }
+
+    const sessionEntries = cleanEntries(input.entries, 60)
+    if (sessionEntries.length === 0) {
+      return NextResponse.json({ error: 'Period and entries are required' }, { status: 400 })
+    }
+
+    const facts = buildSessionFacts({
+      period: period as TimePeriod,
+      sessionEntries,
+      dayEntries: cleanEntries(input.dayEntries, 120),
+      plans: cleanPlans(input.plans),
+      windows: windowsForWake(minuteOrNull(input.wakeMinutes)),
+      nowMinutes: minuteOrNull(input.nowMinutes),
+    })
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       timeout: 30000,
     })
 
-    const context = buildPeriodContext(period, entries)
-    const periodLabel = PERIOD_LABELS[period]
-
-    // Determine overall tone
-    const totalMinutes = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
-    const entertainmentMinutes = entries
-      .filter(e => e.category === 'entertainment')
-      .reduce((sum, e) => sum + e.duration_minutes, 0)
-    // shallow_work belongs here: answering email and filing expenses is still
-    // work, and leaving it out made the model call a full working day
-    // unproductive and then suggest the person try harder.
-    const productiveMinutes = entries
-      .filter(e => ['deep_work', 'shallow_work', 'learning', 'exercise', 'creating'].includes(e.category || ''))
-      .reduce((sum, e) => sum + e.duration_minutes, 0)
-
-    let toneGuidance = ''
-    if (productiveMinutes > entertainmentMinutes && productiveMinutes >= totalMinutes * 0.5) {
-      toneGuidance = 'The period was productive overall. Be encouraging and acknowledge their focus.'
-    } else if (entertainmentMinutes > productiveMinutes && entertainmentMinutes >= totalMinutes * 0.3) {
-      toneGuidance = 'There was notable leisure time. Be honest but supportive, acknowledge what they did accomplish.'
-    } else {
-      toneGuidance = 'Mixed period. Highlight the positives while being realistic about the balance.'
-    }
-
-    // All three take the same context and differ only in their system prompt,
-    // so they ran back to back for no reason — three round trips of latency
-    // while the summary popup spins. They are started together below.
-    const commentaryPromise = openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    // One model call. There were once three, then two more that only
+    // restated the card; the comment is the part with something to say.
+    const completion = await openai.chat.completions.create({
+      ...SESSION_COMMENT_PARAMS,
       messages: [
-        {
-          role: 'system',
-          content: `Generate a brief, insightful summary of this person's ${periodLabel.toLowerCase()}. 2-3 sentences max.
-
-PERSONALITY:
-- Sound like a supportive but real friend who knows them well
-- Use casual language naturally (not forced slang)
-- Can be cheeky about distractions: "Another scroll session? We both know that assignment exists."
-- Celebrate genuinely: "You crushed it. That's your best morning this week."
-- Reference specific activities by name from the entries
-- Occasionally drop a one-liner that feels personal
-- NO emojis (keep this rule)
-- Can be blunt when needed but never mean
-- Don't start with generic praise like "Great" unless it truly fits
-
-${toneGuidance}
-
-EXAMPLES OF GOOD PERIOD SUMMARIES:
-- "Solid morning—2 hours of deep work before the meetings kicked in. That STA414 study session is paying off."
-- "Meeting-heavy afternoon, but you protected an hour for coding at the end. Smart move."
-- "Mixed evening—the gym session was clutch, though that 45-minute scroll sesh crept in after."
-- "You logged 3 hours of TikTok but called it 'research.' Come on."
-- "Back-to-back meetings all afternoon. You survived, but your brain needs a break."`,
-        },
-        {
-          role: 'user',
-          content: context,
-        },
+        { role: 'system', content: buildSessionCommentarySystemPrompt(facts.ahead.kind) },
+        { role: 'user', content: describeSessionFacts(facts) },
       ],
-      temperature: 0.7,
-      max_tokens: 150,
     })
-
-    /**
-     * There were two more calls here, for an "insight" one-liner and a
-     * "prediction" one-liner, shown under the commentary in the session
-     * popup. In practice they restated what was already on the screen —
-     * "You spent 37.5% of your evening on social activities", over a card
-     * already listing Social 1h30m — or said nothing at all: "If you
-     * maintain this evening routine, you could easily finish the week
-     * strong."
-     *
-     * They cost two of this route's three model calls, three times a day,
-     * for text nobody needed. The commentary is the part with something to
-     * say.
-     */
-
-    const completion = await commentaryPromise
     const commentary = completion.choices[0]?.message?.content?.trim() || ''
 
     return NextResponse.json({ commentary })

@@ -17,7 +17,6 @@ it('counts the night and the breakfast', () => {
       isOpen
       onClose={jest.fn()}
       period="morning"
-      date="2026-11-17"
       entries={[
         row('a', 'Sleep', 'sleep', '23:00', '07:00', 480),
         row('b', 'Breakfast', 'meals', '07:30', '08:00', 30),

@@ -169,7 +169,7 @@ describe('GET', () => {
     ['unknown type', 'subject_type=month&subject_key=2026-11'],
     ['day key that is not a date', 'subject_type=day&subject_key=tuesday'],
     ['entry key that is not a uuid', 'subject_type=entry&subject_key=123'],
-    ['session key without a period', 'subject_type=session&subject_key=2026-11-02'],
+    ['session type, which is no longer offered', 'subject_type=session&subject_key=2026-11-02:morning'],
     ['missing key', 'subject_type=day'],
   ])('rejects %s', async (_label, query) => {
     const res = (await GET(get(query))) as unknown as Res

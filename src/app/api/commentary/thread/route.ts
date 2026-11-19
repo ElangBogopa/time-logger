@@ -3,8 +3,7 @@ import { getAppSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 import { checkRateLimit, getRateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit'
-import { TimeEntry, TimePeriod, shiftDateString } from '@/lib/types'
-import { getEntriesForPeriod } from '@/lib/session-utils'
+import { TimeEntry, shiftDateString } from '@/lib/types'
 import { buildThreadSystemPrompt, describeEntries } from '@/lib/prompts'
 import { formatDurationLong } from '@/lib/time-utils'
 
@@ -19,7 +18,7 @@ import { formatDurationLong } from '@/lib/time-utils'
  * input is free-form. Persistence is the only thing keeping this cheap.
  */
 
-const SUBJECT_TYPES = ['entry', 'day', 'session', 'week'] as const
+const SUBJECT_TYPES = ['entry', 'day', 'week'] as const
 type SubjectType = (typeof SUBJECT_TYPES)[number]
 
 // Cap the thread: without one, context grows every turn and cost grows with it.
@@ -29,7 +28,6 @@ const MAX_CONTEXT_MESSAGES = 6
 const MAX_MESSAGE_LENGTH = 2000
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
-const SESSION_KEY = /^\d{4}-\d{2}-\d{2}:(morning|afternoon|evening)$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ReplyRow {
@@ -46,7 +44,6 @@ function isSubjectType(value: string | null): value is SubjectType {
 /** Subject keys come from the client, so they are shape-checked before use. */
 function isValidSubjectKey(type: SubjectType, key: string): boolean {
   if (type === 'entry') return UUID.test(key)
-  if (type === 'session') return SESSION_KEY.test(key)
   return DATE.test(key)
 }
 
@@ -100,7 +97,7 @@ async function loadSubjectContext(
     return `The week starting ${key}: ${entries.length} activities, ${formatDurationLong(total)} logged.\n${describeEntries(entries)}`
   }
 
-  const date = type === 'session' ? key.split(':')[0] : key
+  const date = key
   const { data } = await supabase
     .from('time_entries')
     .select('*')
@@ -109,11 +106,7 @@ async function loadSubjectContext(
     .eq('date', date)
     .order('start_time', { ascending: true })
 
-  let entries = (data as TimeEntry[] | null) || []
-  if (type === 'session') {
-    entries = getEntriesForPeriod(entries, key.split(':')[1] as TimePeriod)
-    return `The ${key.split(':')[1]} of ${date}:\n${describeEntries(entries)}`
-  }
+  const entries = (data as TimeEntry[] | null) || []
 
   const total = entries.reduce((sum, e) => sum + e.duration_minutes, 0)
   return `${date}: ${entries.length} activities, ${formatDurationLong(total)} logged.\n${describeEntries(entries)}`

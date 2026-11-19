@@ -3,8 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { TimePeriod, PERIOD_LABELS, TimeEntry, CATEGORY_LABELS, TimeCategory, getUserToday, getRealToday } from '@/lib/types'
 import { PERIOD_CLASSES } from '@/lib/palette'
-import CommentaryThread from '@/components/CommentaryThread'
-import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Zap, Share2, Check } from 'lucide-react'
+import { Sun, Cloud, Moon, Sparkles, ArrowRight, X, TrendingUp, Share2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { csrfFetch } from '@/lib/api'
 import AnimatedCheckbox from '@/components/AnimatedCheckbox'
@@ -19,8 +18,6 @@ interface PeriodSummaryPopupProps {
   isOpen: boolean
   onClose: () => void
   period: TimePeriod
-  /** The session's date, YYYY-MM-DD — half of the follow-up thread's key. */
-  date: string
   entries: TimeEntry[]
   commentary: string | null
   isLoading: boolean
@@ -45,7 +42,6 @@ export default function PeriodSummaryPopup({
   isOpen,
   onClose,
   period,
-  date,
   entries,
   commentary,
   isLoading,
@@ -178,7 +174,7 @@ export default function PeriodSummaryPopup({
             date={getRealToday()}
             totalMinutes={totalMinutes}
             topCategories={topCategories}
-            commentary={commentary || `Great ${PERIOD_LABELS[period].toLowerCase()} session!`}
+            commentary={commentary || `${PERIOD_LABELS[period]} wrapped up.`}
           />
         )
       })
@@ -256,14 +252,6 @@ export default function PeriodSummaryPopup({
    * to say what it measured. Removed rather than repaired.
    */
 
-  // Find session MVP (activity with most time)
-  const sessionMVP = useMemo(() => {
-    if (periodEntries.length === 0) return null
-
-    const sorted = [...periodEntries].sort((a, b) => b.duration_minutes - a.duration_minutes)
-    return sorted[0]
-  }, [periodEntries])
-
   // Calculate comparison with previous period
   const comparison = useMemo(() => {
     if (!previousPeriodStats) return null
@@ -308,7 +296,6 @@ export default function PeriodSummaryPopup({
   // Sort categories by time
   const sortedCategories = Object.entries(categoryBreakdown)
     .sort(([, a], [, b]) => b - a)
-    .slice(0, 3) // Top 3
 
   return (
     <>
@@ -316,7 +303,7 @@ export default function PeriodSummaryPopup({
 
       {/* A sheet from the bottom, like every other one. It was the last
           card still floating in the middle of the screen. */}
-      <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div data-testid="period-summary-sheet" className="fixed inset-0 z-[60] flex items-end justify-center">
         {/* Backdrop */}
         <div
           className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
@@ -327,14 +314,14 @@ export default function PeriodSummaryPopup({
 
         {/* Modal */}
         <div
-          className={`relative w-full max-w-[430px] transform transition-all duration-300 ease-out ${
+          className={`relative flex max-h-[calc(100%-2.5rem)] w-full max-w-[430px] flex-col transform transition-all duration-300 ease-out ${
             isVisible && !isLeaving ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
           }`}
         >
           {/* Was a 2px gradient frame — amber→orange, or indigo→purple→pink
               for the evening, which is the loudest thing in the app. */}
-          <div className="relative overflow-hidden rounded-t-2xl border border-b-0 border-zinc-700 shadow-2xl max-h-[88vh]">
-            <div className="relative rounded-t-2xl bg-zinc-900 px-5 pt-7 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] overflow-y-auto max-h-[calc(88vh-2px)]">
+          <div className="relative overflow-hidden rounded-t-2xl border border-b-0 border-zinc-700 shadow-2xl flex min-h-0 flex-col">
+            <div className="relative rounded-t-2xl bg-zinc-900 px-5 pt-7 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] overflow-y-auto min-h-0 flex-1 overscroll-contain">
               <span aria-hidden="true" className="absolute top-2.5 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-zinc-600" />
               {/* Header buttons */}
               <div className="absolute right-4 top-4 flex items-center gap-2">
@@ -380,7 +367,7 @@ export default function PeriodSummaryPopup({
               </div>
             )}
 
-            {/* Time summary with MVP */}
+            {/* Time summary */}
             <div className="mb-4 rounded-xl bg-zinc-800/50 p-4">
               <div className="text-center">
                 <p className="text-3xl font-bold text-white">
@@ -388,23 +375,6 @@ export default function PeriodSummaryPopup({
                 </p>
                 <p className="text-sm text-zinc-400">total time tracked</p>
               </div>
-
-              {/* Session MVP */}
-              {sessionMVP && (
-                <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-zinc-700/30 px-3 py-2">
-                  <Zap className="h-4 w-4 text-[#CBB894]" />
-                  <div className="flex-1 text-center">
-                    <p className="field-label">Session MVP</p>
-                    <p className="text-sm font-medium text-white truncate">{sessionMVP.activity}</p>
-                    <p className="text-xs text-zinc-400">
-                      {Math.floor(sessionMVP.duration_minutes / 60) > 0
-                        ? `${Math.floor(sessionMVP.duration_minutes / 60)}h `
-                        : ''}
-                      {sessionMVP.duration_minutes % 60}m
-                    </p>
-                  </div>
-                </div>
-              )}
 
               {/* Category breakdown */}
               {sortedCategories.length > 0 && (
@@ -441,12 +411,6 @@ export default function PeriodSummaryPopup({
                           track", which is praise for nothing in particular. */}
                       &ldquo;{commentary || `${periodLabel} wrapped up.`}&rdquo;
                     </p>
-                    <CommentaryThread
-                      subjectType="session"
-                      subjectKey={`${date}:${period}`}
-                      commentary={commentary}
-                      tone="dark"
-                    />
                   </div>
                 )}
               </div>

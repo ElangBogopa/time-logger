@@ -203,14 +203,8 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       // Only regenerate commentary if activity or description changed
       // This saves ~1790 tokens per edit that only changes time/duration
       if (needsCommentaryUpdate) {
-        // Fetch nearby entries for context (±2 entries instead of full day)
+        // The whole day, so "took Mind to its target" is judged on all of it
         const dayEntries = await fetchEntries({ date, orderBy: 'start_time', orderAsc: true })
-
-        // Filter to nearby entries only (reduce context tokens)
-        const entryIndex = dayEntries.findIndex(e => e.id === entry.id)
-        const nearbyEntries = dayEntries.filter((_, i) =>
-          Math.abs(i - entryIndex) <= 2 || entryIndex === -1
-        )
 
         try {
           const commentaryResponse = await csrfFetch('/api/commentary', {
@@ -218,7 +212,7 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               entry: { ...entry, ...updatedEntry },
-              dayEntries: nearbyEntries,
+              dayEntries,
             }),
           })
 
@@ -317,21 +311,15 @@ export default function TimeEntryModal({ entry, onClose, onUpdate, onDelete, pro
       // Generate commentary
       let generatedCommentary: string | null = null
       try {
-        // Fetch nearby entries for context (±2 entries to reduce tokens)
+        // The whole day, so "took Mind to its target" is judged on all of it
         const dayEntries = await fetchEntries({ date: entry.date, orderBy: 'start_time', orderAsc: true })
-
-        // Filter to nearby entries only (reduce context tokens)
-        const entryIndex = dayEntries.findIndex(e => e.id === entry.id)
-        const nearbyEntries = dayEntries.filter((_, i) =>
-          Math.abs(i - entryIndex) <= 2 || entryIndex === -1
-        )
 
         const commentaryResponse = await csrfFetch('/api/commentary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             entry: { ...entry, category, status: 'confirmed' },
-            dayEntries: nearbyEntries,
+            dayEntries,
           }),
         })
 
