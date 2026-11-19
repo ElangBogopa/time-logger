@@ -171,3 +171,12 @@ Verdict: Ready to merge (0 must fix) — second pass on the brief docs/plans/ses
 ## Review 17 — 2026-11-18 — Opus 5.5 — reviewed 719d118
 Verdict: Ready to merge (0 must fix) — third pass on the brief docs/plans/session-sheet-coach-voice.md, seventeenth on this dev; trying it on a phone is now the better test; the marked findings of review 15 and the findings of earlier briefs left as they were
 - resolved: session-comment-ungrounded (prompts.ts:468 — "time left today" now goes only to a later-today session; a day that is over says so in its facts (:553) and a plan not done says its time has passed (:534); in docs/voice-lines/coach.md none of the three earlier-day comments says time is left, none offers the call to Mum, no missed ring is called open, no "as planned" or "no plan"; the one slip left, "keeps your Admin time on track", is reported by the eval, which is what the next finding asked for), coach-eval-judge-misses-invented-targets (coach-voice-check.ts:122 decides the reviewed claims without a model; the judge must quote what is unsupported and is held to 16 fixed lines, all right in coach.md; its two remaining reports are real; the fix did no harm to the routes, which do not run the checker)
+
+## Review 18 — 2026-11-18 — Opus 5.5 — reviewed fc4ccfa
+Verdict: Ready to merge (0 must fix) — first pass on fc4ccfa (brief docs/plans/review-screen-trim.md), eighteenth on this dev; the findings the log held before it left as they were
+- should · logged-insight-test-cannot-fail · src/__tests__/api/weekly-review-cache.test.ts:87 · the mock answers both weeks' queries with the same ten entries, so this week and last are 600 minutes each (0% change) and the deleted block would never have pushed "Logged N% …"; the new assertion passes with the block restored, so nothing holds the insight gone
+- optional · plan's choice · skipped-wins-test-left · src/__tests__/day-review.test.tsx:241 · an `it.skip` still describes the removed "What stood out" block and waits for its heading · the brief said to leave the `it.skip` tests alone
+
+## Fix attempt 14 — 2026-11-18 — Sonnet 5.5 — commit pending
+- logged-insight-test-cannot-fail · the test's database mock now honours the date range, so last week's query returns its own 20 entries (twice this week's time) and this week is 50% less; the "no Logged insight" assertion fails with the deleted block put back (checked by restoring it) and passes without it · believes: fixed
+- the other open findings · not attempted (not asked, or plan's choice / past the request)

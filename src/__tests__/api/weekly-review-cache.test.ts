@@ -25,14 +25,38 @@ const entries = Array.from({ length: 10 }, (_, i) => ({
   status: 'confirmed',
 }))
 
-// hoisted function declaration, so the jest.mock factory can reach it
+// The week before: twice the time, so a "Logged N% less" insight would be
+// pushed if the route still made one (this week is 50% less than it).
+const previousEntries = Array.from({ length: 20 }, (_, i) => ({
+  ...entries[0],
+  id: `p${i}`,
+  date: `2026-10-${String(19 + (i % 5)).padStart(2, '0')}`,
+}))
+
+// hoisted function declaration, so the jest.mock factory can reach it.
+// It honours the date range, so each week's query gets that week's entries.
 function makeBuilder() {
+  const range: { gte?: string; lte?: string } = {}
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'gte', 'lte', 'order', 'in', 'not', 'limit']) {
+  for (const m of ['select', 'eq', 'order', 'in', 'not', 'limit']) {
     b[m] = () => b
   }
+  b.gte = (col: string, v: string) => {
+    if (col === 'date') range.gte = v
+    return b
+  }
+  b.lte = (col: string, v: string) => {
+    if (col === 'date') range.lte = v
+    return b
+  }
   // awaited at the end of a chain
-  b.then = (resolve: (v: unknown) => unknown) => resolve({ data: entries, error: null })
+  b.then = (resolve: (v: unknown) => unknown) =>
+    resolve({
+      data: [...entries, ...previousEntries].filter(
+        (e) => (!range.gte || e.date >= range.gte) && (!range.lte || e.date <= range.lte)
+      ),
+      error: null,
+    })
   return b
 }
 
