@@ -467,6 +467,7 @@ Write 2 or 3 sentences, under 60 words, about this person's session.
 - If the session holds little — not much logged, no ring reached, a plan not done — say what was there plainly, with no verdict. Allow that rest may have been the point. Do not console or apologise.
 - A plan not done is said once, flatly, or left out. Never as a failing.
 - A ring marked "still open" has not been missed: there is time left today.
+- Only Body, Mind and Heart have targets. No activity and no kind of activity has a target of its own: never write "its target for admin", "your rest target" or the like.
 - Say a ring is open, reached or not reached only when a line of the facts says so for that ring, in those terms. A ring with no line is not mentioned, and a ring that "did not reach its target" is never called open.
 - Mention a plan only if a "Plan kept" or "Plan not done" line names it. With no such line there was no plan: never say "as planned" or "on plan".
 - ${COACH_ENDINGS[aheadKind]}`
@@ -538,11 +539,24 @@ export function describeSessionFacts(facts: SessionFacts): string {
   return lines.join('\n')
 }
 
-export function buildEntryRemarkSystemPrompt(): string {
+/**
+ * The entry remark's instructions depend on whether the entry feeds a ring.
+ * Asking every entry for "minutes toward one" made the model invent a target
+ * for entries that feed none: "toward your rest target", "your entertainment
+ * target today". Only Body, Mind and Heart have targets.
+ */
+export function buildEntryRemarkSystemPrompt(facts: Pick<EntryFacts, 'rings'>): string {
+  const rings = facts.rings.map((r) => r.label).join(' and ')
+  const what =
+    facts.rings.length > 0
+      ? `- Say something true about it: what it added to ${rings} in the words of its line in the facts (reached its target, already on target, or minutes of the target so far), when it happened, or how it sits in the day so far.
+- Only ${rings} ${facts.rings.length === 1 ? 'has' : 'have'} a target here. Never give a target to the activity's own kind or to anything else.`
+      : `- This activity counts toward no ring and there is no target for it or its kind. Never mention a target, a ring, or minutes toward anything.
+- Say something true about it: when it happened, how long it was, or how it sits in the day so far.`
   return `${COACH_VOICE}
 
 Write ONE sentence, under 15 words, about this one activity.
-- Say something true about it: what it added (a ring it brought to target, minutes toward one), when it happened, or how it sits in the day so far.
+${what}
 - Speak only about this entry and what it added. Never mention what the day lacks.`
 }
 
@@ -554,5 +568,8 @@ export function describeEntryFacts(facts: EntryFacts): string {
   lines.push(`Logged today so far: ${formatDurationLong(facts.dayTotalMinutes)}.`)
   lines.push(`${facts.label} entries today, this one included: ${facts.sameCategoryToday}.`)
   for (const ring of facts.rings) lines.push(ringLine(ring, 'entry'))
+  if (facts.rings.length === 0) {
+    lines.push('Rings: this activity counts toward none of Body, Mind or Heart. It has no target.')
+  }
   return lines.join('\n')
 }

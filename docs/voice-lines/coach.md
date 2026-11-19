@@ -15,13 +15,13 @@ Entry params: `{"model":"gpt-4o-mini","max_tokens":40,"temperature":0.7}`
 | too-long | checker | 0 |
 | looks-ahead | checker | 0 |
 | empty | checker | 0 |
-| grounded | judge | 16 |
+| grounded | judge | 7 |
 | on-side | judge | 0 |
 | no-scold | judge | 0 |
 | forward | judge | 0 |
 | not-premature | judge | 0 |
 
-Lines with any checker breach: 0. Lines failing any judge rule: 16.
+Lines with any checker breach: 0. Lines failing any judge rule: 7.
 
 ## session: morning-mind-reaches-target
 
@@ -34,18 +34,17 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Hours that suit it: 3 hours of 4 hours of focused work fell in the hours that suit it.
 - Still ahead later today: the Afternoon session; the Evening session; planned "Read" at 21:00; The dip 13:00–14:00; Second wind 14:00–16:00; Taking things in 16:00–17:00.
 
-> In this session, you reached your Mind target with 240 focused minutes during your "Essay draft" activity. You also had 3 of your 4 hours of Deep Work in the hours that suit it. There's still time later today for your planned "Read" at 21:00.
+> You logged 4 hours of Deep Work on your essay draft and reached your Mind target with 240 focused minutes. There’s still time to engage with your Body and Heart later today, including your planned reading at 21:00.
 
 - note: fine
 
-> You've reached your target for focused minutes in this session with 240 logged during your deep work on the essay draft. Plus, you have three hours of your focused work in the hours that suit it. You still have the evening session ahead, along with your planned reading at 21:00.
+> You reached your Mind target with 240 focused minutes while working on your essay draft. Four hours of Deep Work landed in the hours that suit it. There’s still the Evening session and a planned "Read" at 21:00 ahead.
 
 - note: fine
 
-> In this session, your Mind reached its target with 240 focused minutes while working on the "Essay draft" for 4 hours, which fell largely in the hours that suit it. Your Body and Heart are still open, with opportunities to engage in moderate exercise or time with friends and family later today. Consider the planned "Read" at 21:00 or the Afternoon session.
+> You reached your Mind target with 240 focused minutes spent on your essay draft, and 3 of your 4 hours of Deep Work landed in the hours that suit it. You still have time for your planned "Read" at 21:00.
 
-- judge: grounded
-- note: The claim about Body and Heart being open is misleading as it implies a target was not reached.
+- note: fine
 
 ## session: quiet-afternoon-plan-upcoming
 
@@ -57,15 +56,16 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Heart is still open: 0 of 60 minutes with friends or family so far.
 - Still ahead later today: the Evening session; planned "Evening run" at 19:00; Physical peak 17:00–19:00; People 19:00–21:00; Wind-down 21:00–22:00.
 
-> You logged 2 hours 15 minutes today, with 45 minutes for rest and 1 hour 30 minutes for entertainment. The Body, Mind, and Heart rings are still open, with a chance to work toward them later. You have an Evening run planned at 19:00, which could help meet your Body minutes.
+> You logged 2 hours and 15 minutes today, with a solid block of 1 hour and 30 minutes for watching TV. Both Body and Mind are still open, with no minutes logged towards their targets yet. You still have the chance for an evening run at 19:00, aligning with your physical peak.
+
+- judge: grounded
+- note: The claim about Body and Mind being open is incorrect.
+
+> You logged 2 hours 15 minutes, including a 45-minute nap and 1 hour 30 minutes of watching TV. Body, Mind, and Heart are all still open, with time left for exercise, focused work, and connecting with others. The evening session still has the planned run at 19:00.
 
 - note: fine
 
-> You logged 2 hours and 15 minutes in your session, with 45 minutes for rest and 1 hour and 30 minutes for entertainment. There’s still time to focus on your body with the planned evening run at 19:00.
-
-- note: fine
-
-> You logged 2 hours 15 minutes with 45 minutes of rest and 1 hour 30 minutes of entertainment. The body, mind, and heart have time left today to reach their targets. You still have the evening run planned at 19:00, which aligns well with your physical peak.
+> You logged 2 hours 15 minutes today, with 45 minutes of rest for a nap and 1 hour 30 minutes watching TV. The Body, Mind, and Heart rings are all still open, leaving room for your evening run at 19:00, which aligns well with your physical peak.
 
 - note: fine
 
@@ -80,20 +80,19 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Plan not done: "Call Mum" (15:00).
 - Still ahead later today: the Evening session; Physical peak 17:00–19:00; People 19:00–21:00; Wind-down 21:00–22:00.
 
-> You logged 45 minutes on "Emails" in the afternoon, which kept your Admin time on track. The plan to call Mum wasn't done. Later, you can focus on the Evening session between 17:00 and 19:00, where there’s an opportunity for physical activity.
+> You logged 45 minutes on "Emails" in the Admin category. The Body, Mind, and Heart rings are all still open, with no time logged yet. You have the Evening session ahead, with a Physical peak at 17:00.
+
+- note: fine
+
+> You logged 45 minutes of Admin time for Emails. The Body, Mind, and Heart rings are still open, with no minutes logged yet. You have the Evening session ahead, with a Physical peak from 17:00 to 19:00.
 
 - judge: grounded
-- note: The claim about Admin time being 'on track' is invented.
+- note: The claim about the rings being open is not fully accurate.
 
-> You logged 45 minutes for "Emails" in your Admin category. The plan to call Mum at 15:00 was not done. There’s still time later for the Evening session, so consider your Physical peak between 17:00 and 19:00.
-
-- judge: grounded
-- note: The line incorrectly states the plan was not done without referencing the 'Plan not done' line.
-
-> You logged 45 minutes for "Emails," which kept you engaged in admin tasks. The plan to "Call Mum" was not done, but you still have time in the Evening session to connect with family or focus on some exercise.
+> You logged 45 minutes on emails, which is a solid chunk of Admin. The Body, Mind, and Heart rings are all still open, giving you time to engage in those areas. You could still make that call to Mum or connect with others in the evening session.
 
 - judge: grounded
-- note: The comment inaccurately states that the plan to call Mum was not done without acknowledging it is still possible.
+- note: The claim about the rings being 'all still open' is misleading.
 
 ## session: evening-heart-reaches-target
 
@@ -106,18 +105,18 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Hours that suit it: 1 hour of 1 hour 30 minutes of time with people fell in the hours that suit it.
 - Still ahead tomorrow: the Morning session; Morning movement 06:00–08:00; Plan and refuel 08:00–09:00.
 
-> You reached your heart target with 90 minutes of quality time during dinner with family. There was no plan logged for today, and the minutes for body and mind did not reach their targets. Tomorrow offers the chance to focus on morning movement and a plan to refuel.
+> You reached your Heart target with 90 minutes of social time during dinner with family. Tomorrow, you'll have the chance to focus on Morning movement and refueling your plan.
+
+- note: fine
+
+> You reached your Heart target tonight with 90 minutes of time spent with family during dinner. While Body and Mind did not reach their targets, you did log 1 hour and 30 minutes in a suited time for social activity. Tomorrow's morning session offers a chance to focus on movement and planning.
+
+- note: fine
+
+> You had a solid dinner with family, reaching your Heart target with 90 minutes logged. While there was no Body or Mind target met today, the time spent in social connection was well-placed. Tomorrow offers the chance for Morning movement and a Plan session to set you up for the day ahead.
 
 - judge: grounded
-- note: The claim about no plan logged is incorrect.
-
-> You reached your heart target with 90 minutes spent on dinner with family, which fits well within your optimal hours. While body and mind targets were not reached today, there's still time ahead tomorrow for morning movement.
-
-- note: fine
-
-> You reached your heart target with 90 minutes of dinner with family, which fits perfectly in the hours that suit it. Body and mind targets weren’t reached today, but you still have time tomorrow for morning movement and planning. Tomorrow presents a chance to reset and refuel in the morning session.
-
-- note: fine
+- note: The claim about Body and Mind targets not being met is misleading.
 
 ## session: thin-evening
 
@@ -129,18 +128,18 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Heart did not reach its target today: 0 of 60 minutes with friends or family.
 - Still ahead tomorrow: the Morning session; Morning movement 06:00–08:00; Plan and refuel 08:00–09:00.
 
-> You logged 20 minutes for tidying, which is a solid contribution to your chores. There was no plan noted for today, and the targets for Body, Mind, and Heart remain ahead of you. Tomorrow offers the chance for morning movement and planning, which could set the tone for the day.
+> You logged 20 minutes of tidying in the evening. No rings reached their targets today, but tomorrow offers the chance for morning movement from 06:00 to 08:00, which can help you make progress on your Body target.
 
 - judge: grounded
-- note: The claim about no plan noted is incorrect.
+- note: The mention of 'no rings reached their targets' is not grounded.
 
-> You logged 20 minutes for "Tidying" and kept your focus on chores. Tomorrow, the Morning session offers a chance for movement and planning, setting a solid foundation for the day ahead.
+> You logged 20 minutes for tidying in the evening. Body, Mind, and Heart did not reach their targets today. Tomorrow presents the opportunity for morning movement and refueling your plans.
+
+- note: The comment accurately reflects the session details.
+
+> You logged 20 minutes doing "Tidying" from 19:00 to 19:20. None of the Body, Mind, or Heart rings reached their targets today. Tomorrow, the Morning session gives you a chance to focus on movement and planning.
 
 - note: fine
-
-> You logged 20 minutes tidying in the evening, which counts towards chores. There was no plan kept today for movement, focused time, or connection with others, but tomorrow offers the chance for morning movement and planning.
-
-- note: The lack of a plan kept is a concern.
 
 ## session: earlier-day
 
@@ -151,37 +150,37 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Mind did not reach its target today: 108 of 240 focused minutes.
 - Heart did not reach its target today: 0 of 60 minutes with friends or family.
 
-> In this session, you logged 3 hours and 30 minutes across two activities. The time spent on "Study" reached its target for Learning, totaling 2 hours. The other activity was "Watching TV" for 1 hour and 30 minutes.
-
-- judge: grounded
-- note: The claim about reaching the target for Learning is incorrect.
-
-> You logged 3 hours and 30 minutes today, with 2 hours dedicated to "Study" for Learning. The session included 1 hour and 30 minutes of "Watching TV" for Entertainment.
+> In this session, you logged 3 hours and 30 minutes across two activities, with 2 hours dedicated to studying. The Body, Mind, and Heart targets were not reached, but there is still time left today to engage in those areas.
 
 - note: fine
 
-> In this session, you logged 3 hours and 30 minutes across two activities, with 2 hours dedicated to studying. While the session did not reach targets for body, mind, or heart, it clearly showed a commitment to learning.
+> You logged 3 hours and 30 minutes across two activities this afternoon, with 2 hours dedicated to studying. Body, Mind, and Heart targets were not reached today.
 
-- note: The targets for mind and heart were not met.
+- note: The comment accurately reflects the logged activities and targets.
+
+> You logged 3 hours and 30 minutes across two activities, with 2 hours dedicated to studying. No targets were reached for Body, Mind, or Heart in this session, but there's still time left in the day.
+
+- note: fine
 
 ## entry: entry-tv
 
 - Activity: "Watching TV" (Entertainment) 15:00–16:30, 1 hour 30 minutes.
 - Logged today so far: 1 hour 30 minutes.
 - Entertainment entries today, this one included: 1.
+- Rings: this activity counts toward none of Body, Mind or Heart. It has no target.
 
-> Watching TV added 1 hour and 30 minutes of entertainment to your day so far.
-
-- note: fine
-
-> Watching TV added 1 hour and 30 minutes of entertainment to your day so far.
+> You spent an hour and a half watching TV this afternoon, adding a nice break to your day.
 
 - note: fine
 
-> This entertainment entry added 1 hour and 30 minutes towards your leisure target.
+> You spent an hour and a half watching TV this afternoon, adding a nice break to your day.
+
+- note: fine
+
+> You spent an hour and a half watching TV from 3:00 to 4:30, adding a nice break to your day.
 
 - judge: grounded
-- note: The mention of a 'leisure target' is invented.
+- note: The time logged is incorrect.
 
 ## entry: entry-gym-takes-body-to-target
 
@@ -190,40 +189,36 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Exercise entries today, this one included: 1.
 - With this, Body reached its target for today.
 
-> The gym session at 07:00 added a ring to Body's target for today.
-
-- judge: grounded
-- note: The claim about adding a ring to Body's target is not supported by the facts.
-
-> The gym session at 07:00 added 45 minutes, bringing Body to its target for today.
+> The gym session added 45 minutes to Body, reaching its target for today.
 
 - note: fine
 
-> The gym session added a ring to your Body target and took place early in the day.
+> The gym session this morning helped Body reach its target for today.
 
-- judge: grounded
-- note: The claim about adding a ring is not supported by the facts.
+- note: fine
+
+> The gym session this morning added 45 minutes to Body, reaching its target for the day.
+
+- note: fine
 
 ## entry: entry-nap
 
 - Activity: "Nap" (Rest) 14:00–14:45, 45 minutes.
 - Logged today so far: 45 minutes.
 - Rest entries today, this one included: 1.
+- Rings: this activity counts toward none of Body, Mind or Heart. It has no target.
 
-> The 45-minute nap added a ring to your rest target and fits well into your day.
+> You took a 45-minute nap at 14:00, adding valuable rest to your day.
 
-- judge: grounded
-- note: The mention of a 'rest target' is invented.
+- note: fine
 
-> This 45-minute nap added a ring to your rest target today.
+> You took a solid 45-minute nap in the early afternoon, adding a refreshing break to your day.
 
-- judge: grounded
-- note: The mention of a 'rest target' is invented.
+- note: fine
 
-> Your 45-minute nap added a ring to your rest target and fits well into your day.
+> You took a 45-minute nap at 2 PM, adding valuable rest to your day.
 
-- judge: grounded
-- note: The mention of a 'rest target' is invented.
+- note: fine
 
 ## entry: entry-third-hour-meetings
 
@@ -232,18 +227,16 @@ Lines with any checker breach: 0. Lines failing any judge rule: 16.
 - Meetings entries today, this one included: 3.
 - Toward Mind: 90 of 240 focused minutes today.
 
-> The project sync added one focused hour toward your Mind target today.
+> The "Project sync" meeting added another hour toward your focused Mind minutes today.
+
+- note: fine
+
+> "Project sync" added a solid hour toward your Mind focus, bringing you closer to your target.
 
 - judge: grounded
-- note: The claim about a Mind target is invented.
+- note: The target for Mind focus is not stated in the facts.
 
-> This meeting added one hour toward your Mind target, bringing you to 90 focused minutes today.
+> "Project sync" added one hour of focused time, contributing to your Mind progress today.
 
-- judge: grounded
-- note: The claim about adding to a target is invented.
-
-> The "Project sync" meeting added one hour toward your Mind target, bringing you to 90 focused minutes today.
-
-- judge: grounded
-- note: The claim about the Mind target is not supported by the facts.
+- note: fine
 

@@ -56,8 +56,45 @@ describe('entry prompt', () => {
   it('holds the voice, no review voice and no score number', () => {
     const e = entry('a', 'exercise', 45, 'Gym')
     const text = describeEntryFacts(buildEntryFacts({ entry: e, dayEntries: [e] }))
-    expect(buildEntryRemarkSystemPrompt()).toContain(COACH_VOICE)
-    expect(buildEntryRemarkSystemPrompt()).not.toContain(REVIEW_VOICE)
+    const facts = buildEntryFacts({ entry: e, dayEntries: [e] })
+    expect(buildEntryRemarkSystemPrompt(facts)).toContain(COACH_VOICE)
+    expect(buildEntryRemarkSystemPrompt(facts)).not.toContain(REVIEW_VOICE)
     expect(text).not.toMatch(/\/100|out of 100|\b(Body|Mind|Heart) \d/)
+  })
+})
+
+describe('entry remark for an entry that feeds no ring', () => {
+  // Review 15's examples: a nap, TV and emails feed no ring, and the old
+  // prompt's "minutes toward one" got "toward your rest target".
+  it.each([
+    ['rest', 'Nap'],
+    ['entertainment', 'Watching TV'],
+    ['admin', 'Emails'],
+  ] as const)('%s: says there is no target and never asks for minutes toward one', (category, activity) => {
+    const e = entry('a', category, 45, activity)
+    const facts = buildEntryFacts({ entry: e, dayEntries: [e] })
+    expect(facts.rings).toHaveLength(0)
+    const prompt = buildEntryRemarkSystemPrompt(facts)
+    expect(prompt).toContain('counts toward no ring')
+    expect(prompt).toContain('Never mention a target')
+    expect(prompt).not.toContain('minutes toward one')
+    const text = describeEntryFacts(facts)
+    expect(text).toContain('counts toward none of Body, Mind or Heart. It has no target.')
+    expect(text).not.toMatch(/Toward|reached its target|on target/)
+  })
+
+  it('an entry that feeds a ring names only that ring as having a target', () => {
+    const e = entry('a', 'exercise', 45, 'Gym')
+    const facts = buildEntryFacts({ entry: e, dayEntries: [e] })
+    const prompt = buildEntryRemarkSystemPrompt(facts)
+    expect(prompt).toContain('Only Body has a target here')
+    expect(prompt).not.toContain('counts toward no ring')
+    expect(describeEntryFacts(facts)).not.toContain('It has no target')
+  })
+})
+
+describe('session prompt: only the rings have targets', () => {
+  it('bars a target of an activity or its kind', () => {
+    expect(buildSessionCommentarySystemPrompt('later-today')).toContain('Only Body, Mind and Heart have targets')
   })
 })

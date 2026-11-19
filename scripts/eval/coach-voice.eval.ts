@@ -109,7 +109,7 @@ function session(
 
 function entry(id: string, target: CoachEntry, day: CoachEntry[]): EntryScenario {
   const facts = buildEntryFacts({ entry: target, dayEntries: day })
-  return { kind: 'entry', id, system: buildEntryRemarkSystemPrompt(), input: describeEntryFacts(facts) }
+  return { kind: 'entry', id, system: buildEntryRemarkSystemPrompt(facts), input: describeEntryFacts(facts) }
 }
 
 const morningDeep = e('Essay draft', 'deep_work', '09:00', '13:00', 240)

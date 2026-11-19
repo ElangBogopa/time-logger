@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const completion = await openai.chat.completions.create({
       ...ENTRY_REMARK_PARAMS,
       messages: [
-        { role: 'system', content: buildEntryRemarkSystemPrompt() },
+        { role: 'system', content: buildEntryRemarkSystemPrompt(facts) },
         { role: 'user', content: describeEntryFacts(facts) },
       ],
     })
