@@ -25,8 +25,8 @@ function readCache(from: string, to: string): Row[] | null {
  * Shown from the cache at once and refreshed behind it, as in
  * useWeekEntries; never another range's rows while a new one loads.
  */
-export function useLogRange(from: string, to: string, enabled = true): { rows: Row[]; loaded: boolean } {
-  const [loaded, setLoaded] = useState<{ key: string; rows: Row[] } | null>(null)
+export function useLogRange(from: string, to: string, enabled = true): { rows: Row[]; loaded: boolean; failed: boolean } {
+  const [loaded, setLoaded] = useState<{ key: string; rows: Row[]; failed?: boolean } | null>(null)
   const key = cacheKey(from, to)
   // Read once per range, so the rows keep one identity from render to render.
   const cached = useMemo(() => readCache(from, to), [from, to])
@@ -58,17 +58,24 @@ export function useLogRange(from: string, to: string, enabled = true): { rows: R
       })
       .catch((err) => {
         console.error('Failed to load the log:', err)
-        // Nothing to read is still an answer: the review says so rather than
-        // waiting for ever.
-        if (!cancelled) setLoaded((current) => (current?.key === key ? current : { key, rows: readCache(from, to) ?? [] }))
+        // With a cached range that is what is shown. With none, the log is
+        // not loaded: `failed` says so, and rows are not an empty day.
+        if (cancelled) return
+        setLoaded((current) => {
+          if (current?.key === key) return current
+          const kept = readCache(from, to)
+          return kept ? { key, rows: kept } : { key, rows: [], failed: true }
+        })
       })
     return () => {
       cancelled = true
     }
   }, [enabled, from, to, key])
 
-  if (loaded && loaded.key === key) return { rows: loaded.rows, loaded: true }
-  return cached ? { rows: cached, loaded: true } : { rows: EMPTY, loaded: false }
+  if (loaded && loaded.key === key) {
+    return loaded.failed ? { rows: EMPTY, loaded: false, failed: true } : { rows: loaded.rows, loaded: true, failed: false }
+  }
+  return cached ? { rows: cached, loaded: true, failed: false } : { rows: EMPTY, loaded: false, failed: false }
 }
 
 const EMPTY: Row[] = []

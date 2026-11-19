@@ -746,7 +746,7 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
               notes={ringLines.notes}
               caption={ringLines.caption}
             />
-          ) : (
+          ) : range.failed ? null : (
             <div className="mx-auto h-28 w-64 animate-pulse rounded-xl bg-secondary" />
           )}
         </section>
@@ -757,7 +757,11 @@ export default function DayReviewContent({ embedded = false, date: dateProp }: D
             <div className="flex items-start gap-3">
               <Sparkles className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                {shownWords === null ? (
+                {range.failed ? (
+                  <p className="text-sm text-foreground leading-relaxed">
+                    Your log did not load, so there is nothing to read yet. Try again in a moment.
+                  </p>
+                ) : shownWords === null ? (
                   <div className="space-y-2 animate-pulse" aria-label="Loading the review">
                     <div className="h-4 bg-secondary rounded w-full" />
                     <div className="h-4 bg-secondary rounded w-3/4" />

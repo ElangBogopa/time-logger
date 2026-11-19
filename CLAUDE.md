@@ -506,13 +506,15 @@ Android gets the browser's own install prompt where it has offered one.
     four later: the findings are averages and should not be stretched to a
     3am riser. Anything that reasons about "the right hour" must take the
     shifted windows, never `IDEAL_DAY` directly. Today shows them as "Your
-    windows" (`DayWindowsCard`), every one with its reason and source. Both
-    reviews then say how much landed in them (`WindowAlignmentCard`, sums
+    windows" (`DayWindowsCard`), every one with its reason and source. Under a
+    read about timing, each review then says how much landed in them (the
+    card is not shown under any other read; `WindowAlignmentCard`, sums
     in `lib/window-alignment.ts`): time inside out of time done, for
     focused work, exercise and time with people. It is a fact and a bar,
     never a percentage ring or a fourth score — principle 7 — and it says
     under itself that a person's own log is the better authority. The
-    weekly one asks for its own seven days (`useWeekEntries`); the habit
+    weekly one asks for its own seven days (`useWeekEntries`) and, on the
+    week in progress, counts them to yesterday as its read does; the habit
     history stops at yesterday.
 13. **A review leads with a decision**: each review is the three rings
     with a line against the person's last four weeks, one read, the

@@ -169,13 +169,13 @@ describe('change-focus-outside-window', () => {
     expect(read.kind).toBe('change')
     expect(read.facts).toEqual([
       'On 3 days in a row, less than half of the focused work fell inside the focus windows (9:00 AM–12:00 PM and 2:00 PM–4:00 PM).',
-      'On this day it was 0m of 2h.',
+      'On this day it was none of 2h.',
       'One option: Essay draft at 9:00 AM.',
     ])
     expect(read.evidence).toEqual([
-      { label: 'Sat 14 Nov', value: '0m of 2h inside' },
-      { label: 'Sun 15 Nov', value: '0m of 2h inside' },
-      { label: 'Mon 16 Nov', value: '0m of 2h inside' },
+      { label: 'Sat 14 Nov', value: 'none of 2h inside' },
+      { label: 'Sun 15 Nov', value: 'none of 2h inside' },
+      { label: 'Mon 16 Nov', value: 'none of 2h inside' },
     ])
     expect(read.slot).toEqual({ title: 'Essay draft', startTime: '09:00', durationMinutes: 120 })
     expect(read.timing).toBe(true)
@@ -394,9 +394,9 @@ describe('the week rules', () => {
       'One option: Essay draft at 9:00 AM.',
     ])
     expect(read.evidence).toEqual([
-      { label: 'Mon', value: '0m of 2h inside' },
-      { label: 'Wed', value: '0m of 2h inside' },
-      { label: 'Thu', value: '0m of 2h inside' },
+      { label: 'Mon', value: 'none of 2h inside' },
+      { label: 'Wed', value: 'none of 2h inside' },
+      { label: 'Thu', value: 'none of 2h inside' },
     ])
     expect(read.slot).toEqual({ title: 'Essay draft', startTime: '09:00', durationMinutes: 120 })
     expect(read.timing).toBe(true)

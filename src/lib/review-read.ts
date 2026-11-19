@@ -38,6 +38,11 @@ import { activityKey, activityMatch } from './plan-adherence'
 import { formatDuration, formatTimeDisplay, minutesToTime, timeToMinutes } from './time-utils'
 import { NO_FRIENDS_OR_FAMILY } from './prompts'
 
+/** "1h of 2h", and "none of 2h" where nothing was inside: "0m of 2h" reads as a typo. */
+function ofTotal(inside: number, total: number): string {
+  return `${inside > 0 ? formatDuration(inside) : 'none'} of ${formatDuration(total)}`
+}
+
 // ── Types ──
 
 /** A confirmed entry with a category, reduced to what the rules read. */
@@ -501,14 +506,14 @@ export function dayRead({ date, rows, history, windows }: DayReadInput): ReviewR
           `On ${days.length} days in a row, less than half of the focused work fell inside the focus windows (${listJoin(
             focusWindows.map(windowRange)
           )}).`,
-          `On this day it was ${formatDuration(today.inWindowMinutes)} of ${formatDuration(today.totalMinutes)}.`,
+          `On this day it was ${ofTotal(today.inWindowMinutes, today.totalMinutes)}.`,
           `One option: ${slot.title} at ${at(focusWindows[0].startMinutes)}.`,
         ],
         evidence: days.map((d) => {
           const fact = focusAlignment(allByDay.get(d) ?? [], windows)
           return {
             label: dayLabel(d),
-            value: `${formatDuration(fact?.inWindowMinutes ?? 0)} of ${formatDuration(fact?.totalMinutes ?? 0)} inside`,
+            value: `${ofTotal(fact?.inWindowMinutes ?? 0, fact?.totalMinutes ?? 0)} inside`,
           }
         }),
         slot,
@@ -743,14 +748,14 @@ function chooseWeekRead(days: { date: string; rows: Row[] }[], history: Row[], w
             `On ${offDays.length} days (${listJoin(offDays.map((d) => weekdayLabel(d.date)))}), less than half of the focused work fell inside the focus windows (${listJoin(
               focusWindows.map(windowRange)
             )}).`,
-            `Over the week it was ${formatDuration(week.inWindowMinutes)} of ${formatDuration(week.totalMinutes)}.`,
+            `Over the week it was ${ofTotal(week.inWindowMinutes, week.totalMinutes)}.`,
             `One option: ${slot.title} at ${at(focusWindows[0].startMinutes)}.`,
           ],
           evidence: offDays.map((d) => {
             const fact = focusAlignment(d.rows, windows)
             return {
               label: weekdayLabel(d.date),
-              value: `${formatDuration(fact?.inWindowMinutes ?? 0)} of ${formatDuration(fact?.totalMinutes ?? 0)} inside`,
+              value: `${ofTotal(fact?.inWindowMinutes ?? 0, fact?.totalMinutes ?? 0)} inside`,
             }
           }),
           slot,

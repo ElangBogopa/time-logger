@@ -5,7 +5,7 @@ import { useAccount } from '@/hooks/useAccount'
 import { csrfFetch } from '@/lib/api'
 import { ChevronLeft, ChevronRight, Loader2, Sparkles, BarChart3, Grid3X3, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { getLocalDateString, getWeekStartForDate, shiftDateString } from '@/lib/types'
+import { getLocalDateString, getUserToday, getWeekStartForDate, shiftDateString } from '@/lib/types'
 import { MetricRingRow } from '@/components/MetricRings'
 import { cacheGet, cacheSet } from '@/lib/client-cache'
 import { readCachedText, writeCachedText, storedFingerprint } from '@/lib/ai-text-cache'
@@ -82,10 +82,15 @@ export default function WeeklyReviewContent() {
   // weeks back, and a week is neither.
   const { windows: myWindows, wakeMinutes } = useMyWindows(status === 'authenticated')
   const weekEntries = useWeekEntries(weekStart, status === 'authenticated')
-  const alignment = useMemo(
-    () => alignmentOnDay(weekEntries.filter((e) => e.category) as unknown as Row[], myWindows),
-    [weekEntries, myWindows]
-  )
+  // The read above stops at yesterday on the week in progress (the day has
+  // not ended), so the card beneath it counts the same days. On the week's
+  // first day there is no yesterday inside it, and today is shown.
+  const today = getUserToday()
+  const alignment = useMemo(() => {
+    const endsYesterday = today >= weekStart && today <= shiftDateString(weekStart, 6) && shiftDateString(today, -1) >= weekStart
+    const counted = weekEntries.filter((e) => e.category && !(endsYesterday && e.date !== undefined && e.date >= today))
+    return alignmentOnDay(counted as unknown as Row[], myWindows)
+  }, [weekEntries, myWindows, today, weekStart])
   const [reviewData, setReviewData] = useState<WeeklyReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
 

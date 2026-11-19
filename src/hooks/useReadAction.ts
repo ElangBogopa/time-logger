@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { csrfFetch } from '@/lib/api'
@@ -99,6 +99,9 @@ export function useReadAction(
   const plansToday = usePlans(today, enabled)
   const plansTomorrow = usePlans(tomorrow, enabled)
   const [isSaving, setIsSaving] = useState(false)
+  // The plan a first tap made, kept if timing it failed, so the next tap
+  // times that plan rather than adding a second one.
+  const untimed = useRef<{ key: string; id: string } | null>(null)
 
   const now = new Date()
   const nowMinutes = Math.min(getUserCurrentHour(now), 23) * 60 + now.getMinutes()
@@ -134,24 +137,31 @@ export function useReadAction(
     }
     setIsSaving(true)
     try {
-      const created = await csrfFetch('/api/plans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: targetDate, title: slot.title }),
-      })
-      if (!created.ok) throw new Error('Failed to add the plan')
-      const { plan } = await created.json()
+      const planKey = `${targetDate}|${slot.title}`
+      let planId = untimed.current?.key === planKey ? untimed.current.id : null
+      if (!planId) {
+        const created = await csrfFetch('/api/plans', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: targetDate, title: slot.title }),
+        })
+        if (!created.ok) throw new Error('Failed to add the plan')
+        const { plan } = await created.json()
+        planId = plan.id as string
+        untimed.current = { key: planKey, id: planId }
+      }
       const start = timeToMinutes(slot.startTime)
       const timed = await csrfFetch('/api/plans', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: plan.id,
+          id: planId,
           committed_start: slot.startTime,
           committed_end: minutesToTime(Math.min(24 * 60, start + slot.durationMinutes)),
         }),
       })
       if (!timed.ok) throw new Error('Failed to time the plan')
+      untimed.current = null
       try {
         sessionStorage.removeItem(plansKey(targetDate))
       } catch {

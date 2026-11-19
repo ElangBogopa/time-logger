@@ -151,16 +151,31 @@ describe('the day review', () => {
     expect(screen.queryByRole('region', { name: 'In your windows' })).not.toBeInTheDocument()
   })
 
-  it('survives the log failing to load, with the plain read', async () => {
+  it('says the log did not load, rather than reading it as an ordinary day', async () => {
     const quiet = jest.spyOn(console, 'error').mockImplementation(() => {})
+    // A summary that says 300 minutes were logged, and a log that will not load.
     serveDay([])
     ;(fetchEntries as jest.Mock).mockRejectedValue(new Error('offline'))
     render(<DayReviewContent embedded />)
 
-    expect(
-      await screen.findByText('An ordinary day. There is too little history yet to say what is usual.')
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/Your log did not load/)).toBeInTheDocument()
+    expect(screen.queryByText(/An ordinary day/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/too little history/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'In your windows' })).not.toBeInTheDocument()
+    quiet.mockRestore()
+  })
+
+  it('keeps showing the cached range when the refresh fails', async () => {
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => {})
+    serveDay([entry('deep_work', '09:30', '11:30')])
+    const first = render(<DayReviewContent embedded />)
+    await screen.findByRole('region', { name: 'In your windows' })
+    first.unmount()
+
+    ;(fetchEntries as jest.Mock).mockRejectedValue(new Error('offline'))
+    render(<DayReviewContent embedded />)
+    expect(await screen.findByRole('region', { name: 'In your windows' })).toBeInTheDocument()
+    expect(screen.queryByText(/Your log did not load/)).not.toBeInTheDocument()
     quiet.mockRestore()
   })
 })
@@ -178,7 +193,7 @@ describe('the weekly review', () => {
     ],
     evidence: [
       { label: 'Mon', value: '30m of 2h inside' },
-      { label: 'Wed', value: '0m of 3h inside' },
+      { label: 'Wed', value: 'none of 3h inside' },
       { label: 'Thu', value: '1h of 4h inside' },
     ],
     slot: { title: 'Essay draft', startTime: '09:00', durationMinutes: 120 },
@@ -223,7 +238,7 @@ describe('the weekly review', () => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ plans: [] }) })) as unknown as typeof fetch
   })
 
-  it('asks for the week itself, today included, and shows the windows under a read about timing', async () => {
+  it('asks for the week itself, counts it to yesterday as the read does, and shows the windows under a read about timing', async () => {
     ;(fetchEntries as jest.Mock).mockImplementation(async (params: { dateFrom?: string }) =>
       params.dateFrom === weekStart
         ? [
@@ -242,8 +257,11 @@ describe('the weekly review', () => {
       dateTo: shiftDateString(weekStart, 6),
       status: 'confirmed',
     })
-    expect(within(card).getByText('3h')).toBeInTheDocument()
-    expect(within(card).getByText(/of 4h/)).toBeInTheDocument()
+    // The week in progress stops at yesterday, like the read above the card:
+    // today's 1h 30m is left out. (On the week's first day there is no
+    // yesterday in it, so today is counted.)
+    const todayCounts = getUserToday() === weekStart
+    expect(within(card).getByText(todayCounts ? /of 4h/ : /of 2h 30m/)).toBeInTheDocument()
     expect(within(card).getByText('Time with people')).toBeInTheDocument()
     expect(screen.queryByText(/% of your focused work/)).not.toBeInTheDocument()
   })

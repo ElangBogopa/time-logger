@@ -5,9 +5,12 @@ import { fetchEntries } from '@/lib/api'
 import { shiftDateString } from '@/lib/types'
 import type { AlignmentEntry } from '@/lib/window-alignment'
 
+/** An entry with the day it was logged on, so a caller can stop at yesterday. */
+export type WeekEntry = AlignmentEntry & { date?: string }
+
 const cacheKey = (weekStart: string) => `week-entries:${weekStart}`
 
-function readCache(weekStart: string): AlignmentEntry[] | null {
+function readCache(weekStart: string): WeekEntry[] | null {
   if (typeof window === 'undefined') return null
   try {
     return JSON.parse(sessionStorage.getItem(cacheKey(weekStart)) || '').entries ?? null
@@ -25,8 +28,8 @@ function readCache(weekStart: string): AlignmentEntry[] | null {
  * Shown from the cache at once and refreshed behind it — the current week
  * changes every time something is logged.
  */
-export function useWeekEntries(weekStart: string, enabled = true): AlignmentEntry[] {
-  const [loaded, setLoaded] = useState<{ week: string; entries: AlignmentEntry[] } | null>(null)
+export function useWeekEntries(weekStart: string, enabled = true): WeekEntry[] {
+  const [loaded, setLoaded] = useState<{ week: string; entries: WeekEntry[] } | null>(null)
 
   useEffect(() => {
     if (!enabled) return
@@ -36,7 +39,8 @@ export function useWeekEntries(weekStart: string, enabled = true): AlignmentEntr
     Promise.resolve()
       .then(() => fetchEntries({ dateFrom: weekStart, dateTo: shiftDateString(weekStart, 6), status: 'confirmed' }))
       .then((rows) => {
-        const entries: AlignmentEntry[] = rows.map((row) => ({
+        const entries: WeekEntry[] = rows.map((row) => ({
+          date: row.date,
           category: row.category,
           activity: row.activity,
           start_time: row.start_time,
@@ -61,4 +65,4 @@ export function useWeekEntries(weekStart: string, enabled = true): AlignmentEntr
   return readCache(weekStart) ?? EMPTY
 }
 
-const EMPTY: AlignmentEntry[] = []
+const EMPTY: WeekEntry[] = []
